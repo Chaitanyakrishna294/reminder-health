@@ -700,7 +700,9 @@ const initCommands = () => {
         
         const { error: snoozeErr } = await supabase.from('medications').update({
           next_reminder_at: now.toISOString(),
-          last_sent_at: new Date().toISOString() // refresh last sent to avoid immediate double-triggers
+          last_sent_at: new Date().toISOString(), // refresh last sent to avoid immediate double-triggers
+          retry_count: 0,
+          last_reminder_scheduled_at: null
         }).eq('id', medId);
         
         if (snoozeErr) throw snoozeErr;
@@ -713,6 +715,12 @@ const initCommands = () => {
 
       // Clean up snoozes if action is taken/skip
       delete activeSnoozes[medId];
+
+      // Reset retry state on response (TAKEN/SKIP)
+      await supabase.from('medications').update({
+        retry_count: 0,
+        last_reminder_scheduled_at: null
+      }).eq('id', medId);
 
       if (responseType === 'TAKEN') {
         // Fetch current count and decrement
