@@ -41,7 +41,7 @@ const calculateNextReminder = (timesArray) => {
       });
 
     if (candidate.isAfter(now)) {
-      return candidate.toDate();
+      return candidate.utc().toDate();
     }
   }
 
@@ -58,7 +58,7 @@ const calculateNextReminder = (timesArray) => {
       millisecond: 0
     });
 
-  return tomorrowFirst.toDate();
+  return tomorrowFirst.utc().toDate();
 };
 
 // In-memory snooze tracking
