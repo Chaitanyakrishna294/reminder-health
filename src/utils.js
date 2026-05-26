@@ -1,5 +1,4 @@
 const moment = require('moment-timezone');
-
 /**
  * Delay execution for a given number of milliseconds
  * @param {number} ms
