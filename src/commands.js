@@ -375,7 +375,7 @@ const initCommands = () => {
            
            if (!error) {
               console.log(`[Manage] User ${chatId} updated timings/freq for med ${state.medId}: ${state.times.join(', ')}`);
-              await bot.sendMessage(chatId, `✅ Timings updated successfully! Next reminder: ${nextReminderAt.toLocaleString()}`);
+              await bot.sendMessage(chatId, `✅ Timings updated successfully! Next reminder: ${nextReminderAt.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
               delete userStates[chatId];
            } else {
               await bot.sendMessage(chatId, `❌ Update failed.`);
@@ -510,7 +510,7 @@ const initCommands = () => {
           console.error('Supabase Insert Error:', error);
           await sendMainMenu(chatId, '❌ Sorry, an error occurred while saving your medication.');
         } else {
-          await sendMainMenu(chatId, `✅ Successfully added ${state.drug_name}!\n\nYour next reminder is scheduled for: ${nextReminderAt.toLocaleString()}`);
+          await sendMainMenu(chatId, `✅ Successfully added ${state.drug_name}!\n\nYour next reminder is scheduled for: ${nextReminderAt.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
         }
         delete userStates[chatId];
         return bot.answerCallbackQuery(query.id);
