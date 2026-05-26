@@ -1,14 +1,16 @@
+const moment = require('moment-timezone');
+
 /**
  * Delay execution for a given number of milliseconds
- * @param {number} ms - Milliseconds to delay
+ * @param {number} ms
  * @returns {Promise<void>}
  */
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * Validates if the given string is a valid HH:MM 24-hour time
- * @param {string} timeStr - Time string to validate (e.g., "08:00")
- * @returns {boolean} - True if valid, false otherwise
+ * Validates HH:MM 24-hour format
+ * @param {string} timeStr
+ * @returns {boolean}
  */
 const isValidTime = (timeStr) => {
   const regex = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -16,39 +18,51 @@ const isValidTime = (timeStr) => {
 };
 
 /**
- * Calculates the next reminder date/time based on current time and an array of requested HH:MM
- * Ensures the array is sorted chronologically.
- * @param {string[]} timesArray - Array of time strings in HH:MM format
- * @param {string} timezone - Timezone (default: Asia/Kolkata)
- * @returns {Date} - The Date object of the next reminder strictly in the future
+ * Calculate next reminder in IST timezone
+ * @param {string[]} timesArray
+ * @returns {Date}
  */
-const calculateNextReminder = (timesArray, timezone = 'Asia/Kolkata') => {
-  const now = new Date();
-  
-  // Sort chronologically as requested (e.g. "08:00", "14:00", "20:00")
+const calculateNextReminder = (timesArray) => {
+  const now = moment().tz('Asia/Kolkata');
+
+  // Sort times
   const sortedTimes = [...timesArray].sort((a, b) => a.localeCompare(b));
 
+  // Find next future reminder today
   for (const timeStr of sortedTimes) {
     const [hours, minutes] = timeStr.split(':').map(Number);
-    const candidate = new Date(now);
-    candidate.setHours(hours, minutes, 0, 0);
-    
-    // Find the very first time strictly greater than now
-    if (candidate > now) {
-      return candidate;
+
+    const candidate = moment()
+      .tz('Asia/Kolkata')
+      .set({
+        hour: hours,
+        minute: minutes,
+        second: 0,
+        millisecond: 0
+      });
+
+    if (candidate.isAfter(now)) {
+      return candidate.toDate();
     }
   }
 
-  // If all times for today have already passed, schedule for the first time tomorrow
+  // Otherwise schedule first reminder tomorrow
   const [firstHours, firstMinutes] = sortedTimes[0].split(':').map(Number);
-  const tomorrowFirst = new Date(now);
-  tomorrowFirst.setDate(tomorrowFirst.getDate() + 1);
-  tomorrowFirst.setHours(firstHours, firstMinutes, 0, 0);
-  
-  return tomorrowFirst;
+
+  const tomorrowFirst = moment()
+    .tz('Asia/Kolkata')
+    .add(1, 'day')
+    .set({
+      hour: firstHours,
+      minute: firstMinutes,
+      second: 0,
+      millisecond: 0
+    });
+
+  return tomorrowFirst.toDate();
 };
 
-// In-memory store for snooze counts
+// In-memory snooze tracking
 const activeSnoozes = {};
 
 module.exports = {
