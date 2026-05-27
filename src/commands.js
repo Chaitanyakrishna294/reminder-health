@@ -102,6 +102,16 @@ const handleCaregiverPanel = async (chatId) => {
 
       if (medsErr) throw medsErr;
 
+      // Sort meds by priority: critical -> important -> normal
+      if (meds) {
+        meds.sort((a, b) => {
+          const prioMap = { critical: 3, important: 2, normal: 1 };
+          const aPrio = prioMap[a.priority_level] || 1;
+          const bPrio = prioMap[b.priority_level] || 1;
+          return bPrio - aPrio;
+        });
+      }
+
       // Fetch today's logs
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -127,7 +137,7 @@ const handleCaregiverPanel = async (chatId) => {
       const logMap = {};
       if (todayLogs) {
         todayLogs.forEach(l => {
-          logMap[l.medication_id] = l.response; // TAKEN or SKIP
+          logMap[l.medication_id] = l.response; // TAKEN, SKIP, or MISSED
         });
       }
 
@@ -153,7 +163,12 @@ const handleCaregiverPanel = async (chatId) => {
       } else {
         report += `💊 **Medication Details & Status:**\n\n`;
         meds.forEach(med => {
-          const status = logMap[med.id] ? (logMap[med.id] === 'TAKEN' ? '✅ TAKEN' : '⏭ SKIP') : '⏳ Pending';
+          let statusEmoji = '⏳ Pending';
+          if (logMap[med.id]) {
+            if (logMap[med.id] === 'TAKEN') statusEmoji = '✅ TAKEN';
+            else if (logMap[med.id] === 'SKIP') statusEmoji = '⏭ SKIP';
+            else if (logMap[med.id] === 'MISSED') statusEmoji = '❌ MISSED';
+          }
           
           const nextDate = new Date(med.next_reminder_at);
           const nextTimeStr = moment(med.next_reminder_at).tz('Asia/Kolkata').format('h:mm A');
@@ -168,8 +183,9 @@ const handleCaregiverPanel = async (chatId) => {
             adherenceStr = `${pct}% (${weekStats[med.id].taken}/${weekStats[med.id].total})`;
           }
 
-          report += `• **${med.drug_name}** (${med.dosage || 'N/A'})\n`;
-          report += `  - Today's Status: ${status}\n`;
+          const priorityEmoji = med.priority_level === 'critical' ? '🔴' : med.priority_level === 'important' ? '🟠' : '🟢';
+          report += `• ${priorityEmoji} **${med.drug_name}** (${med.dosage || 'N/A'})\n`;
+          report += `  - Today's Status: ${statusEmoji}\n`;
           report += `  - Next Reminder: ${nextTimeStr}\n`;
           report += `  - ${stockStatus}\n`;
           report += `  - 7-Day Adherence: ${adherenceStr}\n\n`;
@@ -339,8 +355,9 @@ const handleManage = async (chatId, page = 0) => {
     const pageMeds = meds.slice(start, end);
     
     for (const med of pageMeds) {
+      const priorityEmoji = med.priority_level === 'critical' ? '🔴' : med.priority_level === 'important' ? '🟠' : '🟢';
       const timesStr = med.reminder_times ? med.reminder_times.join(', ') : 'N/A';
-      const text = `💊 **${med.drug_name}** ${med.dosage || ''}\n🔁 ${med.frequency.replace('_', ' ')}\n⏰ ${timesStr}\n📦 Stock: ${med.tablet_count}`;
+      const text = `💊 **${med.drug_name}** ${med.dosage || ''}\n🔁 ${med.frequency.replace('_', ' ')}\n⏰ ${timesStr}\n📦 Stock: ${med.tablet_count}\n⚠️ Priority: ${priorityEmoji} ${med.priority_level.toUpperCase()}`;
       const inlineKeyboard = {
         inline_keyboard: [
           [
@@ -523,18 +540,17 @@ const initCommands = () => {
           }
           
           state.tablet_count = count;
-          state.step = 'confirm_add';
+          state.step = 'waiting_for_priority';
           
-          const summary = `Please confirm your new medication:\n\n💊 ${state.drug_name}\n🧪 ${state.dosage}\n🔁 ${state.frequency.replace('_', ' ')}\n⏰ ${state.times.join(', ')}\n📦 ${count} tablets`;
-          const confirmKeyboard = {
+          const inlineKeyboard = {
             inline_keyboard: [
-              [
-                { text: '✅ Confirm', callback_data: CALLBACK_ACTIONS.ADD_CONFIRM },
-                { text: '✏️ Edit', callback_data: CALLBACK_ACTIONS.ADD_EDIT }
-              ]
+              [{ text: '🟢 Normal', callback_data: 'cg_prio_normal' }],
+              [{ text: '🟠 Important', callback_data: 'cg_prio_important' }],
+              [{ text: '🔴 Critical', callback_data: 'cg_prio_critical' }]
             ]
           };
-          await bot.sendMessage(chatId, summary, { reply_markup: confirmKeyboard });
+          
+          await bot.sendMessage(chatId, `Select the priority level for ${state.drug_name}:`, { reply_markup: inlineKeyboard });
           return;
         }
 
@@ -795,6 +811,7 @@ const initCommands = () => {
           frequency: state.frequency,
           reminder_times: state.times,
           tablet_count: state.tablet_count,
+          priority_level: state.priority_level || 'normal',
           next_reminder_at: nextReminderAt.toISOString()
         }]);
 
@@ -860,7 +877,8 @@ const initCommands = () => {
               { text: '📦 Stock', callback_data: `${CALLBACK_ACTIONS.EDIT_SELECT}:stock:${medId}` }
             ],
             [
-              { text: '🔁 Frequency', callback_data: `${CALLBACK_ACTIONS.EDIT_SELECT}:frequency:${medId}` }
+              { text: '🔁 Frequency', callback_data: `${CALLBACK_ACTIONS.EDIT_SELECT}:frequency:${medId}` },
+              { text: '⚠️ Priority', callback_data: `${CALLBACK_ACTIONS.EDIT_SELECT}:priority:${medId}` }
             ]
           ]
         };
@@ -897,6 +915,18 @@ const initCommands = () => {
               ]
            };
            await bot.sendMessage(chatId, 'Select new frequency:', { reply_markup: inlineKeyboard });
+           return bot.answerCallbackQuery(query.id);
+        }
+
+        if (field === 'priority') {
+           const inlineKeyboard = {
+              inline_keyboard: [
+                [{ text: '🟢 Normal', callback_data: `edit_priority:normal:${medId}` }],
+                [{ text: '🟠 Important', callback_data: `edit_priority:important:${medId}` }],
+                [{ text: '🔴 Critical', callback_data: `edit_priority:critical:${medId}` }]
+              ]
+           };
+           await bot.sendMessage(chatId, 'Select new priority level:', { reply_markup: inlineKeyboard });
            return bot.answerCallbackQuery(query.id);
         }
         
@@ -943,6 +973,46 @@ const initCommands = () => {
         
         await bot.sendMessage(chatId, 'What is the first reminder time? Please use exactly HH:MM in 24-hour format (e.g., 08:00 or 21:30).');
         return;
+      }
+      // PRIORITY SELECTION FOR ADDMED
+      if (['cg_prio_normal', 'cg_prio_important', 'cg_prio_critical'].includes(data)) {
+        await bot.answerCallbackQuery(query.id);
+        const state = userStates[chatId];
+        if (!state || state.step !== 'waiting_for_priority') {
+          await bot.editMessageText('❌ Flow expired.', { chat_id: chatId, message_id: messageId, reply_markup: { inline_keyboard: [] } });
+          return;
+        }
+
+        const priority = data.split('_')[2];
+        state.priority_level = priority;
+        state.step = 'confirm_add';
+
+        const priorityEmoji = priority === 'normal' ? '🟢' : priority === 'important' ? '🟠' : '🔴';
+        const summary = `Please confirm your new medication:\n\n💊 ${state.drug_name}\n🧪 ${state.dosage}\n🔁 ${state.frequency.replace('_', ' ')}\n⏰ ${state.times.join(', ')}\n📦 ${state.tablet_count} tablets\n⚠️ Priority: ${priorityEmoji} ${priority.toUpperCase()}`;
+
+        const confirmKeyboard = {
+          inline_keyboard: [
+            [
+              { text: '✅ Confirm', callback_data: CALLBACK_ACTIONS.ADD_CONFIRM },
+              { text: '✏️ Edit', callback_data: CALLBACK_ACTIONS.ADD_EDIT }
+            ]
+          ]
+        };
+        await bot.editMessageText(summary, { chat_id: chatId, message_id: messageId, reply_markup: confirmKeyboard });
+        return;
+      }
+      if (data.startsWith('edit_priority:')) {
+         await bot.answerCallbackQuery(query.id);
+         const [, priority, medId] = data.split(':');
+         
+         const { error } = await supabase.from('medications').update({ priority_level: priority }).eq('id', medId);
+         if (!error) {
+            console.log(`[Manage] User ${chatId} updated priority for med ${medId} to ${priority}`);
+            await bot.sendMessage(chatId, `✅ Successfully updated priority to ${priority.toUpperCase()}!`);
+         } else {
+            await bot.sendMessage(chatId, `❌ Update failed.`);
+         }
+         return;
       }
 
       // REFILL ACTIONS

@@ -99,15 +99,17 @@ const initScheduler = () => {
 
           // 3. Calculate next reminder from the JSONB array
           const nextReminder = calculateNextReminder(med.reminder_times);
+          const intervalMinutes = med.priority_level === 'critical' ? 5 : 15;
+          const retryReminderAt = new Date(Date.now() + intervalMinutes * 60 * 1000).toISOString();
 
           console.log(`[Scheduler] Updating next_reminder_at for Med ID: ${med.id} to ${nextReminder.toISOString()}`);
-          // 4. Update record with next_reminder_at, set retry_reminder_at to now + 15m, and reset retry_count
+          // 4. Update record with next_reminder_at, set retry_reminder_at based on priority, and reset retry_count
           await supabase
             .from('medications')
             .update({
               next_reminder_at: nextReminder.toISOString(),
               last_reminder_scheduled_at: med.next_reminder_at,
-              retry_reminder_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+              retry_reminder_at: retryReminderAt,
               retry_count: 0
             })
             .eq('id', med.id);
@@ -123,12 +125,14 @@ const initScheduler = () => {
             await delay(1000);
             await bot.sendMessage(med.telegram_id, message, { reply_markup: inlineKeyboard });
             const nextReminder = calculateNextReminder(med.reminder_times);
+            const intervalMinutesFallback = med.priority_level === 'critical' ? 5 : 15;
+            const retryReminderAtFallback = new Date(Date.now() + intervalMinutesFallback * 60 * 1000).toISOString();
             await supabase
               .from('medications')
               .update({
                 next_reminder_at: nextReminder.toISOString(),
                 last_reminder_scheduled_at: med.next_reminder_at,
-                retry_reminder_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+                retry_reminder_at: retryReminderAtFallback,
                 retry_count: 0
               })
               .eq('id', med.id);
@@ -160,10 +164,10 @@ const initScheduler = () => {
             continue;
           }
 
-          console.log(`[Scheduler] Processing retry for Med ID: ${med.id}, Retry Count: ${med.retry_count}`);
+          const retryLimit = med.priority_level === 'critical' ? 1 : 2;
 
           // Escalation Branch: Patient missed medication (retry limit exceeded)
-          if (med.retry_count >= 2) {
+          if (med.retry_count >= retryLimit) {
             try {
               // Lock the record immediately to prevent duplicate caregiver alerts
               let lockQuery = supabase
@@ -207,7 +211,8 @@ const initScheduler = () => {
                   .tz('Asia/Kolkata')
                   .format('h:mm A');
 
-                const alertMessage = `⚠️ **Medication Alert**\n\nPatient: **${patientName}**\n💊 **${med.drug_name}**\n⏰ **${formattedTime}**`;
+                const priorityEmoji = med.priority_level === 'critical' ? '🔴 CRITICAL' : med.priority_level === 'important' ? '🟠 IMPORTANT' : '🟢 NORMAL';
+                const alertMessage = `⚠️ **Medication Alert (${priorityEmoji})**\n\nPatient: **${patientName}**\n💊 **${med.drug_name}**\n⏰ **${formattedTime}**`;
 
                 const scheduledTimeMs = new Date(med.last_reminder_scheduled_at).getTime();
                 const alertButtons = {
@@ -253,11 +258,12 @@ const initScheduler = () => {
 
           try {
             // Optimistic lock update for retry
+            const nextRetryInterval = med.priority_level === 'critical' ? 5 : 15;
             let lockQuery = supabase
               .from('medications')
               .update({
                 last_sent_at: now.toISOString(),
-                retry_reminder_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+                retry_reminder_at: new Date(Date.now() + nextRetryInterval * 60 * 1000).toISOString(),
                 retry_count: med.retry_count + 1
               })
               .eq('id', med.id)
@@ -275,6 +281,93 @@ const initScheduler = () => {
             await delay(200); // flood limit delay
           } catch (sendErr) {
             console.error(`[Scheduler] Failed to send retry to ${med.telegram_id}:`, sendErr);
+          }
+        }
+      }
+
+      // 1.7. Check for unresolved caregiver notifications (Missed / Emergency Escalations)
+      console.log(`[Scheduler] Checking for unresolved caregiver notifications at ${now.toISOString()}...`);
+      const { data: pendingEscalations, error: escError } = await supabase
+        .from('medications')
+        .select('*')
+        .eq('active', true)
+        .is('retry_reminder_at', null)
+        .not('last_reminder_scheduled_at', 'is', null);
+
+      if (!escError && pendingEscalations && pendingEscalations.length > 0) {
+        console.log(`[Scheduler] Found ${pendingEscalations.length} medications waiting for caregiver action.`);
+        for (const med of pendingEscalations) {
+          const elapsedMinutes = Math.floor((now.getTime() - new Date(med.last_reminder_scheduled_at).getTime()) / 60000);
+          
+          // Timeout limit: 15 minutes for critical, 60 minutes for other priorities
+          const timeoutLimit = med.priority_level === 'critical' ? 15 : 60;
+
+          if (elapsedMinutes >= timeoutLimit) {
+            try {
+              // Lock the record atomically to prevent concurrent resolutions
+              let lockQuery = supabase
+                .from('medications')
+                .update({
+                  last_reminder_scheduled_at: null
+                })
+                .eq('id', med.id)
+                .eq('last_reminder_scheduled_at', med.last_reminder_scheduled_at);
+
+              const { data: lockData, error: lockErr } = await lockQuery.select();
+
+              if (lockErr || !lockData || lockData.length === 0) {
+                console.log(`[Scheduler] Med ID ${med.id} was already resolved. Skipping auto-MISSED.`);
+                continue;
+              }
+
+              console.log(`[Scheduler] Med ID ${med.id} caregiver response timed out (${elapsedMinutes}m). Auto-logging MISSED.`);
+
+              // 1. Log MISSED in reminder_logs
+              const formattedScheduledTime = new Date(med.last_reminder_scheduled_at).toISOString();
+              await supabase.from('reminder_logs').insert([{
+                telegram_id: med.telegram_id,
+                medication_id: med.id,
+                scheduled_time: formattedScheduledTime,
+                response: 'MISSED'
+              }]);
+
+              // 2. Notify patient
+              try {
+                await bot.sendMessage(med.telegram_id, `❌ You missed your medication: ${med.drug_name}.`);
+              } catch (err) {
+                console.error(`[Scheduler] Failed to notify patient ${med.telegram_id} of missed dose:`, err);
+              }
+
+              // 3. If critical, send emergency escalation warning to caregiver
+              if (med.priority_level === 'critical') {
+                const { data: caregivers } = await supabase
+                  .from('caregiver_info')
+                  .select('caregiver_chat_id')
+                  .eq('patient_telegram_id', med.telegram_id)
+                  .eq('is_active', true);
+
+                if (caregivers && caregivers.length > 0) {
+                  let patientName = 'Patient';
+                  try {
+                    const chatInfo = await bot.getChat(med.telegram_id);
+                    patientName = `${chatInfo.first_name || ''} ${chatInfo.last_name || ''}`.trim() || 'Patient';
+                  } catch (chatErr) {}
+
+                  const alertMsg = `⚠️ **CRITICAL ESCALATION**\n\nPatient **${patientName}** did NOT take their critical medication:\n💊 **${med.drug_name}**\n\n⚠️ **Please check on the patient immediately.**`;
+                  
+                  for (const cg of caregivers) {
+                    try {
+                      await bot.sendMessage(cg.caregiver_chat_id, alertMsg, { parse_mode: 'Markdown' });
+                      console.log(`[Scheduler] Sent critical escalation alert to Caregiver: ${cg.caregiver_chat_id}`);
+                    } catch (cgSendErr) {
+                      console.error(`Failed to send emergency alert to caregiver ${cg.caregiver_chat_id}:`, cgSendErr);
+                    }
+                  }
+                }
+              }
+            } catch (pErr) {
+              console.error(`[Scheduler] Error auto-logging MISSED for Med ID ${med.id}:`, pErr);
+            }
           }
         }
       }

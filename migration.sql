@@ -52,3 +52,9 @@ ALTER TABLE reminder_logs
 ADD COLUMN IF NOT EXISTS delay_minutes INTEGER;
 
 COMMENT ON COLUMN reminder_logs.delay_minutes IS 'Minutes elapsed between scheduled time and response time';
+
+-- 4. Safely add priority_level column to medications
+ALTER TABLE medications
+ADD COLUMN IF NOT EXISTS priority_level TEXT DEFAULT 'normal';
+
+COMMENT ON COLUMN medications.priority_level IS 'Medication priority level: normal, important, or critical';
