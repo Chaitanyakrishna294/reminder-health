@@ -169,7 +169,6 @@ const initScheduler = () => {
               let lockQuery = supabase
                 .from('medications')
                 .update({
-                  last_reminder_scheduled_at: null,
                   retry_reminder_at: null,
                   retry_count: 0
                 })
@@ -195,18 +194,27 @@ const initScheduler = () => {
               if (cgErr) throw cgErr;
 
               if (caregivers && caregivers.length > 0) {
+                // Fetch patient name dynamically from Telegram
+                let patientName = 'Patient';
+                try {
+                  const chatInfo = await bot.getChat(med.telegram_id);
+                  patientName = `${chatInfo.first_name || ''} ${chatInfo.last_name || ''}`.trim() || 'Patient';
+                } catch (chatErr) {
+                  console.error('[Scheduler] Failed to get patient chat details:', chatErr);
+                }
+
                 const formattedTime = moment(med.last_reminder_scheduled_at)
                   .tz('Asia/Kolkata')
                   .format('h:mm A');
 
-                const alertMessage = `⚠️ **Medication Alert**\n\nPatient missed medication:\n💊 **${med.drug_name}**\n⏰ **${formattedTime}**`;
+                const alertMessage = `⚠️ **Medication Alert**\n\nPatient: **${patientName}**\n💊 **${med.drug_name}**\n⏰ **${formattedTime}**`;
 
                 const scheduledTimeMs = new Date(med.last_reminder_scheduled_at).getTime();
                 const alertButtons = {
                   inline_keyboard: [
                     [
-                      { text: '✅ Mark Taken', callback_data: `cg_taken:${med.id}:${scheduledTimeMs}` },
-                      { text: '⏭ Mark Skip', callback_data: `cg_skip:${med.id}:${scheduledTimeMs}` }
+                      { text: '✅ Mark Taken', callback_data: `${CALLBACK_ACTIONS.CG_TAKEN}:${med.id}:${scheduledTimeMs}` },
+                      { text: '⏭ Mark Skip', callback_data: `${CALLBACK_ACTIONS.CG_SKIP}:${med.id}:${scheduledTimeMs}` }
                     ]
                   ]
                 };

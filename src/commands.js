@@ -54,13 +54,15 @@ const handleCaregiver = async (chatId) => {
 
     if (!error && caregiverRecords && caregiverRecords.length > 0) {
       inlineKeyboard.inline_keyboard.push([
-        { text: '📊 Caregiver Panel', callback_data: 'cg_panel' }
+        { text: '📊 Caregiver Panel', callback_data: CALLBACK_ACTIONS.CG_PANEL }
       ]);
     }
 
     inlineKeyboard.inline_keyboard.push([
-      { text: '👨‍⚕ Become Caregiver', callback_data: 'cg_become' },
-      { text: '➕ Add Caregiver', callback_data: 'cg_add' }
+      { text: '👨‍⚕ Become Caregiver', callback_data: CALLBACK_ACTIONS.CG_BECOME }
+    ]);
+    inlineKeyboard.inline_keyboard.push([
+      { text: '➕ Add Caregiver', callback_data: CALLBACK_ACTIONS.CG_ADD }
     ]);
 
     await bot.sendMessage(chatId, '👨‍⚕ Caregiver Connection System\n\nChoose an option below:', { reply_markup: inlineKeyboard });
@@ -669,11 +671,11 @@ const initCommands = () => {
         await bot.answerCallbackQuery(query.id);
         return handleCaregiver(chatId);
       }
-      if (data === 'cg_panel') {
+      if (data === CALLBACK_ACTIONS.CG_PANEL) {
         await bot.answerCallbackQuery(query.id);
         return handleCaregiverPanel(chatId);
       }
-      if (data === 'cg_become') {
+      if (data === CALLBACK_ACTIONS.CG_BECOME) {
         await bot.answerCallbackQuery(query.id);
         
         // 1-to-1 checks: Check if caregiver already has active ID or patient link
@@ -728,7 +730,7 @@ const initCommands = () => {
         }
         return;
       }
-      if (data === 'cg_add') {
+      if (data === CALLBACK_ACTIONS.CG_ADD) {
         await bot.answerCallbackQuery(query.id);
         
         // 1-to-1 checks: Check if patient already has a linked caregiver
@@ -957,17 +959,19 @@ const initCommands = () => {
       // REMINDER RESPONSES
       const [action, medId, scheduledTime] = data.split(':');
       
-      let responseType = '';
-      let isCaregiverAction = false;
+      const isPatientAction = [CALLBACK_ACTIONS.TAKEN, CALLBACK_ACTIONS.SKIP, CALLBACK_ACTIONS.SNOOZE].includes(action);
+      const isCaregiverAction = [CALLBACK_ACTIONS.CG_TAKEN, CALLBACK_ACTIONS.CG_SKIP].includes(action);
 
-      if (action === CALLBACK_ACTIONS.TAKEN || action === 'cg_taken') {
+      if (!isPatientAction && !isCaregiverAction) return;
+
+      let responseType = '';
+      if (action === CALLBACK_ACTIONS.TAKEN || action === CALLBACK_ACTIONS.CG_TAKEN) {
         responseType = 'TAKEN';
-        if (action === 'cg_taken') isCaregiverAction = true;
-      } else if (action === CALLBACK_ACTIONS.SKIP || action === 'cg_skip') {
+      } else if (action === CALLBACK_ACTIONS.SKIP || action === CALLBACK_ACTIONS.CG_SKIP) {
         responseType = 'SKIP';
-        if (action === 'cg_skip') isCaregiverAction = true;
-      } else if (action === CALLBACK_ACTIONS.SNOOZE) {
-        
+      }
+
+      if (action === CALLBACK_ACTIONS.SNOOZE) {
         const currentSnoozes = activeSnoozes[medId] || 0;
         if (currentSnoozes >= MAX_SNOOZES) {
           await bot.answerCallbackQuery(query.id, { text: 'Snooze limit reached for this reminder.', show_alert: true });
@@ -975,27 +979,67 @@ const initCommands = () => {
           return;
         }
 
-        activeSnoozes[medId] = currentSnoozes + 1;
-
-        // Add snooze minutes to now
+        // Try to update/lock the record atomically
         const now = new Date();
         now.setMinutes(now.getMinutes() + SNOOZE_MINUTES);
-        
-        const { error: snoozeErr } = await supabase.from('medications').update({
-          next_reminder_at: now.toISOString(),
-          last_sent_at: new Date().toISOString(), // refresh last sent to avoid immediate double-triggers
-          retry_count: 0,
-          retry_reminder_at: null,
-          last_reminder_scheduled_at: null
-        }).eq('id', medId);
-        
-        if (snoozeErr) throw snoozeErr;
 
+        const { data: updateData, error: snoozeErr } = await supabase
+          .from('medications')
+          .update({
+            next_reminder_at: now.toISOString(),
+            last_sent_at: new Date().toISOString(), // refresh last sent to avoid immediate double-triggers
+            retry_count: 0,
+            retry_reminder_at: null,
+            last_reminder_scheduled_at: null
+          })
+          .eq('id', medId)
+          .not('last_reminder_scheduled_at', 'is', null)
+          .select();
+
+        if (snoozeErr || !updateData || updateData.length === 0) {
+          await bot.answerCallbackQuery(query.id, { text: 'This dose has already been resolved.', show_alert: true });
+          try {
+            await bot.editMessageText(`${query.message.text}\n\n[Status: Already resolved]`, {
+              chat_id: chatId,
+              message_id: messageId,
+              reply_markup: { inline_keyboard: [] }
+            });
+          } catch (e) {}
+          return;
+        }
+
+        activeSnoozes[medId] = currentSnoozes + 1;
         await bot.editMessageText(`${query.message.text}\n\n[Status: ⏰ Snoozed for ${SNOOZE_MINUTES}m]`, { chat_id: chatId, message_id: messageId, reply_markup: { inline_keyboard: [] } });
         await bot.answerCallbackQuery(query.id, { text: `Snoozed for ${SNOOZE_MINUTES}m` });
         return;
       }
-      else return;
+
+      // Handle TAKEN / SKIP
+      // Reset retry/reminder state and check if it's already resolved in one atomic operation
+      const { data: updateData, error: updateErr } = await supabase
+        .from('medications')
+        .update({
+          retry_count: 0,
+          retry_reminder_at: null,
+          last_reminder_scheduled_at: null
+        })
+        .eq('id', medId)
+        .not('last_reminder_scheduled_at', 'is', null)
+        .select();
+
+      if (updateErr || !updateData || updateData.length === 0) {
+        await bot.answerCallbackQuery(query.id, { text: 'This dose has already been resolved.', show_alert: true });
+        try {
+          await bot.editMessageText(`${query.message.text}\n\n[Status: Already resolved]`, {
+            chat_id: chatId,
+            message_id: messageId,
+            reply_markup: { inline_keyboard: [] }
+          });
+        } catch (e) {}
+        return;
+      }
+
+      const med = updateData[0];
 
       // Clean up snoozes if action is taken/skip
       delete activeSnoozes[medId];
@@ -1020,38 +1064,18 @@ const initCommands = () => {
         return;
       }
 
-      // Reset retry state on response (TAKEN/SKIP)
-      await supabase.from('medications').update({
-        retry_count: 0,
-        retry_reminder_at: null,
-        last_reminder_scheduled_at: null
-      }).eq('id', medId);
-
-      // Fetch medication info (needed for patient_telegram_id and stock management)
-      const { data: medData, error: medErr } = await supabase
-        .from('medications')
-        .select('telegram_id, tablet_count, drug_name')
-        .eq('id', medId)
-        .single();
-
-      if (medErr || !medData) {
-        throw new Error('Medication not found');
-      }
-
-      const patientTelegramId = medData.telegram_id;
-
       if (responseType === 'TAKEN') {
         // Fetch current count and decrement
-        if (medData.tablet_count > 0) {
-          const newCount = medData.tablet_count - 1;
+        if (med.tablet_count > 0) {
+          const newCount = med.tablet_count - 1;
           await supabase.from('medications').update({ tablet_count: newCount }).eq('id', medId);
-          console.log(`[Stock Tracking] ${medData.drug_name} taken. New tablet count: ${newCount}`);
+          console.log(`[Stock Tracking] ${med.drug_name} taken. New tablet count: ${newCount}`);
         }
       }
 
       // Save log for TAKEN or SKIP
       const { error } = await supabase.from('reminder_logs').insert([{
-        telegram_id: patientTelegramId,
+        telegram_id: med.telegram_id,
         medication_id: medId,
         scheduled_time: formattedScheduledTime,
         response: responseType
@@ -1078,8 +1102,8 @@ const initCommands = () => {
       if (isCaregiverAction) {
         try {
           const caregiverName = query.from.first_name || 'Your caregiver';
-          const notificationMsg = `🔔 **Caregiver Intervention**\n\nYour caregiver **${caregiverName}** has marked your medication **${medData.drug_name}** as **${responseType}**.`;
-          await bot.sendMessage(patientTelegramId, notificationMsg, { parse_mode: 'Markdown' });
+          const notificationMsg = `🔔 **Caregiver Intervention**\n\nYour caregiver **${caregiverName}** has marked your medication **${med.drug_name}** as **${responseType}**.`;
+          await bot.sendMessage(med.telegram_id, notificationMsg, { parse_mode: 'Markdown' });
         } catch (notifyErr) {
           console.error('[Caregiver Action] Failed to notify patient:', notifyErr);
         }
