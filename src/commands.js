@@ -6,6 +6,63 @@ const { isValidTime, calculateNextReminder, activeSnoozes } = require('./utils')
 
 const userStates = {};
 
+const calculateStreak = (logs) => {
+  if (!logs || logs.length === 0) return 0;
+
+  const days = {};
+  logs.forEach(log => {
+    const dateStr = moment(log.scheduled_time).tz('Asia/Kolkata').format('YYYY-MM-DD');
+    if (!days[dateStr]) {
+      days[dateStr] = { total: 0, taken: 0 };
+    }
+    days[dateStr].total += 1;
+    if (log.response === 'TAKEN') {
+      days[dateStr].taken += 1;
+    }
+  });
+
+  let streak = 0;
+  const baseMoment = moment().tz('Asia/Kolkata');
+  
+  const todayStr = baseMoment.format('YYYY-MM-DD');
+  const todayData = days[todayStr];
+
+  const cursor = baseMoment.clone().subtract(1, 'day');
+  const yesterdayStr = cursor.format('YYYY-MM-DD');
+  const yesterdayData = days[yesterdayStr];
+
+  if (yesterdayData && yesterdayData.taken === yesterdayData.total && yesterdayData.total > 0) {
+    streak = 1;
+    
+    cursor.subtract(1, 'day');
+    let dayCount = 2;
+    while (dayCount <= 30) {
+      const prevDateStr = cursor.format('YYYY-MM-DD');
+      const prevData = days[prevDateStr];
+      if (prevData && prevData.total > 0) {
+        if (prevData.taken === prevData.total) {
+          streak++;
+          cursor.subtract(1, 'day');
+          dayCount++;
+        } else {
+          break;
+        }
+      } else {
+        cursor.subtract(1, 'day');
+        dayCount++;
+      }
+    }
+    
+    if (todayData && todayData.total > 0 && todayData.taken === todayData.total) {
+      streak++;
+    }
+  } else if (todayData && todayData.total > 0 && todayData.taken === todayData.total) {
+    streak = 1;
+  }
+
+  return streak;
+};
+
 const mainMenuKeyboard = {
   reply_markup: {
     keyboard: [
@@ -173,8 +230,12 @@ const handleCaregiverPanel = async (chatId) => {
           const nextDate = new Date(med.next_reminder_at);
           const nextTimeStr = moment(med.next_reminder_at).tz('Asia/Kolkata').format('h:mm A');
           
-          const isLowStock = med.tablet_count <= 5 && med.low_stock_alert_enabled;
-          const stockStatus = isLowStock ? `⚠️ LOW STOCK (${med.tablet_count} left)` : `Stock: ${med.tablet_count} left`;
+          const tabletsPerDay = med.frequency === 'once_daily' ? 1 : med.frequency === 'twice_daily' ? 2 : med.frequency === 'thrice_daily' ? 3 : 1;
+          const daysRemaining = Math.floor(med.tablet_count / tabletsPerDay);
+          const isLowStock = daysRemaining <= 3;
+          const stockStatus = isLowStock 
+            ? `⚠️ LOW STOCK (Only ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining)` 
+            : `Stock: ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining (${med.tablet_count} left)`;
 
           // Weekly adherence
           let adherenceStr = 'N/A';
@@ -190,6 +251,28 @@ const handleCaregiverPanel = async (chatId) => {
           report += `  - ${stockStatus}\n`;
           report += `  - 7-Day Adherence: ${adherenceStr}\n\n`;
         });
+
+        // Today's Timeline View
+        let timelineText = '';
+        if (todayLogs && todayLogs.length > 0) {
+          todayLogs.sort((a, b) => a.scheduled_time.localeCompare(b));
+          todayLogs.forEach(log => {
+            const timeStr = moment(log.scheduled_time).tz('Asia/Kolkata').format('hh:mm A');
+            let statusEmojiStr = '⏳ Pending';
+            if (log.response === 'TAKEN') statusEmojiStr = '✅ Taken';
+            else if (log.response === 'SKIP') statusEmojiStr = '⏭ Skipped';
+            else if (log.response === 'MISSED') statusEmojiStr = '❌ Missed';
+
+            const delayStr = log.response === 'TAKEN' && log.delay_minutes && log.delay_minutes > 5 ? ` (${log.delay_minutes}m late)` : '';
+            const medName = meds.find(m => m.id === log.medication_id)?.drug_name || 'Medication';
+
+            timelineText += `• ${timeStr} → ${statusEmojiStr}${delayStr} (${medName})\n`;
+          });
+        } else {
+          timelineText = 'No activity logged yet today.\n';
+        }
+
+        report += `🕒 **Today's Timeline:**\n\n${timelineText}`;
       }
       
       await bot.sendMessage(chatId, report, { parse_mode: 'Markdown' });
@@ -252,7 +335,7 @@ const handleMyLogs = async (chatId) => {
 
     const { data: logs, error: logsError } = await supabase
       .from('reminder_logs')
-      .select('response, scheduled_time, medication_id')
+      .select('response, scheduled_time, medication_id, delay_minutes')
       .eq('telegram_id', chatId.toString())
       .gte('scheduled_time', today.toISOString());
 
@@ -273,8 +356,13 @@ const handleMyLogs = async (chatId) => {
     let logText = "📝 Today's Activity:\n\n";
     for (const log of logs) {
       const drug = medMap[log.medication_id] || 'Unknown';
-      const status = log.response === 'TAKEN' ? '✅ TAKEN' : '⏭ SKIP';
-      logText += `${drug} → ${status}\n`;
+      let statusEmoji = '⏳ Pending';
+      if (log.response === 'TAKEN') statusEmoji = '✅ TAKEN';
+      else if (log.response === 'SKIP') statusEmoji = '⏭ SKIP';
+      else if (log.response === 'MISSED') statusEmoji = '❌ MISSED';
+
+      const delayStr = log.response === 'TAKEN' && log.delay_minutes && log.delay_minutes > 5 ? ` (${log.delay_minutes}m late)` : '';
+      logText += `${drug} → ${statusEmoji}${delayStr}\n`;
     }
 
     await bot.sendMessage(chatId, logText);
@@ -302,6 +390,16 @@ const handleStats = async (chatId) => {
       return;
     }
 
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const { data: streakLogs } = await supabase
+      .from('reminder_logs')
+      .select('response, scheduled_time')
+      .eq('telegram_id', chatId.toString())
+      .gte('scheduled_time', thirtyDaysAgo.toISOString());
+
+    const streak = calculateStreak(streakLogs);
+
     const medIds = [...new Set(logs.map(l => l.medication_id))];
     const { data: meds, error: medsError } = await supabase.from('medications').select('id, drug_name').in('id', medIds);
     if (medsError) throw medsError;
@@ -317,13 +415,13 @@ const handleStats = async (chatId) => {
       if (log.response === 'TAKEN') stats[drug].taken += 1;
     });
 
-    let statsText = "📊 Weekly Adherence Stats:\n\n";
+    let statsText = `📊 **Weekly Adherence Stats**:\n\n🔥 **Current Streak:** ${streak} Days\n\n`;
     for (const [drug, data] of Object.entries(stats)) {
       const percentage = Math.round((data.taken / data.total) * 100);
       statsText += `${drug} → ${data.taken}/${data.total} doses (${percentage}%)\n`;
     }
 
-    await bot.sendMessage(chatId, statsText);
+    await bot.sendMessage(chatId, statsText, { parse_mode: 'Markdown' });
   } catch (err) {
     console.error(`Error in STATS for ${chatId}:`, err);
     await bot.sendMessage(chatId, '❌ Could not calculate stats.');
@@ -1147,6 +1245,8 @@ const initCommands = () => {
         return;
       }
 
+      const delayMinutes = Math.max(0, Math.round((Date.now() - new Date(parseInt(scheduledTime)).getTime()) / 60000));
+
       if (responseType === 'TAKEN') {
         // Fetch current count and decrement
         if (med.tablet_count > 0) {
@@ -1161,16 +1261,18 @@ const initCommands = () => {
         telegram_id: med.telegram_id,
         medication_id: medId,
         scheduled_time: formattedScheduledTime,
-        response: responseType
+        response: responseType,
+        delay_minutes: responseType === 'TAKEN' ? delayMinutes : null
       }]);
 
       if (error) throw error;
 
       let updatedText = '';
+      const delayStr = responseType === 'TAKEN' && delayMinutes > 5 ? ` (${delayMinutes}m late)` : '';
       if (isCaregiverAction) {
-        updatedText = `${query.message.text}\n\n[Status: Marked as ${responseType === 'TAKEN' ? 'TAKEN' : 'SKIP'} by Caregiver]`;
+        updatedText = `${query.message.text}\n\n[Status: Marked as ${responseType === 'TAKEN' ? 'TAKEN' : 'SKIP'}${delayStr} by Caregiver]`;
       } else {
-        updatedText = `${query.message.text}\n\n[Status: ${responseType === 'TAKEN' ? '✅ Logged as TAKEN' : '⏭ Logged as SKIP'}]`;
+        updatedText = `${query.message.text}\n\n[Status: ${responseType === 'TAKEN' ? `✅ Logged as TAKEN${delayStr}` : '⏭ Logged as SKIP'}]`;
       }
       
       await bot.editMessageText(updatedText, {

@@ -451,47 +451,250 @@ const initScheduler = () => {
     }
   });
 
-  // 3. Daily Low Stock Alert - Every day at 9:00 AM
+  // 3. Daily Low Stock Alert - Every day at 9:00 AM Asia/Kolkata
   cron.schedule('0 9 * * *', async () => {
     try {
       console.log('📦 Checking for low stock medications...');
       
-      const { data: lowStockMeds, error } = await supabase
+      const { data: activeMeds, error } = await supabase
         .from('medications')
         .select('*')
         .eq('active', true)
-        .eq('low_stock_alert_enabled', true)
-        .lte('tablet_count', 5);
+        .eq('low_stock_alert_enabled', true);
 
       if (error) {
-        console.error('Error fetching low stock medications:', error);
+        console.error('Error fetching medications for low stock check:', error);
         return;
       }
 
-      if (!lowStockMeds || lowStockMeds.length === 0) return;
+      if (!activeMeds || activeMeds.length === 0) return;
 
-      for (const med of lowStockMeds) {
-        const message = `⚠️ Your medication stock for ${med.drug_name} is running low.\n\nOnly ${med.tablet_count} tablets remaining.\n\nPlease refill your medicine soon.`;
-        
-        const inlineKeyboard = {
-          inline_keyboard: [
-            [
-              { text: '✅ Bought', callback_data: `${CALLBACK_ACTIONS.REFILL_BOUGHT}:${med.id}` },
-              { text: '❌ Stop Reminders', callback_data: `${CALLBACK_ACTIONS.REFILL_STOP}:${med.id}` }
+      for (const med of activeMeds) {
+        const tabletsPerDay = med.frequency === 'once_daily' ? 1 : med.frequency === 'twice_daily' ? 2 : med.frequency === 'thrice_daily' ? 3 : 1;
+        const daysRemaining = Math.floor(med.tablet_count / tabletsPerDay);
+
+        if (daysRemaining <= 3) {
+          const message = `⚠️ Your medication stock for ${med.drug_name} is running low.\n\nOnly ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining (${med.tablet_count} tablets left).\n\nPlease refill your medicine soon.`;
+          
+          const inlineKeyboard = {
+            inline_keyboard: [
+              [
+                { text: '✅ Bought', callback_data: `${CALLBACK_ACTIONS.REFILL_BOUGHT}:${med.id}` },
+                { text: '❌ Stop Reminders', callback_data: `${CALLBACK_ACTIONS.REFILL_STOP}:${med.id}` }
+              ]
             ]
-          ]
-        };
+          };
 
-        try {
-          await bot.sendMessage(med.telegram_id, message, { reply_markup: inlineKeyboard });
-          await delay(200);
-        } catch (err) {
-          console.error(`Failed to send low stock alert for med ${med.id}:`, err);
+          try {
+            await bot.sendMessage(med.telegram_id, message, { reply_markup: inlineKeyboard });
+            await delay(200);
+          } catch (err) {
+            console.error(`Failed to send low stock alert for med ${med.id}:`, err);
+          }
         }
       }
     } catch (err) {
       console.error('Low stock alert error:', err);
     }
+  }, {
+    timezone: "Asia/Kolkata"
+  });
+
+  // 4. Morning Patient Summary - Every morning at 7:00 AM Asia/Kolkata
+  cron.schedule('0 7 * * *', async () => {
+    try {
+      console.log('[Scheduler] Generating Morning Summaries at 7:00 AM Asia/Kolkata...');
+      
+      const { data: meds, error } = await supabase
+        .from('medications')
+        .select('*')
+        .eq('active', true);
+
+      if (error) {
+        console.error('[Scheduler] Error fetching active medications for morning summary:', error);
+        return;
+      }
+
+      if (!meds || meds.length === 0) return;
+
+      // Group medications by telegram_id
+      const userMeds = {};
+      meds.forEach(med => {
+        if (!userMeds[med.telegram_id]) {
+          userMeds[med.telegram_id] = [];
+        }
+        userMeds[med.telegram_id].push(med);
+      });
+
+      const format12Hour = (timeStr) => {
+        const [hourStr, minStr] = timeStr.split(':');
+        const hour = parseInt(hourStr);
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        const displayHour = hour % 12 === 0 ? 12 : hour % 12;
+        return `${displayHour}:${minStr} ${ampm}`;
+      };
+
+      for (const [telegramId, patientMeds] of Object.entries(userMeds)) {
+        // Flatten reminder times
+        const dayReminders = [];
+        patientMeds.forEach(med => {
+          if (Array.isArray(med.reminder_times)) {
+            med.reminder_times.forEach(timeStr => {
+              dayReminders.push({
+                time: timeStr,
+                drug_name: med.drug_name,
+                dosage: med.dosage
+              });
+            });
+          }
+        });
+
+        if (dayReminders.length === 0) continue;
+
+        // Sort chronologically
+        dayReminders.sort((a, b) => a.time.localeCompare(b.time));
+
+        let message = `🌅 **Today's Medications**\n\n`;
+        dayReminders.forEach(r => {
+          const dosageStr = r.dosage ? ` (${r.dosage})` : '';
+          message += `💊 ${r.drug_name}${dosageStr} → ${format12Hour(r.time)}\n`;
+        });
+
+        try {
+          await bot.sendMessage(telegramId, message, { parse_mode: 'Markdown' });
+          await delay(200);
+        } catch (sendErr) {
+          console.error(`[Scheduler] Failed to send morning summary to patient ${telegramId}:`, sendErr);
+        }
+      }
+    } catch (err) {
+      console.error('[Scheduler] Morning summary error:', err);
+    }
+  }, {
+    timezone: "Asia/Kolkata"
+  });
+
+  // 5. Daily Caregiver Summary - Every night at 9:30 PM Asia/Kolkata
+  cron.schedule('30 21 * * *', async () => {
+    try {
+      console.log('[Scheduler] Generating Daily Caregiver Summaries at 9:30 PM Asia/Kolkata...');
+      
+      // 1. Fetch all active patient IDs
+      const { data: meds, error: medsErr } = await supabase
+        .from('medications')
+        .select('telegram_id')
+        .eq('active', true);
+
+      if (medsErr) {
+        console.error('[Scheduler] Error fetching active patient meds for caregiver summary:', medsErr);
+        return;
+      }
+
+      if (!meds || meds.length === 0) return;
+
+      const activePatientIds = [...new Set(meds.map(m => m.telegram_id))];
+
+      // 2. Fetch active caregiver links for these patients
+      const { data: links, error: linkErr } = await supabase
+        .from('caregiver_info')
+        .select('*')
+        .eq('is_active', true)
+        .in('patient_telegram_id', activePatientIds);
+
+      if (linkErr) {
+        console.error('[Scheduler] Error fetching caregiver links for summary:', linkErr);
+        return;
+      }
+
+      if (!links || links.length === 0) return;
+
+      // 3. For each link, compile adherence stats and low stock alerts
+      const startOfToday = moment().tz('Asia/Kolkata').startOf('day').toISOString();
+
+      for (const link of links) {
+        // Fetch logs for this patient today
+        const { data: todayLogs, error: logsErr } = await supabase
+          .from('reminder_logs')
+          .select('response')
+          .eq('telegram_id', link.patient_telegram_id)
+          .gte('scheduled_time', startOfToday);
+
+        if (logsErr) {
+          console.error(`[Scheduler] Error fetching logs for patient ${link.patient_telegram_id}:`, logsErr);
+          continue;
+        }
+
+        let takenCount = 0;
+        let skippedCount = 0;
+        let missedCount = 0;
+
+        if (todayLogs) {
+          todayLogs.forEach(log => {
+            if (log.response === 'TAKEN') takenCount++;
+            else if (log.response === 'SKIP') skippedCount++;
+            else if (log.response === 'MISSED') missedCount++;
+          });
+        }
+
+        // Fetch patient meds to check for low stock
+        const { data: patientMeds, error: patMedsErr } = await supabase
+          .from('medications')
+          .select('*')
+          .eq('telegram_id', link.patient_telegram_id)
+          .eq('active', true);
+
+        if (patMedsErr) {
+          console.error(`[Scheduler] Error fetching medications for patient ${link.patient_telegram_id}:`, patMedsErr);
+          continue;
+        }
+
+        const lowStockMeds = [];
+        if (patientMeds) {
+          patientMeds.forEach(med => {
+            const tabletsPerDay = med.frequency === 'once_daily' ? 1 : med.frequency === 'twice_daily' ? 2 : med.frequency === 'thrice_daily' ? 3 : 1;
+            const daysRemaining = Math.floor(med.tablet_count / tabletsPerDay);
+            if (daysRemaining <= 3) {
+              lowStockMeds.push({
+                drug_name: med.drug_name,
+                daysRemaining
+              });
+            }
+          });
+        }
+
+        // Get patient name
+        let patientName = 'Patient';
+        try {
+          const chatInfo = await bot.getChat(link.patient_telegram_id);
+          patientName = `${chatInfo.first_name || ''} ${chatInfo.last_name || ''}`.trim() || 'Patient';
+        } catch (chatErr) {}
+
+        // Format message
+        let summaryMessage = `📊 **Daily Adherence Summary**\n`;
+        summaryMessage += `Patient: **${patientName}**\n\n`;
+        summaryMessage += `✅ Taken: ${takenCount}\n`;
+        summaryMessage += `⏭ Skipped: ${skippedCount}\n`;
+        summaryMessage += `❌ Missed: ${missedCount}\n`;
+
+        if (lowStockMeds.length > 0) {
+          summaryMessage += `\n⚠️ **Low Stock Alert:**\n`;
+          lowStockMeds.forEach(med => {
+            summaryMessage += `• ${med.drug_name} (Only ${med.daysRemaining} days remaining)\n`;
+          });
+        }
+
+        try {
+          await bot.sendMessage(link.caregiver_chat_id, summaryMessage, { parse_mode: 'Markdown' });
+          await delay(200);
+        } catch (sendErr) {
+          console.error(`[Scheduler] Failed to send daily summary to caregiver ${link.caregiver_chat_id}:`, sendErr);
+        }
+      }
+    } catch (err) {
+      console.error('[Scheduler] Daily caregiver summary error:', err);
+    }
+  }, {
+    timezone: "Asia/Kolkata"
   });
 };
 
