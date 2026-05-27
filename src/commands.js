@@ -17,7 +17,6 @@ const mainMenuKeyboard = {
     one_time_keyboard: false
   }
 };
-
 const sendMainMenu = async (chatId, text) => {
   await bot.sendMessage(chatId, text, mainMenuKeyboard);
 };
