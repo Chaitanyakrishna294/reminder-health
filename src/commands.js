@@ -41,8 +41,15 @@ const handleAddMed = async (chatId) => {
 };
 
 const handleCaregiver = async (chatId) => {
-  userStates[chatId] = { step: STATES.ADD_CAREGIVER_INFO };
-  await bot.sendMessage(chatId, '👨‍⚕ Let\'s set up your caregiver.\n\nPlease enter your caregiver\'s phone number or Telegram username:');
+  const inlineKeyboard = {
+    inline_keyboard: [
+      [
+        { text: '👨‍⚕ Become Caregiver', callback_data: 'cg_become' },
+        { text: '👨‍⚕ Add Caregiver', callback_data: 'cg_add' }
+      ]
+    ]
+  };
+  await bot.sendMessage(chatId, '👨‍⚕ Caregiver Connection System\n\nChoose an option below:', { reply_markup: inlineKeyboard });
 };
 
 const handleTodaysMeds = async (chatId) => {
@@ -252,14 +259,63 @@ const initCommands = () => {
     const state = userStates[chatId];
     if (state) {
       try {
-        if (state.step === STATES.ADD_CAREGIVER_INFO) {
-          const { error } = await supabase.from('caregiver_info').insert([{
-            telegram_id: chatId.toString(),
-            caregiver_contact: text
-          }]);
-          if (error) throw error;
+        if (state.step === 'waiting_for_cg_id') {
+          const cgId = text.trim();
           
-          await sendMainMenu(chatId, `✅ Caregiver info saved successfully!`);
+          if (!/^CG\d{6}$/.test(cgId)) {
+            await bot.sendMessage(chatId, '⚠️ Invalid Caregiver ID format. It should start with CG followed by 6 digits (e.g., CG483920). Please try again or type /cancel to stop.');
+            return;
+          }
+
+          // Fetch caregiver from DB
+          const { data: cgData, error: fetchErr } = await supabase
+            .from('caregiver_info')
+            .select('*')
+            .eq('caregiver_id', cgId)
+            .eq('is_active', true);
+
+          if (fetchErr || !cgData || cgData.length === 0) {
+            await bot.sendMessage(chatId, '❌ Caregiver ID not found or inactive. Please verify the ID and try again, or type /cancel.');
+            return;
+          }
+
+          const caregiver = cgData[0];
+
+          // Check if already linked
+          if (caregiver.patient_telegram_id === chatId.toString()) {
+            await bot.sendMessage(chatId, '⚠️ You are already linked to this caregiver.');
+            delete userStates[chatId];
+            return;
+          }
+
+          // Check if this ID is already used by another patient
+          if (caregiver.patient_telegram_id) {
+            await bot.sendMessage(chatId, '❌ This Caregiver ID has already been linked by another patient. Please ask your caregiver to generate a new ID.');
+            delete userStates[chatId];
+            return;
+          }
+
+          // Update caregiver record to link patient
+          const { error: linkErr } = await supabase
+            .from('caregiver_info')
+            .update({ patient_telegram_id: chatId.toString() })
+            .eq('caregiver_id', cgId);
+
+          if (linkErr) {
+            console.error('[Caregiver] Linking error:', linkErr);
+            await bot.sendMessage(chatId, '❌ Failed to link caregiver. Please try again later.');
+          } else {
+            await bot.sendMessage(chatId, `✅ Successfully linked to caregiver: **${caregiver.caregiver_name}**!`, { parse_mode: 'Markdown' });
+            
+            // Notify the caregiver
+            try {
+              const patientName = `${msg.from.first_name || ''} ${msg.from.last_name || ''}`.trim() || 'Your patient';
+              await bot.sendMessage(caregiver.caregiver_chat_id, `🔔 **Patient Connected!**\n\nPatient **${patientName}** has successfully linked to you as their caregiver. You will receive alerts if they miss their medications.`, { parse_mode: 'Markdown' });
+            } catch (notifyErr) {
+              console.error('[Caregiver] Failed to notify caregiver:', notifyErr);
+            }
+          }
+
           delete userStates[chatId];
           return;
         }
@@ -469,6 +525,45 @@ const initCommands = () => {
       if (data === CALLBACK_ACTIONS.MENU_CAREGIVER) {
         await bot.answerCallbackQuery(query.id);
         return handleCaregiver(chatId);
+      }
+      if (data === 'cg_become') {
+        await bot.answerCallbackQuery(query.id);
+        const name = `${query.from.first_name || ''} ${query.from.last_name || ''}`.trim() || 'Caregiver';
+        
+        let isUnique = false;
+        let cgId = '';
+        while (!isUnique) {
+          cgId = 'CG' + Math.floor(100000 + Math.random() * 900000);
+          const { data: existing, error } = await supabase
+            .from('caregiver_info')
+            .select('id')
+            .eq('caregiver_id', cgId);
+          if (!error && (!existing || existing.length === 0)) {
+            isUnique = true;
+          }
+        }
+
+        const { error } = await supabase.from('caregiver_info').insert([{
+          caregiver_id: cgId,
+          caregiver_chat_id: chatId.toString(),
+          caregiver_name: name,
+          is_active: true
+        }]);
+
+        if (error) {
+          console.error('[Caregiver] Insert error:', error);
+          await bot.sendMessage(chatId, '❌ Failed to register as a caregiver. Please try again.');
+        } else {
+          const responseMsg = `✅ You have registered as a Caregiver!\n\nYour Caregiver ID is: **${cgId}**\n\nPlease share this ID with your patient manually. They can link you by selecting the **👨‍⚕ Add Caregiver** option in their bot menu.`;
+          await bot.sendMessage(chatId, responseMsg, { parse_mode: 'Markdown' });
+        }
+        return;
+      }
+      if (data === 'cg_add') {
+        await bot.answerCallbackQuery(query.id);
+        userStates[chatId] = { step: 'waiting_for_cg_id' };
+        await bot.sendMessage(chatId, '👨‍⚕ Please enter the Caregiver ID shared by your caregiver (e.g., CG483920):');
+        return;
       }
       if (data === CALLBACK_ACTIONS.MENU_MANAGE) {
         await bot.answerCallbackQuery(query.id);

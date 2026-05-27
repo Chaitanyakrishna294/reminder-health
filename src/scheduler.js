@@ -145,7 +145,7 @@ const initScheduler = () => {
         .select('*')
         .eq('active', true)
         .not('last_reminder_scheduled_at', 'is', null)
-        .lt('retry_count', 2)
+        .lte('retry_count', 2)
         .lte('last_sent_at', fifteenMinutesAgo);
 
       if (retryError) {
@@ -161,6 +161,59 @@ const initScheduler = () => {
           }
 
           console.log(`[Scheduler] Processing retry for Med ID: ${med.id}, Retry Count: ${med.retry_count}`);
+
+          // Escalation Branch: Patient missed medication (retry limit exceeded)
+          if (med.retry_count === 2) {
+            try {
+              // Lock the record immediately to prevent duplicate caregiver alerts
+              let lockQuery = supabase
+                .from('medications')
+                .update({
+                  last_reminder_scheduled_at: null,
+                  retry_count: 0
+                })
+                .eq('id', med.id)
+                .eq('last_sent_at', med.last_sent_at);
+
+              const { data: lockData, error: lockErr } = await lockQuery.select();
+
+              if (lockErr || !lockData || lockData.length === 0) {
+                console.log(`[Scheduler] Med ID ${med.id} alert was already processed. Skipping.`);
+                continue;
+              }
+
+              console.log(`[Scheduler] Patient missed medication. Fetching caregivers for Med ID: ${med.id}`);
+              
+              // Fetch active caregivers for this patient
+              const { data: caregivers, error: cgErr } = await supabase
+                .from('caregiver_info')
+                .select('caregiver_chat_id')
+                .eq('patient_telegram_id', med.telegram_id)
+                .eq('is_active', true);
+
+              if (cgErr) throw cgErr;
+
+              if (caregivers && caregivers.length > 0) {
+                const formattedTime = moment(med.last_reminder_scheduled_at)
+                  .tz('Asia/Kolkata')
+                  .format('h:mm A');
+
+                const alertMessage = `⚠️ **Medication Alert**\n\nPatient missed medication:\n💊 **${med.drug_name}**\n⏰ **${formattedTime}**`;
+
+                for (const cg of caregivers) {
+                  try {
+                    await bot.sendMessage(cg.caregiver_chat_id, alertMessage, { parse_mode: 'Markdown' });
+                    console.log(`[Scheduler] Sent missed dose alert to Caregiver: ${cg.caregiver_chat_id}`);
+                  } catch (sendErr) {
+                    console.error(`[Scheduler] Failed to send alert to caregiver ${cg.caregiver_chat_id}:`, sendErr);
+                  }
+                }
+              }
+            } catch (err) {
+              console.error(`[Scheduler] Error during caregiver alert processing for Med ID ${med.id}:`, err);
+            }
+            continue; // Resolve reminder cycle and skip patient retry send
+          }
 
           const scheduledTimeMs = new Date(med.last_reminder_scheduled_at).getTime();
           const currentSnoozes = activeSnoozes[med.id] || 0;
