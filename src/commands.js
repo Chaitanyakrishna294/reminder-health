@@ -62,6 +62,9 @@ const handleCaregiver = async (chatId) => {
       { text: '👨‍⚕ Become Caregiver', callback_data: CALLBACK_ACTIONS.CG_BECOME }
     ]);
     inlineKeyboard.inline_keyboard.push([
+      { text: '📋 My Caregiver ID', callback_data: CALLBACK_ACTIONS.CG_MY_ID }
+    ]);
+    inlineKeyboard.inline_keyboard.push([
       { text: '➕ Add Caregiver', callback_data: CALLBACK_ACTIONS.CG_ADD }
     ]);
 
@@ -678,7 +681,7 @@ const initCommands = () => {
       if (data === CALLBACK_ACTIONS.CG_BECOME) {
         await bot.answerCallbackQuery(query.id);
         
-        // 1-to-1 checks: Check if caregiver already has active ID or patient link
+        // Check if caregiver already has active ID
         const { data: existingRecords } = await supabase
           .from('caregiver_info')
           .select('*')
@@ -686,17 +689,9 @@ const initCommands = () => {
           .eq('is_active', true);
 
         if (existingRecords && existingRecords.length > 0) {
-          const linked = existingRecords.find(r => r.patient_telegram_id !== null);
-          if (linked) {
-            await bot.sendMessage(chatId, '❌ You are already linked to a patient. For Version 1, a caregiver can only support one patient.');
-            return;
-          }
-          
-          const unlinked = existingRecords.find(r => r.patient_telegram_id === null);
-          if (unlinked) {
-            await bot.sendMessage(chatId, `ℹ️ You already have an active Caregiver ID:\n\n**${unlinked.caregiver_id}**\n\nPlease share this ID with your patient manually.`, { parse_mode: 'Markdown' });
-            return;
-          }
+          const caregiver = existingRecords[0];
+          await bot.sendMessage(chatId, `You are already registered as a caregiver.\n\nYour Caregiver ID:\n**${caregiver.caregiver_id}**`, { parse_mode: 'Markdown' });
+          return;
         }
 
         const name = `${query.from.first_name || ''} ${query.from.last_name || ''}`.trim() || 'Caregiver';
@@ -727,6 +722,24 @@ const initCommands = () => {
         } else {
           const responseMsg = `✅ You have registered as a Caregiver!\n\nYour Caregiver ID is: **${cgId}**\n\nPlease share this ID with your patient manually. They can link you by selecting the **👨‍⚕ Add Caregiver** option in their bot menu.`;
           await bot.sendMessage(chatId, responseMsg, { parse_mode: 'Markdown' });
+        }
+        return;
+      }
+      if (data === CALLBACK_ACTIONS.CG_MY_ID) {
+        await bot.answerCallbackQuery(query.id);
+
+        const { data: existingRecords } = await supabase
+          .from('caregiver_info')
+          .select('*')
+          .eq('caregiver_chat_id', chatId.toString())
+          .eq('is_active', true);
+
+        if (existingRecords && existingRecords.length > 0) {
+          const caregiver = existingRecords[0];
+          const statusStr = caregiver.patient_telegram_id ? '✅ Patient Connected' : 'No patient linked yet';
+          await bot.sendMessage(chatId, `Your Caregiver ID:\n**${caregiver.caregiver_id}**\n\nStatus:\n${statusStr}`, { parse_mode: 'Markdown' });
+        } else {
+          await bot.sendMessage(chatId, '❌ You are not registered as a caregiver yet. Please select the **👨‍⚕ Become Caregiver** option to register first.');
         }
         return;
       }

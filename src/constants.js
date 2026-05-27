@@ -45,7 +45,8 @@ module.exports = {
     CG_SKIP: 'CG_SKIP',
     CG_PANEL: 'CG_PANEL',
     CG_BECOME: 'CG_BECOME',
-    CG_ADD: 'CG_ADD'
+    CG_ADD: 'CG_ADD',
+    CG_MY_ID: 'CG_MY_ID'
   },
 
   MAIN_MENU: {
