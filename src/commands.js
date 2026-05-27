@@ -55,8 +55,11 @@ const handleTodaysMeds = async (chatId) => {
       return;
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const moment = require('moment-timezone');
+    const today = moment()
+      .tz('Asia/Kolkata')
+      .startOf('day')
+      .toDate();
     const { data: logs, error: logsError } = await supabase.from('reminder_logs').select('medication_id, response').eq('telegram_id', chatId.toString()).gte('scheduled_time', today.toISOString());
     if (logsError) throw logsError;
 
