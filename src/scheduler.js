@@ -101,12 +101,13 @@ const initScheduler = () => {
           const nextReminder = calculateNextReminder(med.reminder_times);
 
           console.log(`[Scheduler] Updating next_reminder_at for Med ID: ${med.id} to ${nextReminder.toISOString()}`);
-          // 4. Update record with new next_reminder_at, reset retry count, and set last scheduled reminder
+          // 4. Update record with next_reminder_at, set retry_reminder_at to now + 15m, and reset retry_count
           await supabase
             .from('medications')
             .update({
               next_reminder_at: nextReminder.toISOString(),
               last_reminder_scheduled_at: med.next_reminder_at,
+              retry_reminder_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
               retry_count: 0
             })
             .eq('id', med.id);
@@ -127,6 +128,7 @@ const initScheduler = () => {
               .update({
                 next_reminder_at: nextReminder.toISOString(),
                 last_reminder_scheduled_at: med.next_reminder_at,
+                retry_reminder_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
                 retry_count: 0
               })
               .eq('id', med.id);
@@ -138,15 +140,13 @@ const initScheduler = () => {
 
       // 1.5. Checking for pending retries
       console.log(`[Scheduler] Checking for pending retries at ${now.toISOString()}...`);
-      const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
 
       const { data: retryMedications, error: retryError } = await supabase
         .from('medications')
         .select('*')
         .eq('active', true)
-        .not('last_reminder_scheduled_at', 'is', null)
-        .lte('retry_count', 2)
-        .lte('last_sent_at', fifteenMinutesAgo);
+        .not('retry_reminder_at', 'is', null)
+        .lte('retry_reminder_at', now.toISOString());
 
       if (retryError) {
         console.error('[Scheduler] Error fetching retry medications:', retryError);
@@ -163,13 +163,14 @@ const initScheduler = () => {
           console.log(`[Scheduler] Processing retry for Med ID: ${med.id}, Retry Count: ${med.retry_count}`);
 
           // Escalation Branch: Patient missed medication (retry limit exceeded)
-          if (med.retry_count === 2) {
+          if (med.retry_count >= 2) {
             try {
               // Lock the record immediately to prevent duplicate caregiver alerts
               let lockQuery = supabase
                 .from('medications')
                 .update({
                   last_reminder_scheduled_at: null,
+                  retry_reminder_at: null,
                   retry_count: 0
                 })
                 .eq('id', med.id)
@@ -200,9 +201,19 @@ const initScheduler = () => {
 
                 const alertMessage = `⚠️ **Medication Alert**\n\nPatient missed medication:\n💊 **${med.drug_name}**\n⏰ **${formattedTime}**`;
 
+                const scheduledTimeMs = new Date(med.last_reminder_scheduled_at).getTime();
+                const alertButtons = {
+                  inline_keyboard: [
+                    [
+                      { text: '✅ Mark Taken', callback_data: `cg_taken:${med.id}:${scheduledTimeMs}` },
+                      { text: '⏭ Mark Skip', callback_data: `cg_skip:${med.id}:${scheduledTimeMs}` }
+                    ]
+                  ]
+                };
+
                 for (const cg of caregivers) {
                   try {
-                    await bot.sendMessage(cg.caregiver_chat_id, alertMessage, { parse_mode: 'Markdown' });
+                    await bot.sendMessage(cg.caregiver_chat_id, alertMessage, { parse_mode: 'Markdown', reply_markup: alertButtons });
                     console.log(`[Scheduler] Sent missed dose alert to Caregiver: ${cg.caregiver_chat_id}`);
                   } catch (sendErr) {
                     console.error(`[Scheduler] Failed to send alert to caregiver ${cg.caregiver_chat_id}:`, sendErr);
@@ -238,6 +249,7 @@ const initScheduler = () => {
               .from('medications')
               .update({
                 last_sent_at: now.toISOString(),
+                retry_reminder_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
                 retry_count: med.retry_count + 1
               })
               .eq('id', med.id)

@@ -40,7 +40,10 @@ module.exports = {
     ADD_CONFIRM: 'add_confirm',
     ADD_EDIT: 'add_edit',
     PAGE_NEXT: 'page_next',
-    PAGE_PREV: 'page_prev'
+    PAGE_PREV: 'page_prev',
+    CG_TAKEN: 'cg_taken',
+    CG_SKIP: 'cg_skip',
+    CG_PANEL: 'cg_panel'
   },
 
   MAIN_MENU: {

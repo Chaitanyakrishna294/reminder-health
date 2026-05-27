@@ -1,5 +1,6 @@
 const { bot } = require('./bot');
 const { supabase } = require('./db');
+const moment = require('moment-timezone');
 const { STATES, FREQUENCIES, CALLBACK_ACTIONS, MAIN_MENU, MAX_SNOOZES, SNOOZE_MINUTES } = require('./constants');
 const { isValidTime, calculateNextReminder, activeSnoozes } = require('./utils');
 
@@ -40,15 +41,142 @@ const handleAddMed = async (chatId) => {
 };
 
 const handleCaregiver = async (chatId) => {
-  const inlineKeyboard = {
-    inline_keyboard: [
-      [
-        { text: '👨‍⚕ Become Caregiver', callback_data: 'cg_become' },
-        { text: '👨‍⚕ Add Caregiver', callback_data: 'cg_add' }
-      ]
-    ]
-  };
-  await bot.sendMessage(chatId, '👨‍⚕ Caregiver Connection System\n\nChoose an option below:', { reply_markup: inlineKeyboard });
+  try {
+    const { data: caregiverRecords, error } = await supabase
+      .from('caregiver_info')
+      .select('*')
+      .eq('caregiver_chat_id', chatId.toString())
+      .eq('is_active', true);
+
+    const inlineKeyboard = {
+      inline_keyboard: []
+    };
+
+    if (!error && caregiverRecords && caregiverRecords.length > 0) {
+      inlineKeyboard.inline_keyboard.push([
+        { text: '📊 Caregiver Panel', callback_data: 'cg_panel' }
+      ]);
+    }
+
+    inlineKeyboard.inline_keyboard.push([
+      { text: '👨‍⚕ Become Caregiver', callback_data: 'cg_become' },
+      { text: '➕ Add Caregiver', callback_data: 'cg_add' }
+    ]);
+
+    await bot.sendMessage(chatId, '👨‍⚕ Caregiver Connection System\n\nChoose an option below:', { reply_markup: inlineKeyboard });
+  } catch (err) {
+    console.error('[Caregiver] handleCaregiver error:', err);
+    await bot.sendMessage(chatId, '❌ Error loading caregiver options.');
+  }
+};
+
+const handleCaregiverPanel = async (chatId) => {
+  try {
+    // Find active linkings
+    const { data: links, error: linkErr } = await supabase
+      .from('caregiver_info')
+      .select('*')
+      .eq('caregiver_chat_id', chatId.toString())
+      .eq('is_active', true)
+      .not('patient_telegram_id', 'is', null);
+
+    if (linkErr) throw linkErr;
+
+    if (!links || links.length === 0) {
+      await bot.sendMessage(chatId, '📭 You are not linked to any patient yet. Share your Caregiver ID with your patient to get started!');
+      return;
+    }
+
+    for (const link of links) {
+      // Fetch patient meds
+      const { data: meds, error: medsErr } = await supabase
+        .from('medications')
+        .select('*')
+        .eq('telegram_id', link.patient_telegram_id)
+        .eq('active', true);
+
+      if (medsErr) throw medsErr;
+
+      // Fetch today's logs
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const { data: todayLogs, error: todayLogsErr } = await supabase
+        .from('reminder_logs')
+        .select('*')
+        .eq('telegram_id', link.patient_telegram_id)
+        .gte('scheduled_time', today.toISOString());
+
+      if (todayLogsErr) throw todayLogsErr;
+
+      // Fetch last 7 days logs for adherence stats
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      const { data: weekLogs, error: weekLogsErr } = await supabase
+        .from('reminder_logs')
+        .select('*')
+        .eq('telegram_id', link.patient_telegram_id)
+        .gte('scheduled_time', weekAgo.toISOString());
+
+      if (weekLogsErr) throw weekLogsErr;
+
+      const logMap = {};
+      if (todayLogs) {
+        todayLogs.forEach(l => {
+          logMap[l.medication_id] = l.response; // TAKEN or SKIP
+        });
+      }
+
+      const weekStats = {};
+      if (weekLogs) {
+        weekLogs.forEach(l => {
+          if (!weekStats[l.medication_id]) {
+            weekStats[l.medication_id] = { total: 0, taken: 0 };
+          }
+          weekStats[l.medication_id].total += 1;
+          if (l.response === 'TAKEN') {
+            weekStats[l.medication_id].taken += 1;
+          }
+        });
+      }
+
+      let report = `👨‍⚕ **Caregiver Report**\n`;
+      report += `👤 **Caregiver:** ${link.caregiver_name}\n`;
+      report += `🆔 **Patient Chat ID:** ${link.patient_telegram_id}\n\n`;
+
+      if (!meds || meds.length === 0) {
+        report += `⚠️ Patient has no active medications registered.`;
+      } else {
+        report += `💊 **Medication Details & Status:**\n\n`;
+        meds.forEach(med => {
+          const status = logMap[med.id] ? (logMap[med.id] === 'TAKEN' ? '✅ TAKEN' : '⏭ SKIP') : '⏳ Pending';
+          
+          const nextDate = new Date(med.next_reminder_at);
+          const nextTimeStr = moment(med.next_reminder_at).tz('Asia/Kolkata').format('h:mm A');
+          
+          const isLowStock = med.tablet_count <= 5 && med.low_stock_alert_enabled;
+          const stockStatus = isLowStock ? `⚠️ LOW STOCK (${med.tablet_count} left)` : `Stock: ${med.tablet_count} left`;
+
+          // Weekly adherence
+          let adherenceStr = 'N/A';
+          if (weekStats[med.id] && weekStats[med.id].total > 0) {
+            const pct = Math.round((weekStats[med.id].taken / weekStats[med.id].total) * 100);
+            adherenceStr = `${pct}% (${weekStats[med.id].taken}/${weekStats[med.id].total})`;
+          }
+
+          report += `• **${med.drug_name}** (${med.dosage || 'N/A'})\n`;
+          report += `  - Today's Status: ${status}\n`;
+          report += `  - Next Reminder: ${nextTimeStr}\n`;
+          report += `  - ${stockStatus}\n`;
+          report += `  - 7-Day Adherence: ${adherenceStr}\n\n`;
+        });
+      }
+      
+      await bot.sendMessage(chatId, report, { parse_mode: 'Markdown' });
+    }
+  } catch (err) {
+    console.error('[Caregiver Panel] Error:', err);
+    await bot.sendMessage(chatId, '❌ Error loading Caregiver Panel. Please try again.');
+  }
 };
 
 const handleTodaysMeds = async (chatId) => {
@@ -290,9 +418,15 @@ const initCommands = () => {
 
           const caregiver = cgData[0];
 
-          // Check if already linked
-          if (caregiver.patient_telegram_id === chatId.toString()) {
-            await bot.sendMessage(chatId, '⚠️ You are already linked to this caregiver.');
+          // Check if patient already has a linked caregiver
+          const { data: patientLinks } = await supabase
+            .from('caregiver_info')
+            .select('*')
+            .eq('patient_telegram_id', chatId.toString())
+            .eq('is_active', true);
+
+          if (patientLinks && patientLinks.length > 0) {
+            await bot.sendMessage(chatId, '❌ You already have a caregiver linked to your account. For Version 1, a patient can only have one caregiver.');
             delete userStates[chatId];
             return;
           }
@@ -535,8 +669,34 @@ const initCommands = () => {
         await bot.answerCallbackQuery(query.id);
         return handleCaregiver(chatId);
       }
+      if (data === 'cg_panel') {
+        await bot.answerCallbackQuery(query.id);
+        return handleCaregiverPanel(chatId);
+      }
       if (data === 'cg_become') {
         await bot.answerCallbackQuery(query.id);
+        
+        // 1-to-1 checks: Check if caregiver already has active ID or patient link
+        const { data: existingRecords } = await supabase
+          .from('caregiver_info')
+          .select('*')
+          .eq('caregiver_chat_id', chatId.toString())
+          .eq('is_active', true);
+
+        if (existingRecords && existingRecords.length > 0) {
+          const linked = existingRecords.find(r => r.patient_telegram_id !== null);
+          if (linked) {
+            await bot.sendMessage(chatId, '❌ You are already linked to a patient. For Version 1, a caregiver can only support one patient.');
+            return;
+          }
+          
+          const unlinked = existingRecords.find(r => r.patient_telegram_id === null);
+          if (unlinked) {
+            await bot.sendMessage(chatId, `ℹ️ You already have an active Caregiver ID:\n\n**${unlinked.caregiver_id}**\n\nPlease share this ID with your patient manually.`, { parse_mode: 'Markdown' });
+            return;
+          }
+        }
+
         const name = `${query.from.first_name || ''} ${query.from.last_name || ''}`.trim() || 'Caregiver';
         
         let isUnique = false;
@@ -570,6 +730,19 @@ const initCommands = () => {
       }
       if (data === 'cg_add') {
         await bot.answerCallbackQuery(query.id);
+        
+        // 1-to-1 checks: Check if patient already has a linked caregiver
+        const { data: patientLinks } = await supabase
+          .from('caregiver_info')
+          .select('*')
+          .eq('patient_telegram_id', chatId.toString())
+          .eq('is_active', true);
+
+        if (patientLinks && patientLinks.length > 0) {
+          await bot.sendMessage(chatId, '❌ You already have a caregiver linked to your account. For Version 1, a patient can only have one caregiver.');
+          return;
+        }
+
         userStates[chatId] = { step: 'waiting_for_cg_id' };
         await bot.sendMessage(chatId, '👨‍⚕ Please enter the Caregiver ID shared by your caregiver (e.g., CG483920):');
         return;
@@ -785,9 +958,15 @@ const initCommands = () => {
       const [action, medId, scheduledTime] = data.split(':');
       
       let responseType = '';
-      if (action === CALLBACK_ACTIONS.TAKEN) responseType = 'TAKEN';
-      else if (action === CALLBACK_ACTIONS.SKIP) responseType = 'SKIP';
-      else if (action === CALLBACK_ACTIONS.SNOOZE) {
+      let isCaregiverAction = false;
+
+      if (action === CALLBACK_ACTIONS.TAKEN || action === 'cg_taken') {
+        responseType = 'TAKEN';
+        if (action === 'cg_taken') isCaregiverAction = true;
+      } else if (action === CALLBACK_ACTIONS.SKIP || action === 'cg_skip') {
+        responseType = 'SKIP';
+        if (action === 'cg_skip') isCaregiverAction = true;
+      } else if (action === CALLBACK_ACTIONS.SNOOZE) {
         
         const currentSnoozes = activeSnoozes[medId] || 0;
         if (currentSnoozes >= MAX_SNOOZES) {
@@ -806,6 +985,7 @@ const initCommands = () => {
           next_reminder_at: now.toISOString(),
           last_sent_at: new Date().toISOString(), // refresh last sent to avoid immediate double-triggers
           retry_count: 0,
+          retry_reminder_at: null,
           last_reminder_scheduled_at: null
         }).eq('id', medId);
         
@@ -820,16 +1000,49 @@ const initCommands = () => {
       // Clean up snoozes if action is taken/skip
       delete activeSnoozes[medId];
 
+      // Check if log already exists to prevent duplicate logging (e.g. from patient/caregiver collision)
+      const formattedScheduledTime = new Date(parseInt(scheduledTime)).toISOString();
+      const { data: existingLogs, error: checkLogErr } = await supabase
+        .from('reminder_logs')
+        .select('id')
+        .eq('medication_id', medId)
+        .eq('scheduled_time', formattedScheduledTime);
+
+      if (!checkLogErr && existingLogs && existingLogs.length > 0) {
+        await bot.answerCallbackQuery(query.id, { text: 'This dose has already been logged.', show_alert: true });
+        try {
+          await bot.editMessageText(`${query.message.text}\n\n[Status: Already logged]`, {
+            chat_id: chatId,
+            message_id: messageId,
+            reply_markup: { inline_keyboard: [] }
+          });
+        } catch (e) {}
+        return;
+      }
+
       // Reset retry state on response (TAKEN/SKIP)
       await supabase.from('medications').update({
         retry_count: 0,
+        retry_reminder_at: null,
         last_reminder_scheduled_at: null
       }).eq('id', medId);
 
+      // Fetch medication info (needed for patient_telegram_id and stock management)
+      const { data: medData, error: medErr } = await supabase
+        .from('medications')
+        .select('telegram_id, tablet_count, drug_name')
+        .eq('id', medId)
+        .single();
+
+      if (medErr || !medData) {
+        throw new Error('Medication not found');
+      }
+
+      const patientTelegramId = medData.telegram_id;
+
       if (responseType === 'TAKEN') {
         // Fetch current count and decrement
-        const { data: medData, error: medErr } = await supabase.from('medications').select('tablet_count, drug_name').eq('id', medId).single();
-        if (!medErr && medData && medData.tablet_count > 0) {
+        if (medData.tablet_count > 0) {
           const newCount = medData.tablet_count - 1;
           await supabase.from('medications').update({ tablet_count: newCount }).eq('id', medId);
           console.log(`[Stock Tracking] ${medData.drug_name} taken. New tablet count: ${newCount}`);
@@ -838,15 +1051,20 @@ const initCommands = () => {
 
       // Save log for TAKEN or SKIP
       const { error } = await supabase.from('reminder_logs').insert([{
-        telegram_id: chatId.toString(),
+        telegram_id: patientTelegramId,
         medication_id: medId,
-        scheduled_time: new Date(parseInt(scheduledTime)).toISOString(),
+        scheduled_time: formattedScheduledTime,
         response: responseType
       }]);
 
       if (error) throw error;
 
-      const updatedText = `${query.message.text}\n\n[Status: ${responseType === 'TAKEN' ? '✅ Logged as TAKEN' : '⏭ Logged as SKIP'}]`;
+      let updatedText = '';
+      if (isCaregiverAction) {
+        updatedText = `${query.message.text}\n\n[Status: Marked as ${responseType === 'TAKEN' ? 'TAKEN' : 'SKIP'} by Caregiver]`;
+      } else {
+        updatedText = `${query.message.text}\n\n[Status: ${responseType === 'TAKEN' ? '✅ Logged as TAKEN' : '⏭ Logged as SKIP'}]`;
+      }
       
       await bot.editMessageText(updatedText, {
         chat_id: chatId,
@@ -855,6 +1073,17 @@ const initCommands = () => {
       });
 
       await bot.answerCallbackQuery(query.id, { text: 'Logged successfully ✅' });
+
+      // If resolved by caregiver, send a notification to the patient
+      if (isCaregiverAction) {
+        try {
+          const caregiverName = query.from.first_name || 'Your caregiver';
+          const notificationMsg = `🔔 **Caregiver Intervention**\n\nYour caregiver **${caregiverName}** has marked your medication **${medData.drug_name}** as **${responseType}**.`;
+          await bot.sendMessage(patientTelegramId, notificationMsg, { parse_mode: 'Markdown' });
+        } catch (notifyErr) {
+          console.error('[Caregiver Action] Failed to notify patient:', notifyErr);
+        }
+      }
 
     } catch (err) {
       console.error(`Error handling callback query for ${chatId}:`, err);
