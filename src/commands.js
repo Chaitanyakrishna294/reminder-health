@@ -17,7 +17,6 @@ const mainMenuKeyboard = {
     one_time_keyboard: false
   }
 };
-
 const sendMainMenu = async (chatId, text) => {
   await bot.sendMessage(chatId, text, mainMenuKeyboard);
 };
@@ -62,8 +61,11 @@ const handleTodaysMeds = async (chatId) => {
       return;
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const moment = require('moment-timezone');
+    const today = moment()
+      .tz('Asia/Kolkata')
+      .startOf('day')
+      .toDate();
     const { data: logs, error: logsError } = await supabase.from('reminder_logs').select('medication_id, response').eq('telegram_id', chatId.toString()).gte('scheduled_time', today.toISOString());
     if (logsError) throw logsError;
 
@@ -76,7 +78,11 @@ const handleTodaysMeds = async (chatId) => {
     for (const med of meds) {
       const status = loggedMeds[med.id] ? (loggedMeds[med.id] === 'TAKEN' ? '✅ Logged' : '⏭ Skipped') : '⏳ Pending';
       const nextDate = new Date(med.next_reminder_at);
-      let timeString = nextDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      let timeString = nextDate.toLocaleTimeString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
       scheduleText += `${med.drug_name} ${med.dosage || ''} → ${timeString} [${status}]\n`;
     }
 
@@ -89,8 +95,11 @@ const handleTodaysMeds = async (chatId) => {
 
 const handleMyLogs = async (chatId) => {
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const moment = require('moment-timezone');
+    const today = moment()
+      .tz('Asia/Kolkata')
+      .startOf('day')
+      .toDate();
 
     const { data: logs, error: logsError } = await supabase
       .from('reminder_logs')
