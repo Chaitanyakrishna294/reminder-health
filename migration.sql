@@ -46,3 +46,9 @@ COMMENT ON COLUMN caregiver_info.caregiver_id IS 'Unique 8-character generated I
 COMMENT ON COLUMN caregiver_info.caregiver_chat_id IS 'Telegram chat ID of the registered caregiver';
 COMMENT ON COLUMN caregiver_info.caregiver_name IS 'Name of the caregiver';
 COMMENT ON COLUMN caregiver_info.patient_telegram_id IS 'Telegram chat ID of the connected patient';
+
+-- 3. Safely add delay_minutes column to reminder_logs
+ALTER TABLE reminder_logs
+ADD COLUMN IF NOT EXISTS delay_minutes INTEGER;
+
+COMMENT ON COLUMN reminder_logs.delay_minutes IS 'Minutes elapsed between scheduled time and response time';
