@@ -158,11 +158,7 @@ const initScheduler = () => {
         console.log(`[Scheduler] Found ${retryMedications.length} pending retries.`);
         for (const med of retryMedications) {
           // Safety check: skip if next reminder has already become due/past to prevent retry overlap
-          const nextReminderTime = new Date(med.next_reminder_at);
-          if (nextReminderTime <= now) {
-            console.log(`[Scheduler] Skipping retry for Med ID: ${med.id} because next_reminder_at is already in the past or now.`);
-            continue;
-          }
+          
 
           const retryLimit = med.priority_level === 'critical' ? 1 : 2;
 
