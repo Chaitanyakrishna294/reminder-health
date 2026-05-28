@@ -2,7 +2,7 @@ const cron = require('node-cron');
 const moment = require('moment-timezone');
 const { bot } = require('./bot');
 const { supabase } = require('./db');
-const { delay, calculateNextReminder, activeSnoozes } = require('./utils');
+const { delay, calculateNextReminder, escapeHTML, activeSnoozes } = require('./utils');
 const { CALLBACK_ACTIONS, MAX_SNOOZES } = require('./constants');
 
 const initScheduler = () => {
@@ -69,7 +69,7 @@ const initScheduler = () => {
             inline_keyboard: [ buttons ]
           };
 
-          const message = `💊 Time to take ${med.drug_name} ${med.dosage || ''}`;
+          const message = `💊 Time to take <b>${escapeHTML(med.drug_name)}</b>${med.dosage ? ` (${escapeHTML(med.dosage)})` : ''}`;
 
           try {
             console.log(`[Scheduler] IMMEDIATELY locking medication record for Med ID: ${med.id}`);
@@ -97,17 +97,21 @@ const initScheduler = () => {
             const intervalMinutes = med.priority_level === 'critical' ? 5 : 15;
             const retryReminderAt = new Date(Date.now() + intervalMinutes * 60 * 1000).toISOString();
 
+            const payload = {
+              medication_id: med.id,
+              telegram_id: med.telegram_id,
+              scheduled_for: scheduledFor,
+              reminder_status: 'PENDING_PATIENT',
+              retry_count: 0,
+              snooze_count: currentSnoozes,
+              retry_reminder_at: retryReminderAt
+            };
+            console.log('[Scheduler] reminder_event payload:', payload);
+
             console.log(`[Scheduler] Creating reminder_event for Med ID: ${med.id}, Scheduled: ${scheduledFor}`);
             const { data: eventData, error: eventErr } = await supabase
               .from('reminder_events')
-              .insert([{
-                medication_id: med.id,
-                scheduled_for: scheduledFor,
-                reminder_status: 'PENDING_PATIENT',
-                retry_count: 0,
-                snooze_count: currentSnoozes,
-                retry_reminder_at: retryReminderAt
-              }])
+              .insert([payload])
               .select();
 
             if (eventErr || !eventData || eventData.length === 0) {
@@ -118,7 +122,7 @@ const initScheduler = () => {
             console.log(`[Workflow State Change] Created reminder_event ID ${eventData[0].id} for Med ID ${med.id} with status 'PENDING_PATIENT'`);
             console.log(`[Scheduler] Sending Telegram message for Med ID: ${med.id}`);
             // 3. Send Reminder
-            await bot.sendMessage(med.telegram_id, message, { reply_markup: inlineKeyboard });
+            await bot.sendMessage(med.telegram_id, message, { parse_mode: 'HTML', reply_markup: inlineKeyboard });
 
             // 4. Calculate next reminder from the JSONB array
             const nextReminder = calculateNextReminder(med.reminder_times);
@@ -144,7 +148,7 @@ const initScheduler = () => {
             // Retry once logic
             try {
               await delay(1000);
-              await bot.sendMessage(med.telegram_id, message, { reply_markup: inlineKeyboard });
+              await bot.sendMessage(med.telegram_id, message, { parse_mode: 'HTML', reply_markup: inlineKeyboard });
               const nextReminder = calculateNextReminder(med.reminder_times);
               await supabase
                 .from('medications')
@@ -234,8 +238,8 @@ const initScheduler = () => {
                 inline_keyboard: [ buttons ]
               };
 
-              const message = `💊 Time to take ${med.drug_name} ${med.dosage || ''}`;
-              await bot.sendMessage(med.telegram_id, message, { reply_markup: inlineKeyboard });
+              const message = `💊 Time to take <b>${escapeHTML(med.drug_name)}</b>${med.dosage ? ` (${escapeHTML(med.dosage)})` : ''}`;
+              await bot.sendMessage(med.telegram_id, message, { parse_mode: 'HTML', reply_markup: inlineKeyboard });
               await delay(200);
             } catch (snoozeErr) {
               console.error(`[Scheduler] Failed to send snooze expiration to ${med.telegram_id}:`, snoozeErr);
@@ -294,7 +298,7 @@ const initScheduler = () => {
                   .format('h:mm A');
 
                 const priorityEmoji = med.priority_level === 'critical' ? '🔴 CRITICAL' : med.priority_level === 'important' ? '🟠 IMPORTANT' : '🟢 NORMAL';
-                const alertMessage = `⚠️ **Medication Alert (${priorityEmoji})**\n\nPatient: **${patientName}**\n💊 **${med.drug_name}**\n⏰ **${formattedTime}**`;
+                const alertMessage = `⚠️ <b>Medication Alert (${priorityEmoji})</b>\n\nPatient: <b>${escapeHTML(patientName)}</b>\n💊 <b>${escapeHTML(med.drug_name)}</b>\n⏰ <b>${formattedTime}</b>`;
 
                 const scheduledTimeMs = new Date(event.scheduled_for).getTime();
                 const alertButtons = {
@@ -308,7 +312,7 @@ const initScheduler = () => {
 
                 for (const cg of caregivers) {
                   try {
-                    await bot.sendMessage(cg.caregiver_chat_id, alertMessage, { parse_mode: 'Markdown', reply_markup: alertButtons });
+                    await bot.sendMessage(cg.caregiver_chat_id, alertMessage, { parse_mode: 'HTML', reply_markup: alertButtons });
                     console.log(`[Scheduler] Sent missed dose alert to Caregiver: ${cg.caregiver_chat_id}`);
                   } catch (sendErr) {
                     console.error(`[Scheduler] Failed to send alert to caregiver ${cg.caregiver_chat_id}:`, sendErr);
@@ -366,7 +370,7 @@ const initScheduler = () => {
 
             console.log(`[Workflow State Change] Event ID ${event.id} is being retried. Transitioned status from ${event.reminder_status} to RETRYING_PATIENT (retry_count: ${event.retry_count + 1})`);
             console.log(`[Scheduler] Sending Telegram retry message for Med ID: ${med.id}`);
-            await bot.sendMessage(med.telegram_id, message, { reply_markup: inlineKeyboard });
+            await bot.sendMessage(med.telegram_id, message, { parse_mode: 'HTML', reply_markup: inlineKeyboard });
             await delay(200); // flood limit delay
           } catch (sendErr) {
             console.error(`[Scheduler] Failed to send retry to ${med.telegram_id}:`, sendErr);
@@ -434,7 +438,7 @@ const initScheduler = () => {
 
               // 2. Notify patient
               try {
-                await bot.sendMessage(med.telegram_id, `❌ You missed your medication: ${med.drug_name}.`);
+                await bot.sendMessage(med.telegram_id, `❌ You missed your medication: <b>${escapeHTML(med.drug_name)}</b>.`, { parse_mode: 'HTML' });
               } catch (err) {
                 console.error(`[Scheduler] Failed to notify patient ${med.telegram_id} of missed dose:`, err);
               }
@@ -454,11 +458,11 @@ const initScheduler = () => {
                     patientName = `${chatInfo.first_name || ''} ${chatInfo.last_name || ''}`.trim() || 'Patient';
                   } catch (chatErr) {}
 
-                  const alertMsg = `⚠️ **CRITICAL ESCALATION**\n\nPatient **${patientName}** did NOT take their critical medication:\n💊 **${med.drug_name}**\n\n⚠️ **Please check on the patient immediately.**`;
+                  const alertMsg = `⚠️ <b>CRITICAL ESCALATION</b>\n\nPatient <b>${escapeHTML(patientName)}</b> did NOT take their critical medication:\n💊 <b>${escapeHTML(med.drug_name)}</b>\n\n⚠️ <b>Please check on the patient immediately.</b>`;
                   
                   for (const cg of caregivers) {
                     try {
-                      await bot.sendMessage(cg.caregiver_chat_id, alertMsg, { parse_mode: 'Markdown' });
+                      await bot.sendMessage(cg.caregiver_chat_id, alertMsg, { parse_mode: 'HTML' });
                       console.log(`[Scheduler] Sent critical escalation alert to Caregiver: ${cg.caregiver_chat_id}`);
                     } catch (cgSendErr) {
                       console.error(`Failed to send emergency alert to caregiver ${cg.caregiver_chat_id}:`, cgSendErr);
@@ -532,15 +536,15 @@ const initScheduler = () => {
           }
         });
 
-        let summaryMessage = "📊 Weekly Health Summary\n\n";
+        let summaryMessage = "📊 <b>Weekly Health Summary</b>\n\n";
         for (const [drug, data] of Object.entries(stats)) {
           const percentage = Math.round((data.taken / data.total) * 100);
-          summaryMessage += `${drug} → ${data.taken}/${data.total} doses (${percentage}%)\n`;
+          summaryMessage += `<b>${escapeHTML(drug)}</b> → ${data.taken}/${data.total} doses (${percentage}%)\n`;
         }
         summaryMessage += "\nKeep going 💪";
 
         try {
-          await bot.sendMessage(telegramId, summaryMessage);
+          await bot.sendMessage(telegramId, summaryMessage, { parse_mode: 'HTML' });
           await delay(200); // Flood control
         } catch (err) {
           console.error(`Error sending weekly summary to ${telegramId}:`, err);
@@ -575,7 +579,7 @@ const initScheduler = () => {
         const daysRemaining = Math.floor(med.tablet_count / tabletsPerDay);
 
         if (daysRemaining <= 3) {
-          const message = `⚠️ Your medication stock for ${med.drug_name} is running low.\n\nOnly ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining (${med.tablet_count} tablets left).\n\nPlease refill your medicine soon.`;
+          const message = `⚠️ Your medication stock for <b>${escapeHTML(med.drug_name)}</b> is running low.\n\nOnly ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining (${med.tablet_count} tablets left).\n\nPlease refill your medicine soon.`;
           
           const inlineKeyboard = {
             inline_keyboard: [
@@ -587,7 +591,7 @@ const initScheduler = () => {
           };
 
           try {
-            await bot.sendMessage(med.telegram_id, message, { reply_markup: inlineKeyboard });
+            await bot.sendMessage(med.telegram_id, message, { parse_mode: 'HTML', reply_markup: inlineKeyboard });
             await delay(200);
           } catch (err) {
             console.error(`Failed to send low stock alert for med ${med.id}:`, err);
@@ -655,14 +659,14 @@ const initScheduler = () => {
         // Sort chronologically
         dayReminders.sort((a, b) => a.time.localeCompare(b.time));
 
-        let message = `🌅 **Today's Medications**\n\n`;
+        let message = `🌅 <b>Today's Medications</b>\n\n`;
         dayReminders.forEach(r => {
-          const dosageStr = r.dosage ? ` (${r.dosage})` : '';
-          message += `💊 ${r.drug_name}${dosageStr} → ${format12Hour(r.time)}\n`;
+          const dosageStr = r.dosage ? ` (${escapeHTML(r.dosage)})` : '';
+          message += `💊 ${escapeHTML(r.drug_name)}${dosageStr} → ${format12Hour(r.time)}\n`;
         });
 
         try {
-          await bot.sendMessage(telegramId, message, { parse_mode: 'Markdown' });
+          await bot.sendMessage(telegramId, message, { parse_mode: 'HTML' });
           await delay(200);
         } catch (sendErr) {
           console.error(`[Scheduler] Failed to send morning summary to patient ${telegramId}:`, sendErr);
@@ -771,21 +775,21 @@ const initScheduler = () => {
         } catch (chatErr) {}
 
         // Format message
-        let summaryMessage = `📊 **Daily Adherence Summary**\n`;
-        summaryMessage += `Patient: **${patientName}**\n\n`;
+        let summaryMessage = `📊 <b>Daily Adherence Summary</b>\n`;
+        summaryMessage += `Patient: <b>${escapeHTML(patientName)}</b>\n\n`;
         summaryMessage += `✅ Taken: ${takenCount}\n`;
         summaryMessage += `⏭ Skipped: ${skippedCount}\n`;
         summaryMessage += `❌ Missed: ${missedCount}\n`;
 
         if (lowStockMeds.length > 0) {
-          summaryMessage += `\n⚠️ **Low Stock Alert:**\n`;
+          summaryMessage += `\n⚠️ <b>Low Stock Alert:</b>\n`;
           lowStockMeds.forEach(med => {
-            summaryMessage += `• ${med.drug_name} (Only ${med.daysRemaining} days remaining)\n`;
+            summaryMessage += `• ${escapeHTML(med.drug_name)} (Only ${med.daysRemaining} days remaining)\n`;
           });
         }
 
         try {
-          await bot.sendMessage(link.caregiver_chat_id, summaryMessage, { parse_mode: 'Markdown' });
+          await bot.sendMessage(link.caregiver_chat_id, summaryMessage, { parse_mode: 'HTML' });
           await delay(200);
         } catch (sendErr) {
           console.error(`[Scheduler] Failed to send daily summary to caregiver ${link.caregiver_chat_id}:`, sendErr);

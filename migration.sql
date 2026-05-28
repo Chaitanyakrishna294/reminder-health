@@ -63,6 +63,7 @@ COMMENT ON COLUMN medications.priority_level IS 'Medication priority level: norm
 CREATE TABLE IF NOT EXISTS reminder_events (
   id BIGSERIAL PRIMARY KEY,
   medication_id BIGINT REFERENCES medications(id) ON DELETE CASCADE,
+  telegram_id TEXT NOT NULL,
   scheduled_for TIMESTAMPTZ NOT NULL,
   reminder_status TEXT NOT NULL DEFAULT 'SCHEDULED',
   retry_count INTEGER NOT NULL DEFAULT 0,
@@ -76,10 +77,14 @@ CREATE TABLE IF NOT EXISTS reminder_events (
   UNIQUE (medication_id, scheduled_for) -- Natural Idempotency Key
 );
 
+-- Safely add telegram_id to reminder_events if table exists but lacks the column
+ALTER TABLE reminder_events ADD COLUMN IF NOT EXISTS telegram_id TEXT;
+
 -- Index for scheduler status scans
 CREATE INDEX IF NOT EXISTS idx_reminder_events_status_retry ON reminder_events (reminder_status, retry_reminder_at);
 
 COMMENT ON TABLE reminder_events IS 'Tracks the event-driven lifecycle of scheduled reminders';
+COMMENT ON COLUMN reminder_events.telegram_id IS 'Telegram chat ID of the patient to whom this reminder belongs';
 
 -- 6. Enable Row Level Security (RLS) and define access policies for reminder_events
 ALTER TABLE reminder_events ENABLE ROW LEVEL SECURITY;

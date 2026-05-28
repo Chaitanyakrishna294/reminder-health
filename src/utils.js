@@ -61,6 +61,22 @@ const calculateNextReminder = (timesArray) => {
   return tomorrowFirst.utc().toDate();
 };
 
+/**
+ * HTML escape helper to prevent Telegram parsing errors
+ * @param {any} val
+ * @returns {string}
+ */
+const escapeHTML = (val) => {
+  if (val === null || val === undefined) return '';
+  const str = String(val);
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+};
+
 // In-memory snooze tracking
 const activeSnoozes = {};
 
@@ -68,5 +84,7 @@ module.exports = {
   delay,
   isValidTime,
   calculateNextReminder,
+  escapeHTML,
   activeSnoozes
 };
+

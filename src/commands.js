@@ -2,7 +2,7 @@ const { bot } = require('./bot');
 const { supabase } = require('./db');
 const moment = require('moment-timezone');
 const { STATES, FREQUENCIES, CALLBACK_ACTIONS, MAIN_MENU, MAX_SNOOZES, SNOOZE_MINUTES } = require('./constants');
-const { isValidTime, calculateNextReminder, activeSnoozes } = require('./utils');
+const { isValidTime, calculateNextReminder, escapeHTML, activeSnoozes } = require('./utils');
 
 const userStates = {};
 
@@ -211,14 +211,14 @@ const handleCaregiverPanel = async (chatId) => {
         });
       }
 
-      let report = `👨‍⚕ **Caregiver Report**\n`;
-      report += `👤 **Caregiver:** ${link.caregiver_name}\n`;
-      report += `🆔 **Patient Chat ID:** ${link.patient_telegram_id}\n\n`;
+      let report = `👨‍⚕ <b>Caregiver Report</b>\n`;
+      report += `👤 <b>Caregiver:</b> ${escapeHTML(link.caregiver_name)}\n`;
+      report += `🆔 <b>Patient Chat ID:</b> ${escapeHTML(link.patient_telegram_id)}\n\n`;
 
       if (!meds || meds.length === 0) {
         report += `⚠️ Patient has no active medications registered.`;
       } else {
-        report += `💊 **Medication Details & Status:**\n\n`;
+        report += `💊 <b>Medication Details &amp; Status:</b>\n\n`;
         meds.forEach(med => {
           let statusEmoji = '⏳ Pending';
           if (logMap[med.id]) {
@@ -245,7 +245,7 @@ const handleCaregiverPanel = async (chatId) => {
           }
 
           const priorityEmoji = med.priority_level === 'critical' ? '🔴' : med.priority_level === 'important' ? '🟠' : '🟢';
-          report += `• ${priorityEmoji} **${med.drug_name}** (${med.dosage || 'N/A'})\n`;
+          report += `• ${priorityEmoji} <b>${escapeHTML(med.drug_name)}</b> (${escapeHTML(med.dosage) || 'N/A'})\n`;
           report += `  - Today's Status: ${statusEmoji}\n`;
           report += `  - Next Reminder: ${nextTimeStr}\n`;
           report += `  - ${stockStatus}\n`;
@@ -266,16 +266,16 @@ const handleCaregiverPanel = async (chatId) => {
             const delayStr = log.response === 'TAKEN' && log.delay_minutes && log.delay_minutes > 5 ? ` (${log.delay_minutes}m late)` : '';
             const medName = meds.find(m => m.id === log.medication_id)?.drug_name || 'Medication';
 
-            timelineText += `• ${timeStr} → ${statusEmojiStr}${delayStr} (${medName})\n`;
+            timelineText += `• ${timeStr} → ${statusEmojiStr}${delayStr} (${escapeHTML(medName)})\n`;
           });
         } else {
           timelineText = 'No activity logged yet today.\n';
         }
 
-        report += `🕒 **Today's Timeline:**\n\n${timelineText}`;
+        report += `🕒 <b>Today's Timeline:</b>\n\n${timelineText}`;
       }
       
-      await bot.sendMessage(chatId, report, { parse_mode: 'Markdown' });
+      await bot.sendMessage(chatId, report, { parse_mode: 'HTML' });
     }
   } catch (err) {
     console.error('[Caregiver Panel] Error:', err);
@@ -415,13 +415,13 @@ const handleStats = async (chatId) => {
       if (log.response === 'TAKEN') stats[drug].taken += 1;
     });
 
-    let statsText = `📊 **Weekly Adherence Stats**:\n\n🔥 **Current Streak:** ${streak} Days\n\n`;
+    let statsText = `📊 <b>Weekly Adherence Stats</b>:\n\n🔥 <b>Current Streak:</b> ${streak} Days\n\n`;
     for (const [drug, data] of Object.entries(stats)) {
       const percentage = Math.round((data.taken / data.total) * 100);
-      statsText += `${drug} → ${data.taken}/${data.total} doses (${percentage}%)\n`;
+      statsText += `<b>${escapeHTML(drug)}</b> → ${data.taken}/${data.total} doses (${percentage}%)\n`;
     }
 
-    await bot.sendMessage(chatId, statsText, { parse_mode: 'Markdown' });
+    await bot.sendMessage(chatId, statsText, { parse_mode: 'HTML' });
   } catch (err) {
     console.error(`Error in STATS for ${chatId}:`, err);
     await bot.sendMessage(chatId, '❌ Could not calculate stats.');
@@ -455,7 +455,7 @@ const handleManage = async (chatId, page = 0) => {
     for (const med of pageMeds) {
       const priorityEmoji = med.priority_level === 'critical' ? '🔴' : med.priority_level === 'important' ? '🟠' : '🟢';
       const timesStr = med.reminder_times ? med.reminder_times.join(', ') : 'N/A';
-      const text = `💊 **${med.drug_name}** ${med.dosage || ''}\n🔁 ${med.frequency.replace('_', ' ')}\n⏰ ${timesStr}\n📦 Stock: ${med.tablet_count}\n⚠️ Priority: ${priorityEmoji} ${med.priority_level.toUpperCase()}`;
+      const text = `💊 <b>${escapeHTML(med.drug_name)}</b> ${escapeHTML(med.dosage) || ''}\n🔁 ${escapeHTML(med.frequency.replace('_', ' '))}\n⏰ ${escapeHTML(timesStr)}\n📦 Stock: ${med.tablet_count}\n⚠️ Priority: ${priorityEmoji} ${escapeHTML(med.priority_level.toUpperCase())}`;
       const inlineKeyboard = {
         inline_keyboard: [
           [
@@ -464,7 +464,7 @@ const handleManage = async (chatId, page = 0) => {
           ]
         ]
       };
-      await bot.sendMessage(chatId, text, { parse_mode: 'Markdown', reply_markup: inlineKeyboard });
+      await bot.sendMessage(chatId, text, { parse_mode: 'HTML', reply_markup: inlineKeyboard });
     }
     
     const navButtons = [];
@@ -568,12 +568,12 @@ const initCommands = () => {
             console.error('[Caregiver] Linking error:', linkErr);
             await bot.sendMessage(chatId, '❌ Failed to link caregiver. Please try again later.');
           } else {
-            await bot.sendMessage(chatId, `✅ Successfully linked to caregiver: **${caregiver.caregiver_name}**!`, { parse_mode: 'Markdown' });
+            await bot.sendMessage(chatId, `✅ Successfully linked to caregiver: <b>${escapeHTML(caregiver.caregiver_name)}</b>!`, { parse_mode: 'HTML' });
             
             // Notify the caregiver
             try {
               const patientName = `${msg.from.first_name || ''} ${msg.from.last_name || ''}`.trim() || 'Your patient';
-              await bot.sendMessage(caregiver.caregiver_chat_id, `🔔 **Patient Connected!**\n\nPatient **${patientName}** has successfully linked to you as their caregiver. You will receive alerts if they miss their medications.`, { parse_mode: 'Markdown' });
+              await bot.sendMessage(caregiver.caregiver_chat_id, `🔔 <b>Patient Connected!</b>\n\nPatient <b>${escapeHTML(patientName)}</b> has successfully linked to you as their caregiver. You will receive alerts if they miss their medications.`, { parse_mode: 'HTML' });
             } catch (notifyErr) {
               console.error('[Caregiver] Failed to notify caregiver:', notifyErr);
             }
@@ -804,7 +804,7 @@ const initCommands = () => {
 
         if (existingRecords && existingRecords.length > 0) {
           const caregiver = existingRecords[0];
-          await bot.sendMessage(chatId, `You are already registered as a caregiver.\n\nYour Caregiver ID:\n**${caregiver.caregiver_id}**`, { parse_mode: 'Markdown' });
+          await bot.sendMessage(chatId, `You are already registered as a caregiver.\n\nYour Caregiver ID:\n<b>${escapeHTML(caregiver.caregiver_id)}</b>`, { parse_mode: 'HTML' });
           return;
         }
 
@@ -834,8 +834,8 @@ const initCommands = () => {
           console.error('[Caregiver] Insert error:', error);
           await bot.sendMessage(chatId, '❌ Failed to register as a caregiver. Please try again.');
         } else {
-          const responseMsg = `✅ You have registered as a Caregiver!\n\nYour Caregiver ID is: **${cgId}**\n\nPlease share this ID with your patient manually. They can link you by selecting the **👨‍⚕ Add Caregiver** option in their bot menu.`;
-          await bot.sendMessage(chatId, responseMsg, { parse_mode: 'Markdown' });
+          const responseMsg = `✅ You have registered as a Caregiver!\n\nYour Caregiver ID is: <b>${escapeHTML(cgId)}</b>\n\nPlease share this ID with your patient manually. They can link you by selecting the <b>👨‍⚕ Add Caregiver</b> option in their bot menu.`;
+          await bot.sendMessage(chatId, responseMsg, { parse_mode: 'HTML' });
         }
         return;
       }
@@ -851,7 +851,7 @@ const initCommands = () => {
         if (existingRecords && existingRecords.length > 0) {
           const caregiver = existingRecords[0];
           const statusStr = caregiver.patient_telegram_id ? '✅ Patient Connected' : 'No patient linked yet';
-          await bot.sendMessage(chatId, `Your Caregiver ID:\n**${caregiver.caregiver_id}**\n\nStatus:\n${statusStr}`, { parse_mode: 'Markdown' });
+          await bot.sendMessage(chatId, `Your Caregiver ID:\n<b>${escapeHTML(caregiver.caregiver_id)}</b>\n\nStatus:\n${escapeHTML(statusStr)}`, { parse_mode: 'HTML' });
         } else {
           await bot.sendMessage(chatId, '❌ You are not registered as a caregiver yet. Please select the **👨‍⚕ Become Caregiver** option to register first.');
         }
@@ -1352,8 +1352,8 @@ const initCommands = () => {
       if (isCaregiverAction) {
         try {
           const caregiverName = query.from.first_name || 'Your caregiver';
-          const notificationMsg = `🔔 **Caregiver Intervention**\n\nYour caregiver **${caregiverName}** has marked your medication **${medData.drug_name}** as **${responseType}**.`;
-          await bot.sendMessage(medData.telegram_id, notificationMsg, { parse_mode: 'Markdown' });
+          const notificationMsg = `🔔 <b>Caregiver Intervention</b>\n\nYour caregiver <b>${escapeHTML(caregiverName)}</b> has marked your medication <b>${escapeHTML(medData.drug_name)}</b> as <b>${escapeHTML(responseType)}</b>.`;
+          await bot.sendMessage(medData.telegram_id, notificationMsg, { parse_mode: 'HTML' });
         } catch (notifyErr) {
           console.error('[Caregiver Action] Failed to notify patient:', notifyErr);
         }
