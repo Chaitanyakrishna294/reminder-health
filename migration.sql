@@ -58,3 +58,26 @@ ALTER TABLE medications
 ADD COLUMN IF NOT EXISTS priority_level TEXT DEFAULT 'normal';
 
 COMMENT ON COLUMN medications.priority_level IS 'Medication priority level: normal, important, or critical';
+
+-- 5. Create reminder_events table
+CREATE TABLE IF NOT EXISTS reminder_events (
+  id BIGSERIAL PRIMARY KEY,
+  medication_id BIGINT REFERENCES medications(id) ON DELETE CASCADE,
+  scheduled_for TIMESTAMPTZ NOT NULL,
+  reminder_status TEXT NOT NULL DEFAULT 'SCHEDULED',
+  retry_count INTEGER NOT NULL DEFAULT 0,
+  retry_reminder_at TIMESTAMPTZ,
+  snooze_count INTEGER NOT NULL DEFAULT 0,
+  escalated_at TIMESTAMPTZ,
+  resolved_at TIMESTAMPTZ,
+  resolved_by TEXT, -- 'PATIENT', 'CAREGIVER', or 'SYSTEM'
+  caregiver_notified BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE (medication_id, scheduled_for) -- Natural Idempotency Key
+);
+
+-- Index for scheduler status scans
+CREATE INDEX IF NOT EXISTS idx_reminder_events_status_retry ON reminder_events (reminder_status, retry_reminder_at);
+
+COMMENT ON TABLE reminder_events IS 'Tracks the event-driven lifecycle of scheduled reminders';
+

@@ -31,162 +31,234 @@ const initScheduler = () => {
         return;
       }
 
-      console.log(`[Scheduler] Found ${dueMedications ? dueMedications.length : 0} due reminders.`);
+      console.log(`[Scheduler] Found ${dueMedications ? dueMedications.length : 0} due scheduled medications.`);
 
-      if (!dueMedications || dueMedications.length === 0) return;
+      if (dueMedications && dueMedications.length > 0) {
+        for (const med of dueMedications) {
+          console.log(`[Scheduler] Processing reminder configuration for Med ID: ${med.id}`);
 
-      for (const med of dueMedications) {
-        console.log(`[Scheduler] Processing reminder for Med ID: ${med.id}, Last Sent: ${med.last_sent_at || 'Never'}`);
-
-        // Prevent duplicate reminders within 60 seconds in case JS loop is faster than DB query
-        if (med.last_sent_at) {
-          const lastSent = new Date(med.last_sent_at);
-          const diffSeconds = (now - lastSent) / 1000;
-          if (diffSeconds < 60) {
-            console.log(`[Scheduler] Skipping duplicate for med ${med.id}`);
-            continue;
-          }
-        }
-
-        const scheduledTimeMs = new Date(med.next_reminder_at).getTime();
-
-        // Reset snooze counter if this is a fresh regular reminder cycle
-        const nextTimeIST = moment(med.next_reminder_at).tz('Asia/Kolkata').format('HH:mm');
-        if (med.reminder_times.includes(nextTimeIST)) {
-          delete activeSnoozes[med.id];
-        }
-
-        const currentSnoozes = activeSnoozes[med.id] || 0;
-        const buttons = [
-          { text: '✅ TAKEN', callback_data: `${CALLBACK_ACTIONS.TAKEN}:${med.id}:${scheduledTimeMs}` },
-          { text: '⏭ SKIP', callback_data: `${CALLBACK_ACTIONS.SKIP}:${med.id}:${scheduledTimeMs}` }
-        ];
-
-        if (currentSnoozes < MAX_SNOOZES) {
-          buttons.splice(1, 0, { text: '⏰ Snooze 10m', callback_data: `${CALLBACK_ACTIONS.SNOOZE}:${med.id}:${scheduledTimeMs}` });
-        }
-
-        const inlineKeyboard = {
-          inline_keyboard: [ buttons ]
-        };
-
-        const message = `💊 Time to take ${med.drug_name} ${med.dosage || ''}`;
-
-        try {
-          console.log(`[Scheduler] IMMEDIATELY updating last_sent_at for Med ID: ${med.id}`);
-          // 1. Update last_sent_at IMMEDIATELY before sending to lock it using Optimistic Concurrency Control
-          let lockQuery = supabase
-            .from('medications')
-            .update({ last_sent_at: now.toISOString() })
-            .eq('id', med.id);
-            
+          // Prevent duplicate reminders within 60 seconds in case JS loop is faster than DB query
           if (med.last_sent_at) {
-            lockQuery = lockQuery.eq('last_sent_at', med.last_sent_at);
-          } else {
-            lockQuery = lockQuery.is('last_sent_at', null);
+            const lastSent = new Date(med.last_sent_at);
+            const diffSeconds = (now - lastSent) / 1000;
+            if (diffSeconds < 60) {
+              console.log(`[Scheduler] Skipping duplicate for med ${med.id}`);
+              continue;
+            }
           }
 
-          const { data: lockData, error: lockErr } = await lockQuery.select();
+          const scheduledTimeMs = new Date(med.next_reminder_at).getTime();
 
-          if (lockErr || !lockData || lockData.length === 0) {
-            console.log(`[Scheduler] Med ID ${med.id} was already locked by another process. Skipping duplicate send.`);
-            continue;
+          // Reset snooze counter in activeSnoozes if this is a fresh regular reminder cycle
+          const nextTimeIST = moment(med.next_reminder_at).tz('Asia/Kolkata').format('HH:mm');
+          if (med.reminder_times.includes(nextTimeIST)) {
+            delete activeSnoozes[med.id];
           }
 
-          console.log(`[Scheduler] Sending Telegram message for Med ID: ${med.id}`);
-          // 2. Send Reminder
-          await bot.sendMessage(med.telegram_id, message, { reply_markup: inlineKeyboard });
+          const currentSnoozes = activeSnoozes[med.id] || 0;
+          const buttons = [
+            { text: '✅ TAKEN', callback_data: `${CALLBACK_ACTIONS.TAKEN}:${med.id}:${scheduledTimeMs}` },
+            { text: '⏭ SKIP', callback_data: `${CALLBACK_ACTIONS.SKIP}:${med.id}:${scheduledTimeMs}` }
+          ];
 
-          // 3. Calculate next reminder from the JSONB array
-          const nextReminder = calculateNextReminder(med.reminder_times);
-          const intervalMinutes = med.priority_level === 'critical' ? 5 : 15;
-          const retryReminderAt = new Date(Date.now() + intervalMinutes * 60 * 1000).toISOString();
+          if (currentSnoozes < MAX_SNOOZES) {
+            buttons.splice(1, 0, { text: '⏰ Snooze 10m', callback_data: `${CALLBACK_ACTIONS.SNOOZE}:${med.id}:${scheduledTimeMs}` });
+          }
 
-          console.log(`[Scheduler] Updating next_reminder_at for Med ID: ${med.id} to ${nextReminder.toISOString()}`);
-          // 4. Update record with next_reminder_at, set retry_reminder_at based on priority, and reset retry_count
-          await supabase
-            .from('medications')
-            .update({
-              next_reminder_at: nextReminder.toISOString(),
-              last_reminder_scheduled_at: med.next_reminder_at,
-              retry_reminder_at: retryReminderAt,
-              retry_count: 0
-            })
-            .eq('id', med.id);
+          const inlineKeyboard = {
+            inline_keyboard: [ buttons ]
+          };
 
-          // 5. Add a small delay between sends to avoid Telegram API flood limits
-          await delay(200);
+          const message = `💊 Time to take ${med.drug_name} ${med.dosage || ''}`;
 
-        } catch (sendErr) {
-          console.error(`[Scheduler] Failed to send reminder to ${med.telegram_id}:`, sendErr);
-          
-          // Retry once logic could be added here
           try {
-            await delay(1000);
+            console.log(`[Scheduler] IMMEDIATELY locking medication record for Med ID: ${med.id}`);
+            // 1. Update last_sent_at IMMEDIATELY before sending to lock it using Optimistic Concurrency Control
+            let lockQuery = supabase
+              .from('medications')
+              .update({ last_sent_at: now.toISOString() })
+              .eq('id', med.id);
+              
+            if (med.last_sent_at) {
+              lockQuery = lockQuery.eq('last_sent_at', med.last_sent_at);
+            } else {
+              lockQuery = lockQuery.is('last_sent_at', null);
+            }
+
+            const { data: lockData, error: lockErr } = await lockQuery.select();
+
+            if (lockErr || !lockData || lockData.length === 0) {
+              console.log(`[Scheduler] Med ID ${med.id} was already locked by another process. Skipping duplicate send.`);
+              continue;
+            }
+
+            // 2. Insert event in reminder_events table (Idempotency check via Unique Constraint)
+            const scheduledFor = med.next_reminder_at;
+            const intervalMinutes = med.priority_level === 'critical' ? 5 : 15;
+            const retryReminderAt = new Date(Date.now() + intervalMinutes * 60 * 1000).toISOString();
+
+            console.log(`[Scheduler] Creating reminder_event for Med ID: ${med.id}, Scheduled: ${scheduledFor}`);
+            const { data: eventData, error: eventErr } = await supabase
+              .from('reminder_events')
+              .insert([{
+                medication_id: med.id,
+                scheduled_for: scheduledFor,
+                reminder_status: 'PENDING_PATIENT',
+                retry_count: 0,
+                snooze_count: currentSnoozes,
+                retry_reminder_at: retryReminderAt
+              }])
+              .select();
+
+            if (eventErr || !eventData || eventData.length === 0) {
+              console.error(`[Scheduler] Failed to create reminder_event (already exists / duplicate) for Med ID ${med.id}:`, eventErr);
+              continue;
+            }
+
+            console.log(`[Scheduler] Sending Telegram message for Med ID: ${med.id}`);
+            // 3. Send Reminder
             await bot.sendMessage(med.telegram_id, message, { reply_markup: inlineKeyboard });
+
+            // 4. Calculate next reminder from the JSONB array
             const nextReminder = calculateNextReminder(med.reminder_times);
-            const intervalMinutesFallback = med.priority_level === 'critical' ? 5 : 15;
-            const retryReminderAtFallback = new Date(Date.now() + intervalMinutesFallback * 60 * 1000).toISOString();
+
+            console.log(`[Scheduler] Updating next_reminder_at for Med ID: ${med.id} to ${nextReminder.toISOString()}`);
+            // 5. Update record with next_reminder_at, reset old retry columns
             await supabase
               .from('medications')
               .update({
                 next_reminder_at: nextReminder.toISOString(),
                 last_reminder_scheduled_at: med.next_reminder_at,
-                retry_reminder_at: retryReminderAtFallback,
+                retry_reminder_at: null,
                 retry_count: 0
               })
               .eq('id', med.id);
-          } catch (retryErr) {
-            console.error(`[Scheduler] Retry failed for ${med.telegram_id}:`, retryErr);
+
+            // 6. Add a small delay between sends to avoid Telegram API flood limits
+            await delay(200);
+
+          } catch (sendErr) {
+            console.error(`[Scheduler] Failed to send reminder to ${med.telegram_id}:`, sendErr);
+            
+            // Retry once logic
+            try {
+              await delay(1000);
+              await bot.sendMessage(med.telegram_id, message, { reply_markup: inlineKeyboard });
+              const nextReminder = calculateNextReminder(med.reminder_times);
+              await supabase
+                .from('medications')
+                .update({
+                  next_reminder_at: nextReminder.toISOString(),
+                  last_reminder_scheduled_at: med.next_reminder_at,
+                  retry_reminder_at: null,
+                  retry_count: 0
+                })
+                .eq('id', med.id);
+            } catch (retryErr) {
+              console.error(`[Scheduler] Retry failed for ${med.telegram_id}:`, retryErr);
+            }
           }
         }
       }
 
-      // 1.5. Checking for pending retries
-      console.log(`[Scheduler] Checking for pending retries at ${now.toISOString()}...`);
+      // 1.5. Checking for pending retries / snoozes in reminder_events
+      console.log(`[Scheduler] Checking for pending retries/snoozes in reminder_events at ${now.toISOString()}...`);
 
-      const { data: retryMedications, error: retryError } = await supabase
-        .from('medications')
-        .select('*')
-        .eq('active', true)
-        .not('retry_reminder_at', 'is', null)
+      const { data: activeEvents, error: retryError } = await supabase
+        .from('reminder_events')
+        .select(`
+          *,
+          medications:medication_id (
+            *
+          )
+        `)
+        .in('reminder_status', ['PENDING_PATIENT', 'RETRYING_PATIENT', 'SNOOZED'])
         .lte('retry_reminder_at', now.toISOString());
 
       if (retryError) {
-        console.error('[Scheduler] Error fetching retry medications:', retryError);
-      } else if (retryMedications && retryMedications.length > 0) {
-        console.log(`[Scheduler] Found ${retryMedications.length} pending retries.`);
-        for (const med of retryMedications) {
-          // Safety check: skip if next reminder has already become due/past to prevent retry overlap
-          const nextReminderTime = new Date(med.next_reminder_at);
-          if (nextReminderTime <= now) {
-            console.log(`[Scheduler] Skipping retry for Med ID: ${med.id} because next_reminder_at is already in the past or now.`);
+        console.error('[Scheduler] Error fetching retry/snooze events:', retryError);
+      } else if (activeEvents && activeEvents.length > 0) {
+        console.log(`[Scheduler] Found ${activeEvents.length} active events for retry/snooze check.`);
+        for (const event of activeEvents) {
+          const med = event.medications;
+          if (!med || !med.active) {
+            console.log(`[Scheduler] Skipping event ${event.id} because medication configuration is missing or inactive.`);
             continue;
           }
 
-          const retryLimit = med.priority_level === 'critical' ? 1 : 2;
+          // Case A: Firing Snooze
+          if (event.reminder_status === 'SNOOZED') {
+            const nextRetryInterval = med.priority_level === 'critical' ? 5 : 15;
+            const retryReminderAt = new Date(Date.now() + nextRetryInterval * 60 * 1000).toISOString();
 
-          // Escalation Branch: Patient missed medication (retry limit exceeded)
-          if (med.retry_count >= retryLimit) {
             try {
-              // Lock the record immediately to prevent duplicate caregiver alerts
-              let lockQuery = supabase
-                .from('medications')
+              // Optimistic lock update on reminder_events
+              const { data: updateData, error: updateErr } = await supabase
+                .from('reminder_events')
                 .update({
-                  retry_reminder_at: null,
+                  reminder_status: 'PENDING_PATIENT',
+                  retry_reminder_at: retryReminderAt,
                   retry_count: 0
                 })
-                .eq('id', med.id)
-                .eq('last_sent_at', med.last_sent_at);
+                .eq('id', event.id)
+                .eq('reminder_status', 'SNOOZED')
+                .select();
 
-              const { data: lockData, error: lockErr } = await lockQuery.select();
-
-              if (lockErr || !lockData || lockData.length === 0) {
-                console.log(`[Scheduler] Med ID ${med.id} alert was already processed. Skipping.`);
+              if (updateErr || !updateData || updateData.length === 0) {
+                console.log(`[Scheduler] Snoozed event ${event.id} already processed. Skipping.`);
                 continue;
               }
 
-              console.log(`[Scheduler] Patient missed medication. Fetching caregivers for Med ID: ${med.id}`);
+              console.log(`[Scheduler] Snooze expired. Sending Telegram reminder for Med ID: ${med.id}`);
+              const scheduledTimeMs = new Date(event.scheduled_for).getTime();
+              const currentSnoozes = event.snooze_count;
+              const buttons = [
+                { text: '✅ TAKEN', callback_data: `${CALLBACK_ACTIONS.TAKEN}:${med.id}:${scheduledTimeMs}` },
+                { text: '⏭ SKIP', callback_data: `${CALLBACK_ACTIONS.SKIP}:${med.id}:${scheduledTimeMs}` }
+              ];
+
+              if (currentSnoozes < MAX_SNOOZES) {
+                buttons.splice(1, 0, { text: '⏰ Snooze 10m', callback_data: `${CALLBACK_ACTIONS.SNOOZE}:${med.id}:${scheduledTimeMs}` });
+              }
+
+              const inlineKeyboard = {
+                inline_keyboard: [ buttons ]
+              };
+
+              const message = `💊 Time to take ${med.drug_name} ${med.dosage || ''}`;
+              await bot.sendMessage(med.telegram_id, message, { reply_markup: inlineKeyboard });
+              await delay(200);
+            } catch (snoozeErr) {
+              console.error(`[Scheduler] Failed to send snooze expiration to ${med.telegram_id}:`, snoozeErr);
+            }
+            continue;
+          }
+
+          // Case B: Retrying Patient
+          const retryLimit = med.priority_level === 'critical' ? 1 : 2;
+
+          // Escalation Branch: Patient missed medication retry limit
+          if (event.retry_count >= retryLimit) {
+            try {
+              // Lock the record atomically to prevent duplicate caregiver alerts
+              const { data: updateData, error: updateErr } = await supabase
+                .from('reminder_events')
+                .update({
+                  reminder_status: 'ESCALATED_TO_CG',
+                  escalated_at: now.toISOString(),
+                  retry_reminder_at: null,
+                  retry_count: 0
+                })
+                .eq('id', event.id)
+                .eq('reminder_status', event.reminder_status)
+                .select();
+
+              if (updateErr || !updateData || updateData.length === 0) {
+                console.log(`[Scheduler] Event ${event.id} was already escalated or updated. Skipping.`);
+                continue;
+              }
+
+              console.log(`[Scheduler] Patient missed retry limit. Fetching caregivers for Med ID: ${med.id}`);
               
               // Fetch active caregivers for this patient
               const { data: caregivers, error: cgErr } = await supabase
@@ -207,14 +279,14 @@ const initScheduler = () => {
                   console.error('[Scheduler] Failed to get patient chat details:', chatErr);
                 }
 
-                const formattedTime = moment(med.last_reminder_scheduled_at)
+                const formattedTime = moment(event.scheduled_for)
                   .tz('Asia/Kolkata')
                   .format('h:mm A');
 
                 const priorityEmoji = med.priority_level === 'critical' ? '🔴 CRITICAL' : med.priority_level === 'important' ? '🟠 IMPORTANT' : '🟢 NORMAL';
                 const alertMessage = `⚠️ **Medication Alert (${priorityEmoji})**\n\nPatient: **${patientName}**\n💊 **${med.drug_name}**\n⏰ **${formattedTime}**`;
 
-                const scheduledTimeMs = new Date(med.last_reminder_scheduled_at).getTime();
+                const scheduledTimeMs = new Date(event.scheduled_for).getTime();
                 const alertButtons = {
                   inline_keyboard: [
                     [
@@ -232,15 +304,22 @@ const initScheduler = () => {
                     console.error(`[Scheduler] Failed to send alert to caregiver ${cg.caregiver_chat_id}:`, sendErr);
                   }
                 }
+
+                // Update event to indicate caregiver has been notified
+                await supabase
+                  .from('reminder_events')
+                  .update({ caregiver_notified: true })
+                  .eq('id', event.id);
               }
             } catch (err) {
-              console.error(`[Scheduler] Error during caregiver alert processing for Med ID ${med.id}:`, err);
+              console.error(`[Scheduler] Error during caregiver alert processing for Event ID ${event.id}:`, err);
             }
-            continue; // Resolve reminder cycle and skip patient retry send
+            continue;
           }
 
-          const scheduledTimeMs = new Date(med.last_reminder_scheduled_at).getTime();
-          const currentSnoozes = activeSnoozes[med.id] || 0;
+          // Retry branch: within limits
+          const scheduledTimeMs = new Date(event.scheduled_for).getTime();
+          const currentSnoozes = event.snooze_count;
           const buttons = [
             { text: '✅ TAKEN', callback_data: `${CALLBACK_ACTIONS.TAKEN}:${med.id}:${scheduledTimeMs}` },
             { text: '⏭ SKIP', callback_data: `${CALLBACK_ACTIONS.SKIP}:${med.id}:${scheduledTimeMs}` }
@@ -257,22 +336,21 @@ const initScheduler = () => {
           const message = `⏰ Reminder Again:\nPlease take your medicine.`;
 
           try {
-            // Optimistic lock update for retry
+            // Optimistic lock update on reminder_events
             const nextRetryInterval = med.priority_level === 'critical' ? 5 : 15;
-            let lockQuery = supabase
-              .from('medications')
+            const { data: updateData, error: updateErr } = await supabase
+              .from('reminder_events')
               .update({
-                last_sent_at: now.toISOString(),
+                reminder_status: 'RETRYING_PATIENT',
                 retry_reminder_at: new Date(Date.now() + nextRetryInterval * 60 * 1000).toISOString(),
-                retry_count: med.retry_count + 1
+                retry_count: event.retry_count + 1
               })
-              .eq('id', med.id)
-              .eq('last_sent_at', med.last_sent_at);
+              .eq('id', event.id)
+              .eq('reminder_status', event.reminder_status)
+              .select();
 
-            const { data: lockData, error: lockErr } = await lockQuery.select();
-
-            if (lockErr || !lockData || lockData.length === 0) {
-              console.log(`[Scheduler] Med ID ${med.id} retry was already locked/updated. Skipping.`);
+            if (updateErr || !updateData || updateData.length === 0) {
+              console.log(`[Scheduler] Event ${event.id} retry already processed. Skipping.`);
               continue;
             }
 
@@ -287,17 +365,25 @@ const initScheduler = () => {
 
       // 1.7. Check for unresolved caregiver notifications (Missed / Emergency Escalations)
       console.log(`[Scheduler] Checking for unresolved caregiver notifications at ${now.toISOString()}...`);
+      
       const { data: pendingEscalations, error: escError } = await supabase
-        .from('medications')
-        .select('*')
-        .eq('active', true)
-        .is('retry_reminder_at', null)
-        .not('last_reminder_scheduled_at', 'is', null);
+        .from('reminder_events')
+        .select(`
+          *,
+          medications:medication_id (
+            *
+          )
+        `)
+        .eq('reminder_status', 'ESCALATED_TO_CG');
 
       if (!escError && pendingEscalations && pendingEscalations.length > 0) {
-        console.log(`[Scheduler] Found ${pendingEscalations.length} medications waiting for caregiver action.`);
-        for (const med of pendingEscalations) {
-          const elapsedMinutes = Math.floor((now.getTime() - new Date(med.last_reminder_scheduled_at).getTime()) / 60000);
+        console.log(`[Scheduler] Found ${pendingEscalations.length} medication events waiting for caregiver action.`);
+        for (const event of pendingEscalations) {
+          const med = event.medications;
+          if (!med || !med.active) continue;
+
+          const escalationTime = event.escalated_at ? new Date(event.escalated_at) : new Date(event.scheduled_for);
+          const elapsedMinutes = Math.floor((now.getTime() - escalationTime.getTime()) / 60000);
           
           // Timeout limit: 15 minutes for critical, 60 minutes for other priorities
           const timeoutLimit = med.priority_level === 'critical' ? 15 : 60;
@@ -305,25 +391,28 @@ const initScheduler = () => {
           if (elapsedMinutes >= timeoutLimit) {
             try {
               // Lock the record atomically to prevent concurrent resolutions
-              let lockQuery = supabase
-                .from('medications')
+              const { data: updateData, error: updateErr } = await supabase
+                .from('reminder_events')
                 .update({
-                  last_reminder_scheduled_at: null
+                  reminder_status: 'MISSED',
+                  resolved_at: now.toISOString(),
+                  resolved_by: 'SYSTEM',
+                  retry_reminder_at: null,
+                  retry_count: 0
                 })
-                .eq('id', med.id)
-                .eq('last_reminder_scheduled_at', med.last_reminder_scheduled_at);
+                .eq('id', event.id)
+                .eq('reminder_status', 'ESCALATED_TO_CG')
+                .select();
 
-              const { data: lockData, error: lockErr } = await lockQuery.select();
-
-              if (lockErr || !lockData || lockData.length === 0) {
-                console.log(`[Scheduler] Med ID ${med.id} was already resolved. Skipping auto-MISSED.`);
+              if (updateErr || !updateData || updateData.length === 0) {
+                console.log(`[Scheduler] Event ${event.id} was already resolved. Skipping auto-MISSED.`);
                 continue;
               }
 
-              console.log(`[Scheduler] Med ID ${med.id} caregiver response timed out (${elapsedMinutes}m). Auto-logging MISSED.`);
+              console.log(`[Scheduler] Event ${event.id} caregiver response timed out (${elapsedMinutes}m). Auto-logging MISSED.`);
 
               // 1. Log MISSED in reminder_logs
-              const formattedScheduledTime = new Date(med.last_reminder_scheduled_at).toISOString();
+              const formattedScheduledTime = new Date(event.scheduled_for).toISOString();
               await supabase.from('reminder_logs').insert([{
                 telegram_id: med.telegram_id,
                 medication_id: med.id,
@@ -366,7 +455,7 @@ const initScheduler = () => {
                 }
               }
             } catch (pErr) {
-              console.error(`[Scheduler] Error auto-logging MISSED for Med ID ${med.id}:`, pErr);
+              console.error(`[Scheduler] Error auto-logging MISSED for Event ID ${event.id}:`, pErr);
             }
           }
         }
