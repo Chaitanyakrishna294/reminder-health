@@ -115,6 +115,7 @@ const initScheduler = () => {
               continue;
             }
 
+            console.log(`[Workflow State Change] Created reminder_event ID ${eventData[0].id} for Med ID ${med.id} with status 'PENDING_PATIENT'`);
             console.log(`[Scheduler] Sending Telegram message for Med ID: ${med.id}`);
             // 3. Send Reminder
             await bot.sendMessage(med.telegram_id, message, { reply_markup: inlineKeyboard });
@@ -176,14 +177,69 @@ const initScheduler = () => {
         .lte('retry_reminder_at', now.toISOString());
 
       if (retryError) {
-        console.error('[Scheduler] Error fetching retry medications:', retryError);
-      } else if (retryMedications && retryMedications.length > 0) {
-        console.log(`[Scheduler] Found ${retryMedications.length} pending retries.`);
-        for (const med of retryMedications) {
+        console.error('[Scheduler] Error fetching retry reminder events:', retryError);
+      } else if (activeEvents && activeEvents.length > 0) {
+        console.log(`[Scheduler] Found ${activeEvents.length} active events for retry/snooze check.`);
+        for (const event of activeEvents) {
+          const med = event.medications;
+          if (!med || !med.active) {
+            console.log(`[Scheduler] Skipping event ${event.id} because medication configuration is missing or inactive.`);
+            continue;
+          }
+
           // Safety check: skip if next reminder has already become due/past to prevent retry overlap
           const nextReminderTime = new Date(med.next_reminder_at);
           if (nextReminderTime <= now) {
-            console.log(`[Scheduler] Skipping retry for Med ID: ${med.id} because next_reminder_at is already in the past or now.`);
+            console.log(`[Scheduler] Skipping retry for Event ID: ${event.id} because next_reminder_at is already in the past or now.`);
+            continue;
+          }
+
+          // Case A: Firing Snooze
+          if (event.reminder_status === 'SNOOZED') {
+            const nextRetryInterval = med.priority_level === 'critical' ? 5 : 15;
+            const retryReminderAt = new Date(Date.now() + nextRetryInterval * 60 * 1000).toISOString();
+
+            try {
+              // Optimistic lock update on reminder_events
+              const { data: updateData, error: updateErr } = await supabase
+                .from('reminder_events')
+                .update({
+                  reminder_status: 'PENDING_PATIENT',
+                  retry_reminder_at: retryReminderAt,
+                  retry_count: 0
+                })
+                .eq('id', event.id)
+                .eq('reminder_status', 'SNOOZED')
+                .select();
+
+              if (updateErr || !updateData || updateData.length === 0) {
+                console.log(`[Scheduler] Snoozed event ${event.id} already processed. Skipping.`);
+                continue;
+              }
+
+              console.log(`[Workflow State Change] Snooze expired for Event ID ${event.id}. Transitioned status from SNOOZED to PENDING_PATIENT`);
+              console.log(`[Scheduler] Snooze expired. Sending Telegram reminder for Med ID: ${med.id}`);
+              const scheduledTimeMs = new Date(event.scheduled_for).getTime();
+              const currentSnoozes = event.snooze_count;
+              const buttons = [
+                { text: '✅ TAKEN', callback_data: `${CALLBACK_ACTIONS.TAKEN}:${med.id}:${scheduledTimeMs}` },
+                { text: '⏭ SKIP', callback_data: `${CALLBACK_ACTIONS.SKIP}:${med.id}:${scheduledTimeMs}` }
+              ];
+
+              if (currentSnoozes < MAX_SNOOZES) {
+                buttons.splice(1, 0, { text: '⏰ Snooze 10m', callback_data: `${CALLBACK_ACTIONS.SNOOZE}:${med.id}:${scheduledTimeMs}` });
+              }
+
+              const inlineKeyboard = {
+                inline_keyboard: [ buttons ]
+              };
+
+              const message = `💊 Time to take ${med.drug_name} ${med.dosage || ''}`;
+              await bot.sendMessage(med.telegram_id, message, { reply_markup: inlineKeyboard });
+              await delay(200);
+            } catch (snoozeErr) {
+              console.error(`[Scheduler] Failed to send snooze expiration to ${med.telegram_id}:`, snoozeErr);
+            }
             continue;
           }
 
@@ -211,6 +267,7 @@ const initScheduler = () => {
                 continue;
               }
 
+              console.log(`[Workflow State Change] Event ID ${event.id} retry limit reached. Transitioned status from ${event.reminder_status} to ESCALATED_TO_CG`);
               console.log(`[Scheduler] Patient missed retry limit. Fetching caregivers for Med ID: ${med.id}`);
               
               // Fetch active caregivers for this patient
@@ -307,6 +364,7 @@ const initScheduler = () => {
               continue;
             }
 
+            console.log(`[Workflow State Change] Event ID ${event.id} is being retried. Transitioned status from ${event.reminder_status} to RETRYING_PATIENT (retry_count: ${event.retry_count + 1})`);
             console.log(`[Scheduler] Sending Telegram retry message for Med ID: ${med.id}`);
             await bot.sendMessage(med.telegram_id, message, { reply_markup: inlineKeyboard });
             await delay(200); // flood limit delay
@@ -362,6 +420,7 @@ const initScheduler = () => {
                 continue;
               }
 
+              console.log(`[Workflow State Change] Event ID ${event.id} caregiver response timed out (${elapsedMinutes}m). Transitioned status from ESCALATED_TO_CG to MISSED`);
               console.log(`[Scheduler] Event ${event.id} caregiver response timed out (${elapsedMinutes}m). Auto-logging MISSED.`);
 
               // 1. Log MISSED in reminder_logs

@@ -1212,6 +1212,8 @@ const initCommands = () => {
           return;
         }
 
+        console.log(`[Workflow State Change] Callback SNOOZED event ID ${event.id} (new snooze_count: ${currentSnoozes + 1})`);
+
         // Maintain in-memory snooze tracker as well
         activeSnoozes[medId] = currentSnoozes + 1;
 
@@ -1262,6 +1264,8 @@ const initCommands = () => {
         } catch (e) {}
         return;
       }
+
+      console.log(`[Workflow State Change] Callback resolved event ID ${event.id} status: ${resolvedStatus} by ${resolvedBy}`);
 
       // Fetch the medication configuration record to retrieve patient details and stock count
       const { data: medData, error: getMedErr } = await supabase

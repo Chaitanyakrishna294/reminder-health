@@ -81,3 +81,17 @@ CREATE INDEX IF NOT EXISTS idx_reminder_events_status_retry ON reminder_events (
 
 COMMENT ON TABLE reminder_events IS 'Tracks the event-driven lifecycle of scheduled reminders';
 
+-- 6. Enable Row Level Security (RLS) and define access policies for reminder_events
+ALTER TABLE reminder_events ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow select for authenticated users" ON reminder_events
+  FOR SELECT TO authenticated USING (true);
+
+CREATE POLICY "Allow insert for authenticated users" ON reminder_events
+  FOR INSERT TO authenticated WITH CHECK (true);
+
+CREATE POLICY "Allow update for authenticated users" ON reminder_events
+  FOR UPDATE TO authenticated USING (true);
+
+
+
