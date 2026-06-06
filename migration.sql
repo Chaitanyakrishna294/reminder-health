@@ -98,5 +98,26 @@ CREATE POLICY "Allow insert for authenticated users" ON reminder_events
 CREATE POLICY "Allow update for authenticated users" ON reminder_events
   FOR UPDATE TO authenticated USING (true);
 
+-- 7. Performance Indexes for Dashboard, Schedule Planner, and Care Connect
+CREATE INDEX IF NOT EXISTS idx_profiles_telegram_chat_id ON profiles (telegram_chat_id);
+CREATE INDEX IF NOT EXISTS idx_medications_telegram_id ON medications (telegram_id);
+CREATE INDEX IF NOT EXISTS idx_reminder_events_telegram_schedule ON reminder_events (telegram_id, scheduled_for);
+CREATE INDEX IF NOT EXISTS idx_reminder_logs_telegram_schedule ON reminder_logs (telegram_id, scheduled_time);
+CREATE INDEX IF NOT EXISTS idx_caregiver_info_caregiver_chat ON caregiver_info (caregiver_chat_id);
+CREATE INDEX IF NOT EXISTS idx_caregiver_info_patient_telegram ON caregiver_info (patient_telegram_id);
+
+-- 8. Enable Row Level Security (RLS) and define access policies for caregiver_info
+ALTER TABLE caregiver_info ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow select caregiver_info for authenticated users" ON caregiver_info
+  FOR SELECT TO authenticated USING (true);
+
+CREATE POLICY "Allow insert caregiver_info for authenticated users" ON caregiver_info
+  FOR INSERT TO authenticated WITH CHECK (true);
+
+CREATE POLICY "Allow update caregiver_info for authenticated users" ON caregiver_info
+  FOR UPDATE TO authenticated USING (true);
+
+
 
 

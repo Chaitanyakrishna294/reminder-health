@@ -116,6 +116,25 @@ const initScheduler = () => {
 
             if (eventErr || !eventData || eventData.length === 0) {
               console.error(`[Scheduler] Failed to create reminder_event (already exists / duplicate) for Med ID ${med.id}:`, eventErr);
+              
+              if (eventErr && eventErr.code === '23505') {
+                console.log(`[Scheduler] Unique constraint violation: Event already exists for Med ID ${med.id} scheduled at ${scheduledFor}. Advancing next_reminder_at to avoid duplicate loop.`);
+                try {
+                  const nextReminder = calculateNextReminder(med.reminder_times);
+                  console.log(`[Scheduler] Updating next_reminder_at for Med ID: ${med.id} to ${nextReminder.toISOString()} (recovering from duplicate)`);
+                  await supabase
+                    .from('medications')
+                    .update({
+                      next_reminder_at: nextReminder.toISOString(),
+                      last_reminder_scheduled_at: med.next_reminder_at,
+                      retry_reminder_at: null,
+                      retry_count: 0
+                    })
+                    .eq('id', med.id);
+                } catch (updateErr) {
+                  console.error(`[Scheduler] Failed to update next_reminder_at during recovery for Med ID ${med.id}:`, updateErr);
+                }
+              }
               continue;
             }
 

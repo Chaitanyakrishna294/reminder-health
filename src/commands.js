@@ -492,6 +492,42 @@ const initCommands = () => {
     await sendMainMenu(chatId, welcomeText);
   });
 
+  // /linkweb command
+  bot.onText(/\/linkweb/, async (msg) => {
+    const chatId = msg.chat.id;
+    try {
+      const randomCode = 'RMDR-' + Math.floor(100000 + Math.random() * 900000);
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+
+      // Delete any existing codes for this chat ID
+      await supabase
+        .from('link_codes')
+        .delete()
+        .eq('telegram_chat_id', chatId.toString());
+
+      const { error } = await supabase
+        .from('link_codes')
+        .insert([{
+          telegram_chat_id: chatId.toString(),
+          code: randomCode,
+          expires_at: expiresAt
+        }]);
+
+      if (error) {
+        console.error('[LinkWeb] Error inserting code:', error);
+        await bot.sendMessage(chatId, '❌ Failed to generate verification code. Please try again later.');
+        return;
+      }
+
+      const responseMsg = `🔑 <b>Verification Code Generated!</b>\n\nYour code is:\n<code>${randomCode}</code>\n\nExpiry: <b>15 minutes</b>\n\nPlease enter this code on the registration page of the Web Portal to link your account.`;
+      await bot.sendMessage(chatId, responseMsg, { parse_mode: 'HTML' });
+    } catch (err) {
+      console.error('[LinkWeb] Unexpected error:', err);
+      await bot.sendMessage(chatId, '❌ An unexpected error occurred. Please try again.');
+    }
+  });
+
+
   // Handle text messages (Conversational flow & fallback slash commands)
   bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
