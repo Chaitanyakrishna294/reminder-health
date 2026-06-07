@@ -4,6 +4,30 @@
 ALTER TABLE public.caregiver_info 
 ADD COLUMN IF NOT EXISTS connection_status TEXT DEFAULT 'ACCEPTED';
 
+-- 1b. Update public.profiles SELECT policy to allow patients and caregivers to view linked profiles
+DROP POLICY IF EXISTS "Allow users to read their own profile" ON public.profiles;
+CREATE POLICY "Allow users to read their own profile" ON public.profiles
+  FOR SELECT TO authenticated
+  USING (
+    auth.uid() = id 
+    OR 
+    telegram_chat_id IN (
+      -- Caregiver's patient
+      SELECT patient_telegram_id 
+      FROM public.caregiver_info ci
+      JOIN public.profiles p ON p.telegram_chat_id = ci.caregiver_chat_id
+      WHERE p.id = auth.uid() AND ci.is_active = true
+      
+      UNION
+      
+      -- Patient's caregiver
+      SELECT caregiver_chat_id 
+      FROM public.caregiver_info ci
+      JOIN public.profiles p ON p.telegram_chat_id = ci.patient_telegram_id
+      WHERE p.id = auth.uid() AND ci.is_active = true
+    )
+  );
+
 -- 2. Update RLS policies to enforce accepted connection status for caregivers
 
 -- Recreate Caregiver Medications RLS Policy
