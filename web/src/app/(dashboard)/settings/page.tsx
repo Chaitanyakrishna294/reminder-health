@@ -25,7 +25,7 @@ export default async function SettingsPage() {
       // Find caregiver linked to this patient
       const { data } = await supabase
         .from('caregiver_info')
-        .select('id, caregiver_id, caregiver_name, caregiver_chat_id')
+        .select('id, caregiver_id, caregiver_name, caregiver_chat_id, connection_status')
         .eq('patient_telegram_id', myTelegramChatId)
         .eq('is_active', true)
         .maybeSingle();
@@ -36,7 +36,7 @@ export default async function SettingsPage() {
       // Find caregiver record for this caregiver
       const { data } = await supabase
         .from('caregiver_info')
-        .select('id, caregiver_id, patient_telegram_id')
+        .select('id, caregiver_id, patient_telegram_id, connection_status')
         .eq('caregiver_chat_id', myTelegramChatId)
         .eq('is_active', true)
         .maybeSingle();

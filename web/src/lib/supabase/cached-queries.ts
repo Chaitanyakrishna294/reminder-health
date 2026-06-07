@@ -40,7 +40,7 @@ export const getCachedCaregiverLink = cache(async (telegramChatId: string) => {
   const supabase = await createClient();
   const { data: caregiverLink } = await supabase
     .from('caregiver_info')
-    .select('id,caregiver_chat_id,patient_telegram_id,is_active')
+    .select('id,caregiver_chat_id,patient_telegram_id,is_active,connection_status')
     .eq('caregiver_chat_id', telegramChatId)
     .eq('is_active', true)
     .single();
@@ -101,7 +101,7 @@ export const resolveUserData = cache(async () => {
     // Caregiver account
     if (activeViewMode === 'PATIENT_MONITOR' && myTelegramChatId) {
       const caregiverLink = await getCachedCaregiverLink(myTelegramChatId);
-      if (caregiverLink && caregiverLink.patient_telegram_id) {
+      if (caregiverLink && caregiverLink.patient_telegram_id && caregiverLink.connection_status === 'ACCEPTED') {
         const patientId = caregiverLink.patient_telegram_id;
         targetChatId = patientId;
         const patientProfile = await getCachedPatientProfile(patientId);

@@ -16,7 +16,8 @@ import {
   Trash2, 
   Link2, 
   Sparkles,
-  Smartphone
+  Smartphone,
+  Clock
 } from 'lucide-react';
 
 interface SettingsClientViewProps {
@@ -32,11 +33,13 @@ interface SettingsClientViewProps {
     caregiver_id: string;
     caregiver_name: string;
     caregiver_chat_id: string;
+    connection_status?: string | null;
   } | null;
   caregiverRecord: {
     id: number;
     caregiver_id: string;
     patient_telegram_id: string | null;
+    connection_status?: string | null;
   } | null;
   linkedPatientName: string | null;
 }
@@ -116,10 +119,13 @@ export default function SettingsClientView({
         return;
       }
 
-      // 3. Update caregiver record to link patient
+      // 3. Update caregiver record to link patient and set status to PENDING
       const { error: linkErr } = await supabase
         .from('caregiver_info')
-        .update({ patient_telegram_id: user.telegramChatId })
+        .update({ 
+          patient_telegram_id: user.telegramChatId,
+          connection_status: 'PENDING'
+        })
         .eq('caregiver_id', formattedId);
 
       if (linkErr) throw linkErr;
@@ -129,8 +135,9 @@ export default function SettingsClientView({
         caregiver_id: caregiver.caregiver_id,
         caregiver_name: caregiver.caregiver_name || 'Caregiver',
         caregiver_chat_id: caregiver.caregiver_chat_id || '',
+        connection_status: 'PENDING',
       });
-      setSuccessMsg(`Successfully connected to caregiver: ${caregiver.caregiver_name || 'Caregiver'}`);
+      setSuccessMsg(`Connection request sent to caregiver: ${caregiver.caregiver_name || 'Caregiver'}. Waiting for approval.`);
       setCgIdInput('');
       router.refresh();
     } catch (err: any) {
@@ -228,10 +235,15 @@ export default function SettingsClientView({
     }
   };
 
-  // --- CAREGIVER: Unlink Patient ---
+  // --- CAREGIVER: Unlink Patient / Reject Connection Request ---
   const handleUnlinkPatient = async () => {
     if (!caregiverRecord) return;
-    if (!confirm('Are you sure you want to disconnect from this patient?')) return;
+    const isPending = caregiverRecord.connection_status === 'PENDING';
+    const confirmMessage = isPending 
+      ? 'Are you sure you want to reject this patient connection request?' 
+      : 'Are you sure you want to disconnect from this patient?';
+    
+    if (!confirm(confirmMessage)) return;
 
     setErrorMsg(null);
     setSuccessMsg(null);
@@ -240,21 +252,56 @@ export default function SettingsClientView({
     try {
       const { error } = await supabase
         .from('caregiver_info')
-        .update({ patient_telegram_id: null })
+        .update({ 
+          patient_telegram_id: null,
+          connection_status: null 
+        })
         .eq('id', caregiverRecord.id);
 
       if (error) throw error;
 
       setCaregiverRecord({
         ...caregiverRecord,
-        patient_telegram_id: null
+        patient_telegram_id: null,
+        connection_status: null
       });
       setLinkedPatientName(null);
-      setSuccessMsg('Successfully disconnected from your patient.');
+      setSuccessMsg(isPending ? 'Rejected patient connection request.' : 'Successfully disconnected from your patient.');
       router.refresh();
     } catch (err: any) {
       console.error('[Settings] Unlink Patient Error:', err);
-      setErrorMsg('Failed to disconnect from patient.');
+      setErrorMsg('Failed to process request.');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  // --- CAREGIVER: Accept Patient Connection Request ---
+  const handleAcceptPatient = async () => {
+    if (!caregiverRecord) return;
+
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    setProcessing(true);
+
+    try {
+      const { error } = await supabase
+        .from('caregiver_info')
+        .update({ connection_status: 'ACCEPTED' })
+        .eq('id', caregiverRecord.id);
+
+      if (error) throw error;
+
+      setCaregiverRecord({
+        ...caregiverRecord,
+        connection_status: 'ACCEPTED'
+      });
+      
+      setSuccessMsg('Successfully accepted connection request! You are now linked.');
+      router.refresh();
+    } catch (err: any) {
+      console.error('[Settings] Accept Patient Error:', err);
+      setErrorMsg('Failed to accept patient connection.');
     } finally {
       setProcessing(false);
     }
@@ -410,34 +457,65 @@ export default function SettingsClientView({
         {user.role === 'PATIENT' && (
           <div className="space-y-4">
             {linkedCaregiver ? (
-              <div className="border border-border rounded-2xl p-4 bg-success/5 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-success/15 text-success flex items-center justify-center">
-                      <Stethoscope className="w-4 h-4" />
+              linkedCaregiver.connection_status === 'ACCEPTED' ? (
+                <div className="border border-border rounded-2xl p-4 bg-success/5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-success/15 text-success flex items-center justify-center">
+                        <Stethoscope className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className={`block font-black text-foreground ${isElderly ? 'text-xl' : 'text-sm'}`}>
+                          {linkedCaregiver.caregiver_name}
+                        </span>
+                        <span className={`block text-muted-foreground font-semibold ${isElderly ? 'text-base' : 'text-[11px]'}`}>
+                          Caregiver ID: {linkedCaregiver.caregiver_id}
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <span className={`block font-black text-foreground ${isElderly ? 'text-xl' : 'text-sm'}`}>
-                        {linkedCaregiver.caregiver_name}
-                      </span>
-                      <span className={`block text-muted-foreground font-semibold ${isElderly ? 'text-base' : 'text-[11px]'}`}>
-                        Caregiver ID: {linkedCaregiver.caregiver_id}
-                      </span>
-                    </div>
+                    <button
+                      onClick={handleUnlinkCaregiver}
+                      disabled={processing}
+                      className="p-2.5 text-danger bg-danger/10 hover:bg-danger/20 rounded-xl cursor-pointer transition-all disabled:opacity-50 shrink-0"
+                      title="Disconnect Caregiver"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
-                  <button
-                    onClick={handleUnlinkCaregiver}
-                    disabled={processing}
-                    className="p-2.5 text-danger bg-danger/10 hover:bg-danger/20 rounded-xl cursor-pointer transition-all disabled:opacity-50 shrink-0"
-                    title="Disconnect Caregiver"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className={`p-3 bg-white border border-border rounded-xl text-muted-foreground font-medium ${isElderly ? 'text-base' : 'text-[11px]'}`}>
+                    Connected! Your caregiver is now synced to your routine alerts and can review your compliance ring.
+                  </div>
                 </div>
-                <div className={`p-3 bg-white border border-border rounded-xl text-muted-foreground font-medium ${isElderly ? 'text-base' : 'text-[11px]'}`}>
-                  Connected! Your caregiver is now synced to your routine alerts and can review your compliance ring.
+              ) : (
+                <div className="border border-warning/30 rounded-2xl p-4 bg-warning/5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-warning/15 text-warning flex items-center justify-center">
+                        <Clock className="w-4 h-4 animate-pulse" />
+                      </div>
+                      <div>
+                        <span className={`block font-black text-foreground ${isElderly ? 'text-xl' : 'text-sm'}`}>
+                          {linkedCaregiver.caregiver_name}
+                        </span>
+                        <span className={`block text-muted-foreground font-semibold ${isElderly ? 'text-base' : 'text-[11px]'}`}>
+                          Connection Status: <b className="text-warning">PENDING APPROVAL</b>
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleUnlinkCaregiver}
+                      disabled={processing}
+                      className="px-3 py-1.5 text-xs font-bold text-danger bg-danger/10 hover:bg-danger/20 rounded-lg cursor-pointer transition-all disabled:opacity-50 shrink-0"
+                      title="Cancel Request"
+                    >
+                      Cancel Request
+                    </button>
+                  </div>
+                  <div className={`p-3 bg-white border border-border rounded-xl text-muted-foreground font-medium ${isElderly ? 'text-base' : 'text-[11px]'}`}>
+                    Waiting for your caregiver to accept the link request. You can ask them to check their dashboard or settings page to approve.
+                  </div>
                 </div>
-              </div>
+              )
             ) : (
               <form onSubmit={handleLinkCaregiver} className="space-y-4">
                 <div className="bg-muted/10 border border-border/80 rounded-2xl p-4 space-y-3">
@@ -513,42 +591,85 @@ export default function SettingsClientView({
 
                 {/* Patient Connection Status */}
                 {caregiverRecord.patient_telegram_id ? (
-                  <div className="border border-border rounded-2xl p-4 bg-success/5 space-y-4">
-                    <div className="flex items-center justify-between border-b border-border/40 pb-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-success/15 text-success flex items-center justify-center">
-                          <User className="w-4 h-4" />
+                  caregiverRecord.connection_status === 'ACCEPTED' ? (
+                    <div className="border border-border rounded-2xl p-4 bg-success/5 space-y-4">
+                      <div className="flex items-center justify-between border-b border-border/40 pb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-success/15 text-success flex items-center justify-center">
+                            <User className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <span className={`block font-black text-foreground ${isElderly ? 'text-xl' : 'text-sm'}`}>
+                              Connected Patient: {linkedPatientName || 'Your Patient'}
+                            </span>
+                            <span className={`block text-muted-foreground font-semibold ${isElderly ? 'text-base' : 'text-[11px]'}`}>
+                              Telegram Chat ID: {caregiverRecord.patient_telegram_id}
+                            </span>
+                          </div>
                         </div>
-                        <div>
-                          <span className={`block font-black text-foreground ${isElderly ? 'text-xl' : 'text-sm'}`}>
-                            Connected Patient: {linkedPatientName || 'Your Patient'}
-                          </span>
-                          <span className={`block text-muted-foreground font-semibold ${isElderly ? 'text-base' : 'text-[11px]'}`}>
-                            Telegram Chat ID: {caregiverRecord.patient_telegram_id}
-                          </span>
-                        </div>
+                        <button
+                          onClick={handleUnlinkPatient}
+                          disabled={processing}
+                          className="p-2.5 text-danger bg-danger/10 hover:bg-danger/20 rounded-xl cursor-pointer transition-all disabled:opacity-50 shrink-0"
+                          title="Disconnect Patient"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
+
                       <button
-                        onClick={handleUnlinkPatient}
+                        onClick={handleMonitorPatient}
                         disabled={processing}
-                        className="p-2.5 text-danger bg-danger/10 hover:bg-danger/20 rounded-xl cursor-pointer transition-all disabled:opacity-50 shrink-0"
-                        title="Disconnect Patient"
+                        className={`w-full font-black rounded-xl bg-primary text-primary-foreground hover:bg-primary/95 transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2 ${
+                          isElderly ? 'h-[72px] text-2xl' : 'h-10 text-xs'
+                        }`}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Stethoscope className="w-4 h-4" />
+                        <span>Monitor Patient Dashboard</span>
                       </button>
                     </div>
+                  ) : (
+                    <div className="border border-warning/30 rounded-2xl p-4 bg-warning/5 space-y-4">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-border/40 pb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-warning/15 text-warning flex items-center justify-center">
+                            <User className="w-4 h-4 animate-bounce" />
+                          </div>
+                          <div>
+                            <span className={`block font-black text-foreground ${isElderly ? 'text-xl' : 'text-sm'}`}>
+                              Pending Connection Request: {linkedPatientName || 'New Patient'}
+                            </span>
+                            <span className={`block text-muted-foreground font-semibold ${isElderly ? 'text-base' : 'text-[11px]'}`}>
+                              Telegram Chat ID: {caregiverRecord.patient_telegram_id}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
 
-                    <button
-                      onClick={handleMonitorPatient}
-                      disabled={processing}
-                      className={`w-full font-black rounded-xl bg-primary text-primary-foreground hover:bg-primary/95 transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2 ${
-                        isElderly ? 'h-[72px] text-2xl' : 'h-10 text-xs'
-                      }`}
-                    >
-                      <Stethoscope className="w-4 h-4" />
-                      <span>Monitor Patient Dashboard</span>
-                    </button>
-                  </div>
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <button
+                          onClick={handleAcceptPatient}
+                          disabled={processing}
+                          className={`flex-1 font-black rounded-xl bg-success text-success-foreground hover:bg-success/90 transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2 ${
+                            isElderly ? 'h-[72px] text-2xl' : 'h-10 text-xs'
+                          }`}
+                        >
+                          <Check className="w-4 h-4" />
+                          <span>Accept Connection Request</span>
+                        </button>
+                        <button
+                          onClick={handleUnlinkPatient}
+                          disabled={processing}
+                          className={`font-bold rounded-xl bg-danger/10 text-danger hover:bg-danger/20 transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                            isElderly ? 'h-[72px] px-8 text-2xl' : 'h-10 px-5 text-xs'
+                          }`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          <span>Reject</span>
+                        </button>
+                      </div>
+                    </div>
+                  )
                 ) : (
                   <div className="border border-border border-dashed rounded-2xl p-6 text-center space-y-2 bg-muted/10">
                     <Smartphone className="w-8 h-8 text-muted-foreground mx-auto" />

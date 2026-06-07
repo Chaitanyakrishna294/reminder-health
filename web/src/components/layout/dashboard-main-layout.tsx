@@ -77,12 +77,12 @@ export default function DashboardMainLayout({
 
         const { data: link } = await supabase
           .from('caregiver_info')
-          .select('patient_telegram_id')
+          .select('patient_telegram_id, connection_status')
           .eq('caregiver_chat_id', profile.telegram_chat_id)
           .eq('is_active', true)
           .single();
 
-        if (!link?.patient_telegram_id) return;
+        if (!link?.patient_telegram_id || link.connection_status !== 'ACCEPTED') return;
 
         const { data: events } = await supabase
           .from('reminder_events')

@@ -594,22 +594,25 @@ const initCommands = () => {
             return;
           }
 
-          // Update caregiver record to link patient
+          // Update caregiver record to link patient and set status to PENDING
           const { error: linkErr } = await supabase
             .from('caregiver_info')
-            .update({ patient_telegram_id: chatId.toString() })
+            .update({ 
+              patient_telegram_id: chatId.toString(),
+              connection_status: 'PENDING'
+            })
             .eq('caregiver_id', cgId);
 
           if (linkErr) {
             console.error('[Caregiver] Linking error:', linkErr);
             await bot.sendMessage(chatId, '❌ Failed to link caregiver. Please try again later.');
           } else {
-            await bot.sendMessage(chatId, `✅ Successfully linked to caregiver: <b>${escapeHTML(caregiver.caregiver_name)}</b>!`, { parse_mode: 'HTML' });
+            await bot.sendMessage(chatId, `⏳ Connection request sent to caregiver: <b>${escapeHTML(caregiver.caregiver_name)}</b>!\n\nThey have been notified and must approve the connection from their settings page before linking is complete.`, { parse_mode: 'HTML' });
             
             // Notify the caregiver
             try {
               const patientName = `${msg.from.first_name || ''} ${msg.from.last_name || ''}`.trim() || 'Your patient';
-              await bot.sendMessage(caregiver.caregiver_chat_id, `🔔 <b>Patient Connected!</b>\n\nPatient <b>${escapeHTML(patientName)}</b> has successfully linked to you as their caregiver. You will receive alerts if they miss their medications.`, { parse_mode: 'HTML' });
+              await bot.sendMessage(caregiver.caregiver_chat_id, `🔔 <b>Caregiver Connection Request!</b>\n\nPatient <b>${escapeHTML(patientName)}</b> has requested to link with you as their caregiver.\n\nPlease go to your dashboard settings page to review and <b>Accept</b> this connection request.`, { parse_mode: 'HTML' });
             } catch (notifyErr) {
               console.error('[Caregiver] Failed to notify caregiver:', notifyErr);
             }

@@ -72,12 +72,12 @@ export default function SchedulePlannerPage() {
         if (activeViewMode === 'PATIENT_MONITOR' && profile.role === 'CAREGIVER') {
           const { data: caregiverLink } = await supabase
             .from('caregiver_info')
-            .select('patient_telegram_id')
+            .select('patient_telegram_id, connection_status')
             .eq('caregiver_chat_id', profile.telegram_chat_id)
             .eq('is_active', true)
             .single();
 
-          if (caregiverLink && caregiverLink.patient_telegram_id) {
+          if (caregiverLink && caregiverLink.patient_telegram_id && caregiverLink.connection_status === 'ACCEPTED') {
             targetChatId = caregiverLink.patient_telegram_id;
             
             // Fetch patient name and medications concurrently

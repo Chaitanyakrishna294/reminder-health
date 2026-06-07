@@ -23,6 +23,7 @@ export default function CareConnectPage() {
   const [visibleCount, setVisibleCount] = useState(20);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
+  const [connectionStatus, setConnectionStatus] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
 
@@ -50,45 +51,52 @@ export default function CareConnectPage() {
         let resolvedPeerName = profile.role === 'CAREGIVER' ? 'Patient' : 'Caregiver';
         let resolvedPeerId = '';
         let resolvedIsLinked = false;
+        let resolvedStatus: string | null = null;
 
         if (profile.role === 'CAREGIVER') {
           const { data: caregiverLink } = await supabase
             .from('caregiver_info')
-            .select('patient_telegram_id')
+            .select('patient_telegram_id, connection_status')
             .eq('caregiver_chat_id', profile.telegram_chat_id)
             .eq('is_active', true)
-            .single();
+            .maybeSingle();
 
           if (caregiverLink && caregiverLink.patient_telegram_id) {
+            resolvedStatus = caregiverLink.connection_status || 'ACCEPTED';
             const { data: patientProfile } = await supabase
               .from('profiles')
               .select('id, full_name')
               .eq('telegram_chat_id', caregiverLink.patient_telegram_id)
-              .single();
+              .maybeSingle();
             if (patientProfile) {
               resolvedPeerName = patientProfile.full_name;
               resolvedPeerId = patientProfile.id;
-              resolvedIsLinked = true;
+              if (resolvedStatus === 'ACCEPTED') {
+                resolvedIsLinked = true;
+              }
             }
           }
         } else {
           const { data: caregiverLink } = await supabase
             .from('caregiver_info')
-            .select('caregiver_chat_id')
+            .select('caregiver_chat_id, connection_status')
             .eq('patient_telegram_id', profile.telegram_chat_id)
             .eq('is_active', true)
-            .single();
+            .maybeSingle();
 
           if (caregiverLink && caregiverLink.caregiver_chat_id) {
+            resolvedStatus = caregiverLink.connection_status || 'ACCEPTED';
             const { data: caregiverProfile } = await supabase
               .from('profiles')
               .select('id, full_name')
               .eq('telegram_chat_id', caregiverLink.caregiver_chat_id)
-              .single();
+              .maybeSingle();
             if (caregiverProfile) {
               resolvedPeerName = caregiverProfile.full_name;
               resolvedPeerId = caregiverProfile.id;
-              resolvedIsLinked = true;
+              if (resolvedStatus === 'ACCEPTED') {
+                resolvedIsLinked = true;
+              }
             }
           }
         }
@@ -96,13 +104,18 @@ export default function CareConnectPage() {
         setPeerName(resolvedPeerName);
         setPeerId(resolvedPeerId);
         setIsLinked(resolvedIsLinked);
+        setConnectionStatus(resolvedStatus);
 
-        // Fetch messages from Supabase chat_messages table if linked
+        // Fetch messages from Supabase chat_messages table if linked (last 7 days only)
         if (resolvedIsLinked && resolvedPeerId) {
+          const sevenDaysAgo = new Date();
+          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
           const { data: msgsData } = await supabase
             .from('chat_messages')
             .select('*')
             .or(`and(sender_id.eq.${user.id},recipient_id.eq.${resolvedPeerId}),and(sender_id.eq.${resolvedPeerId},recipient_id.eq.${user.id})`)
+            .gte('created_at', sevenDaysAgo.toISOString())
             .order('created_at', { ascending: true })
             .limit(100);
 
@@ -245,7 +258,9 @@ export default function CareConnectPage() {
   }
 
   // Connection validation screen
+  // Connection validation screen
   if (!isLinked) {
+    const isPending = connectionStatus === 'PENDING';
     const roleText = userProfile?.role === 'CAREGIVER' ? 'Patient' : 'Caregiver';
     return (
       <div className="max-w-4xl mx-auto space-y-6">
@@ -257,33 +272,59 @@ export default function CareConnectPage() {
               Care Connect
             </h1>
             <p className="text-xs text-muted-foreground font-semibold mt-1">
-              Secure connection channel with your {roleText}.
+              Secure connection channel with your {roleText.toLowerCase()}.
             </p>
           </div>
         </div>
 
         {/* Warning Panel */}
         <div className="bg-card border border-border rounded-[24px] shadow-sm p-8 text-center space-y-6 flex flex-col items-center max-w-xl mx-auto mt-12">
-          <div className="w-16 h-16 rounded-full bg-warning/10 text-warning flex items-center justify-center border border-warning/20">
-            <ShieldAlert className="w-8 h-8 text-warning" />
+          <div className={`w-16 h-16 rounded-full flex items-center justify-center border ${
+            isPending 
+              ? 'bg-warning/10 border-warning/20 text-warning' 
+              : 'bg-danger/10 border-danger/20 text-danger'
+          }`}>
+            {isPending ? (
+              <Clock className="w-8 h-8 text-warning animate-pulse" />
+            ) : (
+              <ShieldAlert className="w-8 h-8 text-danger" />
+            )}
           </div>
           <div className="space-y-2">
-            <h2 className="text-xl font-bold text-foreground">Connection Required</h2>
+            <h2 className="text-xl font-bold text-foreground">
+              {isPending ? 'Connection Approval Pending' : 'Connection Required'}
+            </h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Care Connect requires a linked connection between a Patient and a Caregiver. Only paired accounts can use this secure chat channel.
+              {isPending 
+                ? `A connection request has been sent, but is currently waiting for approval. You can start chatting once your ${roleText.toLowerCase()} accepts the connection request.`
+                : 'Care Connect requires a linked connection between a Patient and a Caregiver. Only paired accounts can use this secure chat channel.'}
             </p>
           </div>
           
           <div className="bg-muted p-4 rounded-2xl border border-border text-left w-full space-y-3">
-            <h4 className="text-xs font-black text-foreground uppercase tracking-wider">How to connect:</h4>
-            {userProfile?.role === 'CAREGIVER' ? (
-              <p className="text-xs text-muted-foreground leading-relaxed font-semibold">
-                Please share your <b>Caregiver ID</b> with your patient. They can enter it in their Telegram bot menu under <b>👨‍⚕️ Caregiver</b> → <b>➕ Add Caregiver</b>. Your ID is available on your dashboard console.
-              </p>
+            <h4 className="text-xs font-black text-foreground uppercase tracking-wider">
+              {isPending ? 'Next Steps:' : 'How to connect:'}
+            </h4>
+            {isPending ? (
+              userProfile?.role === 'CAREGIVER' ? (
+                <p className="text-xs text-muted-foreground leading-relaxed font-semibold">
+                  You have a pending connection request from <b>{peerName}</b>. Please go to your <b>Settings</b> page to review and <b>Accept</b> this connection request.
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground leading-relaxed font-semibold">
+                  Waiting for caregiver <b>{peerName}</b> to approve your connection request. You can ask them to check their web dashboard settings page.
+                </p>
+              )
             ) : (
-              <p className="text-xs text-muted-foreground leading-relaxed font-semibold">
-                Please pair your Telegram bot account first. Go to your Telegram bot, enter <b>/linkweb</b> to get your 6-digit pairing code, and link it on your web dashboard Settings.
-              </p>
+              userProfile?.role === 'CAREGIVER' ? (
+                <p className="text-xs text-muted-foreground leading-relaxed font-semibold">
+                  Please share your <b>Caregiver ID</b> with your patient. They can enter it in their profile settings. Your ID is available on your Settings page.
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground leading-relaxed font-semibold">
+                  Please pair your caregiver first. Go to your profile <b>Settings</b>, enter your caregiver's ID in the Caregiver Management section, and click Link.
+                </p>
+              )
             )}
           </div>
         </div>
@@ -312,13 +353,13 @@ export default function CareConnectPage() {
         </div>
       </div>
 
-      {/* Information Banner (7-14 days Auto-Archive) */}
+      {/* Information Banner (7 days Auto-Archive) */}
       <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 flex items-start gap-3">
         <Clock className="w-5 h-5 text-primary shrink-0 mt-0.5" />
         <div>
           <p className="text-xs font-bold text-foreground">Message Retention Policy</p>
           <p className="text-[11px] text-muted-foreground font-medium mt-0.5">
-            To ensure maximum patient privacy and HIPAA compliance, all chat history is automatically archived and deleted from local caches after 14 days.
+            To ensure maximum patient privacy and HIPAA compliance, all chat history is automatically deleted after 7 days.
           </p>
         </div>
       </div>

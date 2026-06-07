@@ -298,6 +298,7 @@ const initScheduler = () => {
                 .from('caregiver_info')
                 .select('caregiver_chat_id')
                 .eq('patient_telegram_id', med.telegram_id)
+                .eq('connection_status', 'ACCEPTED')
                 .eq('is_active', true);
 
               if (cgErr) throw cgErr;
@@ -468,6 +469,7 @@ const initScheduler = () => {
                   .from('caregiver_info')
                   .select('caregiver_chat_id')
                   .eq('patient_telegram_id', med.telegram_id)
+                  .eq('connection_status', 'ACCEPTED')
                   .eq('is_active', true);
 
                 if (caregivers && caregivers.length > 0) {
@@ -723,6 +725,7 @@ const initScheduler = () => {
         .from('caregiver_info')
         .select('*')
         .eq('is_active', true)
+        .eq('connection_status', 'ACCEPTED')
         .in('patient_telegram_id', activePatientIds);
 
       if (linkErr) {
