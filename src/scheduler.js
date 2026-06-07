@@ -1,9 +1,77 @@
 const cron = require('node-cron');
 const moment = require('moment-timezone');
+const webpush = require('web-push');
 const { bot } = require('./bot');
 const { supabase } = require('./db');
 const { delay, calculateNextReminder, escapeHTML, activeSnoozes } = require('./utils');
 const { CALLBACK_ACTIONS, MAX_SNOOZES } = require('./constants');
+
+// ── Browser Push Setup ──────────────────────────────────────────────────────
+if (!process.env.VAPID_SUBJECT || !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
+  console.warn('[Push] VAPID env vars missing — browser push notifications disabled.');
+} else {
+  webpush.setVapidDetails(
+    process.env.VAPID_SUBJECT,
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  );
+  console.log('[Push] web-push VAPID initialized.');
+}
+
+/**
+ * sendBrowserPush — fire-and-forget browser push to all subscriptions for a telegram user.
+ * @param {string} telegramId  - The patient or caregiver telegram_chat_id
+ * @param {{ title: string, body: string, eventId?: string|number }} payload
+ */
+async function sendBrowserPush(telegramId, payload) {
+  if (!process.env.VAPID_PRIVATE_KEY) return; // VAPID not configured
+  try {
+    // 1. Find user profile by telegram_chat_id
+    const { data: profile, error: profErr } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('telegram_chat_id', telegramId)
+      .single();
+
+    if (profErr || !profile) return; // user not registered on web dashboard
+
+    // 2. Fetch all push subscriptions for this user
+    const { data: subs, error: subErr } = await supabase
+      .from('push_subscriptions')
+      .select('id, endpoint, p256dh, auth')
+      .eq('user_id', profile.id);
+
+    if (subErr || !subs || subs.length === 0) return; // no subscriptions
+
+    const pushPayload = JSON.stringify({
+      title: payload.title,
+      body: payload.body,
+      eventId: payload.eventId || null
+    });
+
+    // 3. Send to each subscription, delete expired ones
+    for (const sub of subs) {
+      const subscription = {
+        endpoint: sub.endpoint,
+        keys: { p256dh: sub.p256dh, auth: sub.auth }
+      };
+      try {
+        await webpush.sendNotification(subscription, pushPayload);
+        console.log(`[Push] Delivered to user ${profile.id} endpoint ...${sub.endpoint.slice(-20)}`);
+      } catch (pushErr) {
+        if (pushErr.statusCode === 410 || pushErr.statusCode === 404) {
+          // Subscription expired or invalid — clean up
+          console.log(`[Push] Subscription expired (${pushErr.statusCode}). Removing sub ID ${sub.id}.`);
+          await supabase.from('push_subscriptions').delete().eq('id', sub.id);
+        } else {
+          console.error(`[Push] Failed to deliver to sub ID ${sub.id}:`, pushErr.message);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[Push] sendBrowserPush error:', err);
+  }
+}
 
 const initScheduler = () => {
   console.log('⏰ Schedulers initialized.');
@@ -140,8 +208,13 @@ const initScheduler = () => {
 
             console.log(`[Workflow State Change] Created reminder_event ID ${eventData[0].id} for Med ID ${med.id} with status 'PENDING_PATIENT'`);
             console.log(`[Scheduler] Sending Telegram message for Med ID: ${med.id}`);
-            // 3. Send Reminder
+            // 3. Send Reminder (Telegram + Browser Push)
             await bot.sendMessage(med.telegram_id, message, { parse_mode: 'HTML', reply_markup: inlineKeyboard });
+            sendBrowserPush(med.telegram_id, {
+              title: '💊 Medication Reminder',
+              body: `Time to take ${med.drug_name}${med.dosage ? ` (${med.dosage})` : ''}.`,
+              eventId: eventData[0] ? eventData[0].id : null
+            });
 
             // 4. Calculate next reminder from the JSONB array
             const nextReminder = calculateNextReminder(med.reminder_times);
@@ -259,6 +332,11 @@ const initScheduler = () => {
 
               const message = `💊 Time to take <b>${escapeHTML(med.drug_name)}</b>${med.dosage ? ` (${escapeHTML(med.dosage)})` : ''}`;
               await bot.sendMessage(med.telegram_id, message, { parse_mode: 'HTML', reply_markup: inlineKeyboard });
+              sendBrowserPush(med.telegram_id, {
+                title: '⏰ Snooze Reminder',
+                body: `Time to take ${med.drug_name}${med.dosage ? ` (${med.dosage})` : ''}.`,
+                eventId: event.id
+              });
               await delay(200);
             } catch (snoozeErr) {
               console.error(`[Scheduler] Failed to send snooze expiration to ${med.telegram_id}:`, snoozeErr);
@@ -334,6 +412,11 @@ const initScheduler = () => {
                   try {
                     await bot.sendMessage(cg.caregiver_chat_id, alertMessage, { parse_mode: 'HTML', reply_markup: alertButtons });
                     console.log(`[Scheduler] Sent missed dose alert to Caregiver: ${cg.caregiver_chat_id}`);
+                    sendBrowserPush(cg.caregiver_chat_id, {
+                      title: '⚠️ Patient Missed Medication',
+                      body: `${patientName} has not taken ${med.drug_name}. Action required.`,
+                      eventId: event.id
+                    });
                   } catch (sendErr) {
                     console.error(`[Scheduler] Failed to send alert to caregiver ${cg.caregiver_chat_id}:`, sendErr);
                   }
@@ -391,6 +474,11 @@ const initScheduler = () => {
             console.log(`[Workflow State Change] Event ID ${event.id} is being retried. Transitioned status from ${event.reminder_status} to RETRYING_PATIENT (retry_count: ${event.retry_count + 1})`);
             console.log(`[Scheduler] Sending Telegram retry message for Med ID: ${med.id}`);
             await bot.sendMessage(med.telegram_id, message, { parse_mode: 'HTML', reply_markup: inlineKeyboard });
+            sendBrowserPush(med.telegram_id, {
+              title: '⏰ Reminder — Please Respond',
+              body: `Have you taken ${med.drug_name} yet? This is a follow-up reminder.`,
+              eventId: event.id
+            });
             await delay(200); // flood limit delay
           } catch (sendErr) {
             console.error(`[Scheduler] Failed to send retry to ${med.telegram_id}:`, sendErr);
@@ -456,9 +544,14 @@ const initScheduler = () => {
                 response: 'MISSED'
               }]);
 
-              // 2. Notify patient
+              // 2. Notify patient (Telegram + Browser Push)
               try {
                 await bot.sendMessage(med.telegram_id, `❌ You missed your medication: <b>${escapeHTML(med.drug_name)}</b>.`, { parse_mode: 'HTML' });
+                sendBrowserPush(med.telegram_id, {
+                  title: '❌ Medication Missed',
+                  body: `You missed your scheduled dose of ${med.drug_name}.`,
+                  eventId: event.id
+                });
               } catch (err) {
                 console.error(`[Scheduler] Failed to notify patient ${med.telegram_id} of missed dose:`, err);
               }
@@ -485,6 +578,11 @@ const initScheduler = () => {
                     try {
                       await bot.sendMessage(cg.caregiver_chat_id, alertMsg, { parse_mode: 'HTML' });
                       console.log(`[Scheduler] Sent critical escalation alert to Caregiver: ${cg.caregiver_chat_id}`);
+                      sendBrowserPush(cg.caregiver_chat_id, {
+                        title: '🔴 CRITICAL — Patient Missed Medication',
+                        body: `${patientName} did NOT take critical medication ${med.drug_name}. Check on patient immediately.`,
+                        eventId: event.id
+                      });
                     } catch (cgSendErr) {
                       console.error(`Failed to send emergency alert to caregiver ${cg.caregiver_chat_id}:`, cgSendErr);
                     }
