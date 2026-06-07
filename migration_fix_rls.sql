@@ -1,5 +1,6 @@
 -- 1. FIX MEDICATIONS RLS POLICIES
 DROP POLICY IF EXISTS "Patients can manage their medications" ON public.medications;
+DROP POLICY IF EXISTS "Users can manage their own medications" ON public.medications;
 DROP POLICY IF EXISTS "Caregivers can view patient medications" ON public.medications;
 
 -- Allow all authenticated users (both patients and caregivers) to view and manage their own medications
@@ -22,8 +23,10 @@ CREATE POLICY "Caregivers can view patient medications" ON public.medications
 
 -- 2. FIX REMINDER EVENTS RLS POLICIES
 DROP POLICY IF EXISTS "Patients view own events" ON public.reminder_events;
+DROP POLICY IF EXISTS "Users view own events" ON public.reminder_events;
 DROP POLICY IF EXISTS "Caregivers view patient events" ON public.reminder_events;
 DROP POLICY IF EXISTS "Patients resolve own events" ON public.reminder_events;
+DROP POLICY IF EXISTS "Users resolve own events" ON public.reminder_events;
 DROP POLICY IF EXISTS "Caregivers resolve patient events" ON public.reminder_events;
 
 -- Allow users to view their own reminder events
@@ -64,8 +67,10 @@ CREATE POLICY "Caregivers resolve patient events" ON public.reminder_events
 
 -- 3. FIX REMINDER LOGS RLS POLICIES
 DROP POLICY IF EXISTS "Patients view own logs" ON public.reminder_logs;
+DROP POLICY IF EXISTS "Users view own logs" ON public.reminder_logs;
 DROP POLICY IF EXISTS "Caregivers view patient logs" ON public.reminder_logs;
 DROP POLICY IF EXISTS "Patients insert own logs" ON public.reminder_logs;
+DROP POLICY IF EXISTS "Users insert own logs" ON public.reminder_logs;
 DROP POLICY IF EXISTS "Caregivers insert patient logs" ON public.reminder_logs;
 
 -- Allow users to view their own reminder logs
