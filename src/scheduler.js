@@ -210,7 +210,7 @@ const initScheduler = () => {
             console.log(`[Scheduler] Sending Telegram message for Med ID: ${med.id}`);
             // 3. Send Reminder (Telegram + Browser Push)
             await bot.sendMessage(med.telegram_id, message, { parse_mode: 'HTML', reply_markup: inlineKeyboard });
-            sendBrowserPush(med.telegram_id, {
+            await sendBrowserPush(med.telegram_id, {
               title: '💊 Medication Reminder',
               body: `Time to take ${med.drug_name}${med.dosage ? ` (${med.dosage})` : ''}.`,
               eventId: eventData[0] ? eventData[0].id : null
@@ -332,7 +332,7 @@ const initScheduler = () => {
 
               const message = `💊 Time to take <b>${escapeHTML(med.drug_name)}</b>${med.dosage ? ` (${escapeHTML(med.dosage)})` : ''}`;
               await bot.sendMessage(med.telegram_id, message, { parse_mode: 'HTML', reply_markup: inlineKeyboard });
-              sendBrowserPush(med.telegram_id, {
+              await sendBrowserPush(med.telegram_id, {
                 title: '⏰ Snooze Reminder',
                 body: `Time to take ${med.drug_name}${med.dosage ? ` (${med.dosage})` : ''}.`,
                 eventId: event.id
@@ -412,7 +412,7 @@ const initScheduler = () => {
                   try {
                     await bot.sendMessage(cg.caregiver_chat_id, alertMessage, { parse_mode: 'HTML', reply_markup: alertButtons });
                     console.log(`[Scheduler] Sent missed dose alert to Caregiver: ${cg.caregiver_chat_id}`);
-                    sendBrowserPush(cg.caregiver_chat_id, {
+                    await sendBrowserPush(cg.caregiver_chat_id, {
                       title: '⚠️ Patient Missed Medication',
                       body: `${patientName} has not taken ${med.drug_name}. Action required.`,
                       eventId: event.id
@@ -474,7 +474,7 @@ const initScheduler = () => {
             console.log(`[Workflow State Change] Event ID ${event.id} is being retried. Transitioned status from ${event.reminder_status} to RETRYING_PATIENT (retry_count: ${event.retry_count + 1})`);
             console.log(`[Scheduler] Sending Telegram retry message for Med ID: ${med.id}`);
             await bot.sendMessage(med.telegram_id, message, { parse_mode: 'HTML', reply_markup: inlineKeyboard });
-            sendBrowserPush(med.telegram_id, {
+            await sendBrowserPush(med.telegram_id, {
               title: '⏰ Reminder — Please Respond',
               body: `Have you taken ${med.drug_name} yet? This is a follow-up reminder.`,
               eventId: event.id
@@ -547,7 +547,7 @@ const initScheduler = () => {
               // 2. Notify patient (Telegram + Browser Push)
               try {
                 await bot.sendMessage(med.telegram_id, `❌ You missed your medication: <b>${escapeHTML(med.drug_name)}</b>.`, { parse_mode: 'HTML' });
-                sendBrowserPush(med.telegram_id, {
+                await sendBrowserPush(med.telegram_id, {
                   title: '❌ Medication Missed',
                   body: `You missed your scheduled dose of ${med.drug_name}.`,
                   eventId: event.id
@@ -578,7 +578,7 @@ const initScheduler = () => {
                     try {
                       await bot.sendMessage(cg.caregiver_chat_id, alertMsg, { parse_mode: 'HTML' });
                       console.log(`[Scheduler] Sent critical escalation alert to Caregiver: ${cg.caregiver_chat_id}`);
-                      sendBrowserPush(cg.caregiver_chat_id, {
+                      await sendBrowserPush(cg.caregiver_chat_id, {
                         title: '🔴 CRITICAL — Patient Missed Medication',
                         body: `${patientName} did NOT take critical medication ${med.drug_name}. Check on patient immediately.`,
                         eventId: event.id
