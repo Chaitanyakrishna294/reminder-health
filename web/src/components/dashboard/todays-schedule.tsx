@@ -126,51 +126,7 @@ export default function TodaysSchedule({
     }, 4500);
   };
 
-  // Supabase Realtime Subscription
-  useEffect(() => {
-    if (!patientTelegramChatId) return;
 
-    const channel = supabase
-      .channel(`schedule-realtime-${patientTelegramChatId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'reminder_events',
-          filter: `telegram_id=eq.${patientTelegramChatId}`,
-        },
-        async (payload: any) => {
-          const updatedEvent = payload.new;
-          if (!updatedEvent) return;
-
-          setEvents((prev) => {
-            const index = prev.findIndex((e) => e.id === updatedEvent.id);
-            if (index === -1) return prev;
-            
-            const existing = prev[index];
-            if (existing.reminder_status === updatedEvent.reminder_status) return prev;
-
-            const updated = prev.map((e) =>
-              e.id === updatedEvent.id
-                ? {
-                    ...e,
-                    reminder_status: updatedEvent.reminder_status,
-                    snooze_count: updatedEvent.snooze_count,
-                  }
-                : e
-            );
-            if (onEventsChange) onEventsChange(updated);
-            return updated;
-          });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [patientTelegramChatId, supabase, onEventsChange]);
 
   const handleResolve = async (
     event: ReminderEvent,

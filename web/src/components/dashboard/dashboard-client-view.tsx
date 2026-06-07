@@ -56,6 +56,7 @@ interface DashboardClientViewProps {
   activeEscalations: number;
   lowStockCount: number;
   todayEvents: ReminderEvent[];
+  medications: any[];
   myTelegramChatId: string;
   targetTelegramChatId?: string;
   chartData: any[];
@@ -71,12 +72,13 @@ export default function DashboardClientView({
   patientName,
   monthlyAdherence,
   todayTaken: initialTodayTaken,
-  todayTotal,
+  todayTotal: initialTodayTotal,
   todaySkipped: initialTodaySkipped,
   todayMissed: initialTodayMissed,
   activeEscalations: initialActiveEscalations,
   lowStockCount,
   todayEvents,
+  medications,
   myTelegramChatId,
   targetTelegramChatId,
   chartData,
@@ -106,7 +108,7 @@ export default function DashboardClientView({
       </div>
     );
   }
-  const [events, setEvents] = useState<ReminderEvent[]>(todayEvents);
+  const [events, setEvents] = useState<ReminderEvent[]>([]);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [hoveredEvent, setHoveredEvent] = useState<ReminderEvent | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -143,13 +145,72 @@ export default function DashboardClientView({
     setShowPushBanner(false);
   };
 
-  // Sync state with parent changes
-  useEffect(() => {
-    setEvents(todayEvents);
-  }, [todayEvents]);
-
   const supabase = createClient();
   const router = useRouter();
+
+  // Generate virtual events and filter database events to user's local day client-side
+  useEffect(() => {
+    const now = new Date();
+    
+    // Start/end of local day
+    const clientStartOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const clientEndOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
+
+    // Filter database events to the client's local day
+    const dbEventsToday = todayEvents.filter((e) => {
+      const eTime = new Date(e.scheduled_for).getTime();
+      return eTime >= clientStartOfToday && eTime <= clientEndOfToday;
+    });
+
+    const generatedEvents: ReminderEvent[] = [...dbEventsToday];
+
+    if (medications && medications.length > 0) {
+      medications.forEach((med) => {
+        const times = (med.reminder_times || []) as string[];
+        times.forEach((timeStr) => {
+          const [hours, minutes] = timeStr.split(':').map(Number);
+          
+          // Construct local date/time in client's local timezone
+          const reminderDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
+          
+          // Check if database event already covers this medication scheduled at this local time today
+          const eventExists = dbEventsToday.some((e) => {
+            const eDate = new Date(e.scheduled_for);
+            return (
+              e.medication_id === med.id &&
+              eDate.getHours() === hours &&
+              eDate.getMinutes() === minutes
+            );
+          });
+
+          if (!eventExists) {
+            const virtualId = -(med.id * 1000 + hours * 60 + minutes);
+            // 10-minute grace period for virtual events to become MISSED
+            const isPast = reminderDate.getTime() < (now.getTime() - 10 * 60 * 1000);
+            
+            generatedEvents.push({
+              id: virtualId,
+              medication_id: med.id,
+              telegram_id: targetTelegramChatId || myTelegramChatId || '',
+              scheduled_for: reminderDate.toISOString(),
+              reminder_status: isPast ? 'MISSED' : 'FUTURE_SCHEDULED',
+              snooze_count: 0,
+              medications: {
+                drug_name: med.drug_name,
+                dosage: med.dosage || 'N/A',
+                priority_level: med.priority_level || 'normal',
+              },
+            });
+          }
+        });
+      });
+      
+      // Sort chronologically
+      generatedEvents.sort((a, b) => new Date(a.scheduled_for).getTime() - new Date(b.scheduled_for).getTime());
+    }
+
+    setEvents(generatedEvents);
+  }, [todayEvents, medications, targetTelegramChatId, myTelegramChatId]);
 
   // Toast Helper
   const showToast = (title: string, message: string, type: 'success' | 'error' = 'success') => {
@@ -170,32 +231,14 @@ export default function DashboardClientView({
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: '*', // Listen to INSERT, UPDATE, DELETE to keep everything synchronized
           schema: 'public',
           table: 'reminder_events',
           filter: `telegram_id=eq.${patientId}`,
         },
-        (payload: any) => {
-          const updatedEvent = payload.new;
-          if (!updatedEvent) return;
-
-          setEvents((prev) => {
-            const index = prev.findIndex((e) => e.id === updatedEvent.id);
-            if (index === -1) return prev;
-
-            const existing = prev[index];
-            if (existing.reminder_status === updatedEvent.reminder_status) return prev;
-
-            return prev.map((e) =>
-              e.id === updatedEvent.id
-                ? {
-                    ...e,
-                    reminder_status: updatedEvent.reminder_status,
-                    snooze_count: updatedEvent.snooze_count,
-                  }
-                : e
-            );
-          });
+        () => {
+          // Trigger a Server Component re-fetch to pull the latest database state
+          router.refresh();
         }
       )
       .subscribe();
@@ -203,13 +246,14 @@ export default function DashboardClientView({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [targetTelegramChatId, myTelegramChatId, supabase]);
+  }, [targetTelegramChatId, myTelegramChatId, supabase, router]);
 
-  // Dynamic calculations based on current state
+  // Dynamic calculations based on current state (timezone-safe, calculated on client)
   const todayTaken = events.filter(e => e.reminder_status === 'TAKEN' || e.reminder_status === 'RESOLVED_BY_CG').length;
   const todaySkipped = events.filter(e => e.reminder_status === 'SKIPPED').length;
   const todayMissed = events.filter(e => e.reminder_status === 'MISSED').length;
   const activeEscalations = events.filter(e => e.reminder_status === 'ESCALATED_TO_CG').length;
+  const todayTotal = events.length;
 
   const isGravityState = activeEscalations > 0 || todayMissed > 0;
 
@@ -454,7 +498,7 @@ export default function DashboardClientView({
                   <div className="p-6 bg-muted/60 border border-border rounded-2xl text-center text-xl font-black text-muted-foreground mt-6">
                     🔒 Read-Only Monitor Mode
                   </div>
-                ) : (
+                ) : (new Date(nextPendingEvent.scheduled_for).getTime() <= new Date().getTime()) ? (
                   <div className="flex flex-col sm:flex-row gap-4 mt-6">
                     <button
                       onClick={() => handleElderlyTakeNow(nextPendingEvent, 'TAKEN')}
@@ -470,6 +514,10 @@ export default function DashboardClientView({
                     >
                       SKIP
                     </button>
+                  </div>
+                ) : (
+                  <div className="mt-6 p-6 bg-muted/60 border border-border rounded-2xl text-center text-xl font-black text-muted-foreground">
+                    🕒 Options will become available at {mounted ? new Date(nextPendingEvent.scheduled_for).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
                   </div>
                 )}
               </div>
@@ -670,9 +718,16 @@ export default function DashboardClientView({
 
           <div className="md:col-span-1 border-b md:border-b-0 md:border-r border-primary/10 pb-3 md:pb-0 md:pr-4 flex flex-col justify-center">
             <span className="text-[10px] font-black text-primary uppercase tracking-wider">Last Taken Dose</span>
-            <h3 className="text-xs font-black text-foreground mt-0.5 truncate" title={lastTaken ? `${lastTaken.drug_name} at ${lastTaken.time}` : 'None taken today'}>
-              {lastTaken ? `${lastTaken.drug_name} (${lastTaken.time})` : 'None taken today'}
-            </h3>
+            {(() => {
+              const formattedLastTakenTime = mounted && lastTaken
+                ? new Date(lastTaken.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                : '';
+              return (
+                <h3 className="text-xs font-black text-foreground mt-0.5 truncate" title={lastTaken ? `${lastTaken.drug_name} at ${formattedLastTakenTime}` : 'None taken today'}>
+                  {lastTaken ? `${lastTaken.drug_name} (${formattedLastTakenTime})` : 'None taken today'}
+                </h3>
+              );
+            })()}
           </div>
 
           <div className="md:col-span-1 border-b md:border-b-0 md:border-r border-primary/10 pb-3 md:pb-0 md:pr-4 flex flex-col justify-center">
@@ -881,7 +936,7 @@ export default function DashboardClientView({
               <div className="mt-6 p-3 bg-muted border border-border rounded-2xl text-[11px] font-bold text-muted-foreground w-fit">
                 🔒 Read-Only Monitoring Mode
               </div>
-            ) : (
+            ) : (new Date(nextPendingEvent.scheduled_for).getTime() <= new Date().getTime()) ? (
               <div className="mt-6 flex flex-wrap gap-2.5">
                 <button
                   onClick={() => handleElderlyTakeNow(nextPendingEvent, 'TAKEN')}
@@ -895,6 +950,10 @@ export default function DashboardClientView({
                 >
                   Skip
                 </button>
+              </div>
+            ) : (
+              <div className="mt-6 p-4 bg-muted/50 border border-border/80 rounded-2xl text-center text-xs font-semibold text-muted-foreground w-fit">
+                🕒 Options will become available at {mounted ? new Date(nextPendingEvent.scheduled_for).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
               </div>
             )
           )}

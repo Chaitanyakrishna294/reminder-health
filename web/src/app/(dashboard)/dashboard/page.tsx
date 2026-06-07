@@ -20,8 +20,9 @@ export default async function DashboardPage() {
 
   // 3. Fetch data for target patient in parallel
   const now = new Date();
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-  const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).toISOString();
+  // Query a 48-hour window (24 hours before/after now) to ensure timezone changes don't drop events
+  const startOfWindow = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+  const endOfWindow = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
 
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -51,8 +52,8 @@ export default async function DashboardPage() {
         )
       `)
       .eq('telegram_id', targetChatId)
-      .gte('scheduled_for', startOfToday)
-      .lte('scheduled_for', endOfToday)
+      .gte('scheduled_for', startOfWindow)
+      .lte('scheduled_for', endOfWindow)
       .order('scheduled_for', { ascending: true }),
     supabase
       .from('reminder_logs')
@@ -74,52 +75,6 @@ export default async function DashboardPage() {
 
   const todayEvents = (rawEvents || []) as unknown as ReminderEvent[];
 
-  // Dynamically generate virtual pending events for future scheduled reminder times today
-  const finalEvents: ReminderEvent[] = [...todayEvents];
-  if (medications && medications.length > 0 && targetChatId) {
-    medications.forEach((med) => {
-      const times = (med.reminder_times || []) as string[];
-      times.forEach((timeStr) => {
-        const [hours, minutes] = timeStr.split(':').map(Number);
-        
-        // Construct local time for this dose today
-        const reminderDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
-        
-        // Check if an actual event was already created for this medication at this time today
-        const eventExists = todayEvents.some((e) => {
-          const eDate = new Date(e.scheduled_for);
-          return (
-            e.medication_id === med.id &&
-            eDate.getHours() === hours &&
-            eDate.getMinutes() === minutes
-          );
-        });
-
-        if (!eventExists) {
-          const virtualId = -(med.id * 1000 + hours * 60 + minutes);
-          // 10-minute grace period for virtual events to become MISSED
-          const isPast = reminderDate.getTime() < (now.getTime() - 10 * 60 * 1000);
-          finalEvents.push({
-            id: virtualId,
-            medication_id: med.id,
-            telegram_id: targetChatId,
-            scheduled_for: reminderDate.toISOString(),
-            reminder_status: isPast ? 'MISSED' : 'FUTURE_SCHEDULED',
-            snooze_count: 0,
-            medications: {
-              drug_name: med.drug_name,
-              dosage: med.dosage || 'N/A',
-              priority_level: med.priority_level || 'normal',
-            },
-          });
-        }
-      });
-    });
-
-    // Sort all events chronologically
-    finalEvents.sort((a, b) => new Date(a.scheduled_for).getTime() - new Date(b.scheduled_for).getTime());
-  }
-
   const totalMonthlyDoses = monthlyLogs?.length || 0;
   const takenMonthlyDoses = monthlyLogs?.filter(l => l.response === 'TAKEN').length || 0;
   const monthlyAdherence = totalMonthlyDoses > 0 ? Math.round((takenMonthlyDoses / totalMonthlyDoses) * 100) : 100;
@@ -134,13 +89,6 @@ export default async function DashboardPage() {
     .map(m => ({ drug_name: m.drug_name, tablet_count: m.tablet_count }));
 
   const lowStockCount = lowStockMedicines.length;
-
-  // Today's metrics
-  const todayTotal = finalEvents.length;
-  const todayTaken = finalEvents.filter(e => e.reminder_status === 'TAKEN' || e.reminder_status === 'RESOLVED_BY_CG').length;
-  const todaySkipped = finalEvents.filter(e => e.reminder_status === 'SKIPPED').length;
-  const todayMissed = finalEvents.filter(e => e.reminder_status === 'MISSED').length;
-  const activeEscalations = finalEvents.filter(e => e.reminder_status === 'ESCALATED_TO_CG').length;
 
   // Group 7-day chart data points
   const chartDataMap: { [key: string]: { Taken: number; Skipped: number; Missed: number } } = {};
@@ -170,11 +118,12 @@ export default async function DashboardPage() {
     .filter(l => l.response === 'TAKEN')
     .sort((a, b) => new Date(b.scheduled_time).getTime() - new Date(a.scheduled_time).getTime());
 
+  // Pass raw scheduled_time to avoid timezone formatting mismatch on the server
   const lastTaken = takenLogs.length > 0 ? {
     drug_name: Array.isArray(takenLogs[0].medications)
       ? (takenLogs[0].medications[0]?.drug_name || 'Medication')
       : (takenLogs[0].medications as any)?.drug_name || 'Medication',
-    time: new Date(takenLogs[0].scheduled_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    time: takenLogs[0].scheduled_time
   } : null;
 
   return (
@@ -183,13 +132,14 @@ export default async function DashboardPage() {
       userName={profile.full_name || 'User'}
       patientName={patientName}
       monthlyAdherence={monthlyAdherence}
-      todayTaken={todayTaken}
-      todayTotal={todayTotal}
-      todaySkipped={todaySkipped}
-      todayMissed={todayMissed}
-      activeEscalations={activeEscalations}
+      todayTaken={0}
+      todayTotal={0}
+      todaySkipped={0}
+      todayMissed={0}
+      activeEscalations={0}
       lowStockCount={lowStockCount}
-      todayEvents={finalEvents}
+      todayEvents={todayEvents}
+      medications={medications || []}
       myTelegramChatId={myTelegramChatId || ''}
       targetTelegramChatId={targetChatId || ''}
       chartData={chartData}
