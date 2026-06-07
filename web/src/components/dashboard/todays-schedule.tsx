@@ -5,6 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { resolveReminderEvent } from '@/lib/reminder-events';
 import { useUiMode } from '@/context/ui-mode-context';
 import { Check, SkipForward, AlertCircle, Clock, AlertTriangle, Pill, CheckCircle, XCircle, X } from 'lucide-react';
 
@@ -137,111 +138,29 @@ export default function TodaysSchedule({
     setUpdatingId(event.id);
 
     try {
-      const now = new Date();
-      const scheduledTime = new Date(event.scheduled_for);
-      const delayMinutes = Math.max(0, Math.floor((now.getTime() - scheduledTime.getTime()) / 60000));
+      const resolvedRecord = await resolveReminderEvent({
+        supabase,
+        eventId: event.id,
+        medicationId: event.medication_id,
+        scheduledFor: event.scheduled_for,
+        action,
+        actorRole: userRole,
+      });
 
-      const resolvedStatus = userRole === 'CAREGIVER' ? 'RESOLVED_BY_CG' : action === 'TAKEN' ? 'TAKEN' : 'SKIPPED';
-      const resolvedBy = userRole === 'CAREGIVER' ? 'CAREGIVER' : 'PATIENT';
-
-      let data, updateErr;
-      if (event.id < 0) {
-        // Insert a new record since it is a virtual event
-        const { data: insData, error: insErr } = await supabase
-          .from('reminder_events')
-          .insert([{
-            medication_id: event.medication_id,
-            telegram_id: event.telegram_id,
-            scheduled_for: event.scheduled_for,
-            reminder_status: resolvedStatus,
-            resolved_at: now.toISOString(),
-            resolved_by: resolvedBy,
-            retry_reminder_at: null,
-            retry_count: 0,
-            snooze_count: 0,
-          }])
-          .select();
-        data = insData;
-        updateErr = insErr;
-      } else {
-        // Update the existing database record
-        const { data: updData, error: updErr } = await supabase
-          .from('reminder_events')
-          .update({
-            reminder_status: resolvedStatus,
-            resolved_at: now.toISOString(),
-            resolved_by: resolvedBy,
-            retry_reminder_at: null,
-            retry_count: 0,
-          })
-          .eq('id', event.id)
-          .in('reminder_status', ['PENDING_PATIENT', 'RETRYING_PATIENT', 'SNOOZED', 'ESCALATED_TO_CG', 'FUTURE_SCHEDULED'])
-          .select();
-        data = updData;
-        updateErr = updErr;
+      if (resolvedRecord.already_resolved) {
+        showToast(
+          'Medication already resolved',
+          'This medication was updated from another device.',
+          'error'
+        );
       }
 
-      if (updateErr) throw updateErr;
-
-      // 3. Concurrency check: If no rows updated, notify and refresh state (only for real events)
-      if (!data || data.length === 0) {
-        if (event.id >= 0) {
-          showToast(
-            'Medication already resolved',
-            'This medication was marked as Taken from another device.',
-            'error'
-          );
-
-          // Fetch latest version of this event to sync UI state
-          const { data: latestEvents } = await supabase
-            .from('reminder_events')
-            .select(`
-              id,
-              medication_id,
-              telegram_id,
-              scheduled_for,
-              reminder_status,
-              snooze_count,
-              medications:medication_id (
-                drug_name,
-                dosage,
-                priority_level
-              )
-            `)
-            .eq('id', event.id);
-
-          if (latestEvents && latestEvents.length > 0) {
-            const updatedEvent = latestEvents[0] as unknown as ReminderEvent;
-            const updatedList = events.map((e) => (e.id === event.id ? updatedEvent : e));
-            setEvents(updatedList);
-            if (onEventsChange) onEventsChange(updatedList);
-          }
-          return;
-        }
-      }
-
-      const resolvedRecord = data && data[0];
-
-      // 4. Log the resolution in reminder_logs
-      const { error: logErr } = await supabase.from('reminder_logs').insert([
-        {
-          telegram_id: event.telegram_id,
-          medication_id: event.medication_id,
-          scheduled_time: event.scheduled_for,
-          response: action,
-          delay_minutes: action === 'TAKEN' ? delayMinutes : null,
-        },
-      ]);
-
-      if (logErr) throw logErr;
-
-      // 5. Update local UI state immediately
       const updatedEvents = events.map((e) =>
         e.id === event.id
           ? { 
               ...e, 
-              id: resolvedRecord ? resolvedRecord.id : e.id,
-              reminder_status: resolvedStatus 
+              id: resolvedRecord.event_id ?? e.id,
+              reminder_status: resolvedRecord.reminder_status
             }
           : e
       );
@@ -249,8 +168,9 @@ export default function TodaysSchedule({
       if (onEventsChange) onEventsChange(updatedEvents);
 
       router.refresh();
-    } catch (err: any) {
-      console.error('[Today Schedule] Error resolving event:', err?.message || err, err);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('[Today Schedule] Error resolving event:', message, err);
       showToast('Error', 'Failed to update event. Please try again.', 'error');
     } finally {
       setUpdatingId(null);
