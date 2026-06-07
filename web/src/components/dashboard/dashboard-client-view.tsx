@@ -215,7 +215,7 @@ export default function DashboardClientView({
 
   // Find next pending event
   const isPendingState = (status: string) => {
-    return ['PENDING_PATIENT', 'RETRYING_PATIENT', 'SNOOZED', 'ESCALATED_TO_CG'].includes(status);
+    return ['PENDING_PATIENT', 'RETRYING_PATIENT', 'SNOOZED', 'ESCALATED_TO_CG', 'FUTURE_SCHEDULED'].includes(status);
   };
   const nextPendingEvent = [...events]
     .filter(e => isPendingState(e.reminder_status))
@@ -235,54 +235,81 @@ export default function DashboardClientView({
       const resolvedStatus = activeRole === 'CAREGIVER' ? 'RESOLVED_BY_CG' : action === 'TAKEN' ? 'TAKEN' : 'SKIPPED';
       const resolvedBy = activeRole === 'CAREGIVER' ? 'CAREGIVER' : 'PATIENT';
 
-      // 2. Database-level protection and optimistic locking
-      const { data, error: updateErr } = await supabase
-        .from('reminder_events')
-        .update({
-          reminder_status: resolvedStatus,
-          resolved_at: now.toISOString(),
-          resolved_by: resolvedBy,
-          retry_reminder_at: null,
-          retry_count: 0,
-        })
-        .eq('id', event.id)
-        .in('reminder_status', ['PENDING_PATIENT', 'RETRYING_PATIENT', 'SNOOZED', 'ESCALATED_TO_CG'])
-        .select();
+      let data, updateErr;
+      if (event.id < 0) {
+        // Insert a new record since it is a virtual event
+        const { data: insData, error: insErr } = await supabase
+          .from('reminder_events')
+          .insert([{
+            medication_id: event.medication_id,
+            telegram_id: event.telegram_id,
+            scheduled_for: event.scheduled_for,
+            reminder_status: resolvedStatus,
+            resolved_at: now.toISOString(),
+            resolved_by: resolvedBy,
+            retry_reminder_at: null,
+            retry_count: 0,
+            snooze_count: 0,
+          }])
+          .select();
+        data = insData;
+        updateErr = insErr;
+      } else {
+        // Update existing record
+        const { data: updData, error: updErr } = await supabase
+          .from('reminder_events')
+          .update({
+            reminder_status: resolvedStatus,
+            resolved_at: now.toISOString(),
+            resolved_by: resolvedBy,
+            retry_reminder_at: null,
+            retry_count: 0,
+          })
+          .eq('id', event.id)
+          .in('reminder_status', ['PENDING_PATIENT', 'RETRYING_PATIENT', 'SNOOZED', 'ESCALATED_TO_CG', 'FUTURE_SCHEDULED'])
+          .select();
+        data = updData;
+        updateErr = updErr;
+      }
 
       if (updateErr) throw updateErr;
 
-      // 3. Concurrency check: If 0 rows affected
+      // 3. Concurrency check: If 0 rows affected (only for real events)
       if (!data || data.length === 0) {
-        showToast(
-          'Medication already resolved',
-          'This medication was marked as Taken from another device.',
-          'error'
-        );
+        if (event.id >= 0) {
+          showToast(
+            'Medication already resolved',
+            'This medication was marked as Taken from another device.',
+            'error'
+          );
 
-        // Fetch latest version of this event to sync UI state
-        const { data: latestEvents } = await supabase
-          .from('reminder_events')
-          .select(`
-            id,
-            medication_id,
-            telegram_id,
-            scheduled_for,
-            reminder_status,
-            snooze_count,
-            medications:medication_id (
-              drug_name,
-              dosage,
-              priority_level
-            )
-          `)
-          .eq('id', event.id);
+          // Fetch latest version of this event to sync UI state
+          const { data: latestEvents } = await supabase
+            .from('reminder_events')
+            .select(`
+              id,
+              medication_id,
+              telegram_id,
+              scheduled_for,
+              reminder_status,
+              snooze_count,
+              medications:medication_id (
+                drug_name,
+                dosage,
+                priority_level
+              )
+            `)
+            .eq('id', event.id);
 
-        if (latestEvents && latestEvents.length > 0) {
-          const updatedEvent = latestEvents[0] as unknown as ReminderEvent;
-          setEvents((prev) => prev.map((e) => (e.id === event.id ? updatedEvent : e)));
+          if (latestEvents && latestEvents.length > 0) {
+            const updatedEvent = latestEvents[0] as unknown as ReminderEvent;
+            setEvents((prev) => prev.map((e) => (e.id === event.id ? updatedEvent : e)));
+          }
+          return;
         }
-        return;
       }
+
+      const resolvedRecord = data && data[0];
 
       // 4. Log resolution
       const { error: logErr } = await supabase.from('reminder_logs').insert([
@@ -300,7 +327,13 @@ export default function DashboardClientView({
       // 5. Update state immediately
       setEvents((prev) =>
         prev.map((e) =>
-          e.id === event.id ? { ...e, reminder_status: resolvedStatus } : e
+          e.id === event.id 
+            ? { 
+                ...e, 
+                id: resolvedRecord ? resolvedRecord.id : e.id,
+                reminder_status: resolvedStatus 
+              } 
+            : e
         )
       );
 

@@ -32,7 +32,7 @@ export default async function DashboardPage() {
   const [medsResult, eventsResult, logsResult, monthlyLogsResult] = await Promise.all([
     supabase
       .from('medications')
-      .select('id, drug_name, dosage, frequency, tablet_count, low_stock_alert_enabled')
+      .select('id, drug_name, dosage, frequency, tablet_count, low_stock_alert_enabled, reminder_times, priority_level')
       .eq('telegram_id', targetChatId)
       .eq('active', true),
     supabase
@@ -74,6 +74,50 @@ export default async function DashboardPage() {
 
   const todayEvents = (rawEvents || []) as unknown as ReminderEvent[];
 
+  // Dynamically generate virtual pending events for future scheduled reminder times today
+  const finalEvents: ReminderEvent[] = [...todayEvents];
+  if (medications && medications.length > 0 && targetChatId) {
+    medications.forEach((med) => {
+      const times = (med.reminder_times || []) as string[];
+      times.forEach((timeStr) => {
+        const [hours, minutes] = timeStr.split(':').map(Number);
+        
+        // Construct local time for this dose today
+        const reminderDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
+        
+        // Check if an actual event was already created for this medication at this time today
+        const eventExists = todayEvents.some((e) => {
+          const eDate = new Date(e.scheduled_for);
+          return (
+            e.medication_id === med.id &&
+            eDate.getHours() === hours &&
+            eDate.getMinutes() === minutes
+          );
+        });
+
+        if (!eventExists) {
+          const virtualId = -(med.id * 1000 + hours * 60 + minutes);
+          finalEvents.push({
+            id: virtualId,
+            medication_id: med.id,
+            telegram_id: targetChatId,
+            scheduled_for: reminderDate.toISOString(),
+            reminder_status: 'FUTURE_SCHEDULED',
+            snooze_count: 0,
+            medications: {
+              drug_name: med.drug_name,
+              dosage: med.dosage || 'N/A',
+              priority_level: med.priority_level || 'normal',
+            },
+          });
+        }
+      });
+    });
+
+    // Sort all events chronologically
+    finalEvents.sort((a, b) => new Date(a.scheduled_for).getTime() - new Date(b.scheduled_for).getTime());
+  }
+
   const totalMonthlyDoses = monthlyLogs?.length || 0;
   const takenMonthlyDoses = monthlyLogs?.filter(l => l.response === 'TAKEN').length || 0;
   const monthlyAdherence = totalMonthlyDoses > 0 ? Math.round((takenMonthlyDoses / totalMonthlyDoses) * 100) : 100;
@@ -90,11 +134,11 @@ export default async function DashboardPage() {
   const lowStockCount = lowStockMedicines.length;
 
   // Today's metrics
-  const todayTotal = todayEvents.length;
-  const todayTaken = todayEvents.filter(e => e.reminder_status === 'TAKEN' || e.reminder_status === 'RESOLVED_BY_CG').length;
-  const todaySkipped = todayEvents.filter(e => e.reminder_status === 'SKIPPED').length;
-  const todayMissed = todayEvents.filter(e => e.reminder_status === 'MISSED').length;
-  const activeEscalations = todayEvents.filter(e => e.reminder_status === 'ESCALATED_TO_CG').length;
+  const todayTotal = finalEvents.length;
+  const todayTaken = finalEvents.filter(e => e.reminder_status === 'TAKEN' || e.reminder_status === 'RESOLVED_BY_CG').length;
+  const todaySkipped = finalEvents.filter(e => e.reminder_status === 'SKIPPED').length;
+  const todayMissed = finalEvents.filter(e => e.reminder_status === 'MISSED').length;
+  const activeEscalations = finalEvents.filter(e => e.reminder_status === 'ESCALATED_TO_CG').length;
 
   // Group 7-day chart data points
   const chartDataMap: { [key: string]: { Taken: number; Skipped: number; Missed: number } } = {};
@@ -143,7 +187,7 @@ export default async function DashboardPage() {
       todayMissed={todayMissed}
       activeEscalations={activeEscalations}
       lowStockCount={lowStockCount}
-      todayEvents={todayEvents}
+      todayEvents={finalEvents}
       myTelegramChatId={myTelegramChatId || ''}
       targetTelegramChatId={targetChatId || ''}
       chartData={chartData}

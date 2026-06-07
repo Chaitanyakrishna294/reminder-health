@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageSquare, Send, ShieldAlert, Lock, User, Clock, CheckCircle } from 'lucide-react';
+import { MessageSquare, Send, ShieldAlert, Lock, Clock } from 'lucide-react';
 import { useUiMode } from '@/context/ui-mode-context';
 import { createClient } from '@/lib/supabase/client';
 
@@ -16,6 +16,9 @@ export default function CareConnectPage() {
   const { isElderly } = useUiMode();
   const [userProfile, setUserProfile] = useState<{ role: string; fullName: string } | null>(null);
   const [peerName, setPeerName] = useState<string>('Caregiver');
+  const [peerId, setPeerId] = useState<string>('');
+  const [isLinked, setIsLinked] = useState<boolean>(false);
+  const [userId, setUserId] = useState<string>('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [visibleCount, setVisibleCount] = useState(20);
   const [inputText, setInputText] = useState('');
@@ -28,6 +31,8 @@ export default function CareConnectPage() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
+
+        setUserId(user.id);
 
         const { data: profile } = await supabase
           .from('profiles')
@@ -43,6 +48,8 @@ export default function CareConnectPage() {
         });
 
         let resolvedPeerName = profile.role === 'CAREGIVER' ? 'Patient' : 'Caregiver';
+        let resolvedPeerId = '';
+        let resolvedIsLinked = false;
 
         if (profile.role === 'CAREGIVER') {
           const { data: caregiverLink } = await supabase
@@ -55,10 +62,14 @@ export default function CareConnectPage() {
           if (caregiverLink && caregiverLink.patient_telegram_id) {
             const { data: patientProfile } = await supabase
               .from('profiles')
-              .select('full_name')
+              .select('id, full_name')
               .eq('telegram_chat_id', caregiverLink.patient_telegram_id)
               .single();
-            if (patientProfile) resolvedPeerName = patientProfile.full_name;
+            if (patientProfile) {
+              resolvedPeerName = patientProfile.full_name;
+              resolvedPeerId = patientProfile.id;
+              resolvedIsLinked = true;
+            }
           }
         } else {
           const { data: caregiverLink } = await supabase
@@ -71,44 +82,39 @@ export default function CareConnectPage() {
           if (caregiverLink && caregiverLink.caregiver_chat_id) {
             const { data: caregiverProfile } = await supabase
               .from('profiles')
-              .select('full_name')
+              .select('id, full_name')
               .eq('telegram_chat_id', caregiverLink.caregiver_chat_id)
               .single();
-            if (caregiverProfile) resolvedPeerName = caregiverProfile.full_name;
+            if (caregiverProfile) {
+              resolvedPeerName = caregiverProfile.full_name;
+              resolvedPeerId = caregiverProfile.id;
+              resolvedIsLinked = true;
+            }
           }
         }
 
         setPeerName(resolvedPeerName);
+        setPeerId(resolvedPeerId);
+        setIsLinked(resolvedIsLinked);
 
-        // Load messages from localStorage with a 14-day retention check
-        const storageKey = `care-connect-messages-${user.id}`;
-        const savedMessages = localStorage.getItem(storageKey);
-        
-        if (savedMessages) {
-          const parsed = JSON.parse(savedMessages) as Message[];
-          const fourteenDaysAgo = new Date();
-          fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+        // Fetch messages from Supabase chat_messages table if linked
+        if (resolvedIsLinked && resolvedPeerId) {
+          const { data: msgsData } = await supabase
+            .from('chat_messages')
+            .select('*')
+            .or(`and(sender_id.eq.${user.id},recipient_id.eq.${resolvedPeerId}),and(sender_id.eq.${resolvedPeerId},recipient_id.eq.${user.id})`)
+            .order('created_at', { ascending: true })
+            .limit(100);
 
-          // Auto-archiver script: Keep only messages from the last 14 days
-          const activeMessages = parsed.filter(msg => {
-            const msgDate = new Date(msg.timestamp);
-            return msgDate >= fourteenDaysAgo;
-          });
-
-          setMessages(activeMessages);
-          localStorage.setItem(storageKey, JSON.stringify(activeMessages));
-        } else {
-          // Initialize with some simulated friendly welcome message
-          const initialMessages: Message[] = [
-            {
-              id: 'welcome-1',
-              sender: 'PEER',
-              text: `Hello! This is your secure channel. All check-ins and medication questions can be coordinated here.`,
-              timestamp: new Date(Date.now() - 3600000).toISOString(),
-            }
-          ];
-          setMessages(initialMessages);
-          localStorage.setItem(storageKey, JSON.stringify(initialMessages));
+          if (msgsData) {
+            const parsedMessages: Message[] = msgsData.map((m: any) => ({
+              id: m.id,
+              sender: m.sender_id === user.id ? 'SELF' : 'PEER',
+              text: m.text,
+              timestamp: m.created_at,
+            }));
+            setMessages(parsedMessages);
+          }
         }
       } catch (err) {
         console.error('Error loading Care Connect:', err);
@@ -120,62 +126,95 @@ export default function CareConnectPage() {
     loadProfileAndMessages();
   }, [supabase]);
 
+  // Realtime subscription to receive messages instantly
+  useEffect(() => {
+    if (!userId || !peerId) return;
+
+    const channel = supabase
+      .channel(`chat-realtime-${userId}-${peerId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'chat_messages',
+        },
+        (payload: any) => {
+          const newMsg = payload.new;
+          if (!newMsg) return;
+
+          // Check if message belongs to this conversation
+          const isBelonging =
+            (newMsg.sender_id === userId && newMsg.recipient_id === peerId) ||
+            (newMsg.sender_id === peerId && newMsg.recipient_id === userId);
+
+          if (isBelonging) {
+            setMessages((prev) => {
+              // Avoid duplicate messages
+              if (prev.some((m) => m.id === newMsg.id)) return prev;
+              
+              return [
+                ...prev,
+                {
+                  id: newMsg.id,
+                  sender: newMsg.sender_id === userId ? 'SELF' : 'PEER',
+                  text: newMsg.text,
+                  timestamp: newMsg.created_at,
+                },
+              ];
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId, peerId, supabase]);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSendMessage = (textToSend?: string) => {
+  const handleSendMessage = async (textToSend?: string) => {
     const text = (textToSend || inputText).trim();
-    if (!text || !userProfile) return;
+    if (!text || !userId || !peerId) return;
 
-    const newMessage: Message = {
-      id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      sender: 'SELF',
-      text,
-      timestamp: new Date().toISOString(),
-    };
-
-    const updatedMessages = [...messages, newMessage];
-    setMessages(updatedMessages);
     setInputText('');
 
-    // Save to localStorage
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) {
-        localStorage.setItem(`care-connect-messages-${user.id}`, JSON.stringify(updatedMessages));
-      }
-    });
+    try {
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .insert([
+          {
+            sender_id: userId,
+            recipient_id: peerId,
+            text: text,
+          },
+        ])
+        .select();
 
-    // Simulate caregiver/patient automatic response after 1.5 seconds for interactive demonstration
-    setTimeout(() => {
-      let responseText = "Understood. I am keeping track of the schedule.";
-      if (userProfile.role === 'PATIENT') {
-        if (text.toLowerCase().includes('help')) {
-          responseText = "I received your request. I will call you right away.";
-        } else {
-          responseText = "Got it! Thanks for letting me know. Stay healthy!";
-        }
-      } else {
-        responseText = "I will take my medication on time. Thank you!";
-      }
+      if (error) throw error;
 
-      const replyMessage: Message = {
-        id: `msg-reply-${Date.now()}`,
-        sender: 'PEER',
-        text: responseText,
-        timestamp: new Date().toISOString(),
-      };
-
-      setMessages(prev => {
-        const next = [...prev, replyMessage];
-        supabase.auth.getUser().then(({ data: { user } }) => {
-          if (user) {
-            localStorage.setItem(`care-connect-messages-${user.id}`, JSON.stringify(next));
-          }
+      if (data && data.length > 0) {
+        const newMsg = data[0];
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === newMsg.id)) return prev;
+          return [
+            ...prev,
+            {
+              id: newMsg.id,
+              sender: 'SELF',
+              text: newMsg.text,
+              timestamp: newMsg.created_at,
+            },
+          ];
         });
-        return next;
-      });
-    }, 1500);
+      }
+    } catch (err) {
+      console.error('Failed to send secure message:', err);
+    }
   };
 
   const getQuickReplies = () => {
@@ -201,6 +240,53 @@ export default function CareConnectPage() {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
+  // Connection validation screen
+  if (!isLinked) {
+    const roleText = userProfile?.role === 'CAREGIVER' ? 'Patient' : 'Caregiver';
+    return (
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* Page Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-card p-6 rounded-[24px] border border-border shadow-sm gap-4">
+          <div>
+            <h1 className="text-xl md:text-2xl font-black text-foreground flex items-center gap-2">
+              <MessageSquare className="w-6 h-6 text-primary" />
+              Care Connect
+            </h1>
+            <p className="text-xs text-muted-foreground font-semibold mt-1">
+              Secure connection channel with your {roleText}.
+            </p>
+          </div>
+        </div>
+
+        {/* Warning Panel */}
+        <div className="bg-card border border-border rounded-[24px] shadow-sm p-8 text-center space-y-6 flex flex-col items-center max-w-xl mx-auto mt-12">
+          <div className="w-16 h-16 rounded-full bg-warning/10 text-warning flex items-center justify-center border border-warning/20">
+            <ShieldAlert className="w-8 h-8 text-warning" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-xl font-bold text-foreground">Connection Required</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Care Connect requires a linked connection between a Patient and a Caregiver. Only paired accounts can use this secure chat channel.
+            </p>
+          </div>
+          
+          <div className="bg-muted p-4 rounded-2xl border border-border text-left w-full space-y-3">
+            <h4 className="text-xs font-black text-foreground uppercase tracking-wider">How to connect:</h4>
+            {userProfile?.role === 'CAREGIVER' ? (
+              <p className="text-xs text-muted-foreground leading-relaxed font-semibold">
+                Please share your <b>Caregiver ID</b> with your patient. They can enter it in their Telegram bot menu under <b>👨‍⚕️ Caregiver</b> → <b>➕ Add Caregiver</b>. Your ID is available on your dashboard console.
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground leading-relaxed font-semibold">
+                Please pair your Telegram bot account first. Go to your Telegram bot, enter <b>/linkweb</b> to get your 6-digit pairing code, and link it on your web dashboard Settings.
+              </p>
+            )}
+          </div>
+        </div>
       </div>
     );
   }
