@@ -351,16 +351,17 @@ export default function TodaysSchedule({
   };
 
   if (isElderly) {
+    const completedEvents = events.filter(e => ['TAKEN', 'RESOLVED_BY_CG', 'SKIPPED', 'MISSED'].includes(e.reminder_status));
     return (
       <>
         <div className="space-y-6">
-          {events.length === 0 ? (
+          {completedEvents.length === 0 ? (
             <div className="p-12 text-center text-xl font-extrabold text-muted-foreground bg-card border-2 border-dashed border-border rounded-2xl flex flex-col items-center gap-4">
               <CheckCircle className="w-16 h-16 text-success" />
-              No more medications scheduled for today!
+              No completed medications today yet.
             </div>
           ) : (
-            events.map((event) => {
+            completedEvents.map((event) => {
               const timeStr = mounted
                 ? new Date(event.scheduled_for).toLocaleTimeString([], {
                     hour: '2-digit',
@@ -553,15 +554,16 @@ export default function TodaysSchedule({
     );
   };
 
-  const firstThree = events.slice(0, 3);
-  const remaining = events.slice(3);
+  const completedEvents = events.filter(e => ['TAKEN', 'RESOLVED_BY_CG', 'SKIPPED', 'MISSED'].includes(e.reminder_status));
+  const firstThree = completedEvents.slice(0, 3);
+  const remaining = completedEvents.slice(3);
 
   return (
     <>
       <div className="space-y-6">
-        {events.length === 0 ? (
+        {completedEvents.length === 0 ? (
           <div className="p-8 text-center text-sm text-muted-foreground bg-white/40 rounded-3xl border border-dashed border-border/80">
-            No medication events scheduled for today.
+            No completed medication events today yet.
           </div>
         ) : (
           <>

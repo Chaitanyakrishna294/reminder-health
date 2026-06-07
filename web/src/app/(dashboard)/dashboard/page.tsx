@@ -97,12 +97,14 @@ export default async function DashboardPage() {
 
         if (!eventExists) {
           const virtualId = -(med.id * 1000 + hours * 60 + minutes);
+          // 10-minute grace period for virtual events to become MISSED
+          const isPast = reminderDate.getTime() < (now.getTime() - 10 * 60 * 1000);
           finalEvents.push({
             id: virtualId,
             medication_id: med.id,
             telegram_id: targetChatId,
             scheduled_for: reminderDate.toISOString(),
-            reminder_status: 'FUTURE_SCHEDULED',
+            reminder_status: isPast ? 'MISSED' : 'FUTURE_SCHEDULED',
             snooze_count: 0,
             medications: {
               drug_name: med.drug_name,
