@@ -25,7 +25,7 @@ export async function GET(request: Request) {
             id: user.id,
             role: 'PATIENT',
             full_name: user.user_metadata?.full_name || 'Patient User',
-            telegram_chat_id: null
+            telegram_chat_id: `WEB-${user.id}`
           }]);
         }
       }

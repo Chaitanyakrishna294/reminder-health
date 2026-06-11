@@ -49,17 +49,19 @@ export async function updateSession(request: NextRequest) {
       .eq('id', user.id)
       .single();
 
-    const hasLinkedTelegram = profile && profile.telegram_chat_id;
+    const hasTelegramChatId = profile && profile.telegram_chat_id;
+    const isSynthetic = profile && profile.telegram_chat_id && profile.telegram_chat_id.startsWith('WEB-');
+    const isRealTelegram = hasTelegramChatId && !isSynthetic;
 
-    if (!hasLinkedTelegram) {
+    if (!hasTelegramChatId) {
       // If Telegram is not linked, and the user is not already on the linking page or update-password page, redirect them
       if (url.pathname !== '/link-account' && url.pathname !== '/update-password') {
         url.pathname = '/link-account';
         return NextResponse.redirect(url);
       }
     } else {
-      // If Telegram is linked, prevent accessing the link page
-      if (url.pathname === '/link-account') {
+      // If Telegram is linked with a real account, prevent accessing the link page
+      if (isRealTelegram && url.pathname === '/link-account') {
         url.pathname = '/dashboard';
         return NextResponse.redirect(url);
       }

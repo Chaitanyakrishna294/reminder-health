@@ -91,7 +91,7 @@ export default function SettingsClientView({
     }
 
     if (!user.telegramChatId) {
-      setErrorMsg('You must link your Telegram Chat ID before you can link a caregiver.');
+      setErrorMsg('You must have a resolved account session to link a caregiver.');
       return;
     }
 
@@ -179,7 +179,7 @@ export default function SettingsClientView({
   // --- CAREGIVER: Register/Generate Caregiver ID ---
   const handleBecomeCaregiver = async () => {
     if (!user.telegramChatId) {
-      setErrorMsg('You must connect your Telegram account first to register as a caregiver.');
+      setErrorMsg('You must have a resolved account session to register as a caregiver.');
       return;
     }
 
@@ -389,18 +389,28 @@ export default function SettingsClientView({
           } ${isElderly ? 'text-base' : 'text-[10px]'}`}>
             Role: {user.role}
           </span>
-          {user.telegramChatId ? (
+          {user.telegramChatId && !user.telegramChatId.startsWith('WEB-') ? (
             <span className={`inline-flex items-center px-3 py-1 rounded-full font-bold bg-muted text-muted-foreground border border-border ${
               isElderly ? 'text-base' : 'text-[10px]'
             }`}>
               Telegram Linked: {user.telegramChatId}
             </span>
           ) : (
-            <span className={`inline-flex items-center px-3 py-1 rounded-full font-bold bg-warning/10 text-warning border border-warning/30 ${
-              isElderly ? 'text-base' : 'text-[10px]'
-            }`}>
-              Telegram Not Connected
-            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`inline-flex items-center px-3 py-1 rounded-full font-bold bg-warning/10 text-warning border border-warning/30 ${
+                isElderly ? 'text-base' : 'text-[10px]'
+              }`}>
+                Telegram Not Connected
+              </span>
+              <button
+                onClick={() => router.push('/link-account')}
+                className={`font-black rounded-lg border border-primary text-primary hover:bg-primary/5 transition-all cursor-pointer flex items-center justify-center ${
+                  isElderly ? 'h-9 px-4 text-xs' : 'h-7 px-2.5 text-[10px]'
+                }`}
+              >
+                Connect Telegram Bot
+              </button>
+            </div>
           )}
         </div>
       </div>

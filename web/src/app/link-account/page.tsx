@@ -79,6 +79,41 @@ export default function LinkAccountPage() {
     }
   };
 
+  const handleSkip = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setError('You must be signed in.');
+        setLoading(false);
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('telegram_chat_id')
+        .eq('id', user.id)
+        .single();
+
+      if (profile && !profile.telegram_chat_id) {
+        const { error: updateErr } = await supabase
+          .from('profiles')
+          .update({ telegram_chat_id: `WEB-${user.id}` })
+          .eq('id', user.id);
+
+        if (updateErr) throw updateErr;
+      }
+
+      router.refresh();
+      router.push('/dashboard');
+    } catch (err) {
+      console.error('[LinkAccount] Skip error:', err);
+      setError('Failed to skip. Please try again.');
+      setLoading(false);
+    }
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push('/login');
@@ -227,6 +262,21 @@ export default function LinkAccountPage() {
                 {loading ? 'Confirming Code...' : 'Synchronize Bot'}
               </button>
             </form>
+
+            <div className="relative flex py-1 items-center">
+              <div className="flex-grow border-t border-border/60"></div>
+              <span className="flex-shrink mx-4 text-muted-foreground text-[10px] font-black uppercase tracking-wider">Or</span>
+              <div className="flex-grow border-t border-border/60"></div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleSkip}
+              disabled={loading}
+              className="w-full flex justify-center py-3.5 px-4 border border-border rounded-2xl shadow-sm text-sm font-black text-foreground bg-muted hover:bg-muted/80 transition-all cursor-pointer active:scale-[0.98]"
+            >
+              Skip for Now (Use Web-Only)
+            </button>
 
             <div className="pt-2 text-center">
               <button
