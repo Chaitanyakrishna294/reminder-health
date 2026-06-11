@@ -10,8 +10,8 @@ self.addEventListener('push', function(event) {
 
   const options = {
     body: data.body,
-    icon: '/window.svg',
-    badge: '/window.svg',
+    icon: '/icon-192x192.png',
+    badge: '/icon-192x192.png',
     data: {
       eventId: data.eventId,
       url: '/dashboard'

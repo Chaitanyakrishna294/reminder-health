@@ -18,6 +18,10 @@ export const metadata: Metadata = {
   title: "Re-MIND-eЯ | Healthcare Companion",
   description:
     "Your calm, intelligent healthcare companion. Medication tracking, medication progress tracking, and caregiver coordination — secure and always present.",
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/apple-icon.png",
+  },
 };
 
 export default function RootLayout({
