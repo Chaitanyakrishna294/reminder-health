@@ -740,6 +740,7 @@ const initScheduler = () => {
       if (!activeMeds || activeMeds.length === 0) return;
 
       for (const med of activeMeds) {
+        if (med.tablet_count === null || med.tablet_count === undefined) continue;
         const tabletsPerDay = med.frequency === 'once_daily' ? 1 : med.frequency === 'twice_daily' ? 2 : med.frequency === 'thrice_daily' ? 3 : 1;
         const daysRemaining = Math.floor(med.tablet_count / tabletsPerDay);
 
@@ -922,6 +923,7 @@ const initScheduler = () => {
         const lowStockMeds = [];
         if (patientMeds) {
           patientMeds.forEach(med => {
+            if (med.tablet_count === null || med.tablet_count === undefined) return;
             const tabletsPerDay = med.frequency === 'once_daily' ? 1 : med.frequency === 'twice_daily' ? 2 : med.frequency === 'thrice_daily' ? 3 : 1;
             const daysRemaining = Math.floor(med.tablet_count / tabletsPerDay);
             if (daysRemaining <= 3) {

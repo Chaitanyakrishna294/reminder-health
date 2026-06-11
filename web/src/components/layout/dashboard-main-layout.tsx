@@ -17,7 +17,8 @@ import {
   Shield,
   LogOut,
   Check,
-  FolderHeart
+  FolderHeart,
+  ChevronDown
 } from 'lucide-react';
 
 export default function DashboardMainLayout({ 
@@ -166,7 +167,7 @@ export default function DashboardMainLayout({
     <div className="flex flex-1 min-h-[calc(100vh-4rem)] relative w-full">
       {/* LEFT VERTICAL RAIL (Desktop/Tablet) */}
       <aside 
-        className={`hidden md:flex flex-col items-center justify-center fixed left-6 top-1/2 -translate-y-1/2 z-40 rounded-full bg-white border border-border shadow-[0_8px_24px_rgba(15,23,42,0.08)] transition-all duration-300 ${
+        className={`hidden md:flex flex-col items-center justify-center fixed left-6 top-1/2 -translate-y-1/2 z-40 rounded-[28px] bg-white border border-border shadow-md transition-all duration-300 ${
           isElderly 
             ? 'w-24 py-10 space-y-8 border-2 border-primary/50' 
             : 'w-[72px] py-8 space-y-6'
@@ -179,7 +180,7 @@ export default function DashboardMainLayout({
               key={item.href}
               href={item.href}
               prefetch={shouldPrefetch(item.href)}
-              className={`flex flex-col items-center justify-center rounded-full transition-all relative group ${
+              className={`flex flex-col items-center justify-center rounded-[20px] transition-all relative group ${
                 isElderly
                   ? `w-20 h-20 text-3xl ${active ? 'bg-primary text-primary-foreground shadow-lg' : 'text-foreground hover:bg-muted/80'}`
                   : `w-14 h-14 text-xl ${
@@ -192,7 +193,7 @@ export default function DashboardMainLayout({
             >
               <span>{item.icon}</span>
               {!isElderly && (
-                <span className="absolute left-20 scale-0 group-hover:scale-100 transition-all duration-200 bg-foreground text-background text-xs font-bold px-2 py-1 rounded shadow-sm pointer-events-none whitespace-nowrap z-50">
+                <span className="absolute left-20 scale-0 group-hover:scale-100 transition-all duration-200 bg-foreground text-background text-xs font-bold px-2.5 py-1 rounded shadow-sm pointer-events-none whitespace-nowrap z-50 font-mono">
                   {item.label}
                 </span>
               )}
@@ -203,7 +204,7 @@ export default function DashboardMainLayout({
 
       {/* BOTTOM FLOATING PILL DOCK (Mobile) */}
       <nav 
-        className={`md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-40 rounded-full bg-white border border-border shadow-[0_8px_24px_rgba(15,23,42,0.08)] flex items-center justify-around px-4 transition-all duration-300 ${
+        className={`md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-40 rounded-[32px] bg-white border border-border shadow-lg flex items-center justify-around px-4 transition-all duration-300 ${
           isElderly 
             ? 'w-[92%] h-24 border-2 border-primary/50' 
             : 'w-[90%] max-w-[480px] h-[72px]'
@@ -221,7 +222,7 @@ export default function DashboardMainLayout({
                   ? `h-16 flex-1 max-w-[64px] aspect-square ${
                       active ? 'bg-primary text-primary-foreground shadow-lg' : 'text-foreground bg-muted/40'
                     }`
-                  : `h-11 flex-1 max-w-[44px] aspect-square ${
+                  : `h-12 flex-1 max-w-[48px] aspect-square ${
                       active 
                         ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20' 
                         : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
@@ -249,7 +250,7 @@ export default function DashboardMainLayout({
             <div className="flex flex-wrap items-center gap-3">
               {hasEscalation ? (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black bg-danger/10 text-danger border border-danger/25 animate-pulse uppercase tracking-wider shrink-0">
-                  <AlertTriangle className="w-4 h-4" /> ⚠️ CRITICAL ALARM
+                  <AlertTriangle className="w-4 h-4" /> CRITICAL ALARM
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black bg-[#EAF3FF] text-primary border border-primary/20 uppercase tracking-wider shrink-0">
@@ -261,7 +262,7 @@ export default function DashboardMainLayout({
               <div className="relative group shrink-0">
                 <button className="flex items-center gap-1.5 text-xs font-black text-foreground bg-muted hover:bg-muted/80 border border-border px-3.5 py-1.5 rounded-xl cursor-pointer">
                   <span>Monitoring: {patientName}</span>
-                  <span className="text-[10px] text-muted-foreground">▼</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                 </button>
                 <div className="hidden group-hover:block absolute left-0 top-9 w-48 bg-white border border-border rounded-xl shadow-lg z-50 p-1.5 animate-fade-in">
                   <div className="flex items-center justify-between px-3 py-2 text-xs font-black text-foreground hover:bg-muted rounded-lg cursor-default">

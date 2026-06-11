@@ -12,8 +12,15 @@ export default function AuthLayout({
           <span className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary ring-1 ring-primary/20 mb-3">
             🛡️ Safe & Secure Care
           </span>
-          <span className="text-3xl font-black tracking-tight text-primary flex items-center gap-2">
-            💊 Re-MIND-eЯ
+          <span className="text-3xl font-black tracking-tight text-primary flex items-center gap-1 font-mono">
+            <span>💊 Re-</span>
+            <img 
+              src="/logo2.png" 
+              alt="MIND" 
+              className="rounded-lg object-contain shrink-0 bg-white" 
+              style={{ width: '60px', height: '60px' }}
+            />
+            <span>-eЯ</span>
           </span>
           <p className="mt-2 text-sm text-muted-foreground text-center">
             Apple Health-Inspired Medication Companion

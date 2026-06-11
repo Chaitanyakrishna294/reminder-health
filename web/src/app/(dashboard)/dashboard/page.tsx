@@ -33,7 +33,7 @@ export default async function DashboardPage() {
   const [medsResult, eventsResult, logsResult, monthlyLogsResult] = await Promise.all([
     supabase
       .from('medications')
-      .select('id, drug_name, dosage, frequency, tablet_count, low_stock_alert_enabled, reminder_times, priority_level')
+      .select('id, drug_name, dosage, frequency, tablet_count, low_stock_alert_enabled, reminder_times, priority_level, unit_type, dosage_amount, medication_reason')
       .eq('telegram_id', targetChatId)
       .eq('active', true),
     supabase
@@ -48,7 +48,10 @@ export default async function DashboardPage() {
         medications:medication_id (
           drug_name,
           dosage,
-          priority_level
+          priority_level,
+          unit_type,
+          dosage_amount,
+          medication_reason
         )
       `)
       .eq('telegram_id', targetChatId)
@@ -82,6 +85,7 @@ export default async function DashboardPage() {
   // Active alerts (Low stock)
   const lowStockMedicines = (medications || [])
     .filter(m => {
+      if (m.tablet_count === null || m.tablet_count === undefined) return false;
       const tabletsPerDay = m.frequency === 'once_daily' ? 1 : m.frequency === 'twice_daily' ? 2 : m.frequency === 'thrice_daily' ? 3 : 1;
       const daysRemaining = Math.floor(m.tablet_count / tabletsPerDay);
       return daysRemaining <= 3 && m.low_stock_alert_enabled;
@@ -126,6 +130,34 @@ export default async function DashboardPage() {
     time: takenLogs[0].scheduled_time
   } : null;
 
+  // Fetch active caregiver connections
+  let caregiverConnections: any[] = [];
+  if (myTelegramChatId) {
+    const { data: connections } = await supabase
+      .from('caregiver_info')
+      .select('id, caregiver_name, patient_telegram_id, caregiver_chat_id, connection_status')
+      .or(`patient_telegram_id.eq.${myTelegramChatId},caregiver_chat_id.eq.${myTelegramChatId}`)
+      .eq('is_active', true);
+    
+    if (connections && connections.length > 0) {
+      const patientTelegramIds = connections.map(c => c.patient_telegram_id).filter(Boolean);
+      const caregiverTelegramIds = connections.map(c => c.caregiver_chat_id).filter(Boolean);
+      
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('telegram_chat_id, full_name')
+        .in('telegram_chat_id', [...patientTelegramIds, ...caregiverTelegramIds]);
+        
+      const profileMap = new Map(profiles?.map(p => [p.telegram_chat_id, p.full_name]) || []);
+      
+      caregiverConnections = connections.map(c => ({
+        ...c,
+        resolved_patient_name: profileMap.get(c.patient_telegram_id) || 'Patient',
+        resolved_caregiver_name: profileMap.get(c.caregiver_chat_id) || c.caregiver_name || 'Caregiver'
+      }));
+    }
+  }
+
   return (
     <DashboardClientView 
       userRole={userRole}
@@ -147,6 +179,7 @@ export default async function DashboardPage() {
       hasPatientLinked={!!targetChatId}
       caregiverId={caregiverId}
       lastTaken={lastTaken}
+      caregiverConnections={caregiverConnections}
     />
   );
 }

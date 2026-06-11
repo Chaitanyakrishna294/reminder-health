@@ -1,70 +1,73 @@
 @import "tailwindcss";
 
 :root {
-  --background: #F6F8FC;
-  --foreground: #0f172a;
+  --background: #F8F9FB;
+  --foreground: #0F1C5A;
   
   --card: #ffffff;
-  --card-foreground: #0f172a;
+  --card-foreground: #0F1C5A;
   
-  --primary: #4F8EF7; /* Apple / Healthcare Blue Accent */
+  --primary: #F26B8A; /* Mind Pink Accent */
   --primary-foreground: #ffffff;
   
-  --success: #34c759; /* Apple Green */
+  --success: #34C759; /* Success Green */
   --success-foreground: #ffffff;
   
-  --warning: #ff9500; /* Apple Orange */
+  --warning: #FF9500; /* Warning Orange */
   --warning-foreground: #ffffff;
   
-  --danger: #ff3b30;  /* Apple Red */
+  --danger: #FF3B30;  /* Danger Red */
   --danger-foreground: #ffffff;
   
   --border: rgba(15, 23, 42, 0.04); /* Soft card border */
   --input: rgba(15, 23, 42, 0.04);
-  --ring: #4F8EF7;
+  --ring: #F26B8A;
   
   --muted: #EEF4FB; /* Secondary Background */
   --muted-foreground: #64748b;
   
   --accent-surface: #EAF3FF; /* Accent Surface */
-  --accent-surface-foreground: #0f172a;
+  --accent-surface-foreground: #0F1C5A;
   
-  --radius: 1.5rem; /* 24px rounded corners */
+  --radius: 1.75rem; /* 28px rounded corners */
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #F6F8FC;
-    --foreground: #0f172a;
+    --background: #F8F9FB;
+    --foreground: #0F1C5A;
     
     --card: #ffffff;
-    --card-foreground: #0f172a;
+    --card-foreground: #0F1C5A;
     
-    --primary: #4F8EF7;
+    --primary: #F26B8A;
     --primary-foreground: #ffffff;
     
-    --success: #34c759;
+    --success: #34C759;
     --success-foreground: #ffffff;
     
-    --warning: #ff9500;
+    --warning: #FF9500;
     --warning-foreground: #ffffff;
     
-    --danger: #ff3b30;
+    --danger: #FF3B30;
     --danger-foreground: #ffffff;
     
     --border: rgba(15, 23, 42, 0.04);
     --input: rgba(15, 23, 42, 0.04);
-    --ring: #4F8EF7;
+    --ring: #F26B8A;
     
     --muted: #EEF4FB;
     --muted-foreground: #64748b;
     
     --accent-surface: #EAF3FF;
-    --accent-surface-foreground: #0f172a;
+    --accent-surface-foreground: #0F1C5A;
   }
 }
 
 @theme inline {
+  --font-sans: var(--font-sans), sans-serif;
+  --font-mono: var(--font-mono), monospace;
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -88,8 +91,9 @@
   --radius-md: calc(var(--radius) - 4px);
   --radius-sm: calc(var(--radius) - 8px);
   
-  --shadow-sm: 0 8px 32px rgba(15, 23, 42, 0.06);
-  --shadow-md: 0 8px 32px rgba(15, 23, 42, 0.06);
+  --shadow-sm: 0 4px 20px rgba(15, 23, 42, 0.02);
+  --shadow-md: 0 8px 32px rgba(15, 23, 42, 0.03);
+  --shadow-lg: 0 12px 48px rgba(15, 23, 42, 0.04);
   
   --animate-float: float 8s ease-in-out infinite;
   --animate-breath: breath 12s ease-in-out infinite;
@@ -138,17 +142,59 @@
   animation: red-glow 2s ease-in-out infinite;
 }
 
+/* Slide-up toast animation */
+@keyframes toast-slide-up {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toast-slide-down {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+  }
+}
+
+.animate-toast-in {
+  animation: toast-slide-up 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-toast-out {
+  animation: toast-slide-down 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Fade-in for step transitions */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 body {
-  background: #F6F8FC;
+  background: #F8F9FB;
   color: var(--foreground);
   min-height: 100vh;
   margin: 0;
   background-attachment: fixed;
+  font-family: var(--font-sans), sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6, .font-mono, .badge, .metric, .time-tag, .navigation-label {
+  font-family: var(--font-mono), monospace !important;
 }
 
 @media (prefers-color-scheme: dark) {
   body {
-    background: #F6F8FC;
+    background: #F8F9FB;
     color: var(--foreground);
     background-attachment: fixed;
   }

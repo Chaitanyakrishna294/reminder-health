@@ -698,7 +698,7 @@ const initCommands = () => {
            if (state.field === 'stock') {
              const count = parseInt(text);
              if (isNaN(count) || count < 0) return bot.sendMessage(chatId, `⚠️ Invalid stock.`);
-             updateData = { tablet_count: count };
+             updateData = { current_stock: count };
            }
            
            const { error } = await supabase.from('medications').update(updateData).eq('id', state.medId);
@@ -747,10 +747,10 @@ const initCommands = () => {
             return;
           }
 
-          // Fetch current tablet count
+          // Fetch current stock
           const { data: medData, error: medErr } = await supabase
             .from('medications')
-            .select('tablet_count, drug_name')
+            .select('current_stock, tablet_count, drug_name')
             .eq('id', state.medId)
             .single();
             
@@ -760,12 +760,13 @@ const initCommands = () => {
             return;
           }
 
-          const newTotal = (medData.tablet_count || 0) + addedCount;
+          const currentStockVal = medData.current_stock !== null ? Number(medData.current_stock) : (medData.tablet_count || 0);
+          const newTotal = currentStockVal + addedCount;
           
           const { error: updateErr } = await supabase
             .from('medications')
             .update({ 
-              tablet_count: newTotal,
+              current_stock: newTotal,
               low_stock_alert_enabled: true,
               refill_confirmed: true
             })
@@ -947,7 +948,7 @@ const initCommands = () => {
           dosage: state.dosage,
           frequency: state.frequency,
           reminder_times: state.times,
-          tablet_count: state.tablet_count,
+          current_stock: state.tablet_count,
           priority_level: state.priority_level || 'normal',
           next_reminder_at: nextReminderAt.toISOString()
         }]);
@@ -1350,15 +1351,6 @@ const initCommands = () => {
       }
 
       const delayMinutes = Math.max(0, Math.round((Date.now() - new Date(parseInt(scheduledTime)).getTime()) / 60000));
-
-      if (responseType === 'TAKEN') {
-        // Fetch current count and decrement
-        if (medData.tablet_count > 0) {
-          const newCount = medData.tablet_count - 1;
-          await supabase.from('medications').update({ tablet_count: newCount }).eq('id', medId);
-          console.log(`[Stock Tracking] ${medData.drug_name} taken. New tablet count: ${newCount}`);
-        }
-      }
 
       // Save log for TAKEN or SKIP
       const { error } = await supabase.from('reminder_logs').insert([{

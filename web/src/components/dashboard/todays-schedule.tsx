@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client';
 import { resolveReminderEvent } from '@/lib/reminder-events';
 import { useUiMode } from '@/context/ui-mode-context';
 import { Check, SkipForward, AlertCircle, Clock, AlertTriangle, Pill, CheckCircle, XCircle, X } from 'lucide-react';
+import { PremiumToast } from '@/components/ui/premium-toast';
 
 export interface ReminderEvent {
   id: number;
@@ -20,6 +21,9 @@ export interface ReminderEvent {
     drug_name: string;
     dosage: string;
     priority_level: string;
+    unit_type?: string;
+    dosage_amount?: number;
+    medication_reason?: string;
   };
 }
 
@@ -320,30 +324,7 @@ export default function TodaysSchedule({
         </div>
 
         {/* Toast Notifications */}
-        <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3 max-w-sm w-full pointer-events-none">
-          {toasts.map((toast) => (
-            <div
-              key={toast.id}
-              className="pointer-events-auto flex items-start gap-3 p-4 rounded-2xl border border-white/20 bg-white/80 backdrop-blur-xl shadow-xl shadow-slate-900/10 animate-in slide-in-from-bottom-5 duration-300"
-            >
-              {toast.type === 'error' ? (
-                <AlertTriangle className="w-5 h-5 text-danger shrink-0 mt-0.5" />
-              ) : (
-                <CheckCircle className="w-5 h-5 text-success shrink-0 mt-0.5" />
-              )}
-              <div className="flex-1 space-y-0.5">
-                <h5 className="font-bold text-sm text-[#0F172A]">{toast.title}</h5>
-                <p className="text-xs text-[#475569] leading-relaxed">{toast.message}</p>
-              </div>
-              <button
-                onClick={() => setToasts((prev) => prev.filter((t) => t.id !== toast.id))}
-                className="text-[#94A3B8] hover:text-[#475569] transition-colors p-0.5 hover:bg-slate-100 rounded-md"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          ))}
-        </div>
+        <PremiumToast toasts={toasts} onDismiss={(id) => setToasts((prev) => prev.filter((t) => t.id !== id))} />
       </>
     );
   }
@@ -466,30 +447,7 @@ export default function TodaysSchedule({
       </div>
 
       {/* Toast Notifications */}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3 max-w-sm w-full pointer-events-none">
-        {toasts.map((toast) => (
-          <div
-            key={toast.id}
-            className="pointer-events-auto flex items-start gap-3 p-4 rounded-2xl border border-white/20 bg-white/80 backdrop-blur-xl shadow-xl shadow-slate-900/10 animate-in slide-in-from-bottom-5 duration-300"
-          >
-            {toast.type === 'error' ? (
-              <AlertTriangle className="w-5 h-5 text-danger shrink-0 mt-0.5" />
-            ) : (
-              <CheckCircle className="w-5 h-5 text-success shrink-0 mt-0.5" />
-            )}
-            <div className="flex-1 space-y-0.5">
-              <h5 className="font-bold text-sm text-[#0F172A]">{toast.title}</h5>
-              <p className="text-xs text-[#475569] leading-relaxed">{toast.message}</p>
-            </div>
-            <button
-              onClick={() => setToasts((prev) => prev.filter((t) => t.id !== toast.id))}
-              className="text-[#94A3B8] hover:text-[#475569] transition-colors p-0.5 hover:bg-slate-100 rounded-md"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        ))}
-      </div>
+      <PremiumToast toasts={toasts} onDismiss={(id) => setToasts((prev) => prev.filter((t) => t.id !== id))} />
     </>
   );
 }

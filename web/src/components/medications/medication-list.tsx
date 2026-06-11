@@ -19,6 +19,11 @@ export interface Medication {
   priority_level: string;
   next_reminder_at: string | null;
   active: boolean;
+  unit_type?: string;
+  dosage_amount?: number;
+  current_stock?: number | null;
+  stock_threshold?: number | null;
+  medication_reason?: string | null;
 }
 
 interface MedicationListProps {
@@ -59,7 +64,7 @@ export default function MedicationList({
 
         const { data, error } = await supabase
           .from('medications')
-          .select('id, telegram_id, drug_name, dosage, frequency, reminder_times, tablet_count, priority_level, next_reminder_at, active')
+          .select('id, telegram_id, drug_name, dosage, frequency, reminder_times, tablet_count, priority_level, next_reminder_at, active, unit_type, dosage_amount, current_stock, stock_threshold, medication_reason')
           .eq('telegram_id', queryId);
 
         if (!error && data) {
@@ -214,7 +219,10 @@ export default function MedicationList({
                           {med.drug_name}
                         </h3>
                         <p className={`text-muted-foreground mt-1 ${isElderly ? 'text-lg font-bold' : 'text-xs'}`}>
-                          Dosage: <b className="text-foreground">{med.dosage}</b>
+                          Dosage: <b className="text-foreground">{med.dosage_amount || 1} {med.unit_type?.toLowerCase() || 'tablet'}(s)</b>
+                          {med.dosage && med.dosage !== 'N/A' && (
+                            <> ({med.dosage})</>
+                          )}
                         </p>
                       </div>
                     </div>
@@ -258,9 +266,32 @@ export default function MedicationList({
                       <span className="text-muted-foreground font-bold">Stock:</span>
                       <span className="font-extrabold text-foreground flex items-center gap-1">
                         <Package className="w-4 h-4 text-muted-foreground shrink-0" />
-                        <span>{med.tablet_count} tablets</span>
+                        {med.current_stock !== null && med.current_stock !== undefined ? (
+                          <span className={
+                            med.stock_threshold !== null && med.stock_threshold !== undefined && Number(med.current_stock) <= Number(med.stock_threshold)
+                              ? 'text-danger font-black animate-pulse'
+                              : ''
+                          }>
+                            {med.current_stock} {med.unit_type?.toLowerCase() || 'unit'}(s) 
+                            {med.stock_threshold !== null && med.stock_threshold !== undefined && Number(med.current_stock) <= Number(med.stock_threshold) && (
+                              <span className="text-[10px] ml-1 bg-danger/10 text-danger border border-danger/20 px-1.5 py-0.5 rounded font-black">
+                                LOW
+                              </span>
+                            )}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground font-medium">Not tracked</span>
+                        )}
                       </span>
                     </div>
+
+                    {/* Medication Reason */}
+                    {med.medication_reason && (
+                      <div className={`flex items-start justify-between ${isElderly ? 'text-lg' : 'text-xs text-muted-foreground'}`}>
+                        <span className="text-muted-foreground font-bold">Reason:</span>
+                        <span className="font-extrabold text-foreground text-right">{med.medication_reason}</span>
+                      </div>
+                    )}
 
                     {/* Next scheduled run */}
                     {med.active && med.next_reminder_at && (
