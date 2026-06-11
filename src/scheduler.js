@@ -231,7 +231,11 @@ const initScheduler = () => {
             console.log(`[Workflow State Change] Created reminder_event ID ${eventData[0].id} for Med ID ${med.id} with status 'PENDING_PATIENT'`);
             console.log(`[Scheduler] Sending Telegram message for Med ID: ${med.id}`);
             // 3. Send Reminder (Telegram + Browser Push)
-            await bot.sendMessage(med.telegram_id, message, { parse_mode: 'HTML', reply_markup: inlineKeyboard });
+            try {
+              await bot.sendMessage(med.telegram_id, message, { parse_mode: 'HTML', reply_markup: inlineKeyboard });
+            } catch (tgErr) {
+              console.error(`[Scheduler] Telegram failed to send reminder to ${med.telegram_id}:`, tgErr.message || tgErr);
+            }
             await sendBrowserPush(med.telegram_id, {
               title: '💊 Medication Reminder',
               body: `Time to take ${med.drug_name}${med.dosage ? ` (${med.dosage})` : ''}.`,
@@ -353,7 +357,11 @@ const initScheduler = () => {
               };
 
               const message = `💊 Time to take <b>${escapeHTML(med.drug_name)}</b>${med.dosage ? ` (${escapeHTML(med.dosage)})` : ''}`;
-              await bot.sendMessage(med.telegram_id, message, { parse_mode: 'HTML', reply_markup: inlineKeyboard });
+              try {
+                await bot.sendMessage(med.telegram_id, message, { parse_mode: 'HTML', reply_markup: inlineKeyboard });
+              } catch (tgErr) {
+                console.error(`[Scheduler] Telegram failed to send snooze reminder to ${med.telegram_id}:`, tgErr.message || tgErr);
+              }
               await sendBrowserPush(med.telegram_id, {
                 title: '⏰ Snooze Reminder',
                 body: `Time to take ${med.drug_name}${med.dosage ? ` (${med.dosage})` : ''}.`,
@@ -432,15 +440,19 @@ const initScheduler = () => {
 
                 for (const cg of caregivers) {
                   try {
-                    await bot.sendMessage(cg.caregiver_chat_id, alertMessage, { parse_mode: 'HTML', reply_markup: alertButtons });
-                    console.log(`[Scheduler] Sent missed dose alert to Caregiver: ${cg.caregiver_chat_id}`);
+                    try {
+                      await bot.sendMessage(cg.caregiver_chat_id, alertMessage, { parse_mode: 'HTML', reply_markup: alertButtons });
+                      console.log(`[Scheduler] Sent missed dose alert to Caregiver: ${cg.caregiver_chat_id}`);
+                    } catch (tgErr) {
+                      console.error(`[Scheduler] Telegram failed to send caregiver alert to ${cg.caregiver_chat_id}:`, tgErr.message || tgErr);
+                    }
                     await sendBrowserPush(cg.caregiver_chat_id, {
                       title: '⚠️ Patient Missed Medication',
                       body: `${patientName} has not taken ${med.drug_name}. Action required.`,
                       eventId: event.id
                     });
                   } catch (sendErr) {
-                    console.error(`[Scheduler] Failed to send alert to caregiver ${cg.caregiver_chat_id}:`, sendErr);
+                    console.error(`[Scheduler] Failed to process caregiver alert for ${cg.caregiver_chat_id}:`, sendErr);
                   }
                 }
 
@@ -495,7 +507,11 @@ const initScheduler = () => {
 
             console.log(`[Workflow State Change] Event ID ${event.id} is being retried. Transitioned status from ${event.reminder_status} to RETRYING_PATIENT (retry_count: ${event.retry_count + 1})`);
             console.log(`[Scheduler] Sending Telegram retry message for Med ID: ${med.id}`);
-            await bot.sendMessage(med.telegram_id, message, { parse_mode: 'HTML', reply_markup: inlineKeyboard });
+            try {
+              await bot.sendMessage(med.telegram_id, message, { parse_mode: 'HTML', reply_markup: inlineKeyboard });
+            } catch (tgErr) {
+              console.error(`[Scheduler] Telegram failed to send retry reminder to ${med.telegram_id}:`, tgErr.message || tgErr);
+            }
             await sendBrowserPush(med.telegram_id, {
               title: '⏰ Reminder — Please Respond',
               body: `Have you taken ${med.drug_name} yet? This is a follow-up reminder.`,
@@ -568,7 +584,11 @@ const initScheduler = () => {
 
               // 2. Notify patient (Telegram + Browser Push)
               try {
-                await bot.sendMessage(med.telegram_id, `❌ You missed your medication: <b>${escapeHTML(med.drug_name)}</b>.`, { parse_mode: 'HTML' });
+                try {
+                  await bot.sendMessage(med.telegram_id, `❌ You missed your medication: <b>${escapeHTML(med.drug_name)}</b>.`, { parse_mode: 'HTML' });
+                } catch (tgErr) {
+                  console.error(`[Scheduler] Telegram failed to send missed dose alert to patient ${med.telegram_id}:`, tgErr.message || tgErr);
+                }
                 await sendBrowserPush(med.telegram_id, {
                   title: '❌ Medication Missed',
                   body: `You missed your scheduled dose of ${med.drug_name}.`,
@@ -598,8 +618,12 @@ const initScheduler = () => {
                   
                   for (const cg of caregivers) {
                     try {
-                      await bot.sendMessage(cg.caregiver_chat_id, alertMsg, { parse_mode: 'HTML' });
-                      console.log(`[Scheduler] Sent critical escalation alert to Caregiver: ${cg.caregiver_chat_id}`);
+                      try {
+                        await bot.sendMessage(cg.caregiver_chat_id, alertMsg, { parse_mode: 'HTML' });
+                        console.log(`[Scheduler] Sent critical escalation alert to Caregiver: ${cg.caregiver_chat_id}`);
+                      } catch (tgErr) {
+                        console.error(`[Scheduler] Telegram failed to send critical alert to caregiver ${cg.caregiver_chat_id}:`, tgErr.message || tgErr);
+                      }
                       await sendBrowserPush(cg.caregiver_chat_id, {
                         title: '🔴 CRITICAL — Patient Missed Medication',
                         body: `${patientName} did NOT take critical medication ${med.drug_name}. Check on patient immediately.`,
