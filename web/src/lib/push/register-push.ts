@@ -78,6 +78,10 @@ export async function registerPush(): Promise<boolean> {
 
     const responseData = await res.json();
     console.log('Push subscription stored successfully:', responseData);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('lastPushEndpoint', subscription.endpoint);
+      localStorage.setItem('lastPushRefreshTimestamp', Date.now().toString());
+    }
     return true;
   } catch (error) {
     console.error('Error during push notification registration:', error);

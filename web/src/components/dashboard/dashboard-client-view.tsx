@@ -124,9 +124,40 @@ export default function DashboardClientView({
       'serviceWorker' in navigator &&
       'PushManager' in window
     ) {
-      const dismissed = sessionStorage.getItem('dismissedPushBanner') === 'true';
-      if (Notification.permission === 'default' && !dismissed) {
-        setShowPushBanner(true);
+      if (Notification.permission === 'granted') {
+        const checkAndRefreshSubscription = async () => {
+          try {
+            const registration = await navigator.serviceWorker.ready;
+            const subscription = await registration.pushManager.getSubscription();
+            
+            if (!subscription) {
+              console.log('[PUSH_DIAGNOSTIC] Subscription missing on device. Re-registering...');
+              await registerPush();
+            } else {
+              const lastRefresh = localStorage.getItem('lastPushRefreshTimestamp');
+              const lastEndpoint = localStorage.getItem('lastPushEndpoint');
+              const now = Date.now();
+              const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+              
+              if (
+                subscription.endpoint !== lastEndpoint ||
+                !lastRefresh ||
+                now - parseInt(lastRefresh) > sevenDaysMs
+              ) {
+                console.log('[PUSH_DIAGNOSTIC] Refresh conditions met. Updating push subscription...');
+                await registerPush();
+              }
+            }
+          } catch (err) {
+            console.error('[PUSH_DIAGNOSTIC] Auto-registration check failed:', err);
+          }
+        };
+        checkAndRefreshSubscription();
+      } else {
+        const dismissed = sessionStorage.getItem('dismissedPushBanner') === 'true';
+        if (Notification.permission === 'default' && !dismissed) {
+          setShowPushBanner(true);
+        }
       }
     }
   }, []);

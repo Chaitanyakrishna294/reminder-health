@@ -55,17 +55,39 @@ async function sendBrowserPush(telegramId, payload) {
         endpoint: sub.endpoint,
         keys: { p256dh: sub.p256dh, auth: sub.auth }
       };
+      let gateway = 'Unknown Gateway';
       try {
+        gateway = new URL(sub.endpoint).hostname;
+      } catch (urlErr) {}
+
+      try {
+        console.log(`[PUSH_DIAGNOSTIC] Action: push_dispatching | User: ${profile.id} | SubID: ${sub.id} | Endpoint: ...${sub.endpoint.slice(-20)}`);
         await webpush.sendNotification(subscription, pushPayload);
-        console.log(`[Push] Delivered to user ${profile.id} endpoint ...${sub.endpoint.slice(-20)}`);
+        console.log(`[PUSH_DIAGNOSTIC] Action: push_delivered | User: ${profile.id} | SubID: ${sub.id} | Gateway: ${gateway}`);
+        
+        await supabase.from('push_logs').insert([{
+          user_id: profile.id,
+          status: 'SUCCESS',
+          gateway: gateway
+        }]);
       } catch (pushErr) {
+        let status = 'FAILED';
+        let errorMessage = pushErr.message;
+        
         if (pushErr.statusCode === 410 || pushErr.statusCode === 404) {
-          // Subscription expired or invalid — clean up
-          console.log(`[Push] Subscription expired (${pushErr.statusCode}). Removing sub ID ${sub.id}.`);
+          status = 'EXPIRED';
+          console.log(`[PUSH_DIAGNOSTIC] Action: subscription_removed | SubID: ${sub.id} | Status: ${pushErr.statusCode} (Expired/Gone)`);
           await supabase.from('push_subscriptions').delete().eq('id', sub.id);
         } else {
-          console.error(`[Push] Failed to deliver to sub ID ${sub.id}:`, pushErr.message);
+          console.error(`[PUSH_DIAGNOSTIC] Action: gateway_error | SubID: ${sub.id} | Code: ${pushErr.statusCode || 'Unknown'} | Error: ${pushErr.message}`);
         }
+        
+        await supabase.from('push_logs').insert([{
+          user_id: profile.id,
+          status: status,
+          gateway: gateway,
+          error_message: errorMessage
+        }]);
       }
     }
   } catch (err) {

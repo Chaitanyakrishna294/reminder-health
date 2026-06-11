@@ -45,6 +45,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: upsertErr.message }, { status: 500 });
     }
 
+    console.log(`[PUSH_DIAGNOSTIC] Action: subscription_registered | User: ${user.id} | Device: ${deviceName || 'Unknown'} | Endpoint: ...${endpoint.slice(-30)}`);
+
     return NextResponse.json({ success: true, data });
   } catch (error: any) {
     console.error('[API Subscribe] Catch block error:', error);
