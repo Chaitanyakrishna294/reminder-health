@@ -9,7 +9,6 @@ import {
   LayoutDashboard, 
   Pill, 
   Calendar, 
-  MessageSquare, 
   AlertTriangle, 
   Settings,
   Phone,
@@ -107,7 +106,6 @@ export default function DashboardMainLayout({
       { href: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
       { href: '/medications', label: 'Medications', icon: <Pill className="w-5 h-5" /> },
       { href: '/schedule-planner', label: 'Schedule', icon: <Calendar className="w-5 h-5" /> },
-      { href: '/care-connect', label: 'Care Connect', icon: <MessageSquare className="w-5 h-5" /> },
       { href: '/settings', label: 'Settings', icon: <Settings className="w-5 h-5" /> },
     ];
 
@@ -274,12 +272,6 @@ export default function DashboardMainLayout({
 
             {/* Right section: Quick Actions */}
             <div className="flex flex-wrap items-center gap-3 relative shrink-0">
-              <Link
-                href="/care-connect"
-                className="inline-flex items-center justify-center gap-1.5 text-xs font-black text-foreground bg-muted hover:bg-muted/80 border border-border px-4 py-2 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98]"
-              >
-                <MessageSquare className="w-3.5 h-3.5" /> Message Patient
-              </Link>
               <button
                 onClick={handleCall}
                 className="inline-flex items-center justify-center gap-1.5 text-xs font-black text-foreground bg-muted hover:bg-muted/80 border border-border px-4 py-2 rounded-xl transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
