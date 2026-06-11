@@ -16,12 +16,13 @@ export default async function HealthVaultPage() {
 
   const supabase = await createClient();
 
-  // Fetch categories for this user with related record counts.
+  // Fetch categories for this user with related record counts (active files only).
   // Caregiver access is not implemented in this foundation sprint.
   const { data: categories } = await supabase
     .from('health_categories')
     .select('id, name, is_default, created_at, health_records(count)')
     .eq('user_id', user.id)
+    .is('health_records.deleted_at', null)
     .order('name', { ascending: true });
 
   return (

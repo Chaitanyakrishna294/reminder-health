@@ -24,7 +24,11 @@ import {
   Upload,
   Download,
   FolderOpen,
-  Eye
+  Eye,
+  Search,
+  Trash2,
+  RotateCcw,
+  Trash
 } from 'lucide-react';
 
 interface Category {
@@ -64,6 +68,22 @@ export default function HealthVaultClientView({
   const [currentPage, setCurrentPage] = useState(0);
   const [recordsError, setRecordsError] = useState<string | null>(null);
 
+  // Search and Trash States
+  const [searchQuery, setSearchQuery] = useState('');
+  const [viewingTrash, setViewingTrash] = useState(false);
+
+  // Edit Metadata Modal State
+  const [recordToEdit, setRecordToEdit] = useState<any | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDate, setEditDate] = useState('');
+  const [editCategoryId, setEditCategoryId] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  // Permanent Delete Modal State
+  const [recordToPermanentlyDelete, setRecordToPermanentlyDelete] = useState<any | null>(null);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
+  const [isDeletingPermanently, setIsDeletingPermanently] = useState(false);
+
   // Upload Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeStep, setActiveStep] = useState<1 | 2 | 3 | 4>(1);
@@ -71,16 +91,16 @@ export default function HealthVaultClientView({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
 
-  // Preview Modal State
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [previewType, setPreviewType] = useState<string | null>(null);
-  const [previewTitle, setPreviewTitle] = useState<string | null>(null);
-
   // Form Field State
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [recordDate, setRecordDate] = useState<string>('');
   const [recordTitle, setRecordTitle] = useState<string>('');
+
+  // Preview Modal State
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewType, setPreviewType] = useState<string | null>(null);
+  const [previewTitle, setPreviewTitle] = useState<string | null>(null);
 
   // Drag and drop state
   const [isDragging, setIsDragging] = useState(false);
@@ -96,23 +116,26 @@ export default function HealthVaultClientView({
     }
     getSession();
 
-    // Default record date to today
     const today = new Date().toISOString().split('T')[0];
     setRecordDate(today);
   }, [supabase]);
 
-  // Load records when selectedCategory changes
+  // Fetch timeline records when viewing mode, category, page, or search query changes
   useEffect(() => {
     if (selectedCategory) {
-      setRecords([]);
-      setTotalRecordsCount(0);
-      setCurrentPage(0);
-      fetchRecords(selectedCategory.id, 0, false);
+      const delayDebounceFn = setTimeout(() => {
+        setRecords([]);
+        setTotalRecordsCount(0);
+        setCurrentPage(0);
+        fetchRecords(selectedCategory.id, 0, false);
+      }, searchQuery.trim() ? 400 : 0); // Debounce if typing, run instantly otherwise
+
+      return () => clearTimeout(delayDebounceFn);
     } else {
       setRecords([]);
       setTotalRecordsCount(0);
     }
-  }, [selectedCategory]);
+  }, [selectedCategory, viewingTrash, searchQuery]);
 
   const fetchRecords = async (categoryId: string, page: number, append: boolean = false) => {
     setIsLoadingRecords(true);
@@ -121,12 +144,26 @@ export default function HealthVaultClientView({
       const from = page * LIMIT;
       const to = from + LIMIT - 1;
 
-      const { data, error, count } = await supabase
+      let query = supabase
         .from('health_records')
         .select('id, title, record_date, file_name, file_url, file_type, file_size, uploaded_at', { count: 'exact' })
-        .eq('category_id', categoryId)
-        .order('record_date', { ascending: false })
-        .range(from, to);
+        .eq('category_id', categoryId);
+
+      // Filter by soft-delete state
+      if (viewingTrash) {
+        query = query.not('deleted_at', 'is', null);
+      } else {
+        query = query.is('deleted_at', null);
+      }
+
+      // Filter by case-insensitive text search (Title or File name)
+      if (searchQuery.trim()) {
+        query = query.or(`title.ilike.%${searchQuery.trim()}%,file_name.ilike.%${searchQuery.trim()}%`);
+      }
+
+      query = query.order('record_date', { ascending: false }).range(from, to);
+
+      const { data, error, count } = await query;
 
       if (error) throw error;
 
@@ -159,7 +196,7 @@ export default function HealthVaultClientView({
     try {
       const { data, error } = await supabase.storage
         .from('health-vault')
-        .createSignedUrl(path, 60); // 60 seconds token expiry
+        .createSignedUrl(path, 60);
 
       if (error) throw error;
 
@@ -181,7 +218,7 @@ export default function HealthVaultClientView({
     try {
       const { data, error } = await supabase.storage
         .from('health-vault')
-        .createSignedUrl(path, 60); // 60 seconds token expiry
+        .createSignedUrl(path, 60);
 
       if (error) throw error;
 
@@ -192,6 +229,186 @@ export default function HealthVaultClientView({
       console.error('Preview generation error:', err);
       alert('Failed to load document preview.');
     }
+  };
+
+  // Soft Delete handler
+  const handleSoftDelete = async (recordId: string) => {
+    if (!confirm('Are you sure you want to move this record to the Trash?')) return;
+    try {
+      const { error } = await supabase
+        .from('health_records')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', recordId);
+
+      if (error) throw error;
+
+      // Log compliance audit trace on client side
+      await supabase.from('audit_logs').insert([{
+        user_id: userId,
+        action: 'SOFT_DELETE_RECORD',
+        details: { record_id: recordId }
+      }]);
+
+      setRecords((prev) => prev.filter((r) => r.id !== recordId));
+      setTotalRecordsCount((prev) => Math.max(0, prev - 1));
+      router.refresh();
+    } catch (err) {
+      console.error('Soft delete error:', err);
+      alert('Failed to delete record.');
+    }
+  };
+
+  // Restore from Trash handler
+  const handleRestore = async (recordId: string) => {
+    try {
+      const { error } = await supabase
+        .from('health_records')
+        .update({ deleted_at: null })
+        .eq('id', recordId);
+
+      if (error) throw error;
+
+      // Log compliance audit trace
+      await supabase.from('audit_logs').insert([{
+        user_id: userId,
+        action: 'RESTORE_RECORD',
+        details: { record_id: recordId }
+      }]);
+
+      setRecords((prev) => prev.filter((r) => r.id !== recordId));
+      setTotalRecordsCount((prev) => Math.max(0, prev - 1));
+      router.refresh();
+    } catch (err) {
+      console.error('Restore error:', err);
+      alert('Failed to restore record.');
+    }
+  };
+
+  // Permanent Hard Delete handler
+  const handlePermanentDelete = async () => {
+    if (!recordToPermanentlyDelete) return;
+    if (deleteConfirmationText.trim().toUpperCase() !== 'DELETE') {
+      alert('Please type DELETE to confirm permanent destruction.');
+      return;
+    }
+
+    setIsDeletingPermanently(true);
+    try {
+      // 1. Remove binary object from storage bucket
+      const { error: storageError } = await supabase.storage
+        .from('health-vault')
+        .remove([recordToPermanentlyDelete.file_url]);
+
+      if (storageError) {
+        console.warn('Storage delete warning (continuing to clear DB row):', storageError.message);
+      }
+
+      // 2. Clear metadata row from database
+      const { error: dbError } = await supabase
+        .from('health_records')
+        .delete()
+        .eq('id', recordToPermanentlyDelete.id);
+
+      if (dbError) throw dbError;
+
+      // 3. Log compliance audit trace (required for medical records)
+      await supabase.from('audit_logs').insert([{
+        user_id: userId,
+        action: 'MANUAL_PERMANENT_DELETE',
+        details: {
+          record_id: recordToPermanentlyDelete.id,
+          file_name: recordToPermanentlyDelete.file_name,
+          title: recordToPermanentlyDelete.title,
+          file_url: recordToPermanentlyDelete.file_url
+        }
+      }]);
+
+      setRecords((prev) => prev.filter((r) => r.id !== recordToPermanentlyDelete.id));
+      setTotalRecordsCount((prev) => Math.max(0, prev - 1));
+      setRecordToPermanentlyDelete(null);
+      setDeleteConfirmationText('');
+      router.refresh();
+    } catch (err: any) {
+      console.error('Permanent delete error:', err);
+      alert('Failed to permanently delete record.');
+    } finally {
+      setIsDeletingPermanently(false);
+    }
+  };
+
+  // Metadata Edit Save handler
+  const handleSaveEdit = async () => {
+    if (!recordToEdit) return;
+    if (!editTitle.trim()) {
+      alert('Title is required.');
+      return;
+    }
+    if (!editDate) {
+      alert('Record date is required.');
+      return;
+    }
+    if (!editCategoryId) {
+      alert('Category folder selection is required.');
+      return;
+    }
+
+    setIsSavingEdit(true);
+    try {
+      const { error } = await supabase
+        .from('health_records')
+        .update({
+          title: editTitle.trim(),
+          record_date: editDate,
+          category_id: editCategoryId
+        })
+        .eq('id', recordToEdit.id);
+
+      if (error) throw error;
+
+      // Log compliance audit trace
+      await supabase.from('audit_logs').insert([{
+        user_id: userId,
+        action: 'EDIT_RECORD_METADATA',
+        details: {
+          record_id: recordToEdit.id,
+          old_title: recordToEdit.title,
+          new_title: editTitle.trim(),
+          old_date: recordToEdit.record_date,
+          new_date: editDate,
+          old_category_id: selectedCategory?.id,
+          new_category_id: editCategoryId
+        }
+      }]);
+
+      // If record is moved to another category, hide it from the current timeline
+      if (selectedCategory && editCategoryId !== selectedCategory.id) {
+        setRecords((prev) => prev.filter((r) => r.id !== recordToEdit.id));
+        setTotalRecordsCount((prev) => Math.max(0, prev - 1));
+      } else {
+        setRecords((prev) =>
+          prev.map((r) =>
+            r.id === recordToEdit.id
+              ? { ...r, title: editTitle.trim(), record_date: editDate }
+              : r
+          )
+        );
+      }
+
+      setRecordToEdit(null);
+      router.refresh();
+    } catch (err: any) {
+      console.error('Error saving metadata edit:', err);
+      alert('Failed to save record changes.');
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const openEditModal = (record: any) => {
+    setRecordToEdit(record);
+    setEditTitle(record.title);
+    setEditDate(record.record_date);
+    setEditCategoryId(selectedCategory?.id || '');
   };
 
   // Grouping timeline: Year -> Date group -> items
@@ -269,33 +486,7 @@ export default function HealthVaultClientView({
     }
   };
 
-  const openUploadModal = (categoryId: string = '') => {
-    setSelectedCategoryId(categoryId || (categories[0]?.id || ''));
-    setSelectedFile(null);
-    setUploadError(null);
-    setUploadSuccess(false);
-    setIsUploading(false);
-    setActiveStep(1);
-    
-    const today = new Date().toISOString().split('T')[0];
-    setRecordDate(today);
-    setRecordTitle('');
-    setIsModalOpen(true);
-  };
-
-  // Upload validators
-  const validateFile = (file: File): string | null => {
-    const extension = '.' + file.name.split('.').pop()?.toLowerCase();
-    if (!ALLOWED_EXTENSIONS.includes(extension)) {
-      return `Unsupported file extension (${extension}). Supported: PDF, JPG, JPEG, PNG, WEBP, DOC, DOCX, TXT, ZIP.`;
-    }
-    const maxSize = 20 * 1024 * 1024; // 20 MB
-    if (file.size > maxSize) {
-      return 'File exceeds 20 MB size limit.';
-    }
-    return null;
-  };
-
+  // Upload handlers
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
@@ -338,6 +529,32 @@ export default function HealthVaultClientView({
         setRecordTitle(nameWithoutExt);
       }
     }
+  };
+
+  const validateFile = (file: File): string | null => {
+    const extension = '.' + file.name.split('.').pop()?.toLowerCase();
+    if (!ALLOWED_EXTENSIONS.includes(extension)) {
+      return `Unsupported file extension (${extension}). Supported: PDF, JPG, JPEG, PNG, WEBP, DOC, DOCX, TXT, ZIP.`;
+    }
+    const maxSize = 20 * 1024 * 1024; // 20 MB
+    if (file.size > maxSize) {
+      return 'File exceeds 20 MB size limit.';
+    }
+    return null;
+  };
+
+  const openUploadModal = (categoryId: string = '') => {
+    setSelectedCategoryId(categoryId || (categories[0]?.id || ''));
+    setSelectedFile(null);
+    setUploadError(null);
+    setUploadSuccess(false);
+    setIsUploading(false);
+    setActiveStep(1);
+    
+    const today = new Date().toISOString().split('T')[0];
+    setRecordDate(today);
+    setRecordTitle('');
+    setIsModalOpen(true);
   };
 
   const handleUploadSave = async () => {
@@ -399,10 +616,20 @@ export default function HealthVaultClientView({
         throw new Error(`Database error: ${dbError.message}`);
       }
 
+      // Log upload action
+      await supabase.from('audit_logs').insert([{
+        user_id: userId,
+        action: 'UPLOAD_RECORD',
+        details: {
+          file_name: selectedFile.name,
+          title: recordTitle.trim(),
+          category_id: selectedCategoryId
+        }
+      }]);
+
       setUploadSuccess(true);
       router.refresh();
       
-      // Auto reload current category timeline if uploading inside details view
       if (selectedCategory && selectedCategory.id === selectedCategoryId) {
         fetchRecords(selectedCategoryId, 0, false);
       }
@@ -487,6 +714,7 @@ export default function HealthVaultClientView({
                     onClick={() => {
                       if (!category.id.startsWith('default-')) {
                         setSelectedCategory(category);
+                        setViewingTrash(false);
                       }
                     }}
                     className={`bg-card rounded-3xl border border-border flex flex-col justify-between transition-all duration-300 shadow-sm cursor-pointer ${
@@ -553,14 +781,16 @@ export default function HealthVaultClientView({
               </div>
               <div>
                 <h2 className={`font-black text-foreground tracking-tight ${isElderly ? 'text-3xl' : 'text-xl'}`}>
-                  {selectedCategory.name}
+                  {selectedCategory.name} {viewingTrash && '(Trash Folder)'}
                 </h2>
                 <p className={`text-muted-foreground ${isElderly ? 'text-lg mt-0.5' : 'text-xs'}`}>
-                  Chronological history timeline • Loaded {records.length} of {totalRecordsCount} documents
+                  {viewingTrash 
+                    ? `Trash container • Loaded ${records.length} items to purge` 
+                    : `Chronological history timeline • Loaded ${records.length} of ${totalRecordsCount} documents`}
                 </p>
               </div>
             </div>
-            {userRole !== 'CAREGIVER' && (
+            {userRole !== 'CAREGIVER' && !viewingTrash && (
               <button
                 onClick={() => openUploadModal(selectedCategory.id)}
                 className={`font-black rounded bg-primary text-primary-foreground hover:bg-primary/95 transition-all cursor-pointer shadow-sm flex items-center justify-center shrink-0 ${
@@ -571,6 +801,57 @@ export default function HealthVaultClientView({
                 <span>Upload to {selectedCategory.name}</span>
               </button>
             )}
+          </div>
+
+          {/* Active / Trash Toggles & Simple Search Bar */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card border border-border/60 rounded-3xl p-4 shadow-sm">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setViewingTrash(false)}
+                className={`font-black rounded-xl transition-all cursor-pointer ${
+                  !viewingTrash 
+                    ? 'bg-primary text-primary-foreground shadow-sm' 
+                    : 'bg-muted text-muted-foreground hover:text-foreground'
+                } ${isElderly ? 'px-5 py-2.5 text-sm' : 'px-3 py-1.5 text-xs'}`}
+              >
+                Active Records
+              </button>
+              <button
+                onClick={() => setViewingTrash(true)}
+                className={`font-black rounded-xl transition-all cursor-pointer flex items-center gap-1 ${
+                  viewingTrash 
+                    ? 'bg-primary text-primary-foreground shadow-sm' 
+                    : 'bg-muted text-muted-foreground hover:text-foreground'
+                } ${isElderly ? 'px-5 py-2.5 text-sm' : 'px-3 py-1.5 text-xs'}`}
+              >
+                <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                <span>Trash Folder</span>
+              </button>
+            </div>
+
+            {/* Simple Case-Insensitive Search Input */}
+            <div className="relative max-w-md w-full">
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-muted-foreground/60">
+                <Search className="w-4 h-4" />
+              </span>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by title or file name..."
+                className={`w-full bg-muted border border-border/80 rounded-2xl pl-9 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary/20 text-foreground font-semibold placeholder:text-muted-foreground/50 ${
+                  isElderly ? 'text-sm' : 'text-xs'
+                }`}
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted-foreground hover:text-foreground cursor-pointer"
+                >
+                  <X className="w-4 h-4 shrink-0" />
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Records Error Alert */}
@@ -585,28 +866,36 @@ export default function HealthVaultClientView({
           {isLoadingRecords && records.length === 0 ? (
             <div className="space-y-4 py-12">
               <div className="h-[100px] w-full bg-muted/20 animate-pulse rounded-3xl flex items-center justify-center text-xs text-muted-foreground font-semibold">
-                Loading records timeline...
+                Loading records...
               </div>
             </div>
           ) : records.length === 0 ? (
-            // Required Empty State for Timeline
+            // Trashed or Active Empty State
             <div className={`bg-card border border-border rounded-3xl text-center shadow-sm flex flex-col items-center justify-center max-w-xl mx-auto space-y-4 py-16 ${
               isElderly ? 'p-16 border-4 border-dashed' : 'p-12 border-dashed'
             }`}>
               <div className={`rounded-full bg-muted flex items-center justify-center text-muted-foreground/60 ${
                 isElderly ? 'w-16 h-16' : 'w-12 h-12'
               }`}>
-                <FileText className={isElderly ? 'w-8 h-8' : 'w-6 h-6'} />
+                {viewingTrash ? <Trash2 className="w-8 h-8" /> : <FileText className="w-8 h-8" />}
               </div>
               <div className="space-y-2">
                 <h3 className={`font-black text-foreground ${isElderly ? 'text-2xl' : 'text-base'}`}>
-                  No records uploaded yet.
+                  {viewingTrash 
+                    ? 'Trash is empty.' 
+                    : searchQuery.trim() 
+                      ? 'No search results found.' 
+                      : 'No records uploaded yet.'}
                 </h3>
                 <p className={`text-muted-foreground max-w-sm mx-auto leading-relaxed ${isElderly ? 'text-lg' : 'text-xs'}`}>
-                  Upload your first medical record.
+                  {viewingTrash 
+                    ? 'Deleted medical files will be stored here for 30 days before permanent purging.' 
+                    : searchQuery.trim() 
+                      ? 'Try updating your search query keywords.' 
+                      : 'Upload your first medical record.'}
                 </p>
               </div>
-              {userRole !== 'CAREGIVER' && (
+              {userRole !== 'CAREGIVER' && !viewingTrash && !searchQuery.trim() && (
                 <button
                   onClick={() => openUploadModal(selectedCategory.id)}
                   className={`font-black rounded bg-primary text-primary-foreground hover:bg-primary/95 transition-all cursor-pointer shadow-sm flex items-center justify-center ${
@@ -654,7 +943,7 @@ export default function HealthVaultClientView({
                           {dateGroup.items.map((item) => (
                             <div
                               key={item.id}
-                              className={`bg-card rounded-2xl border border-border flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all duration-300 shadow-sm ${
+                              className={`bg-card rounded-2xl border border-border flex flex-col lg:flex-row lg:items-center justify-between gap-4 transition-all duration-300 shadow-sm ${
                                 isElderly 
                                   ? 'p-6 border-2 hover:scale-[1.005] hover:shadow-md' 
                                   : 'p-4 hover:scale-[1.005] hover:shadow-md'
@@ -674,32 +963,85 @@ export default function HealthVaultClientView({
                                 </div>
                               </div>
 
-                              <div className="flex items-center gap-3 shrink-0 self-end md:self-auto">
+                              {/* Document Action Items */}
+                              <div className="flex flex-wrap items-center gap-2.5 shrink-0 self-end lg:self-auto">
                                 <span className={`uppercase font-extrabold px-1.5 py-0.5 rounded bg-muted border border-border text-muted-foreground font-mono ${
                                   isElderly ? 'text-[10px]' : 'text-[8px]'
                                 }`}>
                                   {item.file_name.split('.').pop() || 'file'}
                                 </span>
 
-                                <button
-                                  onClick={() => handlePreview(item.file_url, item.file_type, item.title)}
-                                  className={`font-black rounded bg-muted text-foreground hover:bg-muted/80 border border-border flex items-center justify-center cursor-pointer transition-all ${
-                                    isElderly ? 'px-4.5 py-2.5 text-sm' : 'px-3 py-1.5 text-[10px]'
-                                  }`}
-                                >
-                                  <Eye className="w-3.5 h-3.5 mr-1 shrink-0" />
-                                  <span>Preview</span>
-                                </button>
+                                {!viewingTrash ? (
+                                  <>
+                                    <button
+                                      onClick={() => handlePreview(item.file_url, item.file_type, item.title)}
+                                      className={`font-black rounded bg-muted text-foreground hover:bg-muted/80 border border-border flex items-center justify-center cursor-pointer transition-all ${
+                                        isElderly ? 'px-4 py-2 text-xs' : 'px-2.5 py-1 text-[10px]'
+                                      }`}
+                                    >
+                                      <Eye className="w-3.5 h-3.5 mr-1 shrink-0" />
+                                      <span>Preview</span>
+                                    </button>
 
-                                <button
-                                  onClick={() => handleDownload(item.file_url, item.file_name)}
-                                  className={`font-black rounded bg-primary/10 text-primary hover:bg-primary/15 border border-primary/25 flex items-center justify-center cursor-pointer transition-all ${
-                                    isElderly ? 'px-4.5 py-2.5 text-sm' : 'px-3 py-1.5 text-[10px]'
-                                  }`}
-                                >
-                                  <Download className="w-3.5 h-3.5 mr-1 shrink-0" />
-                                  <span>Download</span>
-                                </button>
+                                    <button
+                                      onClick={() => handleDownload(item.file_url, item.file_name)}
+                                      className={`font-black rounded bg-muted text-foreground hover:bg-muted/80 border border-border flex items-center justify-center cursor-pointer transition-all ${
+                                        isElderly ? 'px-4 py-2 text-xs' : 'px-2.5 py-1 text-[10px]'
+                                      }`}
+                                    >
+                                      <Download className="w-3.5 h-3.5 mr-1 shrink-0" />
+                                      <span>Download</span>
+                                    </button>
+
+                                    {userRole !== 'CAREGIVER' && (
+                                      <>
+                                        <button
+                                          onClick={() => openEditModal(item)}
+                                          className={`font-black rounded bg-muted text-foreground hover:bg-muted/80 border border-border flex items-center justify-center cursor-pointer transition-all ${
+                                            isElderly ? 'px-4 py-2 text-xs' : 'px-2.5 py-1 text-[10px]'
+                                          }`}
+                                        >
+                                          <Edit className="w-3.5 h-3.5 mr-1 shrink-0" />
+                                          <span>Edit</span>
+                                        </button>
+
+                                        <button
+                                          onClick={() => handleSoftDelete(item.id)}
+                                          className={`font-black rounded bg-danger/10 text-danger hover:bg-danger/15 border border-danger/25 flex items-center justify-center cursor-pointer transition-all ${
+                                            isElderly ? 'px-4 py-2 text-xs' : 'px-2.5 py-1 text-[10px]'
+                                          }`}
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5 mr-1 shrink-0" />
+                                          <span>Delete</span>
+                                        </button>
+                                      </>
+                                    )}
+                                  </>
+                                ) : (
+                                  userRole !== 'CAREGIVER' && (
+                                    <>
+                                      <button
+                                        onClick={() => handleRestore(item.id)}
+                                        className={`font-black rounded bg-success/10 text-success hover:bg-success/15 border border-success/25 flex items-center justify-center cursor-pointer transition-all ${
+                                          isElderly ? 'px-4.5 py-2 text-xs' : 'px-3 py-1 text-[10px]'
+                                        }`}
+                                      >
+                                        <RotateCcw className="w-3.5 h-3.5 mr-1 shrink-0" />
+                                        <span>Restore</span>
+                                      </button>
+
+                                      <button
+                                        onClick={() => setRecordToPermanentlyDelete(item)}
+                                        className={`font-black rounded bg-danger/10 text-danger hover:bg-danger/15 border border-danger/25 flex items-center justify-center cursor-pointer transition-all ${
+                                          isElderly ? 'px-4.5 py-2 text-xs' : 'px-3 py-1 text-[10px]'
+                                        }`}
+                                      >
+                                        <Trash className="w-3.5 h-3.5 mr-1 shrink-0" />
+                                        <span>Purge Forever</span>
+                                      </button>
+                                    </>
+                                  )
+                                )}
                               </div>
                             </div>
                           ))}
@@ -726,15 +1068,147 @@ export default function HealthVaultClientView({
                         <span>Loading more...</span>
                       </>
                     ) : (
-                      <>
-                        <span>Load More Records</span>
-                      </>
+                      <span>Load More Records</span>
                     )}
                   </button>
                 </div>
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Edit Metadata Modal */}
+      {recordToEdit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/60 backdrop-blur-sm animate-fade-in">
+          <div className={`bg-card border border-border shadow-2xl rounded-3xl w-full max-w-md relative p-6 ${isElderly ? 'p-8 border-2' : 'p-6'}`}>
+            <div className="flex items-center justify-between border-b border-border/50 pb-4 mb-4">
+              <div>
+                <h3 className={`font-black text-foreground ${isElderly ? 'text-2xl' : 'text-lg'}`}>Edit Record Details</h3>
+                <p className={`text-muted-foreground ${isElderly ? 'text-base' : 'text-xs'}`}>Modify record categorizations and dates.</p>
+              </div>
+              <button onClick={() => setRecordToEdit(null)} className="text-muted-foreground hover:text-foreground hover:bg-muted p-1.5 rounded-full cursor-pointer">
+                <X className="w-5 h-5 shrink-0" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <label className={`block font-black text-foreground ${isElderly ? 'text-lg' : 'text-xs'}`}>Title</label>
+                <input
+                  type="text"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className={`w-full bg-muted border border-border rounded-xl px-4 py-2.5 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 ${
+                    isElderly ? 'text-lg font-bold' : 'text-sm font-semibold'
+                  }`}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className={`block font-black text-foreground ${isElderly ? 'text-lg' : 'text-xs'}`}>Record Date</label>
+                <input
+                  type="date"
+                  value={editDate}
+                  onChange={(e) => setEditDate(e.target.value)}
+                  className={`w-full bg-muted border border-border rounded-xl px-4 py-2.5 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 ${
+                    isElderly ? 'text-lg font-bold' : 'text-sm font-semibold'
+                  }`}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className={`block font-black text-foreground ${isElderly ? 'text-lg' : 'text-xs'}`}>Category Folder</label>
+                <select
+                  value={editCategoryId}
+                  onChange={(e) => setEditCategoryId(e.target.value)}
+                  className={`w-full bg-muted border border-border rounded-xl px-4 py-2.5 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 ${
+                    isElderly ? 'text-lg font-bold' : 'text-sm font-semibold'
+                  }`}
+                >
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-border/50 pt-4 mt-6">
+              <button
+                onClick={() => setRecordToEdit(null)}
+                disabled={isSavingEdit}
+                className="px-4 py-2 rounded-xl text-xs font-black border border-border text-foreground hover:bg-muted cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveEdit}
+                disabled={isSavingEdit}
+                className="px-4 py-2 rounded-xl text-xs font-black bg-primary text-primary-foreground hover:bg-primary/95 flex items-center gap-1 cursor-pointer"
+              >
+                {isSavingEdit ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                <span>Save Changes</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Permanent Delete Confirmation Modal */}
+      {recordToPermanentlyDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/70 backdrop-blur-sm animate-fade-in">
+          <div className={`bg-card border border-border shadow-2xl rounded-3xl w-full max-w-md relative p-6 text-center space-y-4 ${
+            isElderly ? 'p-8 border-2' : 'p-6'
+          }`}>
+            <div className="p-3 bg-danger/10 text-danger rounded-full w-14 h-14 flex items-center justify-center mx-auto shrink-0">
+              <Trash className="w-8 h-8" />
+            </div>
+
+            <div className="space-y-2">
+              <h3 className={`font-black text-foreground ${isElderly ? 'text-2xl' : 'text-lg'}`}>
+                Confirm Permanent Deletion
+              </h3>
+              <p className={`text-muted-foreground leading-relaxed ${isElderly ? 'text-base' : 'text-xs'}`}>
+                This action is irreversible. The record metadata and physical storage file will be deleted forever.
+              </p>
+              <p className={`font-extrabold text-foreground ${isElderly ? 'text-sm mt-2' : 'text-[11px] mt-2'}`}>
+                Please type <b className="text-danger">DELETE</b> below to confirm:
+              </p>
+            </div>
+
+            <input
+              type="text"
+              value={deleteConfirmationText}
+              onChange={(e) => setDeleteConfirmationText(e.target.value)}
+              placeholder="Type DELETE here..."
+              className={`w-full bg-muted border border-danger/30 rounded-xl px-4 py-2.5 text-center text-foreground focus:outline-none focus:ring-2 focus:ring-danger/20 font-black uppercase tracking-widest ${
+                isElderly ? 'text-sm' : 'text-xs'
+              }`}
+            />
+
+            <div className="flex items-center gap-3 border-t border-border/50 pt-4 mt-6">
+              <button
+                onClick={() => {
+                  setRecordToPermanentlyDelete(null);
+                  setDeleteConfirmationText('');
+                }}
+                disabled={isDeletingPermanently}
+                className="flex-1 px-4 py-2.5 rounded-xl text-xs font-black border border-border text-foreground hover:bg-muted cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePermanentDelete}
+                disabled={isDeletingPermanently || deleteConfirmationText.trim().toUpperCase() !== 'DELETE'}
+                className="flex-1 px-4 py-2.5 rounded-xl text-xs font-black bg-danger text-danger-foreground hover:bg-danger/95 flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isDeletingPermanently ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                <span>Delete Forever</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
