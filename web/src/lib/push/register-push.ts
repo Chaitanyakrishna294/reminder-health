@@ -13,7 +13,7 @@ function urlBase64ToUint8Array(base64String: string) {
   return outputArray;
 }
 
-export async function registerPush(): Promise<boolean> {
+export async function registerPush(userChatId?: string): Promise<boolean> {
   if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) {
     console.warn('Push notifications are not supported by this browser.');
     return false;
@@ -81,6 +81,9 @@ export async function registerPush(): Promise<boolean> {
     if (typeof window !== 'undefined') {
       localStorage.setItem('lastPushEndpoint', subscription.endpoint);
       localStorage.setItem('lastPushRefreshTimestamp', Date.now().toString());
+      if (userChatId) {
+        localStorage.setItem('lastPushUserChatId', userChatId);
+      }
     }
     return true;
   } catch (error) {

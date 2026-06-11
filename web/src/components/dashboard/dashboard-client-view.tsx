@@ -132,20 +132,22 @@ export default function DashboardClientView({
             
             if (!subscription) {
               console.log('[PUSH_DIAGNOSTIC] Subscription missing on device. Re-registering...');
-              await registerPush();
+              await registerPush(myTelegramChatId);
             } else {
               const lastRefresh = localStorage.getItem('lastPushRefreshTimestamp');
               const lastEndpoint = localStorage.getItem('lastPushEndpoint');
+              const lastPushUser = localStorage.getItem('lastPushUserChatId');
               const now = Date.now();
               const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
               
               if (
                 subscription.endpoint !== lastEndpoint ||
+                lastPushUser !== myTelegramChatId ||
                 !lastRefresh ||
                 now - parseInt(lastRefresh) > sevenDaysMs
               ) {
                 console.log('[PUSH_DIAGNOSTIC] Refresh conditions met. Updating push subscription...');
-                await registerPush();
+                await registerPush(myTelegramChatId);
               }
             }
           } catch (err) {
@@ -163,7 +165,7 @@ export default function DashboardClientView({
   }, []);
 
   const handleEnableNotifications = async () => {
-    const success = await registerPush();
+    const success = await registerPush(myTelegramChatId);
     if (success) {
       showToast('Notifications Enabled', 'You will now receive medication reminders in this browser.', 'success');
       setShowPushBanner(false);
