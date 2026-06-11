@@ -16,7 +16,8 @@ import {
   ExternalLink,
   Shield,
   LogOut,
-  Check
+  Check,
+  FolderHeart
 } from 'lucide-react';
 
 export default function DashboardMainLayout({ 
@@ -105,7 +106,8 @@ export default function DashboardMainLayout({
     const baseItems = [
       { href: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
       { href: '/medications', label: 'Medications', icon: <Pill className="w-5 h-5" /> },
-      { href: '/schedule-planner', label: 'Schedule', icon: <Calendar className="w-5 h-5" /> },
+      { href: '/schedule-planner', label: 'Scheduler', icon: <Calendar className="w-5 h-5" /> },
+      { href: '/health-vault', label: 'Health Vault', icon: <FolderHeart className="w-5 h-5" /> },
       { href: '/settings', label: 'Settings', icon: <Settings className="w-5 h-5" /> },
     ];
 
@@ -119,7 +121,7 @@ export default function DashboardMainLayout({
   const navItems = getNavItems();
 
   const shouldPrefetch = (path: string) => {
-    const allowed = ['/dashboard', '/medications', '/schedule-planner'];
+    const allowed = ['/dashboard', '/medications', '/schedule-planner', '/health-vault'];
     return allowed.includes(path);
   };
 
