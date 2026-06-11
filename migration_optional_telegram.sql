@@ -19,7 +19,10 @@ UPDATE public.profiles
 SET telegram_chat_id = 'WEB-' || id::text 
 WHERE telegram_chat_id IS NULL;
 
--- 3. Drop and recreate foreign key constraint on caregiver_info with ON UPDATE CASCADE
+-- 3. Clean up orphaned caregiver records and drop/recreate foreign key constraint with ON UPDATE CASCADE
+DELETE FROM public.caregiver_info 
+WHERE caregiver_chat_id NOT IN (SELECT telegram_chat_id FROM public.profiles WHERE telegram_chat_id IS NOT NULL);
+
 ALTER TABLE public.caregiver_info 
   DROP CONSTRAINT IF EXISTS caregiver_info_caregiver_chat_id_fkey;
 
