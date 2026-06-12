@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useUiMode } from '@/context/ui-mode-context';
 import { createClient } from '@/lib/supabase/client';
 import { 
@@ -29,11 +30,12 @@ interface SettingsClientViewProps {
     telegramChatId: string;
   };
   linkedCaregiver: {
-    id: number;
+    id: number | string;
     caregiver_id: string;
     caregiver_name: string;
     caregiver_chat_id: string;
     connection_status?: string | null;
+    source?: 'connections' | 'legacy';
   } | null;
   caregiverRecord: {
     id: number;
@@ -78,7 +80,7 @@ export default function SettingsClientView({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // --- PATIENT: Link Caregiver ---
+  // --- PATIENT: Link Caregiver (Sprint 5.6C: creates caregiver_connections + notification) ---
   const handleLinkCaregiver = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
@@ -97,7 +99,7 @@ export default function SettingsClientView({
 
     setProcessing(true);
     try {
-      // 1. Fetch caregiver details
+      // 1. Fetch caregiver details from caregiver_info (legacy ID exchange)
       const { data: cgData, error: fetchErr } = await supabase
         .from('caregiver_info')
         .select('*')
@@ -112,15 +114,94 @@ export default function SettingsClientView({
 
       const caregiver = cgData[0];
 
-      // 2. Check if caregiver already has a linked patient
-      if (caregiver.patient_telegram_id) {
-        setErrorMsg('This caregiver is already connected to another patient.');
+      // 2. Resolve caregiver's profile UUID from their telegram_chat_id
+      const { data: cgProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('telegram_chat_id', caregiver.caregiver_chat_id)
+        .single();
+
+      if (!cgProfile) {
+        setErrorMsg('Unable to resolve caregiver profile. Please contact support.');
         setProcessing(false);
         return;
       }
 
-      // 3. Update caregiver record to link patient and set status to PENDING
-      const { error: linkErr } = await supabase
+      // 3. Check for existing connection
+      const { data: existingConn } = await supabase
+        .from('caregiver_connections')
+        .select('id, connection_status')
+        .eq('caregiver_profile_id', cgProfile.id)
+        .eq('patient_profile_id', user.id)
+        .maybeSingle();
+
+      if (existingConn) {
+        if (existingConn.connection_status === 'ACCEPTED') {
+          setErrorMsg('You are already connected with this caregiver.');
+        } else if (existingConn.connection_status === 'PENDING') {
+          setErrorMsg('A connection request is already pending with this caregiver.');
+        } else {
+          // Re-activate a previously rejected/withdrawn connection
+          const { error: reactivateErr } = await supabase
+            .from('caregiver_connections')
+            .update({ 
+              connection_status: 'PENDING', 
+              is_active: true,
+              expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            })
+            .eq('id', existingConn.id);
+
+          if (reactivateErr) throw reactivateErr;
+
+          // Insert notification for the caregiver
+          await supabase
+            .from('notifications')
+            .insert({
+              user_id: cgProfile.id,
+              title: 'Care Circle Request',
+              message: `${user.fullName} would like you to support their medication routine.`,
+              type: 'CARE_CIRCLE_ACCESS_REQUEST',
+              connection_id: existingConn.id,
+            });
+
+          setSuccessMsg(`Connection request re-sent to ${caregiver.caregiver_name || 'Caregiver'}. Waiting for approval.`);
+        }
+        setProcessing(false);
+        setCgIdInput('');
+        router.refresh();
+        return;
+      }
+
+      // 4. Create new connection in caregiver_connections
+      const { data: newConn, error: connErr } = await supabase
+        .from('caregiver_connections')
+        .insert({
+          caregiver_profile_id: cgProfile.id,
+          patient_profile_id: user.id,
+          connection_status: 'PENDING',
+          is_active: true,
+          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        })
+        .select('id')
+        .single();
+
+      if (connErr) throw connErr;
+
+      // 5. Insert CARE_CIRCLE_ACCESS_REQUEST notification for the caregiver
+      if (newConn) {
+        await supabase
+          .from('notifications')
+          .insert({
+            user_id: cgProfile.id,
+            title: 'Care Circle Request',
+            message: `${user.fullName} would like you to support their medication routine.`,
+            type: 'CARE_CIRCLE_ACCESS_REQUEST',
+            connection_id: newConn.id,
+          });
+      }
+
+      // 6. Also update legacy caregiver_info for backward compatibility
+      await supabase
         .from('caregiver_info')
         .update({ 
           patient_telegram_id: user.telegramChatId,
@@ -128,16 +209,15 @@ export default function SettingsClientView({
         })
         .eq('caregiver_id', formattedId);
 
-      if (linkErr) throw linkErr;
-
       setLinkedCaregiver({
-        id: caregiver.id,
+        id: newConn?.id || caregiver.id,
         caregiver_id: caregiver.caregiver_id,
         caregiver_name: caregiver.caregiver_name || 'Caregiver',
         caregiver_chat_id: caregiver.caregiver_chat_id || '',
         connection_status: 'PENDING',
+        source: 'connections',
       });
-      setSuccessMsg(`Connection request sent to caregiver: ${caregiver.caregiver_name || 'Caregiver'}. Waiting for approval.`);
+      setSuccessMsg(`Connection request sent to ${caregiver.caregiver_name || 'Caregiver'}. Waiting for approval.`);
       setCgIdInput('');
       router.refresh();
     } catch (err: any) {
@@ -148,7 +228,7 @@ export default function SettingsClientView({
     }
   };
 
-  // --- PATIENT: Unlink Caregiver ---
+  // --- PATIENT: Unlink Caregiver (supports both caregiver_connections and legacy) ---
   const handleUnlinkCaregiver = async () => {
     if (!linkedCaregiver) return;
     if (!confirm('Are you sure you want to disconnect from this caregiver?')) return;
@@ -158,12 +238,21 @@ export default function SettingsClientView({
     setProcessing(true);
 
     try {
-      const { error } = await supabase
-        .from('caregiver_info')
-        .update({ patient_telegram_id: null })
-        .eq('id', linkedCaregiver.id);
-
-      if (error) throw error;
+      if ((linkedCaregiver as any).source === 'connections') {
+        // New architecture: update caregiver_connections
+        const { error } = await supabase
+          .from('caregiver_connections')
+          .update({ is_active: false, connection_status: 'REJECTED' })
+          .eq('id', linkedCaregiver.id);
+        if (error) throw error;
+      } else {
+        // Legacy: update caregiver_info
+        const { error } = await supabase
+          .from('caregiver_info')
+          .update({ patient_telegram_id: null })
+          .eq('id', linkedCaregiver.id);
+        if (error) throw error;
+      }
 
       setLinkedCaregiver(null);
       setSuccessMsg('Successfully disconnected from your caregiver.');
@@ -285,12 +374,24 @@ export default function SettingsClientView({
     setProcessing(true);
 
     try {
+      // Update legacy caregiver_info
       const { error } = await supabase
         .from('caregiver_info')
         .update({ connection_status: 'ACCEPTED' })
         .eq('id', caregiverRecord.id);
 
       if (error) throw error;
+
+      // Also update caregiver_connections if a matching record exists
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (authUser) {
+        await supabase
+          .from('caregiver_connections')
+          .update({ connection_status: 'ACCEPTED' })
+          .eq('caregiver_profile_id', authUser.id)
+          .eq('connection_status', 'PENDING')
+          .eq('is_active', true);
+      }
 
       setCaregiverRecord({
         ...caregiverRecord,
@@ -483,14 +584,12 @@ export default function SettingsClientView({
                         </span>
                       </div>
                     </div>
-                    <button
-                      onClick={handleUnlinkCaregiver}
-                      disabled={processing}
-                      className="p-2.5 text-danger bg-danger/10 hover:bg-danger/20 rounded-xl cursor-pointer transition-all disabled:opacity-50 shrink-0"
-                      title="Disconnect Caregiver"
+                    <Link
+                      href="/care-circle/manage"
+                      className="px-3.5 py-2 text-xs font-bold text-primary bg-primary/10 hover:bg-primary/20 rounded-xl cursor-pointer transition-all flex items-center gap-1 shrink-0"
                     >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                      Manage Shared Trust
+                    </Link>
                   </div>
                   <div className={`p-3 bg-white border border-border rounded-xl text-muted-foreground font-medium ${isElderly ? 'text-base' : 'text-[11px]'}`}>
                     Connected! Your caregiver is now synced to your routine alerts and can review your compliance ring.

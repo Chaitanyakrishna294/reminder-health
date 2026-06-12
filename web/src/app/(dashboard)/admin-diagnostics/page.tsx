@@ -20,7 +20,7 @@ import Link from 'next/link';
 interface PushLog {
   id: number;
   user_id: string;
-  status: 'SUCCESS' | 'EXPIRED' | 'FAILED';
+  status: 'SENT' | 'DISPLAYED' | 'OPENED' | 'EXPIRED' | 'FAILED';
   gateway: string | null;
   error_message: string | null;
   created_at: string;
@@ -38,10 +38,13 @@ export default function AdminDiagnosticsPage() {
   const [stats, setStats] = useState({
     activeSubscriptions: 0,
     totalSent: 0,
-    successCount: 0,
+    sentCount: 0,
+    displayedCount: 0,
+    openedCount: 0,
     failedCount: 0,
     expiredCount: 0,
-    successRate: 100,
+    deliveryRate: 100,
+    openRate: 0,
     lastPushTime: null as string | null,
   });
   const [logs, setLogs] = useState<PushLog[]>([]);
@@ -92,7 +95,9 @@ export default function AdminDiagnosticsPage() {
       if (statsErr) throw statsErr;
 
       const total = allStatsLogs?.length || 0;
-      const success = allStatsLogs?.filter(l => l.status === 'SUCCESS').length || 0;
+      const sent = allStatsLogs?.filter(l => l.status === 'SENT').length || 0;
+      const displayed = allStatsLogs?.filter(l => l.status === 'DISPLAYED').length || 0;
+      const opened = allStatsLogs?.filter(l => l.status === 'OPENED').length || 0;
       const failed = allStatsLogs?.filter(l => l.status === 'FAILED').length || 0;
       const expired = allStatsLogs?.filter(l => l.status === 'EXPIRED').length || 0;
       
@@ -103,10 +108,13 @@ export default function AdminDiagnosticsPage() {
       setStats({
         activeSubscriptions: subCount || 0,
         totalSent: total,
-        successCount: success,
+        sentCount: sent,
+        displayedCount: displayed,
+        openedCount: opened,
         failedCount: failed,
         expiredCount: expired,
-        successRate: total > 0 ? parseFloat(((success / total) * 100).toFixed(1)) : 100,
+        deliveryRate: sent > 0 ? parseFloat(((displayed / sent) * 100).toFixed(1)) : 100,
+        openRate: sent > 0 ? parseFloat(((opened / sent) * 100).toFixed(1)) : 0,
         lastPushTime: lastPush,
       });
 
@@ -242,45 +250,47 @@ export default function AdminDiagnosticsPage() {
             </div>
           </div>
 
-          {/* Success Rate */}
+          {/* Delivery Rate */}
           <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 flex flex-col justify-between">
             <div>
-              <span className="text-xs text-slate-400 font-semibold tracking-wide uppercase">7d Delivery Success</span>
-              <h2 className="text-3xl font-extrabold text-white mt-2">{stats.successRate}%</h2>
+              <span className="text-xs text-slate-400 font-semibold tracking-wide uppercase">7d Delivery Rate</span>
+              <h2 className="text-3xl font-extrabold text-white mt-2">{stats.deliveryRate}%</h2>
             </div>
             <div className={`flex items-center gap-2 mt-4 text-xs px-2.5 py-1 rounded-lg w-max font-medium ${
-              stats.successRate >= 95 
+              stats.deliveryRate >= 90 
                 ? 'text-emerald-400 bg-emerald-500/5' 
-                : stats.successRate >= 75 
+                : stats.deliveryRate >= 70 
                 ? 'text-amber-400 bg-amber-500/5' 
                 : 'text-red-400 bg-red-500/5'
             }`}>
               <CheckCircle className="h-3.5 w-3.5" />
-              {stats.successCount} / {stats.totalSent} Pushes Successful
+              {stats.displayedCount} / {stats.sentCount} Pushes Displayed
             </div>
           </div>
 
-          {/* Failed Pushes */}
+          {/* Open Rate */}
           <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 flex flex-col justify-between">
             <div>
-              <span className="text-xs text-slate-400 font-semibold tracking-wide uppercase">7d Gateway Rejections</span>
-              <h2 className="text-3xl font-extrabold text-white mt-2">{stats.failedCount}</h2>
+              <span className="text-xs text-slate-400 font-semibold tracking-wide uppercase">7d Open Rate</span>
+              <h2 className="text-3xl font-extrabold text-white mt-2">{stats.openRate}%</h2>
             </div>
-            <div className="flex items-center gap-2 mt-4 text-xs text-red-400 bg-red-500/5 px-2.5 py-1 rounded-lg w-max font-medium">
-              <ShieldAlert className="h-3.5 w-3.5" />
-              Connection or VAPID errors
+            <div className="flex items-center gap-2 mt-4 text-xs text-indigo-400 bg-indigo-500/5 px-2.5 py-1 rounded-lg w-max font-medium">
+              <Activity className="h-3.5 w-3.5" />
+              {stats.openedCount} / {stats.sentCount} Pushes Opened
             </div>
           </div>
 
-          {/* Expired Pushes */}
+          {/* Failures & Expirations */}
           <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 flex flex-col justify-between">
             <div>
-              <span className="text-xs text-slate-400 font-semibold tracking-wide uppercase">7d Expired Subscriptions</span>
-              <h2 className="text-3xl font-extrabold text-white mt-2">{stats.expiredCount}</h2>
+              <span className="text-xs text-slate-400 font-semibold tracking-wide uppercase">7d Rejections & Expirations</span>
+              <h2 className="text-3xl font-extrabold text-white mt-2">
+                {stats.failedCount + stats.expiredCount}
+              </h2>
             </div>
             <div className="flex items-center gap-2 mt-4 text-xs text-amber-400 bg-amber-500/5 px-2.5 py-1 rounded-lg w-max font-medium">
               <AlertTriangle className="h-3.5 w-3.5" />
-              HTTP 410 (Deletions automated)
+              Failed: {stats.failedCount} | Expired: {stats.expiredCount}
             </div>
           </div>
 
@@ -322,8 +332,14 @@ export default function AdminDiagnosticsPage() {
                     </tr>
                   ) : (
                     logs.map((log) => {
-                      const isSuccess = log.status === 'SUCCESS';
-                      const isExpired = log.status === 'EXPIRED';
+                      const statusColors: Record<PushLog['status'], { bg: string, text: string, dot: string }> = {
+                        SENT: { bg: 'bg-cyan-500/10', text: 'text-cyan-400', dot: 'bg-cyan-400' },
+                        DISPLAYED: { bg: 'bg-indigo-500/10', text: 'text-indigo-400', dot: 'bg-indigo-400' },
+                        OPENED: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', dot: 'bg-emerald-400' },
+                        EXPIRED: { bg: 'bg-amber-500/10', text: 'text-amber-400', dot: 'bg-amber-400' },
+                        FAILED: { bg: 'bg-red-500/10', text: 'text-red-400', dot: 'bg-red-400' },
+                      };
+                      const color = statusColors[log.status] || { bg: 'bg-slate-500/10', text: 'text-slate-400', dot: 'bg-slate-400' };
                       
                       return (
                         <tr key={log.id} className="hover:bg-slate-800/20 transition-all">
@@ -335,20 +351,8 @@ export default function AdminDiagnosticsPage() {
                             <div className="text-[10px] text-slate-500 font-mono">{log.user_id.slice(0, 8)}...</div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                              isSuccess 
-                                ? 'bg-emerald-500/10 text-emerald-400' 
-                                : isExpired 
-                                ? 'bg-amber-500/10 text-amber-400' 
-                                : 'bg-red-500/10 text-red-400'
-                            }`}>
-                              <span className={`h-1.5 w-1.5 rounded-full ${
-                                isSuccess 
-                                  ? 'bg-emerald-400' 
-                                  : isExpired 
-                                  ? 'bg-amber-400' 
-                                  : 'bg-red-400'
-                              }`} />
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${color.bg} ${color.text}`}>
+                              <span className={`h-1.5 w-1.5 rounded-full ${color.dot}`} />
                               {log.status}
                             </span>
                           </td>

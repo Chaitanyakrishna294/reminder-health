@@ -43,6 +43,7 @@ interface HealthVaultClientViewProps {
   categories: Category[];
   userRole: 'PATIENT' | 'CAREGIVER';
   patientName: string;
+  patientId?: string;
 }
 
 const ALLOWED_EXTENSIONS = ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.doc', '.docx', '.txt', '.zip'];
@@ -52,6 +53,7 @@ export default function HealthVaultClientView({
   categories,
   userRole,
   patientName,
+  patientId,
 }: HealthVaultClientViewProps) {
   const { isElderly } = useUiMode();
   const router = useRouter();
@@ -665,9 +667,14 @@ export default function HealthVaultClientView({
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <h1 className={`font-extrabold text-foreground tracking-tight ${isElderly ? 'text-4xl' : 'text-2xl'}`}>
-                {userRole === 'CAREGIVER' ? `${patientName}'s Health Vault` : 'My Health Vault'}
+                {userRole === 'CAREGIVER' ? `Documents Shared by ${patientName}` : 'My Health Vault'}
               </h1>
-              <p className={`text-muted-foreground mt-1 ${isElderly ? 'text-lg' : 'text-sm'}`}>
+              {userRole === 'CAREGIVER' && (
+                <p className="text-xs text-primary font-bold mt-1.5 bg-primary/5 border border-primary/20 px-3 py-1.5 rounded-xl w-max">
+                  Shared through Care Circle. You currently have read-only access.
+                </p>
+              )}
+              <p className={`text-muted-foreground mt-2 ${isElderly ? 'text-lg' : 'text-sm'}`}>
                 {userRole === 'CAREGIVER'
                   ? 'Access medical records and categories for your linked patient.'
                   : 'Securely upload, view, and organize your prescriptions, lab reports, and clinical summaries.'}
@@ -802,6 +809,19 @@ export default function HealthVaultClientView({
               </button>
             )}
           </div>
+
+          {userRole === 'CAREGIVER' && (
+            <div className="flex items-start gap-3.5 bg-primary/5 text-primary border border-primary/20 rounded-3xl p-5 text-xs">
+              <ShieldCheck className="w-5 h-5 shrink-0 text-primary mt-0.5" />
+              <div className="space-y-1">
+                <h4 className="font-extrabold text-sm text-foreground">📖 Documents Shared by {patientName}</h4>
+                <p className="font-bold text-primary opacity-90">Shared through Care Circle. You currently have read-only access.</p>
+                <p className="text-muted-foreground mt-1.5 leading-relaxed font-semibold">
+                  {patientName} has chosen to share their health documents with you. You may review prescriptions, lab reports, and medical records. All documents remain read-only.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Active / Trash Toggles & Simple Search Bar */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card border border-border/60 rounded-3xl p-4 shadow-sm">

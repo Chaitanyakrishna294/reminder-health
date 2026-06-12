@@ -235,7 +235,8 @@ interface DashboardClientViewProps {
   hasPatientLinked: boolean;
   caregiverId?: string;
   lastTaken: { drug_name: string; time: string } | null;
-  caregiverConnections?: any[];
+  peopleICareFor?: any[];
+  peopleCaringForMe?: any[];
 }
 
 export default function DashboardClientView({
@@ -258,35 +259,19 @@ export default function DashboardClientView({
   hasPatientLinked,
   caregiverId,
   lastTaken,
-  caregiverConnections = [],
+  peopleICareFor = [],
+  peopleCaringForMe = [],
 }: DashboardClientViewProps) {
-  const { isElderly, toggleMode, viewMode } = useUiMode();
-  const activeRole = viewMode === 'PATIENT_MONITOR' ? 'CAREGIVER' : 'PATIENT';
+  const { isElderly, toggleMode } = useUiMode();
+  const viewMode = 'PATIENT' as string;
 
-  // Handle unlinked caregiver view in Caregiver View mode dynamically
-  if (activeRole === 'CAREGIVER' && !hasPatientLinked) {
-    return (
-      <div className="flex flex-col items-center justify-center p-8 bg-card border border-border rounded-3xl shadow-sm max-w-xl mx-auto mt-12 space-y-4">
-        <Stethoscope className="w-12 h-12 text-primary shrink-0" />
-        <h2 className="text-xl font-bold text-foreground">Welcome, Caregiver!</h2>
-        <p className="text-sm text-muted-foreground text-center">
-          You are currently not linked to any patient. To monitor medication progress, ask your patient to connect with you in their Telegram Bot using your Caregiver ID:
-        </p>
-        <div className="bg-primary/10 text-primary border border-primary/20 rounded px-4 py-2 font-mono font-bold text-lg">
-          {caregiverId || 'N/A'}
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Instructions: Inside the Telegram bot menu, they should choose <b>Caregiver</b> → <b>Add Caregiver</b> and input this ID.
-        </p>
-      </div>
-    );
-  }
   const [events, setEvents] = useState<ReminderEvent[]>([]);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [hoveredEvent, setHoveredEvent] = useState<ReminderEvent | null>(null);
   const [mounted, setMounted] = useState(false);
   const [toasts, setToasts] = useState<{ id: string; title: string; message: string; type: 'success' | 'error' }[]>([]);
   const [showPushBanner, setShowPushBanner] = useState(false);
+  const [showIosPwaBanner, setShowIosPwaBanner] = useState(false);
 
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
 
@@ -299,6 +284,19 @@ export default function DashboardClientView({
 
   useEffect(() => {
     setMounted(true);
+
+    if (typeof window !== 'undefined' && typeof navigator !== 'undefined') {
+      const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
+        (navigator as any).standalone === true;
+      const dismissed = localStorage.getItem('dismissedIosPwaBanner') === 'true';
+
+      if (isIos && !isStandalone && !dismissed) {
+        setShowIosPwaBanner(true);
+      }
+    }
+
     if (
       typeof window !== 'undefined' &&
       'Notification' in window &&
@@ -496,7 +494,7 @@ export default function DashboardClientView({
         medicationId: event.medication_id,
         scheduledFor: event.scheduled_for,
         action,
-        actorRole: activeRole,
+        actorRole: userRole,
       });
 
       if (resolvedRecord.already_resolved) {
@@ -618,6 +616,25 @@ export default function DashboardClientView({
                   <X className="w-6 h-6" />
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* iOS PWA Installation Banner */}
+          {showIosPwaBanner && (
+            <div className="bg-gradient-to-r from-indigo-500/10 to-purple-500/10 dark:from-indigo-500/20 dark:to-purple-500/20 border-4 border-indigo-500/30 p-5 rounded-2xl flex flex-col sm:flex-row items-center justify-between text-foreground gap-4">
+              <span className="text-xl font-black text-center sm:text-left flex items-start gap-2">
+                <Plus className="w-8 h-8 text-indigo-500 shrink-0" />
+                <span>To receive push reminders on iOS, install Re-MIND-eЯ: tap the Share button and select 'Add to Home Screen'.</span>
+              </span>
+              <button
+                onClick={() => {
+                  localStorage.setItem('dismissedIosPwaBanner', 'true');
+                  setShowIosPwaBanner(false);
+                }}
+                className="bg-indigo-500 text-white font-black px-8 py-3 rounded-xl text-xl cursor-pointer hover:bg-indigo-600 transition-all shadow-md shrink-0"
+              >
+                Dismiss
+              </button>
             </div>
           )}
   
@@ -805,6 +822,35 @@ export default function DashboardClientView({
               onClick={handleDismissBanner}
               aria-label="Dismiss banner"
               className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-full transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* iOS PWA Installation Banner */}
+      {showIosPwaBanner && (
+        <div className="bg-gradient-to-r from-indigo-500/10 to-purple-500/10 dark:from-indigo-500/20 dark:to-purple-500/20 border border-indigo-500/20 dark:border-indigo-500/30 rounded-3xl p-5 shadow-lg relative overflow-hidden flex flex-col sm:flex-row items-center justify-between gap-4 animate-fade-in z-45">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+              <Plus className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-sm font-black text-foreground">Add to Home Screen (iOS)</h4>
+              <p className="text-xs text-muted-foreground font-semibold mt-0.5">
+                To receive push reminders on iOS, install Re-MIND-eЯ: tap the <span className="font-bold text-indigo-600 dark:text-indigo-400">Share</span> button (box with an up arrow) and select <span className="font-bold text-indigo-600 dark:text-indigo-400">"Add to Home Screen"</span>.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2.5 w-full sm:w-auto shrink-0 justify-end">
+            <button
+              onClick={() => {
+                localStorage.setItem('dismissedIosPwaBanner', 'true');
+                setShowIosPwaBanner(false);
+              }}
+              className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-full transition-colors cursor-pointer"
+              aria-label="Dismiss banner"
             >
               <X className="w-4 h-4" />
             </button>
@@ -1230,7 +1276,7 @@ export default function DashboardClientView({
           <div className="min-w-0">
             <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Caregiver</p>
             <p className="text-sm font-extrabold text-foreground mt-0.5 truncate">
-              {activeRole === 'CAREGIVER' ? 'Active Monitor' : 'Secure Sync'}
+              {userRole === 'CAREGIVER' ? 'Active Monitor' : 'Secure Sync'}
             </p>
           </div>
         </div>
@@ -1304,7 +1350,7 @@ export default function DashboardClientView({
 
           <TodaysSchedule 
             events={events}
-            userRole={activeRole}
+            userRole={userRole}
             currentUserTelegramChatId={myTelegramChatId || ''}
             patientTelegramChatId={targetTelegramChatId || myTelegramChatId || ''}
             onEventsChange={setEvents}
@@ -1376,71 +1422,98 @@ export default function DashboardClientView({
           </div>
 
           {/* Layer 5: Care Circle */}
-          <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4">
-            <div>
-              <h3 className="font-black text-foreground text-sm">Care Circle</h3>
-              <p className="text-[11px] text-muted-foreground">
-                {userRole === 'PATIENT' ? 'People Caring For Me' : 'People I Care For'}
-              </p>
+          <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-5">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="font-black text-foreground text-sm">Care Circle</h3>
+                <p className="text-[11px] text-muted-foreground">Manage sharing & family relationships</p>
+              </div>
+              <Link 
+                href="/care-circle"
+                className="px-3 py-1 rounded bg-muted border border-border hover:bg-slate-100 text-foreground transition-all text-[10px] font-bold"
+              >
+                Open Hub
+              </Link>
             </div>
             
-            <div className="space-y-3">
-              {caregiverConnections && caregiverConnections.length > 0 ? (
-                caregiverConnections.map((conn) => {
-                  const displayName = userRole === 'PATIENT' 
-                    ? conn.resolved_caregiver_name 
-                    : conn.resolved_patient_name;
-                  const isAccepted = conn.connection_status === 'ACCEPTED';
-                  const initials = displayName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() || 'C';
+            <div className="space-y-4">
+              {/* Sub-List 1: People I Care For */}
+              <div className="space-y-2">
+                <p className="text-[10px] uppercase font-bold text-slate-400">People I Care For ({peopleICareFor.length})</p>
+                {peopleICareFor.length > 0 ? (
+                  <div className="space-y-2">
+                    {peopleICareFor.slice(0, 3).map((conn) => {
+                      const initials = conn.resolved_name?.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() || 'P';
+                      return (
+                        <div key={conn.connection_id} className="flex items-center justify-between p-3 rounded-2xl bg-muted border border-border">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-black">
+                              {initials}
+                            </div>
+                            <div>
+                              <p className="text-xs font-black text-foreground">{conn.resolved_name}</p>
+                              <p className="text-[9px] font-bold text-muted-foreground uppercase">{conn.relationship_type}</p>
+                            </div>
+                          </div>
+                          <Link 
+                            href={`/care-circle/${conn.patient_telegram_id}`}
+                            className="px-2.5 py-1 rounded bg-muted hover:bg-slate-100 text-[10px] font-bold text-foreground border border-border transition-all"
+                          >
+                            Overview
+                          </Link>
+                        </div>
+                      );
+                    })}
+                    {peopleICareFor.length > 3 && (
+                      <p className="text-[10px] text-center text-muted-foreground">
+                        + {peopleICareFor.length - 3} more. <Link href="/care-circle" className="text-primary font-bold">View all</Link>
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-muted-foreground border border-dashed border-border/80 rounded-xl p-3 text-center">
+                    No active patients linked yet.
+                  </p>
+                )}
+              </div>
 
-                  return (
-                    <div key={conn.id} className="flex items-center justify-between p-3 rounded-2xl bg-muted border border-border">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-black font-mono">
-                          {initials}
+              {/* Sub-List 2: People Caring For Me */}
+              <div className="space-y-2">
+                <p className="text-[10px] uppercase font-bold text-slate-400">People Caring For Me ({peopleCaringForMe.length})</p>
+                {peopleCaringForMe.length > 0 ? (
+                  <div className="space-y-2">
+                    {peopleCaringForMe.slice(0, 3).map((conn) => {
+                      const initials = conn.resolved_name?.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() || 'C';
+                      return (
+                        <div key={conn.connection_id} className="flex items-center justify-between p-3 rounded-2xl bg-muted border border-border">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-black">
+                              {initials}
+                            </div>
+                            <div>
+                              <p className="text-xs font-black text-foreground">{conn.resolved_name}</p>
+                              <p className="text-[9px] font-bold text-muted-foreground uppercase">{conn.relationship_type}</p>
+                            </div>
+                          </div>
+                          <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 uppercase">
+                            {conn.connection_status}
+                          </span>
                         </div>
-                        <div>
-                          <p className="text-xs font-black text-foreground">{displayName}</p>
-                          <p className="text-[10px] font-semibold text-muted-foreground">
-                            {userRole === 'PATIENT' ? 'Caregiver' : 'Patient'}
-                          </p>
-                        </div>
-                      </div>
-                      <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${
-                        isAccepted 
-                          ? 'bg-success/15 text-success border border-success/30' 
-                          : 'bg-warning/15 text-warning border border-warning/35 animate-pulse'
-                      }`}>
-                        {conn.connection_status}
-                      </span>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="text-center py-6 text-xs font-semibold text-muted-foreground border border-dashed border-border/85 rounded-2xl">
-                  {userRole === 'PATIENT' 
-                    ? 'No caregivers linked yet' 
-                    : 'No patients linked yet'}
-                </div>
-              )}
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-muted-foreground border border-dashed border-border/80 rounded-xl p-3 text-center">
+                    No active caregivers linked yet.
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 
         </div>
 
       </div>
-
-      {/* Caregiver-only Widgets */}
-      {activeRole === 'CAREGIVER' && (
-        <CaregiverConsole
-          userName={userName}
-          patientName={patientName || 'Your Patient'}
-          activeEscalations={activeEscalations}
-          todayMissed={todayMissed}
-          monthlyAdherence={monthlyAdherence}
-          myTelegramChatId={myTelegramChatId}
-        />
-      )}
 
       </div>
 

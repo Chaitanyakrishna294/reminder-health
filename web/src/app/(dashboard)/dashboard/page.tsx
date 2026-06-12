@@ -3,7 +3,9 @@ import { createClient } from '@/lib/supabase/server';
 import DashboardClientView from '@/components/dashboard/dashboard-client-view';
 import { ReminderEvent } from '@/components/dashboard/todays-schedule';
 import { resolveUserData } from '@/lib/supabase/cached-queries';
+import { getCareCircleConnections } from '@/lib/supabase/care-circle-service';
 import { Stethoscope } from 'lucide-react';
+
 
 export const revalidate = 0; // Dynamic rendering, always fresh
 
@@ -130,32 +132,13 @@ export default async function DashboardPage() {
     time: takenLogs[0].scheduled_time
   } : null;
 
-  // Fetch active caregiver connections
-  let caregiverConnections: any[] = [];
+  // Fetch active caregiver connections split into dual lists
+  let peopleICareFor: any[] = [];
+  let peopleCaringForMe: any[] = [];
   if (myTelegramChatId) {
-    const { data: connections } = await supabase
-      .from('caregiver_info')
-      .select('id, caregiver_name, patient_telegram_id, caregiver_chat_id, connection_status')
-      .or(`patient_telegram_id.eq.${myTelegramChatId},caregiver_chat_id.eq.${myTelegramChatId}`)
-      .eq('is_active', true);
-    
-    if (connections && connections.length > 0) {
-      const patientTelegramIds = connections.map(c => c.patient_telegram_id).filter(Boolean);
-      const caregiverTelegramIds = connections.map(c => c.caregiver_chat_id).filter(Boolean);
-      
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('telegram_chat_id, full_name')
-        .in('telegram_chat_id', [...patientTelegramIds, ...caregiverTelegramIds]);
-        
-      const profileMap = new Map(profiles?.map(p => [p.telegram_chat_id, p.full_name]) || []);
-      
-      caregiverConnections = connections.map(c => ({
-        ...c,
-        resolved_patient_name: profileMap.get(c.patient_telegram_id) || 'Patient',
-        resolved_caregiver_name: profileMap.get(c.caregiver_chat_id) || c.caregiver_name || 'Caregiver'
-      }));
-    }
+    const connectionsData = await getCareCircleConnections(myTelegramChatId);
+    peopleICareFor = connectionsData.peopleICareFor;
+    peopleCaringForMe = connectionsData.peopleCaringForMe;
   }
 
   return (
@@ -179,7 +162,9 @@ export default async function DashboardPage() {
       hasPatientLinked={!!targetChatId}
       caregiverId={caregiverId}
       lastTaken={lastTaken}
-      caregiverConnections={caregiverConnections}
+      peopleICareFor={peopleICareFor}
+      peopleCaringForMe={peopleCaringForMe}
     />
   );
 }
+

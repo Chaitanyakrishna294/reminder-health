@@ -43,10 +43,26 @@ async function sendBrowserPush(telegramId, payload) {
 
     if (subErr || !subs || subs.length === 0) return; // no subscriptions
 
+    // Generate cryptographically secure tracking token for reminder events
+    let trackingToken = null;
+    if (payload.eventId) {
+      const crypto = require('crypto');
+      trackingToken = crypto.randomBytes(32).toString('hex');
+      const tokenHash = crypto.createHash('sha256').update(trackingToken).digest('hex');
+      
+      // Store token hash in push_tracking_tokens
+      await supabase.from('push_tracking_tokens').insert([{
+        event_id: payload.eventId,
+        token_hash: tokenHash,
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      }]);
+    }
+
     const pushPayload = JSON.stringify({
       title: payload.title,
       body: payload.body,
-      eventId: payload.eventId || null
+      eventId: payload.eventId || null,
+      trackingToken: trackingToken
     });
 
     // 3. Send to each subscription, delete expired ones
@@ -65,11 +81,12 @@ async function sendBrowserPush(telegramId, payload) {
         await webpush.sendNotification(subscription, pushPayload);
         console.log(`[PUSH_DIAGNOSTIC] Action: push_delivered | User: ${profile.id} | SubID: ${sub.id} | Gateway: ${gateway}`);
         
-        await supabase.from('push_logs').insert([{
+        await supabase.from('push_logs').upsert([{
           user_id: profile.id,
-          status: 'SUCCESS',
+          event_id: payload.eventId || null,
+          status: 'SENT',
           gateway: gateway
-        }]);
+        }], { onConflict: 'event_id,status', ignoreDuplicates: true });
       } catch (pushErr) {
         let status = 'FAILED';
         let errorMessage = pushErr.message;
@@ -82,12 +99,13 @@ async function sendBrowserPush(telegramId, payload) {
           console.error(`[PUSH_DIAGNOSTIC] Action: gateway_error | SubID: ${sub.id} | Code: ${pushErr.statusCode || 'Unknown'} | Error: ${pushErr.message}`);
         }
         
-        await supabase.from('push_logs').insert([{
+        await supabase.from('push_logs').upsert([{
           user_id: profile.id,
+          event_id: payload.eventId || null,
           status: status,
           gateway: gateway,
           error_message: errorMessage
-        }]);
+        }], { onConflict: 'event_id,status', ignoreDuplicates: true });
       }
     }
   } catch (err) {

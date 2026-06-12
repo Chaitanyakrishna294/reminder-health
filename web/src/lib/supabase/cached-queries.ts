@@ -35,16 +35,15 @@ export const getCachedProfile = cache(async (userId: string) => {
   return profile;
 });
 
-// Get active caregiver link info
-export const getCachedCaregiverLink = cache(async (telegramChatId: string) => {
+// Get active caregiver connection list
+export const getCachedCaregiverLinks = cache(async (telegramChatId: string) => {
   const supabase = await createClient();
-  const { data: caregiverLink } = await supabase
-    .from('caregiver_info')
-    .select('id,caregiver_chat_id,patient_telegram_id,is_active,connection_status')
+  const { data: caregiverLinks } = await supabase
+    .from('active_caregiver_links')
+    .select('connection_id,caregiver_chat_id,caregiver_name,patient_telegram_id,connection_status,relationship_type,is_primary,can_view_medications,can_view_vault,can_view_reports,can_edit_medications,can_receive_escalations')
     .eq('caregiver_chat_id', telegramChatId)
-    .eq('is_active', true)
-    .single();
-  return caregiverLink;
+    .eq('is_active', true);
+  return caregiverLinks || [];
 });
 
 // Get patient's full name and phone number from profile
@@ -52,7 +51,7 @@ export const getCachedPatientProfile = cache(async (patientTelegramId: string) =
   const supabase = await createClient();
   const { data: patientProfile, error } = await supabase
     .from('profiles')
-    .select('full_name,phone_number')
+    .select('id,full_name,phone_number')
     .eq('telegram_chat_id', patientTelegramId)
     .single();
 
@@ -60,7 +59,7 @@ export const getCachedPatientProfile = cache(async (patientTelegramId: string) =
     if (error.message?.includes('phone_number') || error.code === '42703') {
       const { data: fallbackProfile } = await supabase
         .from('profiles')
-        .select('full_name')
+        .select('id,full_name')
         .eq('telegram_chat_id', patientTelegramId)
         .single();
       return fallbackProfile ? { ...fallbackProfile, phone_number: null } as any : null;
@@ -73,7 +72,7 @@ export const getCachedPatientProfile = cache(async (patientTelegramId: string) =
 });
 
 
-// Resolve full user context data in a single request cache
+// Resolve full user context data in a single request cache (strictly user-centric for main dashboard)
 export const resolveUserData = cache(async () => {
   const user = await getCachedUser();
   if (!user) return null;
@@ -84,37 +83,11 @@ export const resolveUserData = cache(async () => {
   const userRole = profile.role as 'PATIENT' | 'CAREGIVER';
   const myTelegramChatId = profile.telegram_chat_id;
 
-  // Retrieve view-mode from cookies
-  const cookieStore = await cookies();
-  const viewModeCookie = cookieStore.get('view-mode')?.value as 'PATIENT_SELF' | 'PATIENT_MONITOR' | undefined;
-  const activeViewMode = viewModeCookie || 'PATIENT_SELF';
-
-  let targetChatId: string | null = null;
-  let patientName = '';
-  let patientPhone = '';
-
-  if (userRole === 'PATIENT') {
-    targetChatId = myTelegramChatId;
-    patientName = profile.full_name || '';
-    patientPhone = profile.phone_number || '';
-  } else {
-    // Caregiver account
-    if (activeViewMode === 'PATIENT_MONITOR' && myTelegramChatId) {
-      const caregiverLink = await getCachedCaregiverLink(myTelegramChatId);
-      if (caregiverLink && caregiverLink.patient_telegram_id && caregiverLink.connection_status === 'ACCEPTED') {
-        const patientId = caregiverLink.patient_telegram_id;
-        targetChatId = patientId;
-        const patientProfile = await getCachedPatientProfile(patientId);
-        patientName = patientProfile ? patientProfile.full_name : 'Your Patient';
-        patientPhone = patientProfile ? (patientProfile.phone_number || '') : '';
-      }
-    } else {
-      // PATIENT_SELF view (caregiver's own account)
-      targetChatId = myTelegramChatId;
-      patientName = profile.full_name || '';
-      patientPhone = profile.phone_number || '';
-    }
-  }
+  // Since Sprint 5.6B uses Care Circle Driven Navigation, the main dashboard 
+  // target is always the user's own profile space.
+  const targetChatId = myTelegramChatId;
+  const patientName = profile.full_name || '';
+  const patientPhone = profile.phone_number || '';
 
   return {
     user,
@@ -126,3 +99,4 @@ export const resolveUserData = cache(async () => {
     patientPhone,
   };
 });
+

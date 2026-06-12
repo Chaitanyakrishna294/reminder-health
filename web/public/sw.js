@@ -14,13 +14,23 @@ self.addEventListener('push', function(event) {
     badge: '/icon-192x192.png',
     data: {
       eventId: data.eventId,
+      trackingToken: data.trackingToken,
       url: '/dashboard'
     }
   };
 
-  event.waitUntil(
-    self.registration.showNotification(data.title, options)
-  );
+  const promiseChain = self.registration.showNotification(data.title, options)
+    .then(() => {
+      if (data.eventId && data.trackingToken) {
+        return fetch('/api/push/displayed', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ eventId: data.eventId, trackingToken: data.trackingToken })
+        }).catch(err => console.error('Failed to report DISPLAYED status:', err));
+      }
+    });
+
+  event.waitUntil(promiseChain);
 });
 
 self.addEventListener('notificationclick', function(event) {
@@ -31,7 +41,18 @@ self.addEventListener('notificationclick', function(event) {
     targetUrl = event.notification.data.url;
   }
 
-  event.waitUntil(
+  const promiseChain = Promise.all([
+    (event.notification.data && event.notification.data.eventId && event.notification.data.trackingToken)
+      ? fetch('/api/push/opened', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            eventId: event.notification.data.eventId,
+            trackingToken: event.notification.data.trackingToken
+          })
+        }).catch(err => console.error('Failed to report OPENED status:', err))
+      : Promise.resolve(),
+
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
       for (var i = 0; i < clientList.length; i++) {
         var client = clientList[i];
@@ -43,5 +64,7 @@ self.addEventListener('notificationclick', function(event) {
         return clients.openWindow(targetUrl);
       }
     })
-  );
+  ]);
+
+  event.waitUntil(promiseChain);
 });

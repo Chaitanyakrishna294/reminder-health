@@ -20,20 +20,64 @@ export default async function SettingsPage() {
   let caregiverRecord = null;
   let linkedPatientProfile = null;
 
+  // Sprint 5.6C: Dual-source resolution
+  // Check caregiver_connections first (new architecture), fall back to caregiver_info (legacy)
+
   if (userRole === 'PATIENT') {
-    if (myTelegramChatId) {
-      // Find caregiver linked to this patient
+    // Check for connections where I am the patient
+    const { data: ccData } = await supabase
+      .from('caregiver_connections')
+      .select(`
+        id,
+        caregiver_profile_id,
+        connection_status,
+        relationship_type,
+        is_primary,
+        can_view_medications,
+        can_receive_escalations,
+        can_view_reports,
+        can_view_vault,
+        can_edit_medications,
+        created_at
+      `)
+      .eq('patient_profile_id', user.id)
+      .eq('is_active', true)
+      .in('connection_status', ['PENDING', 'ACCEPTED'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (ccData) {
+      // Resolve caregiver name
+      const { data: cgProfile } = await supabase
+        .from('profiles')
+        .select('full_name, telegram_chat_id')
+        .eq('id', ccData.caregiver_profile_id)
+        .single();
+
+      linkedCaregiver = {
+        id: ccData.id,
+        caregiver_id: '', // N/A for connection-based records
+        caregiver_name: cgProfile?.full_name || 'Caregiver',
+        caregiver_chat_id: cgProfile?.telegram_chat_id || '',
+        connection_status: ccData.connection_status,
+        source: 'connections' as const,
+      };
+    } else if (myTelegramChatId) {
+      // Fallback to legacy caregiver_info
       const { data } = await supabase
         .from('caregiver_info')
         .select('id, caregiver_id, caregiver_name, caregiver_chat_id, connection_status')
         .eq('patient_telegram_id', myTelegramChatId)
         .eq('is_active', true)
         .maybeSingle();
-      linkedCaregiver = data;
+      if (data) {
+        linkedCaregiver = { ...data, source: 'legacy' as const };
+      }
     }
   } else {
+    // CAREGIVER: Check for my caregiver_info record (for CG ID generation)
     if (myTelegramChatId) {
-      // Find caregiver record for this caregiver
       const { data } = await supabase
         .from('caregiver_info')
         .select('id, caregiver_id, patient_telegram_id, connection_status')
@@ -42,8 +86,25 @@ export default async function SettingsPage() {
         .maybeSingle();
       caregiverRecord = data;
 
-      if (caregiverRecord && caregiverRecord.patient_telegram_id) {
-        // Fetch patient profile name
+      // Also check caregiver_connections for the outgoing request status
+      const { data: ccOutgoing } = await supabase
+        .from('caregiver_connections')
+        .select('id, patient_profile_id, connection_status, created_at')
+        .eq('caregiver_profile_id', user.id)
+        .eq('is_active', true)
+        .in('connection_status', ['PENDING', 'ACCEPTED'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (ccOutgoing) {
+        const { data: patientProf } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', ccOutgoing.patient_profile_id)
+          .single();
+        linkedPatientProfile = patientProf;
+      } else if (caregiverRecord && caregiverRecord.patient_telegram_id) {
         const { data: patientProf } = await supabase
           .from('profiles')
           .select('full_name')

@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useRealtimeNotifications, Notification } from '@/hooks/use-realtime-notifications';
-import { Bell, Check, SkipForward, AlertTriangle, XCircle } from 'lucide-react';
+import { Bell, Check, SkipForward, AlertTriangle, XCircle, Heart } from 'lucide-react';
 
 interface NotificationCenterProps {
   userId: string;
@@ -12,6 +13,7 @@ export default function NotificationCenter({ userId }: NotificationCenterProps) 
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useRealtimeNotifications(userId);
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -35,6 +37,16 @@ export default function NotificationCenter({ userId }: NotificationCenterProps) 
         return { icon: <AlertTriangle className="w-4 h-4 text-danger animate-pulse" />, bg: 'bg-danger/10' };
       case 'MISSED':
         return { icon: <XCircle className="w-4 h-4 text-danger" />, bg: 'bg-danger/10' };
+      case 'CARE_CIRCLE_ACCESS_REQUEST':
+        return { icon: <Heart className="w-4 h-4 text-primary animate-pulse" />, bg: 'bg-primary/10' };
+      case 'CARE_CIRCLE_ACCESS_GRANTED':
+        return { icon: <Heart className="w-4 h-4 text-success" />, bg: 'bg-success/10' };
+      case 'CARE_CIRCLE_ACCESS_UPDATED':
+        return { icon: <Heart className="w-4 h-4 text-warning" />, bg: 'bg-warning/10' };
+      case 'CARE_CIRCLE_ACCESS_REVOKED':
+        return { icon: <Heart className="w-4 h-4 text-danger" />, bg: 'bg-danger/10' };
+      case 'CARE_CIRCLE_PRIMARY_CHANGED':
+        return { icon: <Heart className="w-4 h-4 text-primary font-bold" />, bg: 'bg-primary/10' };
       default:
         return { icon: <Bell className="w-4 h-4 text-muted-foreground" />, bg: 'bg-muted' };
     }
@@ -100,14 +112,41 @@ export default function NotificationCenter({ userId }: NotificationCenterProps) 
                         </span>
                       </div>
                       <p className="text-xs text-muted-foreground break-words leading-relaxed">{n.message}</p>
-                      {!n.is_read && (
+                      {!n.is_read && n.type === 'CARE_CIRCLE_ACCESS_REQUEST' ? (
+                        <button
+                          onClick={() => {
+                            markAsRead(n.id);
+                            setIsOpen(false);
+                            router.push('/care-circle/requests');
+                          }}
+                          className="text-[10px] text-primary hover:underline font-bold pt-1 block cursor-pointer"
+                        >
+                          View Request →
+                        </button>
+                      ) : !n.is_read && [
+                        'CARE_CIRCLE_ACCESS_GRANTED',
+                        'CARE_CIRCLE_ACCESS_UPDATED',
+                        'CARE_CIRCLE_ACCESS_REVOKED',
+                        'CARE_CIRCLE_PRIMARY_CHANGED'
+                      ].includes(n.type) ? (
+                        <button
+                          onClick={() => {
+                            markAsRead(n.id);
+                            setIsOpen(false);
+                            router.push('/care-circle/manage');
+                          }}
+                          className="text-[10px] text-primary hover:underline font-bold pt-1 block cursor-pointer"
+                        >
+                          Manage Shared Trust →
+                        </button>
+                      ) : !n.is_read ? (
                         <button
                           onClick={() => markAsRead(n.id)}
                           className="text-[10px] text-primary hover:underline font-medium pt-1 block cursor-pointer"
                         >
                           Mark as read
                         </button>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                 );
