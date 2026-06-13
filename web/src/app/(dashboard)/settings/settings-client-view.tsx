@@ -624,7 +624,7 @@ export default function SettingsClientView({
                 <button
                   type="submit"
                   disabled={processing || !cgIdInput.trim()}
-                  className={`font-black rounded-xl bg-primary text-primary-foreground hover:bg-primary/95 transition-all shadow-sm cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 ${
+                  className={`font-black rounded-xl bg-primary text-primary-foreground hover:bg-primary-hover transition-all shadow-sm cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 ${
                     isElderly ? 'h-16 px-8 text-xl' : 'h-10 px-5 text-xs'
                   }`}
                 >
@@ -706,7 +706,7 @@ export default function SettingsClientView({
                         <button
                           onClick={() => handleMonitorPatient(patient)}
                           disabled={processing || !patient.patient_telegram_id}
-                          className={`w-full font-black rounded-xl bg-primary text-primary-foreground hover:bg-primary/95 transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 ${
+                          className={`w-full font-black rounded-xl bg-primary text-primary-foreground hover:bg-primary-hover transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 ${
                             isElderly ? 'h-[72px] text-2xl' : 'h-10 text-xs'
                           }`}
                         >
@@ -778,7 +778,7 @@ export default function SettingsClientView({
               <button
                 onClick={handleBecomeCaregiver}
                 disabled={processing}
-                className={`font-black rounded-xl bg-primary text-primary-foreground hover:bg-primary/95 transition-all shadow-sm cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 mx-auto ${
+                className={`font-black rounded-xl bg-primary text-primary-foreground hover:bg-primary-hover transition-all shadow-sm cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 mx-auto ${
                   isElderly ? 'h-[72px] px-10 text-2xl' : 'h-10 px-6 text-xs'
                 }`}
               >

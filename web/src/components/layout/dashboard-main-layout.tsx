@@ -339,7 +339,7 @@ export default function DashboardMainLayout({
                       </button>
                       <a
                         href={`tel:${patientPhone}`}
-                        className="flex-1 inline-flex items-center justify-center gap-1 text-[10px] font-black bg-primary text-primary-foreground hover:bg-primary/95 px-2 py-1.5 rounded-lg transition-all text-center"
+                        className="flex-1 inline-flex items-center justify-center gap-1 text-[10px] font-black bg-primary text-primary-foreground hover:bg-primary-hover px-2 py-1.5 rounded-lg transition-all text-center"
                       >
                         <ExternalLink className="w-3 h-3" />
                         <span>Open App</span>

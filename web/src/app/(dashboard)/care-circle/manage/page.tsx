@@ -765,7 +765,7 @@ export default function SharedTrustCenter() {
               <button
                 onClick={handleSaveChanges}
                 disabled={processing !== null}
-                className="flex-1 py-2.5 bg-primary hover:bg-primary/95 text-white font-bold text-xs rounded-xl cursor-pointer transition-all disabled:opacity-50"
+                className="flex-1 py-2.5 bg-primary hover:bg-primary-hover text-white font-bold text-xs rounded-xl cursor-pointer transition-all disabled:opacity-50"
               >
                 {processing ? 'Saving...' : 'Save Changes'}
               </button>

@@ -140,7 +140,7 @@ export default function RegisterPage() {
         <button
           type="submit"
           disabled={loading}
-          className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-2xl shadow-sm font-semibold text-primary-foreground bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 transition-all active:scale-[0.98] cursor-pointer ${isElderly ? 'py-4 text-xl' : 'text-sm'}`}
+          className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-2xl shadow-sm font-semibold text-primary-foreground bg-primary hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 transition-all active:scale-[0.98] cursor-pointer ${isElderly ? 'py-4 text-xl' : 'text-sm'}`}
         >
           {loading ? 'Registering...' : 'Register'}
         </button>

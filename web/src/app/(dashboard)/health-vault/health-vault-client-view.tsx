@@ -683,7 +683,7 @@ export default function HealthVaultClientView({
             {userRole !== 'CAREGIVER' && (
               <button
                 onClick={() => openUploadModal()}
-                className={`font-black rounded bg-primary text-primary-foreground hover:bg-primary/95 transition-all cursor-pointer shadow-sm flex items-center justify-center ${
+                className={`font-black rounded bg-primary text-primary-foreground hover:bg-primary-hover transition-all cursor-pointer shadow-sm flex items-center justify-center ${
                   isElderly ? 'px-6 py-3.5 text-lg' : 'px-4 py-2 text-xs'
                 }`}
               >
@@ -800,7 +800,7 @@ export default function HealthVaultClientView({
             {userRole !== 'CAREGIVER' && !viewingTrash && (
               <button
                 onClick={() => openUploadModal(selectedCategory.id)}
-                className={`font-black rounded bg-primary text-primary-foreground hover:bg-primary/95 transition-all cursor-pointer shadow-sm flex items-center justify-center shrink-0 ${
+                className={`font-black rounded bg-primary text-primary-foreground hover:bg-primary-hover transition-all cursor-pointer shadow-sm flex items-center justify-center shrink-0 ${
                   isElderly ? 'px-6 py-3.5 text-base' : 'px-4 py-2 text-xs'
                 }`}
               >
@@ -918,7 +918,7 @@ export default function HealthVaultClientView({
               {userRole !== 'CAREGIVER' && !viewingTrash && !searchQuery.trim() && (
                 <button
                   onClick={() => openUploadModal(selectedCategory.id)}
-                  className={`font-black rounded bg-primary text-primary-foreground hover:bg-primary/95 transition-all cursor-pointer shadow-sm flex items-center justify-center ${
+                  className={`font-black rounded bg-primary text-primary-foreground hover:bg-primary-hover transition-all cursor-pointer shadow-sm flex items-center justify-center ${
                     isElderly ? 'px-5 py-3 text-base' : 'px-4 py-2 text-xs'
                   }`}
                 >
@@ -1166,7 +1166,7 @@ export default function HealthVaultClientView({
               <button
                 onClick={handleSaveEdit}
                 disabled={isSavingEdit}
-                className="px-4 py-2 rounded-xl text-xs font-black bg-primary text-primary-foreground hover:bg-primary/95 flex items-center gap-1 cursor-pointer"
+                className="px-4 py-2 rounded-xl text-xs font-black bg-primary text-primary-foreground hover:bg-primary-hover flex items-center gap-1 cursor-pointer"
               >
                 {isSavingEdit ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                 <span>Save Changes</span>
@@ -1475,7 +1475,7 @@ export default function HealthVaultClientView({
                         setUploadError(null);
                         setActiveStep((prev) => (prev + 1) as any);
                       }}
-                      className={`font-black rounded bg-primary text-primary-foreground hover:bg-primary/95 transition-all cursor-pointer flex items-center justify-center ${
+                      className={`font-black rounded bg-primary text-primary-foreground hover:bg-primary-hover transition-all cursor-pointer flex items-center justify-center ${
                         isElderly ? 'px-5 py-3 text-base' : 'px-3.5 py-2 text-xs'
                       }`}
                     >
@@ -1486,7 +1486,7 @@ export default function HealthVaultClientView({
                     <button
                       onClick={handleUploadSave}
                       disabled={isUploading}
-                      className={`font-black rounded bg-primary text-primary-foreground hover:bg-primary/95 transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      className={`font-black rounded bg-primary text-primary-foreground hover:bg-primary-hover transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                         isElderly ? 'px-6 py-3.5 text-base' : 'px-4 py-2.5 text-xs'
                       }`}
                     >
@@ -1572,7 +1572,7 @@ export default function HealthVaultClientView({
                         document.body.removeChild(a);
                       }
                     }}
-                    className={`font-black rounded bg-primary text-primary-foreground hover:bg-primary/95 transition-all cursor-pointer shadow-sm flex items-center justify-center mx-auto ${
+                    className={`font-black rounded bg-primary text-primary-foreground hover:bg-primary-hover transition-all cursor-pointer shadow-sm flex items-center justify-center mx-auto ${
                       isElderly ? 'px-6 py-3.5 text-base' : 'px-4 py-2 text-xs'
                     }`}
                   >

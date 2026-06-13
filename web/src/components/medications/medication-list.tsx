@@ -6,7 +6,9 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { calculateNextReminder } from '@/lib/medication-utils';
 import { useUiMode } from '@/context/ui-mode-context';
-import { Pill, Plus, Package, Clock } from 'lucide-react';
+import { Plus, Package, Clock, Pause, Play, SquarePen, Trash2 } from 'lucide-react';
+import { getUnitIcon } from '@/components/ui/custom-icons';
+import { getSeverityTheme } from '@/lib/severity-theme';
 
 export interface Medication {
   id: number;
@@ -140,17 +142,6 @@ export default function MedicationList({
     }
   };
 
-  const getPriorityColor = (level: string) => {
-    switch (level) {
-      case 'critical':
-        return 'bg-danger/10 text-danger border-danger/25';
-      case 'important':
-        return 'bg-warning/10 text-warning border-warning/25';
-      default:
-        return 'bg-success/10 text-success border-success/25';
-    }
-  };
-
   const format12Hour = (timeStr: string) => {
     const [hourStr, minStr] = timeStr.split(':');
     const hour = parseInt(hourStr);
@@ -162,7 +153,7 @@ export default function MedicationList({
   return (
     <div className="space-y-6">
       {/* Header Panel */}
-      <div className={`flex justify-between items-center bg-card rounded-xl border border-border shadow-sm transition-all duration-300 ${
+      <div className={`flex justify-between items-center bg-card rounded-3xl border border-border shadow-sm transition-all duration-300 ${
         isElderly ? 'p-6 border-2' : 'p-4'
       }`}>
         <div>
@@ -174,7 +165,7 @@ export default function MedicationList({
         {activeRole !== 'CAREGIVER' && (
           <Link
             href="/medications/new"
-            className={`font-black rounded bg-primary text-primary-foreground hover:bg-primary/95 transition-all cursor-pointer shadow-sm flex items-center justify-center ${
+            className={`font-black rounded-full bg-primary text-primary-foreground hover:bg-primary-hover transition-all cursor-pointer shadow-sm flex items-center justify-center ${
               isElderly ? 'px-6 py-3.5 text-lg' : 'px-4 py-2 text-xs'
             }`}
           >
@@ -186,7 +177,7 @@ export default function MedicationList({
 
       {/* Grid List */}
       {meds.length === 0 ? (
-        <div className={`bg-card border border-border rounded-lg text-center text-muted-foreground shadow-sm ${
+        <div className={`bg-card border border-border rounded-3xl text-center text-muted-foreground shadow-sm ${
           isElderly ? 'p-16 text-lg' : 'p-12 text-sm'
         }`}>
           No active medications found. Click "Add Medication" to register your first one.
@@ -195,25 +186,26 @@ export default function MedicationList({
         <div className={`grid grid-cols-1 gap-6 ${isElderly ? 'md:grid-cols-1 max-w-4xl mx-auto' : 'md:grid-cols-2'}`}>
           {meds.map((med) => {
             const isLoading = loadingId === med.id;
+            const theme = getSeverityTheme(med.priority_level);
             return (
               <div
                 key={med.id}
-                className={`bg-card rounded-3xl border border-border flex flex-col justify-between transition-all duration-300 ${
-                  isElderly 
-                    ? 'p-8 border-4 border-primary/40 space-y-6' 
-                    : 'p-5 space-y-4 animate-breath hover:scale-[1.01] hover:shadow-md shadow-sm'
+                className={`rounded-3xl border flex flex-col justify-between transition-all duration-300 ${
+                  isElderly
+                    ? 'p-8 border-4 space-y-6'
+                    : 'p-5 space-y-4 hover:scale-[1.01] hover:shadow-md shadow-sm'
                 } ${
-                  !med.active ? 'opacity-60 bg-muted/20' : ''
+                  !med.active
+                    ? 'opacity-60 bg-muted/30 border-border'
+                    : `${theme.bg} ${isElderly ? theme.borderStrong : theme.border}`
                 }`}
               >
                 <div>
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
-                      {isElderly ? (
-                        <Pill className="text-primary w-10 h-10 shrink-0" />
-                      ) : (
-                        <Pill className="text-primary w-6 h-6 shrink-0" />
-                      )}
+                      <span className={`shrink-0 flex items-center justify-center rounded-2xl ${theme.tile} ${isElderly ? 'w-16 h-16' : 'w-10 h-10'}`}>
+                        {getUnitIcon(med.unit_type, isElderly ? 'w-8 h-8' : 'w-5 h-5')}
+                      </span>
                       <div>
                         <h3 className={`font-black text-foreground tracking-tight ${isElderly ? 'text-3xl' : 'text-sm'}`}>
                           {med.drug_name}
@@ -228,8 +220,8 @@ export default function MedicationList({
                     </div>
                     <span
                       className={`uppercase font-extrabold border transition-all ${
-                        isElderly ? 'px-4 py-1.5 text-xs rounded-lg border-2' : 'px-2 py-0.5 rounded text-[10px]'
-                      } ${getPriorityColor(med.priority_level)}`}
+                        isElderly ? 'px-4 py-1.5 text-xs rounded-full border-2' : 'px-2 py-0.5 rounded-full text-[10px]'
+                      } ${theme.badge}`}
                     >
                       {med.priority_level}
                     </span>
@@ -251,7 +243,7 @@ export default function MedicationList({
                         {med.reminder_times.map((time, idx) => (
                           <span
                             key={idx}
-                            className={`bg-muted rounded font-mono font-extrabold text-foreground border border-border ${
+                            className={`bg-muted rounded-md font-mono font-extrabold text-foreground border border-border ${
                               isElderly ? 'px-2.5 py-1 text-sm' : 'px-1.5 py-0.5 text-[10px]'
                             }`}
                           >
@@ -274,7 +266,7 @@ export default function MedicationList({
                           }>
                             {med.current_stock} {med.unit_type?.toLowerCase() || 'unit'}(s) 
                             {med.stock_threshold !== null && med.stock_threshold !== undefined && Number(med.current_stock) <= Number(med.stock_threshold) && (
-                              <span className="text-[10px] ml-1 bg-danger/10 text-danger border border-danger/20 px-1.5 py-0.5 rounded font-black">
+                              <span className="text-[10px] ml-1 bg-danger/10 text-danger border border-danger/20 px-1.5 py-0.5 rounded-full font-black">
                                 LOW
                               </span>
                             )}
@@ -321,32 +313,40 @@ export default function MedicationList({
                     <button
                       onClick={() => handleToggleActive(med)}
                       disabled={isLoading}
-                      className={`font-black rounded cursor-pointer transition-all ${
-                        isElderly ? 'px-6 py-3 text-base shadow-sm' : 'px-3 py-1.5 text-xs'
+                      aria-label={med.active ? 'Pause medication' : 'Resume medication'}
+                      title={med.active ? 'Pause' : 'Resume'}
+                      className={`rounded-full cursor-pointer transition-all backdrop-blur-md border shadow-sm flex items-center justify-center disabled:opacity-50 ${isLoading ? 'animate-pulse' : ''} ${
+                        isElderly ? 'w-14 h-14' : 'w-9 h-9'
                       } ${
                         med.active
-                          ? 'bg-muted text-foreground hover:bg-muted/80'
-                          : 'bg-primary/10 text-primary hover:bg-primary/20'
+                          ? 'bg-white/55 border-white/70 text-foreground hover:bg-white/80'
+                          : 'bg-primary/15 border-primary/30 text-primary hover:bg-primary/25'
                       }`}
                     >
-                      {isLoading ? '...' : med.active ? 'Pause' : 'Resume'}
+                      {med.active
+                        ? <Pause className={isElderly ? 'w-6 h-6' : 'w-4 h-4'} />
+                        : <Play className={isElderly ? 'w-6 h-6' : 'w-4 h-4'} />}
                     </button>
                     <Link
                       href={`/medications/${med.id}`}
-                      className={`font-black rounded bg-muted text-foreground hover:bg-muted/80 transition-all border border-border text-center ${
-                        isElderly ? 'px-6 py-3 text-base shadow-sm' : 'px-3 py-1.5 text-xs'
+                      aria-label="Edit medication"
+                      title="Edit"
+                      className={`rounded-full bg-white/55 backdrop-blur-md border border-white/70 text-foreground hover:bg-white/80 transition-all shadow-sm flex items-center justify-center ${
+                        isElderly ? 'w-14 h-14' : 'w-9 h-9'
                       }`}
                     >
-                      Edit
+                      <SquarePen className={isElderly ? 'w-6 h-6' : 'w-4 h-4'} />
                     </Link>
                     <button
                       onClick={() => handleDelete(med.id)}
                       disabled={isLoading}
-                      className={`font-black rounded bg-danger/10 text-danger hover:bg-danger/25 transition-all cursor-pointer ${
-                        isElderly ? 'px-6 py-3 text-base shadow-sm' : 'px-3 py-1.5 text-xs'
+                      aria-label="Delete medication"
+                      title="Delete"
+                      className={`rounded-full bg-danger/15 backdrop-blur-md border border-danger/30 text-danger hover:bg-danger/25 transition-all cursor-pointer shadow-sm flex items-center justify-center disabled:opacity-50 ${
+                        isElderly ? 'w-14 h-14' : 'w-9 h-9'
                       }`}
                     >
-                      Delete
+                      <Trash2 className={isElderly ? 'w-6 h-6' : 'w-4 h-4'} />
                     </button>
                   </div>
                 )}

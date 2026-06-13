@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useUiMode } from '@/context/ui-mode-context';
-import { Pill, User, Users, ChevronDown, LogOut } from 'lucide-react';
+import { Pill, ChevronDown, LogOut, Glasses } from 'lucide-react';
 import NotificationCenter from '@/components/shared/notification-center';
 
 interface NavbarProps {
@@ -50,7 +50,7 @@ export default function Navbar({ user }: NavbarProps) {
                   className="inline-block rounded-md object-contain shrink-0 bg-white"
                   style={{
                     width: isElderly ? '75px' : '55px',
-                    height: isElderly ? '75x' : '55px'
+                    height: isElderly ? '75px' : '55px'
                   }}
                 />
                 <span>eЯ</span>
@@ -64,16 +64,17 @@ export default function Navbar({ user }: NavbarProps) {
             {/* Realtime Bell */}
             <NotificationCenter userId={user.id} />
 
-            {/* Mode Switcher Toggle */}
+            {/* Mode Switcher Toggle (icon-only: glasses = large/accessible "Elderly" view) */}
             <button
               onClick={toggleMode}
-              className={`flex items-center justify-center font-bold rounded-2xl transition-all duration-200 border cursor-pointer hover:scale-[1.02] active:scale-[0.98] font-mono ${isElderly
-                ? 'bg-warning/20 hover:bg-warning/35 border-warning/50 text-warning-foreground px-4 py-2.5 text-base shadow-sm font-extrabold'
-                : 'bg-muted hover:bg-muted/80 border-border text-foreground/80 hover:text-foreground px-2.5 py-1.5 text-xs font-semibold'
+              aria-label={isElderly ? 'Switch to Normal view' : 'Switch to Elderly (large, accessible) view'}
+              title={isElderly ? 'Switch to Normal view' : 'Switch to Elderly view'}
+              className={`flex items-center justify-center rounded-full transition-all duration-200 border cursor-pointer hover:scale-[1.05] active:scale-[0.95] ${isElderly
+                ? 'bg-warning/20 hover:bg-warning/35 border-warning/50 text-warning-foreground w-12 h-12 shadow-sm'
+                : 'bg-muted hover:bg-muted/80 border-border text-foreground/80 hover:text-foreground w-9 h-9'
                 }`}
             >
-              <User className="w-3.5 h-3.5 mr-1" />
-              <span>{isElderly ? 'Normal Mode' : 'Elderly Mode'}</span>
+              <Glasses className={isElderly ? 'w-6 h-6' : 'w-[18px] h-[18px]'} />
             </button>
 
             {/* Profile Dropdown */}
@@ -94,7 +95,7 @@ export default function Navbar({ user }: NavbarProps) {
               </button>
 
               {userDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-card rounded-md shadow-lg border border-border py-1 z-50">
+                <div className="absolute right-0 mt-2 w-56 bg-card rounded-2xl shadow-lg border border-border py-1.5 z-50 overflow-hidden animate-fade-in">
                   <div className="px-4 py-2 border-b border-border">
                     <p className="text-xs text-muted-foreground">Signed in as</p>
                     <p className="text-sm font-semibold text-foreground truncate">{user.email}</p>

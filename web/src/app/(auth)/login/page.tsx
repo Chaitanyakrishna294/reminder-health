@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useUiMode } from '@/context/ui-mode-context';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Sparkles, AlertTriangle, Info } from 'lucide-react';
 
 function LoginForm() {
   const [email, setEmail] = useState('');
@@ -83,14 +83,14 @@ function LoginForm() {
       </div>
 
       {error && (
-        <div className="bg-danger/10 text-danger text-sm p-3 rounded-2xl border border-danger/20">
-          ⚠️ {error}
+        <div className="bg-danger/10 text-danger text-sm p-3 rounded-2xl border border-danger/20 flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /> <span>{error}</span>
         </div>
       )}
 
       {info && (
-        <div className="bg-primary/10 text-primary text-sm p-3 rounded-2xl border border-primary/20">
-          ℹ️ {info}
+        <div className="bg-primary/10 text-primary text-sm p-3 rounded-2xl border border-primary/20 flex items-start gap-2">
+          <Info className="w-4 h-4 shrink-0 mt-0.5" /> <span>{info}</span>
         </div>
       )}
 
@@ -143,7 +143,7 @@ function LoginForm() {
         <button
           type="submit"
           disabled={loading}
-          className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-2xl shadow-sm font-semibold text-primary-foreground bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 transition-all active:scale-[0.98] cursor-pointer ${isElderly ? 'py-4 text-xl' : 'text-sm'}`}
+          className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-2xl shadow-sm font-semibold text-primary-foreground bg-primary hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 transition-all active:scale-[0.98] cursor-pointer ${isElderly ? 'py-4 text-xl' : 'text-sm'}`}
         >
           {loading ? 'Signing In...' : 'Sign In with Password'}
         </button>
@@ -159,9 +159,9 @@ function LoginForm() {
         type="button"
         disabled={loading || magicLinkSent}
         onClick={handleMagicLink}
-        className="w-full flex items-center justify-center gap-2 py-3 px-4 border border-lavender/40 rounded-2xl shadow-sm text-sm font-semibold text-primary bg-lavender/10 hover:bg-lavender/20 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 transition-all active:scale-[0.98] cursor-pointer"
+        className="w-full flex items-center justify-center gap-2 py-3 px-4 border border-primary/30 rounded-2xl shadow-sm text-sm font-semibold text-primary bg-primary-soft hover:bg-primary/15 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 transition-all active:scale-[0.98] cursor-pointer"
       >
-        ✨ Send Login Magic Link
+        <Sparkles className="w-4 h-4 shrink-0" /> Send Login Magic Link
       </button>
 
       <div className="text-center text-sm">

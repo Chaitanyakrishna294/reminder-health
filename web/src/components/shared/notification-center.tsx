@@ -70,7 +70,7 @@ export default function NotificationCenter({ userId }: NotificationCenterProps) 
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 bg-card rounded-lg shadow-lg border border-border py-2 z-50 overflow-hidden">
+        <div className="fixed left-3 right-3 top-20 w-auto sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-80 bg-card rounded-2xl shadow-lg border border-border py-2 z-50 overflow-hidden animate-fade-in">
           <div className="flex items-center justify-between px-4 py-2 border-b border-border">
             <span className="font-bold text-foreground text-sm">Notifications</span>
             {unreadCount > 0 && (

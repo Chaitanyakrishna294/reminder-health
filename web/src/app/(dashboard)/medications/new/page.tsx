@@ -799,7 +799,7 @@ export default function NewMedicationPage() {
                   <button
                     type="button"
                     onClick={handleNextStep}
-                    className={`px-6 py-2.5 font-semibold rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-200 flex items-center gap-2 cursor-pointer shadow-sm ${
+                    className={`px-6 py-2.5 font-semibold rounded-2xl bg-primary text-primary-foreground hover:bg-primary-hover transition-all duration-200 flex items-center gap-2 cursor-pointer shadow-sm ${
                       isElderly ? 'h-[72px] text-lg' : 'text-sm'
                     }`}
                   >

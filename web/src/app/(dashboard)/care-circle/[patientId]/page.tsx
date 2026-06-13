@@ -107,7 +107,7 @@ export default async function PatientConsolePage({ params }: PageProps) {
           You do not have an active caregiver relationship connection with this user, or the link is still pending acceptance.
         </p>
         <div className="pt-4">
-          <Link href="/care-circle" className="px-4 py-2.5 bg-primary hover:bg-primary/95 text-xs font-bold rounded-xl text-white transition-all shadow-sm">
+          <Link href="/care-circle" className="px-4 py-2.5 bg-primary hover:bg-primary-hover text-xs font-bold rounded-xl text-white transition-all shadow-sm">
             Back to Care Circle
           </Link>
         </div>

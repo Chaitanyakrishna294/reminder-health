@@ -1,4 +1,5 @@
 import React from 'react';
+import { Pill, Beaker, Droplets, Wind, Sparkles, Package, CircleDot, Bandage } from 'lucide-react';
 
 export const SpoonIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
   <svg 
@@ -39,3 +40,38 @@ export const TabletIcon = ({ className = "w-5 h-5" }: { className?: string }) =>
     <path d="m3.46 10.54 7.08-7.08" />
   </svg>
 );
+
+// Maps a medication's unit_type to its representative icon.
+// Shared by the dashboard and the medication list so the icon is consistent everywhere.
+export const getUnitIcon = (unitType?: string, className: string = 'w-6 h-6') => {
+  const type = unitType?.toUpperCase() || 'TABLET';
+  switch (type) {
+    case 'TABLET':
+      return <TabletIcon className={className} />;
+    case 'CAPSULE':
+      return <Pill className={className} />;
+    case 'ML':
+    case 'LIQUID':
+      return <Beaker className={className} />;
+    case 'DROP':
+    case 'DROPS':
+      return <Droplets className={className} />;
+    case 'SPRAY':
+      return <Wind className={className} />;
+    case 'APPLICATION':
+      return <CreamBottleIcon className={className} />;
+    case 'TEASPOON':
+      return <SpoonIcon className={className} />;
+    case 'PATCH':
+      return <Bandage className={className} />;
+    case 'POWDER':
+      return <Sparkles className={className} />;
+    case 'INHALER':
+    case 'INHALATION':
+      return <Wind className={className} />;
+    case 'OTHER':
+      return <Package className={className} />;
+    default:
+      return <CircleDot className={className} />;
+  }
+};

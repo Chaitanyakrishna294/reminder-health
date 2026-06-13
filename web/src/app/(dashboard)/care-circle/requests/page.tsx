@@ -542,7 +542,7 @@ export default function CareCircleRequestsPage() {
                       <button
                         onClick={() => handleAccept(request.id)}
                         disabled={isProcessing}
-                        className="flex-1 h-10 bg-primary text-primary-foreground font-black text-xs rounded-xl hover:bg-primary/95 transition-all shadow-sm cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+                        className="flex-1 h-10 bg-primary text-primary-foreground font-black text-xs rounded-xl hover:bg-primary-hover transition-all shadow-sm cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
                       >
                         {isProcessing ? (
                           <Loader2 className="w-4 h-4 animate-spin" />

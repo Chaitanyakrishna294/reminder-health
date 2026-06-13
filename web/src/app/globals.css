@@ -9,18 +9,20 @@
   
   --primary: #F26B8A; /* Mind Pink Accent */
   --primary-foreground: #ffffff;
-  
+  --primary-hover: #ED5276; /* Pressed/hover pink */
+  --primary-soft: #FDEEF2; /* Tinted pink surface */
+
   --success: #34C759; /* Success Green */
   --success-foreground: #ffffff;
-  
+
   --warning: #FF9500; /* Warning Orange */
   --warning-foreground: #ffffff;
-  
+
   --danger: #FF3B30;  /* Danger Red */
   --danger-foreground: #ffffff;
-  
-  --border: rgba(15, 23, 42, 0.04); /* Soft card border */
-  --input: rgba(15, 23, 42, 0.04);
+
+  --border: rgba(15, 23, 42, 0.07); /* Soft card border */
+  --input: rgba(15, 23, 42, 0.10);
   --ring: #F26B8A;
   
   --muted: #EEF4FB; /* Secondary Background */
@@ -74,6 +76,8 @@
   --color-card-foreground: var(--card-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-soft: var(--primary-soft);
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
@@ -91,13 +95,15 @@
   --radius-md: calc(var(--radius) - 4px);
   --radius-sm: calc(var(--radius) - 8px);
   
-  --shadow-sm: 0 4px 20px rgba(15, 23, 42, 0.02);
-  --shadow-md: 0 8px 32px rgba(15, 23, 42, 0.03);
-  --shadow-lg: 0 12px 48px rgba(15, 23, 42, 0.04);
-  
+  /* Layered, soft-but-visible elevation (navy-tinted to match foreground) */
+  --shadow-sm: 0 1px 2px rgba(15, 28, 90, 0.04), 0 2px 8px rgba(15, 28, 90, 0.04);
+  --shadow-md: 0 2px 4px rgba(15, 28, 90, 0.04), 0 8px 20px rgba(15, 28, 90, 0.07);
+  --shadow-lg: 0 4px 8px rgba(15, 28, 90, 0.05), 0 18px 40px rgba(15, 28, 90, 0.10);
+
   --animate-float: float 8s ease-in-out infinite;
   --animate-breath: breath 12s ease-in-out infinite;
   --animate-orbit-rotate: orbit-rotate 20s linear infinite;
+  --animate-fade-in: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @keyframes float {
@@ -180,21 +186,38 @@
 }
 
 body {
-  background: #F8F9FB;
+  /* Whisper-subtle brand tint over the base so large surfaces feel less flat */
+  background-color: #F8F9FB;
+  background-image:
+    radial-gradient(60rem 60rem at 100% -10%, rgba(242, 107, 138, 0.05), transparent 60%),
+    radial-gradient(50rem 50rem at -10% 0%, rgba(91, 141, 239, 0.05), transparent 55%);
   color: var(--foreground);
   min-height: 100vh;
   margin: 0;
   background-attachment: fixed;
   font-family: var(--font-sans), sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 h1, h2, h3, h4, h5, h6, .font-mono, .badge, .metric, .time-tag, .navigation-label {
   font-family: var(--font-mono), monospace !important;
+  letter-spacing: -0.01em;
+}
+
+/* Consistent, on-brand keyboard focus ring across the app */
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+*:focus:not(:focus-visible) {
+  outline: none;
 }
 
 @media (prefers-color-scheme: dark) {
   body {
-    background: #F8F9FB;
+    background-color: #F8F9FB;
     color: var(--foreground);
     background-attachment: fixed;
   }

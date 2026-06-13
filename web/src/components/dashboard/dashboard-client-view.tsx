@@ -25,6 +25,7 @@ const CaregiverConsole = dynamic(() => import('@/components/dashboard/caregiver-
 
 import { createClient } from '@/lib/supabase/client';
 import { SpoonIcon, CreamBottleIcon, TabletIcon } from '@/components/ui/custom-icons';
+import { getSeverityTheme } from '@/lib/severity-theme';
 import { 
   Activity, 
   Clock, 
@@ -62,7 +63,7 @@ import {
   Bandage
 } from 'lucide-react';
 
-const FEATURE_FLAG_ENABLE_PILL_SLIDER = false;
+const FEATURE_FLAG_ENABLE_PILL_SLIDER = true;
 
 const getUnitIcon = (unitType?: string, className: string = "w-6 h-6") => {
   const type = unitType?.toUpperCase() || 'TABLET';
@@ -133,6 +134,7 @@ interface MedicationSliderProps {
 
 const MedicationSlider = ({ event, onResolve }: MedicationSliderProps) => {
   const [position, setPosition] = useState(0); // in pixels
+  const [progress, setProgress] = useState(0); // -100 (skip) .. 100 (take)
   const [isDragging, setIsDragging] = useState(false);
   const trackRef = React.useRef<HTMLDivElement>(null);
 
@@ -146,18 +148,18 @@ const MedicationSlider = ({ event, onResolve }: MedicationSliderProps) => {
     const width = rect.width;
     const center = rect.left + width / 2;
     const offset = clientX - center;
-    const maxOffset = width / 2 - 24; // 24px is approximate knob radius
+    const maxOffset = width / 2 - 28; // ~knob radius
     const percentage = Math.max(-100, Math.min(100, (offset / maxOffset) * 100));
-    // scale to actual pixels inside the track
     setPosition((percentage / 100) * maxOffset);
+    setProgress(percentage);
   };
 
   const handleEnd = () => {
     if (!isDragging || !trackRef.current) return;
     setIsDragging(false);
     const rect = trackRef.current.getBoundingClientRect();
-    const maxOffset = rect.width / 2 - 24;
-    const threshold = maxOffset * 0.75;
+    const maxOffset = rect.width / 2 - 28;
+    const threshold = maxOffset * 0.7;
 
     if (position >= threshold) {
       onResolve('TAKEN');
@@ -165,6 +167,7 @@ const MedicationSlider = ({ event, onResolve }: MedicationSliderProps) => {
       onResolve('SKIP');
     }
     setPosition(0);
+    setProgress(0);
   };
 
   useEffect(() => {
@@ -192,26 +195,57 @@ const MedicationSlider = ({ event, onResolve }: MedicationSliderProps) => {
     };
   }, [isDragging, position]);
 
+  const takeIntensity = Math.max(0, progress) / 100; // 0..1 dragging right (take)
+  const skipIntensity = Math.max(0, -progress) / 100; // 0..1 dragging left (skip)
+  const armedTake = progress > 45;
+  const armedSkip = progress < -45;
+
   return (
-    <div 
+    <div
       ref={trackRef}
-      className="relative w-full h-12 rounded-full overflow-hidden border border-border flex items-center justify-between px-6 select-none bg-slate-100 dark:bg-slate-900 shadow-inner"
+      role="slider"
+      aria-label="Slide left to skip, right to take this medication"
+      aria-valuemin={-100}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(progress)}
+      className="relative w-full h-14 rounded-full overflow-hidden border border-border flex items-center justify-between px-5 select-none bg-muted shadow-inner"
     >
-      <span className="text-[10px] font-black text-danger/80">← SKIP</span>
-      <span className="text-[10px] font-black text-muted-foreground">SLIDE TO ACTION</span>
-      <span className="text-[10px] font-black text-success/80">TAKE →</span>
-      
-      <div 
+      {/* Directional fills that intensify as the knob travels */}
+      <div
+        className="absolute inset-y-0 left-0 w-1/2 bg-danger/35 pointer-events-none transition-opacity duration-75"
+        style={{ opacity: skipIntensity }}
+      />
+      <div
+        className="absolute inset-y-0 right-0 w-1/2 bg-success/35 pointer-events-none transition-opacity duration-75"
+        style={{ opacity: takeIntensity }}
+      />
+
+      <span className={`relative z-10 flex items-center gap-1 text-[11px] font-black transition-colors ${armedSkip ? 'text-danger' : 'text-danger/70'}`}>
+        <X className="w-3.5 h-3.5 shrink-0" /> Skip
+      </span>
+      <span
+        className="relative z-10 text-[10px] font-black uppercase tracking-wider text-muted-foreground transition-opacity"
+        style={{ opacity: 1 - Math.min(1, Math.abs(progress) / 60) }}
+      >
+        Slide to confirm
+      </span>
+      <span className={`relative z-10 flex items-center gap-1 text-[11px] font-black transition-colors ${armedTake ? 'text-success' : 'text-success/70'}`}>
+        Take <Check className="w-3.5 h-3.5 shrink-0" />
+      </span>
+
+      <div
         onMouseDown={handleStart}
         onTouchStart={handleStart}
-        style={{ 
-          transform: `translateX(calc(-50% + ${position}px))`, 
+        style={{
+          transform: `translateX(calc(-50% + ${position}px))`,
           left: '50%',
           transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
         }}
-        className="absolute top-1 w-10 h-10 rounded-full bg-white dark:bg-slate-800 shadow-md border border-slate-200 dark:border-slate-700 cursor-grab active:cursor-grabbing flex items-center justify-center font-mono text-sm touch-none"
+        className={`absolute top-1 z-20 w-12 h-12 rounded-full bg-white shadow-lg border-2 cursor-grab active:cursor-grabbing flex items-center justify-center touch-none transition-colors ${
+          armedTake ? 'border-success/60 text-success' : armedSkip ? 'border-danger/60 text-danger' : 'border-border text-primary'
+        }`}
       >
-        <Pill className="w-5 h-5 text-primary" />
+        {armedTake ? <Check className="w-5 h-5" /> : armedSkip ? <X className="w-5 h-5" /> : getUnitIcon(event.medications?.unit_type, 'w-5 h-5')}
       </div>
     </div>
   );
@@ -636,7 +670,7 @@ export default function DashboardClientView({
               <div className="flex items-center gap-4 w-full sm:w-auto shrink-0 justify-end">
                 <button
                   onClick={handleEnableNotifications}
-                  className="bg-primary text-primary-foreground font-black px-8 py-3 rounded-xl text-xl cursor-pointer hover:bg-primary/95 transition-all shadow-md shrink-0"
+                  className="bg-primary text-primary-foreground font-black px-8 py-3 rounded-xl text-xl cursor-pointer hover:bg-primary-hover transition-all shadow-md shrink-0"
                 >
                   Enable Notifications
                 </button>
@@ -678,7 +712,7 @@ export default function DashboardClientView({
             </span>
             <button 
               onClick={toggleMode}
-              className="bg-primary text-primary-foreground font-black px-8 py-3 rounded-xl text-xl cursor-pointer hover:bg-primary/95 transition-all shadow-md shrink-0"
+              className="bg-primary text-primary-foreground font-black px-8 py-3 rounded-xl text-xl cursor-pointer hover:bg-primary-hover transition-all shadow-md shrink-0"
             >
               Switch to Normal View
             </button>
@@ -821,6 +855,7 @@ export default function DashboardClientView({
   }
 
   const isMissed = nextPendingEvent && (new Date(nextPendingEvent.scheduled_for).getTime() <= new Date().getTime());
+  const nextSeverity = getSeverityTheme(nextPendingEvent?.medications?.priority_level);
 
   // ==========================================
   // NORMAL MODE VIEW (Premium Apple Health Theme)
@@ -1077,10 +1112,12 @@ export default function DashboardClientView({
       {/* First Viewport: Top Row split layout (Left: Next Medication card, Right: Compliance Ring) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left: Next/Missed Medication summary card */}
-        <div className={`lg:col-span-7 bg-card rounded-3xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden min-h-[300px] border transition-colors ${
-          isMissed 
-            ? 'border-danger/50 shadow-danger/5 shadow-md bg-danger/[0.02]' 
-            : 'border-border'
+        <div className={`lg:col-span-7 rounded-3xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden min-h-[300px] border transition-colors ${
+          isMissed
+            ? 'border-danger/50 shadow-danger/5 shadow-md bg-danger/[0.02]'
+            : nextPendingEvent
+              ? `${nextSeverity.bg} ${nextSeverity.border}`
+              : 'bg-card border-border'
         }`}>
           <div>
             <div className="flex justify-between items-start gap-4">
@@ -1093,9 +1130,9 @@ export default function DashboardClientView({
                 {nextPendingEvent ? (
                   <div className="mt-4 flex items-start gap-4">
                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-colors ${
-                      isMissed 
-                        ? 'bg-danger/10 text-danger border border-danger/20' 
-                        : 'bg-primary/10 text-primary'
+                      isMissed
+                        ? 'bg-danger/10 text-danger border border-danger/20'
+                        : nextSeverity.tile
                     }`}>
                       {getUnitIcon(nextPendingEvent.medications.unit_type, "w-6 h-6")}
                     </div>
@@ -1169,15 +1206,15 @@ export default function DashboardClientView({
                 <div className="mt-6 flex flex-wrap gap-2.5">
                   <button
                     onClick={() => handleElderlyTakeNow(nextPendingEvent, 'TAKEN')}
-                    className="px-5 py-2.5 bg-success text-success-foreground text-xs font-black rounded-full hover:bg-success/90 active:scale-[0.98] transition-all cursor-pointer shadow-sm"
+                    className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-success/20 backdrop-blur-md border border-success/40 text-success text-xs font-black rounded-full hover:bg-success/30 active:scale-[0.98] transition-all cursor-pointer shadow-sm"
                   >
-                    Take Now
+                    <Check className="w-4 h-4" /> Take Now
                   </button>
                   <button
                     onClick={() => handleElderlyTakeNow(nextPendingEvent, 'SKIP')}
-                    className="px-4 py-2.5 bg-muted text-muted-foreground text-xs font-bold rounded-full hover:bg-muted/80 active:scale-[0.98] transition-all cursor-pointer border border-border"
+                    className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-white/55 backdrop-blur-md border border-white/70 text-muted-foreground text-xs font-bold rounded-full hover:bg-white/80 active:scale-[0.98] transition-all cursor-pointer shadow-sm"
                   >
-                    Skip
+                    <X className="w-4 h-4" /> Skip
                   </button>
                 </div>
               )
@@ -1333,7 +1370,7 @@ export default function DashboardClientView({
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Today's Progress */}
         <div className="bg-white border border-border rounded-3xl p-4 shadow-sm flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-[#EAF3FF] text-[#4F8EF7] flex items-center justify-center shrink-0">
+          <div className="w-10 h-10 rounded-full bg-accent-surface text-[#4F8EF7] flex items-center justify-center shrink-0">
             <TrendingUp className="w-5 h-5" />
           </div>
           <div className="min-w-0">
@@ -1364,7 +1401,7 @@ export default function DashboardClientView({
           </div>
           <div className="min-w-0">
             <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Inventory</p>
-            <p className="text-sm font-extrabold text-foreground mt-0.5 truncate">
+            <p className="text-sm font-extrabold text-foreground mt-0.5 leading-tight">
               {lowStockCount > 0 ? `${lowStockCount} Low Item${lowStockCount > 1 ? 's' : ''}` : 'Stock Balanced'}
             </p>
           </div>
@@ -1377,7 +1414,7 @@ export default function DashboardClientView({
           </div>
           <div className="min-w-0">
             <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Caregiver</p>
-            <p className="text-sm font-extrabold text-foreground mt-0.5 truncate">
+            <p className="text-sm font-extrabold text-foreground mt-0.5 leading-tight">
               {userRole === 'CAREGIVER' ? 'Active Monitor' : 'Secure Sync'}
             </p>
           </div>
@@ -1393,7 +1430,7 @@ export default function DashboardClientView({
           <p className="text-[11px] text-muted-foreground font-semibold">Your compliance routine tracking status by time-of-day period</p>
         </div>
         
-        <div className="grid grid-cols-4 gap-2 text-center">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center">
           {[
             { label: 'Morning', icon: <Sun className="w-3.5 h-3.5 shrink-0" />, period: getPeriodStatus(5, 12) },
             { label: 'Afternoon', icon: <CloudSun className="w-3.5 h-3.5 shrink-0" />, period: getPeriodStatus(12, 17) },
@@ -1444,7 +1481,7 @@ export default function DashboardClientView({
             </div>
             <Link
               href="/medications"
-              className="px-4 py-2 text-xs font-black rounded-lg bg-primary text-primary-foreground hover:scale-105 active:scale-95 transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+              className="px-4 py-2 text-xs font-black rounded-full bg-primary text-primary-foreground hover:bg-primary-hover hover:scale-105 active:scale-95 transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" /> Manage Inventory
             </Link>
@@ -1537,7 +1574,7 @@ export default function DashboardClientView({
               </div>
               <Link 
                 href="/care-circle"
-                className="px-3 py-1 rounded bg-muted border border-border hover:bg-slate-100 text-foreground transition-all text-[10px] font-bold"
+                className="px-3 py-1.5 rounded-full bg-muted border border-border hover:bg-muted/70 text-foreground transition-all text-[10px] font-bold"
               >
                 Open Hub
               </Link>
@@ -1546,7 +1583,7 @@ export default function DashboardClientView({
             <div className="space-y-4">
               {/* Sub-List 1: People I Care For */}
               <div className="space-y-2">
-                <p className="text-[10px] uppercase font-bold text-slate-400">People I Care For ({peopleICareFor.length})</p>
+                <p className="text-[10px] uppercase font-bold text-muted-foreground">People I Care For ({peopleICareFor.length})</p>
                 {peopleICareFor.length > 0 ? (
                   <div className="space-y-2">
                     {peopleICareFor.slice(0, 3).map((conn) => {
@@ -1564,7 +1601,7 @@ export default function DashboardClientView({
                           </div>
                           <Link 
                             href={`/care-circle/${conn.patient_telegram_id}`}
-                            className="px-2.5 py-1 rounded bg-muted hover:bg-slate-100 text-[10px] font-bold text-foreground border border-border transition-all"
+                            className="px-2.5 py-1 rounded-full bg-muted hover:bg-muted/70 text-[10px] font-bold text-foreground border border-border transition-all"
                           >
                             Overview
                           </Link>
@@ -1586,7 +1623,7 @@ export default function DashboardClientView({
 
               {/* Sub-List 2: People Caring For Me */}
               <div className="space-y-2">
-                <p className="text-[10px] uppercase font-bold text-slate-400">People Caring For Me ({peopleCaringForMe.length})</p>
+                <p className="text-[10px] uppercase font-bold text-muted-foreground">People Caring For Me ({peopleCaringForMe.length})</p>
                 {peopleCaringForMe.length > 0 ? (
                   <div className="space-y-2">
                     {peopleCaringForMe.slice(0, 3).map((conn) => {
@@ -1602,7 +1639,7 @@ export default function DashboardClientView({
                               <p className="text-[9px] font-bold text-muted-foreground uppercase">{conn.relationship_type}</p>
                             </div>
                           </div>
-                          <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 uppercase">
+                          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-success/10 text-success uppercase">
                             {conn.connection_status}
                           </span>
                         </div>

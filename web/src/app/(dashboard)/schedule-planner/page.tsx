@@ -344,7 +344,7 @@ export default function SchedulePlannerPage() {
                       }}
                       className={`h-12 w-full rounded-2xl flex flex-col items-center justify-center relative cursor-pointer border transition-all text-xs font-bold ${
                         isSelected
-                          ? 'bg-primary text-white border-primary shadow-sm shadow-primary/20 hover:bg-primary/95'
+                          ? 'bg-primary text-white border-primary shadow-sm shadow-primary/20 hover:bg-primary-hover'
                           : isToday
                             ? 'bg-primary/10 border-primary text-primary hover:bg-primary/15'
                             : 'bg-white border-border hover:bg-muted text-foreground'
@@ -578,7 +578,7 @@ export default function SchedulePlannerPage() {
               </button>
               <button
                 onClick={handleApplyOverride}
-                className="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/95 text-xs font-black rounded-xl cursor-pointer shadow-sm"
+                className="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary-hover text-xs font-black rounded-xl cursor-pointer shadow-sm"
               >
                 Apply Override
               </button>

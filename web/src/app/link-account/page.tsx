@@ -257,7 +257,7 @@ export default function LinkAccountPage() {
               <button
                 type="submit"
                 disabled={loading || code.trim().length < 11}
-                className="w-full flex justify-center py-3.5 px-4 border border-transparent rounded-2xl shadow-lg text-sm font-black text-primary-foreground bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 transition-all cursor-pointer active:scale-[0.98]"
+                className="w-full flex justify-center py-3.5 px-4 border border-transparent rounded-2xl shadow-lg text-sm font-black text-primary-foreground bg-primary hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 transition-all cursor-pointer active:scale-[0.98]"
               >
                 {loading ? 'Confirming Code...' : 'Synchronize Bot'}
               </button>

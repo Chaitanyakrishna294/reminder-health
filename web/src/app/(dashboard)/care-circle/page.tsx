@@ -161,7 +161,7 @@ export default async function CareCirclePage() {
           </Link>
           <Link 
             href="/care-circle/manage"
-            className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-primary hover:bg-primary/95 text-white transition-all shadow-sm"
+            className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-primary hover:bg-primary-hover text-white transition-all shadow-sm"
           >
             <Settings className="w-3.5 h-3.5" /> Manage Shared Trust
           </Link>

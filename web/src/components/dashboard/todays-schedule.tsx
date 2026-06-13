@@ -9,6 +9,7 @@ import { resolveReminderEvent } from '@/lib/reminder-events';
 import { useUiMode } from '@/context/ui-mode-context';
 import { Check, SkipForward, AlertCircle, Clock, AlertTriangle, Pill, CheckCircle, XCircle, X } from 'lucide-react';
 import { PremiumToast } from '@/components/ui/premium-toast';
+import { getSeverityTheme } from '@/lib/severity-theme';
 
 export interface ReminderEvent {
   id: number;
@@ -347,17 +348,18 @@ export default function TodaysSchedule({
           ? isPending 
           : isEscalated;
 
-    // Capsule border depending on status
-    const borderClass = isEscalated 
-      ? 'border-danger/30 bg-danger/5 shadow-sm shadow-danger/10' 
-      : isPending 
-        ? 'border-border/60 hover:border-primary/40' 
-        : 'border-border/40 opacity-90';
+    // Severity-tinted capsule; escalated overrides everything with danger emphasis.
+    const theme = getSeverityTheme(event.medications.priority_level);
+    const borderClass = isEscalated
+      ? 'border-danger/30 bg-danger/5 shadow-sm shadow-danger/10'
+      : isPending
+        ? `${theme.bg} ${theme.border} hover:border-primary/40`
+        : `${theme.bg} border-border/40 opacity-90`;
 
     return (
-      <div 
-        key={event.id} 
-        className={`rounded-3xl min-h-[120px] border bg-card p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm hover:shadow-md transition-all duration-300 ${borderClass}`}
+      <div
+        key={event.id}
+        className={`rounded-3xl min-h-[120px] border p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm hover:shadow-md transition-all duration-300 ${borderClass}`}
       >
         <div className="flex items-center gap-5">
           {/* Visual Status Circle Indicator surrounded by Severity Arc */}
@@ -389,16 +391,16 @@ export default function TodaysSchedule({
               <button
                 onClick={() => handleResolve(event, 'TAKEN')}
                 disabled={isUpdating}
-                className="px-6 py-3 text-sm font-black rounded-full bg-success text-success-foreground hover:bg-success/90 active:scale-[0.96] transition-all cursor-pointer shadow-md disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-5 py-3 text-sm font-black rounded-full bg-success/20 backdrop-blur-md border border-success/40 text-success hover:bg-success/30 active:scale-[0.96] transition-all cursor-pointer shadow-sm disabled:opacity-50"
               >
-                {isUpdating ? '...' : userRole === 'CAREGIVER' ? 'Confirm Taken' : 'TAKE NOW'}
+                {isUpdating ? '...' : (<><Check className="w-4 h-4" /> <span>{userRole === 'CAREGIVER' ? 'Confirm Taken' : 'Take Now'}</span></>)}
               </button>
               <button
                 onClick={() => handleResolve(event, 'SKIP')}
                 disabled={isUpdating}
-                className="px-4 py-3 text-sm font-bold rounded-full bg-muted text-muted-foreground hover:bg-muted/80 active:scale-[0.96] transition-all cursor-pointer border border-border disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-4 py-3 text-sm font-bold rounded-full bg-white/55 backdrop-blur-md border border-white/70 text-muted-foreground hover:bg-white/80 active:scale-[0.96] transition-all cursor-pointer shadow-sm disabled:opacity-50"
               >
-                {isUpdating ? '...' : 'Skip'}
+                {isUpdating ? '...' : (<><X className="w-4 h-4" /> <span>Skip</span></>)}
               </button>
             </div>
           ) : (
