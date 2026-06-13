@@ -165,22 +165,17 @@ export default function SettingsClientView({
         } else if (existingConn.connection_status === 'PENDING') {
           setErrorMsg('A connection request is already pending with this caregiver.');
         } else {
-          // Re-activate a previously rejected/withdrawn connection
-          const { error: reactivateErr } = await supabase
-            .from('caregiver_connections')
-            .update({ 
-              connection_status: 'PENDING', 
-              is_active: true,
-              expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-            })
-            .eq('id', existingConn.id);
+          // Re-activate a previously rejected/withdrawn connection via RPC
+          const { data: connId, error: reactivateErr } = await supabase
+            .rpc('invite_caregiver', { caregiver_id: cgProfile.id });
 
           if (reactivateErr) throw reactivateErr;
 
-          // The caregiver_connections AFTER UPDATE trigger (security definer) emits the
-          // CARE_CIRCLE_ACCESS_REQUEST notification on reactivation — no client-side insert.
-
           setSuccessMsg(`Connection request re-sent to ${caregiver.caregiver_name || 'Caregiver'}. Waiting for approval.`);
+          setProcessing(false);
+          setCgIdInput('');
+          router.refresh();
+          return;
         }
         setProcessing(false);
         setCgIdInput('');
@@ -188,18 +183,9 @@ export default function SettingsClientView({
         return;
       }
 
-      // 4. Create new connection in caregiver_connections
-      const { data: newConn, error: connErr } = await supabase
-        .from('caregiver_connections')
-        .insert({
-          caregiver_profile_id: cgProfile.id,
-          patient_profile_id: user.id,
-          connection_status: 'PENDING',
-          is_active: true,
-          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        })
-        .select('id')
-        .single();
+      // 4. Request connection via RPC (handles both new insert and reactivation under SECURITY DEFINER)
+      const { data: connId, error: connErr } = await supabase
+        .rpc('invite_caregiver', { caregiver_id: cgProfile.id });
 
       if (connErr) throw connErr;
 
@@ -211,7 +197,7 @@ export default function SettingsClientView({
       // in caregiver_connections (surfaced via the active_caregiver_links compatibility view).
 
       const newLinked = {
-        id: newConn?.id || caregiver.id,
+        id: (connId as string) || caregiver.id,
         caregiver_id: caregiver.caregiver_id,
         caregiver_name: caregiver.caregiver_name || 'Caregiver',
         caregiver_chat_id: caregiver.caregiver_chat_id || '',

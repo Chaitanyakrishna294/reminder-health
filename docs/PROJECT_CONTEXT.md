@@ -14,7 +14,7 @@ Re-MIND-eЯ is a high-reliability, patient-centric medication management and adh
 
 1. **Patient**: The individual whose medication routines are tracked.
 2. **Caregiver**: A trusted supporter linked to the patient's Care Circle who monitors adherence.
-3. **Care Circle**: A many-to-many coordination layer linking patients to their caregivers.
+3. **Care Circle**: A many-to-many coordination layer linking patients to their caregivers. Connections are requested securely using a database RPC `invite_caregiver` and managed via the `caregiver_connections` table (which is the single source of truth; the legacy `caregiver_info` relationship storage is deprecated).
 4. **Reminder Event**: An instance of a scheduled dose. Can be *real* (database record) or *virtual* (client-side prediction for future daily slots).
 5. **Escalation**: The process where a missed reminder moves from patient alerts to caregiver notifications after a predefined cooldown window.
 6. **Health Vault**: A secure space where patient documents (prescriptions, scan reports) are uploaded and shared selectively.

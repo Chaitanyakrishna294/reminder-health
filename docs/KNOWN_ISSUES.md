@@ -21,6 +21,17 @@ This document lists confirmed bugs, technical limitations, and security issues i
 - **Problem**: Client browser generates virtual events using the client's local browser timezone (e.g. UTC). This mismatch with the medication's database timezone (e.g. Asia/Kolkata) causes incorrect `scheduled_for` parameters, resulting in `INVALID_SCHEDULED_TIME` RPC failures.
 - **Remediation**: Use `moment-timezone` to align client boundaries and scheduled times with the medication's timezone.
 
+### Care Circle Requests Not Appearing
+- **Status**: OPEN (Pending Verification)
+- **Problem**: Patient web client failed to create `PENDING` caregiver connection request rows because direct client-side inserts on `caregiver_connections` were blocked by Row-Level Security policies, causing requests to silently fail.
+- **Remediation**: Replaced direct client inserts with calls to the `invite_caregiver` SECURITY DEFINER RPC.
+
+### Unknown User Display in Request Lists
+- **Status**: OPEN (Pending Verification)
+- **Problem**: Names of pending requests resolved to "Unknown" because the SELECT policy on `profiles` relied on deprecated `caregiver_info` relationships and failed to resolve names for pending connection requests.
+- **Remediation**: Updated `profiles` SELECT policy to allow users to read profiles of users with whom they have a connection (both `PENDING` and `ACCEPTED`) in `caregiver_connections`.
+
+
 ---
 
 ## 2. Technical Limitations & Sandbox Issues

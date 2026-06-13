@@ -37,3 +37,12 @@ This file documents the architectural decisions made during the evolution of the
 - **Decision**: Shift the creation of caregiver connection request notifications from the client browser to database-level security definer triggers on the `caregiver_connections` table.
 - **Reason**: Client-side inserts to the `notifications` table for other users (i.e. patient inserting a notification for caregiver) violate RLS boundaries and are blocked. Shifts notification creation to triggers executing in security definer context.
 - **Impact**: No manual writes to `notifications` on client side. Trigger automatically handles notifications on `INSERT` or `UPDATE` trust events.
+
+---
+
+## ADR-005: Care Circle Request Creation RPC
+- **Date**: 2026-06-13
+- **Status**: APPROVED
+- **Decision**: Patient caregiver invitations must be created through SECURITY DEFINER RPC `invite_caregiver()` rather than direct client inserts on the `caregiver_connections` table.
+- **Reason**: RLS restrictions on `caregiver_connections` prevented direct client-side inserts by patients (only caregivers were authorized to insert connection requests directly). Moving request creation into a secure database RPC bypasses direct client-side write restrictions while enforcing business validations.
+- **Impact**: All future caregiver invitation creation and reactivation flows must call `invite_caregiver()`. Direct client-side `INSERT`/`UPDATE` calls are deprecated.

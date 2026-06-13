@@ -62,7 +62,7 @@ Many-to-many relationship tracking.
 - `id` (UUID, PK).
 - `patient_profile_id` (UUID): References `profiles(id)`.
 - `caregiver_profile_id` (UUID): References `profiles(id)`.
-- `connection_status` (Text): `PENDING`, `ACCEPTED`, `REJECTED`.
+- `connection_status` (Text): `PENDING`, `ACCEPTED`, `REJECTED`, `WITHDRAWN`, `EXPIRED`.
 - `is_active` (Boolean).
 - `relationship_type` (Text).
 - `is_primary` (Boolean).
@@ -71,6 +71,15 @@ Many-to-many relationship tracking.
 - `can_view_reports` (Boolean).
 - `can_edit_medications` (Boolean).
 - `can_receive_escalations` (Boolean).
+- `expires_at` (Timestamp).
+
+### caregiver_info
+Legacy registry for Caregiver ID exchanges.
+- `id` (UUID, PK).
+- `caregiver_id` (Text): Unique caregiver invite code (format: `CG` + 6 digits).
+- `caregiver_name` (Text).
+- `caregiver_chat_id` (Text).
+- *Deprecated columns*: `patient_telegram_id`, `connection_status`, `is_active`. These must not be used for relationship logic.
 
 ---
 
@@ -83,5 +92,22 @@ Unifies `caregiver_connections` (modern many-to-many table) and `caregiver_info`
 
 ## 3. Custom Functions & Triggers
 
+- **`invite_caregiver(caregiver_id UUID)`**: SECURITY DEFINER RPC used by patients to invite/request caregiver connections securely. Bypasses patient write restrictions on `caregiver_connections`, validates user state, prevents self-invitation, checks for duplicates, and reactivates previously rejected/withdrawn/expired requests (returns UUID connection ID).
 - **`handle_caregiver_connection_trust_events()`**: Fires on INSERT/UPDATE in `caregiver_connections` to automatically audit changes and insert access request alerts into `notifications` (executed as `SECURITY DEFINER`).
 - **`handle_reminder_event_state_change()`**: Fires on INSERT/UPDATE of `reminder_events`. Generates notification alerts and loops through all active caregivers to fan out alerts on escalations or confirmations.
+
+---
+
+## 4. Row-Level Security (RLS) Summary
+
+- **profiles**:
+  - `SELECT`: Allows authenticated users to view their own profile, or the profile of any user they are connected with via `caregiver_connections` (both `PENDING` and `ACCEPTED` relationships where `is_active = true`).
+  - `INSERT`/`UPDATE`: Users can only edit their own profile.
+- **caregiver_connections**:
+  - `SELECT`: Allowed for either patient or caregiver associated with the connection.
+  - `INSERT`: Restricted on client side. Patients must use the `invite_caregiver` RPC to initiate connections. Caregivers are permitted to register connections.
+  - `UPDATE`: Caregivers can update connection status (e.g., to ACCEPTED or REJECTED). Patients can update metadata or revoke connections.
+- **notifications**:
+  - `SELECT`: Users can view their own notifications.
+  - `INSERT`: Bypassed via SECURITY DEFINER database triggers (like `handle_caregiver_connection_trust_events`) to prevent client-side RLS insert failures. Direct client-side inserts are disallowed.
+
