@@ -77,7 +77,19 @@ export const resolveUserData = cache(async () => {
   const user = await getCachedUser();
   if (!user) return null;
 
-  const profile = await getCachedProfile(user.id);
+  let profile = await getCachedProfile(user.id);
+  if (!profile) {
+    // Self-heal: an authenticated user with no profile row (e.g. the profile was deleted)
+    // would otherwise dead-end ("can't connect"). Recreate it on demand via a SECURITY
+    // DEFINER RPC that mirrors handle_new_user()'s defaults, then continue.
+    try {
+      const supabase = await createClient();
+      const { data: healed } = await supabase.rpc('ensure_my_profile');
+      if (healed) profile = healed as typeof profile;
+    } catch (err) {
+      console.error('resolveUserData: ensure_my_profile failed:', err);
+    }
+  }
   if (!profile) return null;
 
   const userRole = profile.role as 'PATIENT' | 'CAREGIVER';
