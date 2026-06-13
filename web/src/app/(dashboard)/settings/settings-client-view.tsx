@@ -123,89 +123,54 @@ export default function SettingsClientView({
 
     setProcessing(true);
     try {
-      // 1. Fetch caregiver details from caregiver_info (legacy ID exchange)
-      const { data: cgData, error: fetchErr } = await supabase
-        .from('caregiver_info')
-        .select('*')
-        .eq('caregiver_id', formattedId)
-        .eq('is_active', true);
+      // 1. Resolve the caregiver from their shareable CG-ID via a SECURITY DEFINER RPC.
+      //    Direct reads of caregiver_info/profiles are RLS-restricted to already-linked rows,
+      //    so a patient inviting a NEW caregiver must resolve the code through the RPC.
+      const { data: lk, error: lkErr } = await supabase
+        .rpc('lookup_caregiver_by_code', { p_cg_id: formattedId });
+      if (lkErr) throw lkErr;
 
-      if (fetchErr || !cgData || cgData.length === 0) {
+      const match = Array.isArray(lk) ? lk[0] : lk;
+      if (!match || !match.caregiver_profile_id) {
         setErrorMsg('Caregiver ID not found or inactive. Please ask your caregiver for their correct ID.');
         setProcessing(false);
         return;
       }
+      const cgName = match.caregiver_name || 'Caregiver';
 
-      const caregiver = cgData[0];
+      // 2. Create/reactivate the request via invite_caregiver (handles dedupe + reactivation
+      //    + the request notification trigger, all under SECURITY DEFINER).
+      const { data: connId, error: connErr } = await supabase
+        .rpc('invite_caregiver', { caregiver_id: match.caregiver_profile_id });
 
-      // 2. Resolve caregiver's profile UUID from their telegram_chat_id
-      const { data: cgProfile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('telegram_chat_id', caregiver.caregiver_chat_id)
-        .single();
-
-      if (!cgProfile) {
-        setErrorMsg('Unable to resolve caregiver profile. Please contact support.');
-        setProcessing(false);
-        return;
-      }
-
-      // 3. Check for existing connection
-      const { data: existingConn } = await supabase
-        .from('caregiver_connections')
-        .select('id, connection_status')
-        .eq('caregiver_profile_id', cgProfile.id)
-        .eq('patient_profile_id', user.id)
-        .maybeSingle();
-
-      if (existingConn) {
-        if (existingConn.connection_status === 'ACCEPTED') {
+      if (connErr) {
+        const m = (connErr.message || '').toLowerCase();
+        if (m.includes('already connected')) {
           setErrorMsg('You are already connected with this caregiver.');
-        } else if (existingConn.connection_status === 'PENDING') {
+        } else if (m.includes('already pending')) {
           setErrorMsg('A connection request is already pending with this caregiver.');
+        } else if (m.includes('cannot invite yourself')) {
+          setErrorMsg("You can't send a request to yourself.");
+        } else if (m.includes('not registered as a caregiver')) {
+          setErrorMsg('That user has not registered as a caregiver yet.');
         } else {
-          // Re-activate a previously rejected/withdrawn connection via RPC
-          const { data: connId, error: reactivateErr } = await supabase
-            .rpc('invite_caregiver', { caregiver_id: cgProfile.id });
-
-          if (reactivateErr) throw reactivateErr;
-
-          setSuccessMsg(`Connection request re-sent to ${caregiver.caregiver_name || 'Caregiver'}. Waiting for approval.`);
-          setProcessing(false);
-          setCgIdInput('');
-          router.refresh();
-          return;
+          console.error('[Settings] invite_caregiver error:', connErr);
+          setErrorMsg('Could not send the connection request. Please try again.');
         }
         setProcessing(false);
-        setCgIdInput('');
-        router.refresh();
         return;
       }
 
-      // 4. Request connection via RPC (handles both new insert and reactivation under SECURITY DEFINER)
-      const { data: connId, error: connErr } = await supabase
-        .rpc('invite_caregiver', { caregiver_id: cgProfile.id });
-
-      if (connErr) throw connErr;
-
-      // 5. The caregiver_connections AFTER INSERT trigger (security definer) creates the
-      // CARE_CIRCLE_ACCESS_REQUEST notification for the caregiver, bypassing RLS. We no
-      // longer insert it client-side (the patient's auth.uid() cannot write the caregiver's row).
-      // We also no longer write caregiver_info.patient_telegram_id — that single-column legacy
-      // write is what hijacked a shared caregiver between patients. Relationships live purely
-      // in caregiver_connections (surfaced via the active_caregiver_links compatibility view).
-
       const newLinked = {
-        id: (connId as string) || caregiver.id,
-        caregiver_id: caregiver.caregiver_id,
-        caregiver_name: caregiver.caregiver_name || 'Caregiver',
-        caregiver_chat_id: caregiver.caregiver_chat_id || '',
+        id: (connId as string) || formattedId,
+        caregiver_id: formattedId,
+        caregiver_name: cgName,
+        caregiver_chat_id: '',
         connection_status: 'PENDING',
         source: 'connections' as const,
       };
-      setLinkedCaregivers(prev => [newLinked, ...prev]);
-      setSuccessMsg(`Connection request sent to ${caregiver.caregiver_name || 'Caregiver'}. Waiting for approval.`);
+      setLinkedCaregivers(prev => [newLinked, ...prev.filter(c => c.caregiver_id !== formattedId)]);
+      setSuccessMsg(`Connection request sent to ${cgName}. Waiting for approval.`);
       setCgIdInput('');
       router.refresh();
     } catch (err: any) {
