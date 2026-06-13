@@ -119,25 +119,25 @@ export default function CareCircleRequestsPage() {
   const [selectedPreset, setSelectedPreset] = useState<Record<string, PermissionPreset>>({});
   const [customFlags, setCustomFlags] = useState<Record<string, Record<string, boolean>>>({});
 
-  // Fetch pending requests (where I am the patient)
+  // Fetch pending requests (correct query direction: incoming = where I am the caregiver, outgoing = where I am the patient)
   const fetchRequests = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       setCurrentUserId(user.id);
 
-      // Incoming: requests where I am the patient
+      // Incoming: requests where I am the caregiver (the recipient of a link request)
       const { data: incoming } = await supabase
         .from('caregiver_connections')
         .select(`
           id,
-          caregiver_profile_id,
+          patient_profile_id,
           relationship_type,
           created_at,
           expires_at,
           connection_status
         `)
-        .eq('patient_profile_id', user.id)
+        .eq('caregiver_profile_id', user.id)
         .eq('connection_status', 'PENDING')
         .eq('is_active', true)
         .order('created_at', { ascending: false });
@@ -149,19 +149,20 @@ export default function CareCircleRequestsPage() {
           return new Date(r.expires_at).getTime() > Date.now();
         });
 
-        // Resolve caregiver names
-        const caregiverIds = validRequests.map(r => r.caregiver_profile_id);
-        if (caregiverIds.length > 0) {
+        // Resolve patient names
+        const patientIds = validRequests.map(r => r.patient_profile_id);
+        if (patientIds.length > 0) {
           const { data: profiles } = await supabase
             .from('profiles')
             .select('id, full_name')
-            .in('id', caregiverIds);
+            .in('id', patientIds);
 
           const nameMap = new Map(profiles?.map(p => [p.id, p.full_name]) || []);
 
           setPendingRequests(validRequests.map(r => ({
             ...r,
-            caregiver_name: nameMap.get(r.caregiver_profile_id) || 'Unknown',
+            caregiver_profile_id: r.patient_profile_id,
+            caregiver_name: nameMap.get(r.patient_profile_id) || 'Unknown',
           })));
         } else {
           setPendingRequests([]);
@@ -170,33 +171,34 @@ export default function CareCircleRequestsPage() {
         setPendingRequests([]);
       }
 
-      // Outgoing: requests where I am the caregiver
+      // Outgoing: requests where I am the patient (I sent the request to a caregiver)
       const { data: outgoing } = await supabase
         .from('caregiver_connections')
         .select(`
           id,
-          patient_profile_id,
+          caregiver_profile_id,
           connection_status,
           created_at,
           expires_at
         `)
-        .eq('caregiver_profile_id', user.id)
+        .eq('patient_profile_id', user.id)
         .in('connection_status', ['PENDING', 'WITHDRAWN'])
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
       if (outgoing && outgoing.length > 0) {
-        const patientIds = outgoing.map(r => r.patient_profile_id);
+        const caregiverIds = outgoing.map(r => r.caregiver_profile_id);
         const { data: profiles } = await supabase
           .from('profiles')
           .select('id, full_name')
-          .in('id', patientIds);
+          .in('id', caregiverIds);
 
         const nameMap = new Map(profiles?.map(p => [p.id, p.full_name]) || []);
 
         setSentRequests(outgoing.map(r => ({
           ...r,
-          patient_name: nameMap.get(r.patient_profile_id) || 'Unknown',
+          patient_profile_id: r.caregiver_profile_id,
+          patient_name: nameMap.get(r.caregiver_profile_id) || 'Unknown',
         })));
       } else {
         setSentRequests([]);
@@ -225,11 +227,14 @@ export default function CareCircleRequestsPage() {
       : PERMISSION_PRESETS[preset].flags;
 
     try {
+      const requestObj = pendingRequests.find(r => r.id === requestId);
+      const patientId = requestObj ? requestObj.caregiver_profile_id : (currentUserId || '');
+
       // Check if patient already has a primary caregiver
       const { data: existingPrimary } = await supabase
         .from('caregiver_connections')
         .select('id')
-        .eq('patient_profile_id', currentUserId)
+        .eq('patient_profile_id', patientId)
         .eq('is_primary', true)
         .eq('is_active', true)
         .eq('connection_status', 'ACCEPTED')
@@ -237,6 +242,7 @@ export default function CareCircleRequestsPage() {
 
       // First accepted caregiver becomes primary automatically
       const isPrimary = !existingPrimary;
+
 
       const { error } = await supabase
         .from('caregiver_connections')

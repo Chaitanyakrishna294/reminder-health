@@ -8,7 +8,7 @@ export interface Notification {
   user_id: string;
   title: string;
   message: string;
-  type: 'TAKEN' | 'SKIPPED' | 'MISSED' | 'ESCALATED' | 'CARE_CIRCLE_ACCESS_REQUEST' | 'CARE_CIRCLE_ACCESS_GRANTED' | 'CARE_CIRCLE_ACCESS_UPDATED' | 'CARE_CIRCLE_ACCESS_REVOKED' | 'CARE_CIRCLE_PRIMARY_CHANGED';
+  type: 'TAKEN' | 'SKIPPED' | 'MISSED' | 'ESCALATED' | 'CARE_CIRCLE_ACCESS_REQUEST' | 'CARE_CIRCLE_ACCESS_GRANTED' | 'CARE_CIRCLE_ACCESS_UPDATED' | 'CARE_CIRCLE_ACCESS_REVOKED' | 'CARE_CIRCLE_PRIMARY_CHANGED' | 'UNCONFIRMED';
   is_read: boolean;
   created_at: string;
   connection_id?: string | null;

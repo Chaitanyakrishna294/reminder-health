@@ -74,6 +74,22 @@ export default function SettingsClientView({
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [highlightCareCircle, setHighlightCareCircle] = useState(false);
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const checkHash = () => {
+        if (window.location.hash === '#care-circle') {
+          setHighlightCareCircle(true);
+          const timer = setTimeout(() => setHighlightCareCircle(false), 5000);
+          return () => clearTimeout(timer);
+        }
+      };
+      checkHash();
+      window.addEventListener('hashchange', checkHash);
+      return () => window.removeEventListener('hashchange', checkHash);
+    }
+  }, []);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -533,7 +549,14 @@ export default function SettingsClientView({
       </div>
 
       {/* SECTION 3: UNIFIED CAREGIVER & CLIENT MANAGEMENT */}
-      <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-6">
+      <div 
+        id="care-circle"
+        className={`bg-card border rounded-3xl p-6 shadow-sm space-y-6 transition-all duration-500 ${
+          highlightCareCircle 
+            ? 'border-primary ring-2 ring-primary/20 bg-primary/5 scale-[1.01]' 
+            : 'border-border'
+        }`}
+      >
         <div className="space-y-1">
           <h3 className={`font-black text-foreground flex items-center gap-1.5 ${isElderly ? 'text-2xl' : 'text-sm'}`}>
             <Stethoscope className="w-5 h-5 text-primary" />

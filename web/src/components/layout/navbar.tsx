@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useUiMode } from '@/context/ui-mode-context';
 import { Pill, User, Users, ChevronDown, LogOut } from 'lucide-react';
+import NotificationCenter from '@/components/shared/notification-center';
 
 interface NavbarProps {
   user: {
@@ -59,6 +60,9 @@ export default function Navbar({ user }: NavbarProps) {
 
           {/* Action Center (Role Switcher, Realtime Bell, Mode Toggle, Profile Dropdown) */}
           <div className="flex items-center space-x-3 sm:space-x-4">
+
+            {/* Realtime Bell */}
+            <NotificationCenter userId={user.id} />
 
             {/* Mode Switcher Toggle */}
             <button

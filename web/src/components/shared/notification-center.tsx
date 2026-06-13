@@ -117,7 +117,7 @@ export default function NotificationCenter({ userId }: NotificationCenterProps) 
                           onClick={() => {
                             markAsRead(n.id);
                             setIsOpen(false);
-                            router.push('/care-circle/requests');
+                            router.push('/settings#care-circle');
                           }}
                           className="text-[10px] text-primary hover:underline font-bold pt-1 block cursor-pointer"
                         >
@@ -133,7 +133,7 @@ export default function NotificationCenter({ userId }: NotificationCenterProps) 
                           onClick={() => {
                             markAsRead(n.id);
                             setIsOpen(false);
-                            router.push('/care-circle/manage');
+                            router.push('/settings#care-circle');
                           }}
                           className="text-[10px] text-primary hover:underline font-bold pt-1 block cursor-pointer"
                         >
