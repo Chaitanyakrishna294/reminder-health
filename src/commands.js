@@ -124,6 +124,9 @@ const handleCaregiver = async (chatId) => {
       inlineKeyboard.inline_keyboard.push([
         { text: '📊 Caregiver Panel', callback_data: CALLBACK_ACTIONS.CG_PANEL }
       ]);
+      inlineKeyboard.inline_keyboard.push([
+        { text: '📥 Pending Requests', callback_data: CALLBACK_ACTIONS.CG_REQUESTS }
+      ]);
     }
 
     inlineKeyboard.inline_keyboard.push([
@@ -291,6 +294,115 @@ const handleCaregiverPanel = async (chatId) => {
   } catch (err) {
     console.error('[Caregiver Panel] Error:', err);
     await bot.sendMessage(chatId, '❌ Error loading Caregiver Panel. Please try again.');
+  }
+};
+
+// --- CAREGIVER: list pending Care Circle requests with Accept/Decline buttons ---
+const handleCaregiverRequests = async (chatId) => {
+  try {
+    const caregiverProfileId = await resolveProfileId(chatId);
+    if (!caregiverProfileId) {
+      await bot.sendMessage(chatId, '❌ Please sign in on the web app first so we can link your caregiver profile, then you can manage requests here.');
+      return;
+    }
+
+    const { data: requests, error } = await supabase
+      .from('caregiver_connections')
+      .select('id, patient_profile_id')
+      .eq('caregiver_profile_id', caregiverProfileId)
+      .eq('connection_status', 'PENDING')
+      .eq('is_active', true)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+
+    if (!requests || requests.length === 0) {
+      await bot.sendMessage(chatId, '📭 You have no pending Care Circle requests.');
+      return;
+    }
+
+    const patientIds = requests.map(r => r.patient_profile_id);
+    const { data: patients } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .in('id', patientIds);
+    const nameMap = new Map((patients || []).map(p => [p.id, p.full_name || 'A patient']));
+
+    for (const req of requests) {
+      const pname = nameMap.get(req.patient_profile_id) || 'A patient';
+      await bot.sendMessage(
+        chatId,
+        `🤝 <b>${escapeHTML(pname)}</b> would like you to support their medication routine.`,
+        {
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [[
+              { text: '✅ Accept', callback_data: `${CALLBACK_ACTIONS.CG_ACCEPT_REQ}:${req.id}` },
+              { text: '❌ Decline', callback_data: `${CALLBACK_ACTIONS.CG_REJECT_REQ}:${req.id}` }
+            ]]
+          }
+        }
+      );
+    }
+  } catch (err) {
+    console.error('[Caregiver Requests] Error:', err);
+    await bot.sendMessage(chatId, '❌ Error loading pending requests. Please try again.');
+  }
+};
+
+// --- CAREGIVER: respond to a request. Bot runs as service role (RLS/validation bypassed),
+// so we enforce ownership in code before the direct status update. ---
+const respondToRequestViaBot = async (chatId, connectionId, accept) => {
+  try {
+    const caregiverProfileId = await resolveProfileId(chatId);
+    if (!caregiverProfileId) {
+      await bot.sendMessage(chatId, '❌ Unable to resolve your caregiver profile.');
+      return;
+    }
+
+    const { data: conn } = await supabase
+      .from('caregiver_connections')
+      .select('id, caregiver_profile_id, connection_status, is_active')
+      .eq('id', connectionId)
+      .maybeSingle();
+
+    if (!conn) {
+      await bot.sendMessage(chatId, '❌ Request not found.');
+      return;
+    }
+    if (conn.caregiver_profile_id !== caregiverProfileId) {
+      await bot.sendMessage(chatId, '❌ This request is not addressed to you.');
+      return;
+    }
+    if (conn.connection_status !== 'PENDING' || !conn.is_active) {
+      await bot.sendMessage(chatId, 'ℹ️ This request has already been handled.');
+      return;
+    }
+
+    const update = accept
+      ? { connection_status: 'ACCEPTED' }
+      : { connection_status: 'REJECTED', is_active: false };
+
+    const { error: updErr } = await supabase
+      .from('caregiver_connections')
+      .update(update)
+      .eq('id', connectionId);
+
+    if (updErr) {
+      console.error('[Caregiver Requests] Update error:', updErr);
+      await bot.sendMessage(chatId, '❌ Failed to update the request. Please try again.');
+      return;
+    }
+
+    await bot.sendMessage(
+      chatId,
+      accept
+        ? '✅ Request accepted. You are now connected and will receive their medication alerts.'
+        : '❌ Request declined.'
+    );
+  } catch (err) {
+    console.error('[Caregiver Requests] respond error:', err);
+    await bot.sendMessage(chatId, '❌ Failed to process the request. Please try again.');
   }
 };
 
@@ -654,36 +766,14 @@ const initCommands = () => {
             return;
           }
 
-          // Legacy fallback: one party has no web profile yet. Use caregiver_info.
-          // We no longer globally block a patient from having multiple caregivers, but
-          // a single legacy caregiver_info row can only carry one patient link.
-          if (caregiver.patient_telegram_id && caregiver.patient_telegram_id !== chatId.toString()) {
-            await bot.sendMessage(chatId, '❌ This Caregiver ID is currently linked to another patient and the caregiver has not yet set up a web account for multi-patient support. Please ask them to sign in on the web app.');
-            delete userStates[chatId];
-            return;
-          }
-
-          const { error: linkErr } = await supabase
-            .from('caregiver_info')
-            .update({
-              patient_telegram_id: chatId.toString(),
-              connection_status: 'PENDING'
-            })
-            .eq('caregiver_id', cgId);
-
-          if (linkErr) {
-            console.error('[Caregiver] Legacy linking error:', linkErr);
-            await bot.sendMessage(chatId, '❌ Failed to link caregiver. Please try again later.');
-          } else {
-            await bot.sendMessage(chatId, `⏳ Connection request sent to caregiver: <b>${escapeHTML(caregiver.caregiver_name)}</b>!\n\nThey have been notified and must approve the connection from their settings page before linking is complete.`, { parse_mode: 'HTML' });
-
-            try {
-              await bot.sendMessage(caregiver.caregiver_chat_id, `🔔 <b>Caregiver Connection Request!</b>\n\nPatient <b>${escapeHTML(patientName)}</b> has requested to link with you as their caregiver.\n\nPlease go to your dashboard settings page to review and <b>Accept</b> this connection request.`, { parse_mode: 'HTML' });
-            } catch (notifyErr) {
-              console.error('[Caregiver] Failed to notify caregiver:', notifyErr);
-            }
-          }
-
+          // No legacy fallback: caregiver_connections is the single relationship source of
+          // truth, and it requires web profiles for both parties. The old caregiver_info
+          // patient_telegram_id write was the single-link hijack vector and is deprecated.
+          // If either party hasn't created a web account yet, guide them to sign in.
+          await bot.sendMessage(
+            chatId,
+            '⚠️ To link a caregiver, both you and your caregiver need a (free) web account so we can connect you securely.\n\nPlease open the Re-MIND-eЯ web app, sign in with this Telegram account, and send the request from Settings → Care Circle. Multiple caregivers are fully supported there.'
+          );
           delete userStates[chatId];
           return;
         }
@@ -897,6 +987,18 @@ const initCommands = () => {
       if (data === CALLBACK_ACTIONS.CG_PANEL) {
         await bot.answerCallbackQuery(query.id);
         return handleCaregiverPanel(chatId);
+      }
+      if (data === CALLBACK_ACTIONS.CG_REQUESTS) {
+        await bot.answerCallbackQuery(query.id);
+        return handleCaregiverRequests(chatId);
+      }
+      if (data.startsWith(CALLBACK_ACTIONS.CG_ACCEPT_REQ + ':')) {
+        await bot.answerCallbackQuery(query.id);
+        return respondToRequestViaBot(chatId, data.split(':')[1], true);
+      }
+      if (data.startsWith(CALLBACK_ACTIONS.CG_REJECT_REQ + ':')) {
+        await bot.answerCallbackQuery(query.id);
+        return respondToRequestViaBot(chatId, data.split(':')[1], false);
       }
       if (data === CALLBACK_ACTIONS.CG_BECOME) {
         await bot.answerCallbackQuery(query.id);

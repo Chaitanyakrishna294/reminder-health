@@ -47,7 +47,10 @@ module.exports = {
     CG_PANEL: 'CG_PANEL',
     CG_BECOME: 'CG_BECOME',
     CG_ADD: 'CG_ADD',
-    CG_MY_ID: 'CG_MY_ID'
+    CG_MY_ID: 'CG_MY_ID',
+    CG_REQUESTS: 'CG_REQUESTS',
+    CG_ACCEPT_REQ: 'CG_ACCEPT_REQ',
+    CG_REJECT_REQ: 'CG_REJECT_REQ'
   },
 
   MAIN_MENU: {

@@ -46,3 +46,16 @@ This file documents the architectural decisions made during the evolution of the
 - **Decision**: Patient caregiver invitations must be created through SECURITY DEFINER RPC `invite_caregiver()` rather than direct client inserts on the `caregiver_connections` table.
 - **Reason**: RLS restrictions on `caregiver_connections` prevented direct client-side inserts by patients (only caregivers were authorized to insert connection requests directly). Moving request creation into a secure database RPC bypasses direct client-side write restrictions while enforcing business validations.
 - **Impact**: All future caregiver invitation creation and reactivation flows must call `invite_caregiver()`. Direct client-side `INSERT`/`UPDATE` calls are deprecated.
+
+---
+
+## ADR-006: Caregiver Request Response RPC, Dual-Role Support, and State-Machine Hardening
+- **Date**: 2026-06-13
+- **Status**: APPROVED
+- **Decision**:
+  1. Acceptance/decline of a Care Circle request goes through a SECURITY DEFINER RPC `respond_to_caregiver_request(p_connection_id, p_action)` (`ACCEPT`/`REJECT` by the caregiver, `WITHDRAW` by the patient). `validate_caregiver_connection_updates` was relaxed to permit the caregiver transition `PENDING→ACCEPTED` (and `PENDING→REJECTED`).
+  2. A profile may act as **both** patient and caregiver: `invite_caregiver()` no longer gates on `profiles.role = 'CAREGIVER'`; "is a caregiver" means the target has an active CG-ID in `caregiver_info`. `profiles.role` is now a default hint, not an exclusivity constraint.
+  3. The accept notification is addressed to the **patient** (their caregiver accepted), and "access revoked" only fires for genuine teardown of an `ACCEPTED` relationship.
+  4. `caregiver_info` is reduced to a CG-ID/identity directory only — no surface writes relationship state to it anymore (web link/accept and bot link no longer write `patient_telegram_id`).
+- **Reason**: Under RLS + the validation trigger, no actor could accept a request (the patient invites, but the caregiver was forbidden from setting `ACCEPTED`, and `SECURITY DEFINER` does not change `auth.uid()` so triggers still fired). The single-role model also blocked mutual/family care. Primary reassignment during a caregiver's self-revoke tripped the validation trigger on the sibling row; an internal-bypass GUC (`app.cc_internal`) set by `reassign_primary_after_revoke()` resolves it.
+- **Impact**: Web accept calls the RPC; the Telegram bot adds a pending-requests list with Accept/Decline (service-role direct update, ownership-checked). Verified end-to-end against real RLS via `scratch/verify_carecircle_auth.js` (15/15).

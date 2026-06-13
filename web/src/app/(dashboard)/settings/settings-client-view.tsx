@@ -370,13 +370,17 @@ export default function SettingsClientView({
 
     try {
       if (patient.source === 'connections') {
-        const { error } = await supabase
-          .from('caregiver_connections')
-          .update({ connection_status: 'ACCEPTED' })
-          .eq('id', patient.id);
+        // Caregiver accepts via SECURITY DEFINER RPC. A direct UPDATE would still be filtered
+        // through the validation trigger (auth.uid() is unchanged by SECURITY DEFINER); the RPC
+        // is the canonical, authorization-checked entry point for responding to a request.
+        const { error } = await supabase.rpc('respond_to_caregiver_request', {
+          p_connection_id: patient.id,
+          p_action: 'ACCEPT',
+        });
         if (error) throw error;
       } else {
-        // Legacy fallback: accept the single caregiver_info row.
+        // Legacy caregiver_info row (pre-migration link). Accept in place; no new relationship
+        // writes are introduced — caregiver_connections is the source of truth going forward.
         const { error } = await supabase
           .from('caregiver_info')
           .update({ connection_status: 'ACCEPTED' })
