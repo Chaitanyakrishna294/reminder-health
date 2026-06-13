@@ -10,6 +10,7 @@ interface ResolveReminderEventParams {
   scheduledFor: string;
   action: ReminderResolveAction;
   actorRole: ReminderResolveActorRole;
+  resolutionChannel?: string;
 }
 
 export interface ResolveReminderEventResult {
@@ -28,6 +29,7 @@ export async function resolveReminderEvent({
   scheduledFor,
   action,
   actorRole,
+  resolutionChannel,
 }: ResolveReminderEventParams): Promise<ResolveReminderEventResult> {
   const { data, error } = await supabase.rpc('resolve_reminder_event', {
     p_event_id: eventId > 0 ? eventId : null,
@@ -35,6 +37,7 @@ export async function resolveReminderEvent({
     p_scheduled_for: scheduledFor,
     p_action: action,
     p_actor_role: actorRole,
+    p_resolution_channel: resolutionChannel || null,
   });
 
   if (error) {

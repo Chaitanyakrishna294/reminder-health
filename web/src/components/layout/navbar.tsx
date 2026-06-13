@@ -22,7 +22,7 @@ interface NavbarProps {
 export default function Navbar({ user }: NavbarProps) {
   const router = useRouter();
   const supabase = createClient();
-  const { isElderly, toggleMode } = useUiMode();
+  const { isElderly, toggleMode, viewMode } = useUiMode();
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
 
   const handleLogout = async () => {
@@ -95,10 +95,7 @@ export default function Navbar({ user }: NavbarProps) {
                     <p className="text-xs text-muted-foreground">Signed in as</p>
                     <p className="text-sm font-semibold text-foreground truncate">{user.email}</p>
                     <div className="mt-1 flex items-center gap-1.5">
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-primary/15 text-primary">
-                        {user.role}
-                      </span>
-                      {user.role === 'CAREGIVER' && user.patientName && (
+                      {viewMode === 'PATIENT_MONITOR' && user.patientName && (
                         <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-success/15 text-success">
                           Monitoring: {user.patientName}
                         </span>

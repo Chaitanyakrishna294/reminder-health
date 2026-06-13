@@ -31,7 +31,6 @@ export default async function EditMedicationPage({ params }: PageProps) {
 
   if (!profile) redirect('/login');
 
-  const userRole = profile.role as 'PATIENT' | 'CAREGIVER';
   const myTelegramChatId = profile.telegram_chat_id;
 
   // 2. Fetch medication detail
@@ -45,15 +44,8 @@ export default async function EditMedicationPage({ params }: PageProps) {
     redirect('/medications');
   }
 
-  // Caregivers can only monitor and cannot edit their patient's medications
-  if (userRole === 'CAREGIVER' && medication.telegram_id !== myTelegramChatId) {
-    redirect('/medications');
-  }
-
-  // 3. Verify access permissions (users can only edit their own medications)
-  const isAuthorized = medication.telegram_id === myTelegramChatId;
-
-  if (!isAuthorized) {
+  // Verify access permissions (users can only edit their own medications)
+  if (medication.telegram_id !== myTelegramChatId) {
     redirect('/medications');
   }
 

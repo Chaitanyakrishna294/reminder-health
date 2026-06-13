@@ -43,6 +43,7 @@ module.exports = {
     PAGE_PREV: 'page_prev',
     CG_TAKEN: 'CG_TAKEN',
     CG_SKIP: 'CG_SKIP',
+    CG_ACKNOWLEDGE: 'CG_ACKNOWLEDGE',
     CG_PANEL: 'CG_PANEL',
     CG_BECOME: 'CG_BECOME',
     CG_ADD: 'CG_ADD',

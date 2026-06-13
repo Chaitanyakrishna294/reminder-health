@@ -37,7 +37,6 @@ export default async function DashboardLayout({
       />
 
       <DashboardMainLayout 
-        userRole={profile.role as 'PATIENT' | 'CAREGIVER'}
         patientName={patientName}
         patientPhone={patientPhone}
       >

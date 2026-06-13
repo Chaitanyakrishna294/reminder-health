@@ -2,6 +2,7 @@ import React from 'react';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { resolveUserData } from '@/lib/supabase/cached-queries';
+import MedicationReviewQueue from '@/components/dashboard/medication-review-queue';
 import { 
   getActiveConnectionForPatient, 
   getPatientHealthMetrics, 
@@ -364,6 +365,11 @@ export default async function PatientConsolePage({ params }: PageProps) {
         {/* Right Side: Permission-Aware Data Views */}
         <div className="lg:col-span-2 space-y-6">
           
+          <MedicationReviewQueue 
+            patientTelegramChatId={patientId}
+            userRole="CAREGIVER"
+          />
+
           {/* Medications schedule card */}
           <div className="bg-card border border-border rounded-3xl p-6 space-y-4 shadow-sm">
             <div className="flex justify-between items-center">

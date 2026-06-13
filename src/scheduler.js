@@ -209,10 +209,10 @@ const initScheduler = () => {
               medication_id: med.id,
               telegram_id: med.telegram_id,
               scheduled_for: scheduledFor,
-              reminder_status: 'PENDING_PATIENT',
+              reminder_status: 'SENT',
               retry_count: 0,
               snooze_count: currentSnoozes,
-              retry_reminder_at: retryReminderAt
+              retry_reminder_at: null
             };
             console.log('[Scheduler] reminder_event payload:', payload);
 
@@ -246,7 +246,7 @@ const initScheduler = () => {
               continue;
             }
 
-            console.log(`[Workflow State Change] Created reminder_event ID ${eventData[0].id} for Med ID ${med.id} with status 'PENDING_PATIENT'`);
+            console.log(`[Workflow State Change] Created reminder_event ID ${eventData[0].id} for Med ID ${med.id} with status 'SENT'`);
             console.log(`[Scheduler] Sending Telegram message for Med ID: ${med.id}`);
             // 3. Send Reminder (Telegram + Browser Push)
             try {
@@ -302,250 +302,125 @@ const initScheduler = () => {
         }
       }
 
-      // 1.5. Checking for pending retries / snoozes in reminder_events
-      console.log(`[Scheduler] Checking for pending retries/snoozes in reminder_events at ${now.toISOString()}...`);
+      // 1.5. Checking for pending retries / snoozes in reminder_events via DB RPC
+      console.log(`[Scheduler] Scanning and escalating overdue reminders via DB RPC at ${now.toISOString()}...`);
+      const { data: transitions, error: scanErr } = await supabase.rpc('scan_and_escalate_overdue_reminders');
 
-      const { data: activeEvents, error: retryError } = await supabase
-        .from('reminder_events')
-        .select(`
-          *,
-          medications:medication_id (
-            *
-          )
-        `)
-        .in('reminder_status', ['PENDING_PATIENT', 'RETRYING_PATIENT', 'SNOOZED'])
-        .lte('retry_reminder_at', now.toISOString());
-
-      if (retryError) {
-        console.error('[Scheduler] Error fetching retry reminder events:', retryError);
-      } else if (activeEvents && activeEvents.length > 0) {
-        console.log(`[Scheduler] Found ${activeEvents.length} active events for retry/snooze check.`);
-        for (const event of activeEvents) {
-          const med = event.medications;
-          if (!med || !med.active) {
-            console.log(`[Scheduler] Skipping event ${event.id} because medication configuration is missing or inactive.`);
-            continue;
-          }
-
-          // Safety check: skip if next reminder has already become due/past to prevent retry overlap
-          const nextReminderTime = new Date(med.next_reminder_at);
-          if (nextReminderTime <= now) {
-            console.log(`[Scheduler] Skipping retry for Event ID: ${event.id} because next_reminder_at is already in the past or now.`);
-            continue;
-          }
-
-          // Case A: Firing Snooze
-          if (event.reminder_status === 'SNOOZED') {
-            const nextRetryInterval = med.priority_level === 'critical' ? 5 : 15;
-            const retryReminderAt = new Date(Date.now() + nextRetryInterval * 60 * 1000).toISOString();
-
-            try {
-              // Optimistic lock update on reminder_events
-              const { data: updateData, error: updateErr } = await supabase
-                .from('reminder_events')
-                .update({
-                  reminder_status: 'PENDING_PATIENT',
-                  retry_reminder_at: retryReminderAt,
-                  retry_count: 0
-                })
-                .eq('id', event.id)
-                .eq('reminder_status', 'SNOOZED')
-                .select();
-
-              if (updateErr || !updateData || updateData.length === 0) {
-                console.log(`[Scheduler] Snoozed event ${event.id} already processed. Skipping.`);
-                continue;
-              }
-
-              console.log(`[Workflow State Change] Snooze expired for Event ID ${event.id}. Transitioned status from SNOOZED to PENDING_PATIENT`);
-              console.log(`[Scheduler] Snooze expired. Sending Telegram reminder for Med ID: ${med.id}`);
-              const scheduledTimeMs = new Date(event.scheduled_for).getTime();
-              const currentSnoozes = event.snooze_count;
-              const buttons = [
-                { text: '✅ TAKEN', callback_data: `${CALLBACK_ACTIONS.TAKEN}:${med.id}:${scheduledTimeMs}` },
-                { text: '⏭ SKIP', callback_data: `${CALLBACK_ACTIONS.SKIP}:${med.id}:${scheduledTimeMs}` }
-              ];
-
-              if (currentSnoozes < MAX_SNOOZES) {
-                buttons.splice(1, 0, { text: '⏰ Snooze 10m', callback_data: `${CALLBACK_ACTIONS.SNOOZE}:${med.id}:${scheduledTimeMs}` });
-              }
-
-              const inlineKeyboard = {
-                inline_keyboard: [ buttons ]
-              };
-
-              const message = `💊 Time to take <b>${escapeHTML(med.drug_name)}</b>${med.dosage ? ` (${escapeHTML(med.dosage)})` : ''}`;
-              try {
-                await bot.sendMessage(med.telegram_id, message, { parse_mode: 'HTML', reply_markup: inlineKeyboard });
-              } catch (tgErr) {
-                console.error(`[Scheduler] Telegram failed to send snooze reminder to ${med.telegram_id}:`, tgErr.message || tgErr);
-              }
-              await sendBrowserPush(med.telegram_id, {
-                title: '⏰ Snooze Reminder',
-                body: `Time to take ${med.drug_name}${med.dosage ? ` (${med.dosage})` : ''}.`,
-                eventId: event.id
-              });
-              await delay(200);
-            } catch (snoozeErr) {
-              console.error(`[Scheduler] Failed to send snooze expiration to ${med.telegram_id}:`, snoozeErr);
-            }
-            continue;
-          }
-
-          // Case B: Retrying Patient
-          const retryLimit = med.priority_level === 'critical' ? 1 : 2;
-
-          // Escalation Branch: Patient missed medication retry limit
-          if (event.retry_count >= retryLimit) {
-            try {
-              // Lock the record atomically to prevent duplicate caregiver alerts
-              const { data: updateData, error: updateErr } = await supabase
-                .from('reminder_events')
-                .update({
-                  reminder_status: 'ESCALATED_TO_CG',
-                  escalated_at: now.toISOString(),
-                  retry_reminder_at: null,
-                  retry_count: 0
-                })
-                .eq('id', event.id)
-                .eq('reminder_status', event.reminder_status)
-                .select();
-
-              if (updateErr || !updateData || updateData.length === 0) {
-                console.log(`[Scheduler] Event ${event.id} was already escalated or updated. Skipping.`);
-                continue;
-              }
-
-              console.log(`[Workflow State Change] Event ID ${event.id} retry limit reached. Transitioned status from ${event.reminder_status} to ESCALATED_TO_CG`);
-              console.log(`[Scheduler] Patient missed retry limit. Fetching caregivers for Med ID: ${med.id}`);
-              
-              // Fetch active caregivers for this patient
-              const { data: caregivers, error: cgErr } = await supabase
-                .from('caregiver_info')
-                .select('caregiver_chat_id')
-                .eq('patient_telegram_id', med.telegram_id)
-                .eq('connection_status', 'ACCEPTED')
-                .eq('is_active', true);
-
-              if (cgErr) throw cgErr;
-
-              if (caregivers && caregivers.length > 0) {
-                // Fetch patient name dynamically from Telegram
-                let patientName = 'Patient';
-                try {
-                  const chatInfo = await bot.getChat(med.telegram_id);
-                  patientName = `${chatInfo.first_name || ''} ${chatInfo.last_name || ''}`.trim() || 'Patient';
-                } catch (chatErr) {
-                  console.error('[Scheduler] Failed to get patient chat details:', chatErr);
-                }
-
-                const formattedTime = moment(event.scheduled_for)
-                  .tz('Asia/Kolkata')
-                  .format('h:mm A');
-
-                const priorityEmoji = med.priority_level === 'critical' ? '🔴 CRITICAL' : med.priority_level === 'important' ? '🟠 IMPORTANT' : '🟢 NORMAL';
-                const alertMessage = `⚠️ <b>Medication Alert (${priorityEmoji})</b>\n\nPatient: <b>${escapeHTML(patientName)}</b>\n💊 <b>${escapeHTML(med.drug_name)}</b>\n⏰ <b>${formattedTime}</b>`;
-
-                const scheduledTimeMs = new Date(event.scheduled_for).getTime();
-                const alertButtons = {
-                  inline_keyboard: [
-                    [
-                      { text: '✅ Mark Taken', callback_data: `${CALLBACK_ACTIONS.CG_TAKEN}:${med.id}:${scheduledTimeMs}` },
-                      { text: '⏭ Mark Skip', callback_data: `${CALLBACK_ACTIONS.CG_SKIP}:${med.id}:${scheduledTimeMs}` }
-                    ]
-                  ]
-                };
-
-                for (const cg of caregivers) {
-                  try {
-                    try {
-                      await bot.sendMessage(cg.caregiver_chat_id, alertMessage, { parse_mode: 'HTML', reply_markup: alertButtons });
-                      console.log(`[Scheduler] Sent missed dose alert to Caregiver: ${cg.caregiver_chat_id}`);
-                    } catch (tgErr) {
-                      console.error(`[Scheduler] Telegram failed to send caregiver alert to ${cg.caregiver_chat_id}:`, tgErr.message || tgErr);
-                    }
-                    await sendBrowserPush(cg.caregiver_chat_id, {
-                      title: '⚠️ Patient Missed Medication',
-                      body: `${patientName} has not taken ${med.drug_name}. Action required.`,
-                      eventId: event.id
-                    });
-                  } catch (sendErr) {
-                    console.error(`[Scheduler] Failed to process caregiver alert for ${cg.caregiver_chat_id}:`, sendErr);
-                  }
-                }
-
-                // Update event to indicate caregiver has been notified
-                await supabase
-                  .from('reminder_events')
-                  .update({ caregiver_notified: true })
-                  .eq('id', event.id);
-              }
-            } catch (err) {
-              console.error(`[Scheduler] Error during caregiver alert processing for Event ID ${event.id}:`, err);
-            }
-            continue;
-          }
-
-          // Retry branch: within limits
-          const scheduledTimeMs = new Date(event.scheduled_for).getTime();
-          const currentSnoozes = event.snooze_count;
-          const buttons = [
-            { text: '✅ TAKEN', callback_data: `${CALLBACK_ACTIONS.TAKEN}:${med.id}:${scheduledTimeMs}` },
-            { text: '⏭ SKIP', callback_data: `${CALLBACK_ACTIONS.SKIP}:${med.id}:${scheduledTimeMs}` }
-          ];
-
-          if (currentSnoozes < MAX_SNOOZES) {
-            buttons.splice(1, 0, { text: '⏰ Snooze 10m', callback_data: `${CALLBACK_ACTIONS.SNOOZE}:${med.id}:${scheduledTimeMs}` });
-          }
-
-          const inlineKeyboard = {
-            inline_keyboard: [ buttons ]
-          };
-
-          const message = `⏰ Reminder Again:\nPlease take your medicine.`;
-
-          try {
-            // Optimistic lock update on reminder_events
-            const nextRetryInterval = med.priority_level === 'critical' ? 5 : 15;
-            const { data: updateData, error: updateErr } = await supabase
+      if (scanErr) {
+        console.error('[Scheduler] Error calling scan_and_escalate_overdue_reminders:', scanErr);
+      } else if (transitions && transitions.length > 0) {
+        console.log(`[Scheduler] scan_and_escalate_overdue_reminders returned ${transitions.length} transitions.`);
+        for (const transition of transitions) {
+          const scheduledTimeMs = new Date(transition.scheduled_for).getTime();
+          
+          if (transition.new_status === 'GENTLE_REMINDER') {
+            console.log(`[Workflow State Change] Event ID ${transition.event_id} transitioned to GENTLE_REMINDER. Sending re-engagement reminder.`);
+            
+            // Fetch the event to get correct snooze count
+            const { data: eventRow } = await supabase
               .from('reminder_events')
-              .update({
-                reminder_status: 'RETRYING_PATIENT',
-                retry_reminder_at: new Date(Date.now() + nextRetryInterval * 60 * 1000).toISOString(),
-                retry_count: event.retry_count + 1
-              })
-              .eq('id', event.id)
-              .eq('reminder_status', event.reminder_status)
-              .select();
+              .select('snooze_count')
+              .eq('id', transition.event_id)
+              .single();
+            const currentSnoozes = eventRow ? eventRow.snooze_count : 0;
 
-            if (updateErr || !updateData || updateData.length === 0) {
-              console.log(`[Scheduler] Event ${event.id} retry already processed. Skipping.`);
+            const buttons = [
+              { text: '✅ TAKEN', callback_data: `${CALLBACK_ACTIONS.TAKEN}:${transition.medication_id}:${scheduledTimeMs}` },
+              { text: '⏭ SKIP', callback_data: `${CALLBACK_ACTIONS.SKIP}:${transition.medication_id}:${scheduledTimeMs}` }
+            ];
+
+            if (currentSnoozes < MAX_SNOOZES) {
+              buttons.splice(1, 0, { text: '⏰ Snooze 10m', callback_data: `${CALLBACK_ACTIONS.SNOOZE}:${transition.medication_id}:${scheduledTimeMs}` });
+            }
+
+            const inlineKeyboard = {
+              inline_keyboard: [ buttons ]
+            };
+
+            const message = `⏰ <b>Gentle Reminder:</b> Please take your <b>${escapeHTML(transition.drug_name)}</b>${transition.dosage ? ` (${escapeHTML(transition.dosage)})` : ''}.`;
+            try {
+              await bot.sendMessage(transition.telegram_id, message, { parse_mode: 'HTML', reply_markup: inlineKeyboard });
+            } catch (tgErr) {
+              console.error(`[Scheduler] Telegram failed to send gentle reminder to ${transition.telegram_id}:`, tgErr.message || tgErr);
+            }
+            await sendBrowserPush(transition.telegram_id, {
+              title: '⏰ Gentle Reminder',
+              body: `Please remember to take your ${transition.drug_name}${transition.dosage ? ` (${transition.dosage})` : ''}.`,
+              eventId: transition.event_id
+            });
+            await delay(200);
+          } else if (transition.new_status === 'ESCALATED') {
+            console.log(`[Workflow State Change] Event ID ${transition.event_id} transitioned to ESCALATED. Notifying caregivers.`);
+            
+            // Fetch active caregivers for this patient
+            const { data: caregivers, error: cgErr } = await supabase
+              .from('active_caregiver_links')
+              .select('caregiver_chat_id')
+              .eq('patient_telegram_id', transition.telegram_id)
+              .eq('connection_status', 'ACCEPTED')
+              .eq('is_active', true)
+              .eq('can_receive_escalations', true);
+
+            if (cgErr) {
+              console.error('[Scheduler] Error fetching caregivers for escalation:', cgErr);
               continue;
             }
 
-            console.log(`[Workflow State Change] Event ID ${event.id} is being retried. Transitioned status from ${event.reminder_status} to RETRYING_PATIENT (retry_count: ${event.retry_count + 1})`);
-            console.log(`[Scheduler] Sending Telegram retry message for Med ID: ${med.id}`);
-            try {
-              await bot.sendMessage(med.telegram_id, message, { parse_mode: 'HTML', reply_markup: inlineKeyboard });
-            } catch (tgErr) {
-              console.error(`[Scheduler] Telegram failed to send retry reminder to ${med.telegram_id}:`, tgErr.message || tgErr);
+            if (caregivers && caregivers.length > 0) {
+              // Fetch patient name dynamically from Telegram
+              let patientName = 'Patient';
+              try {
+                const chatInfo = await bot.getChat(transition.telegram_id);
+                patientName = `${chatInfo.first_name || ''} ${chatInfo.last_name || ''}`.trim() || 'Patient';
+              } catch (chatErr) {
+                console.error('[Scheduler] Failed to get patient chat details:', chatErr);
+              }
+
+              const formattedTime = moment(transition.scheduled_for)
+                .tz('Asia/Kolkata')
+                .format('h:mm A');
+
+              const priorityEmoji = transition.priority_level === 'critical' ? '🔴 CRITICAL' : transition.priority_level === 'important' ? '🟠 IMPORTANT' : '🟢 NORMAL';
+              const alertMessage = `🚨 <b>Medication Alert (${priorityEmoji})</b>\n\nA medication for <b>${escapeHTML(patientName)}</b> (<b>${escapeHTML(transition.drug_name)}</b>${transition.dosage ? ` - ${escapeHTML(transition.dosage)}` : ''} due at <b>${formattedTime}</b>) has not yet been confirmed. Please verify or check with them.`;
+
+              const alertButtons = {
+                inline_keyboard: [
+                  [
+                    { text: '🤝 Acknowledge Alert', callback_data: `${CALLBACK_ACTIONS.CG_ACKNOWLEDGE}:${transition.medication_id}:${scheduledTimeMs}` },
+                    { text: '✅ Confirm Taken', callback_data: `${CALLBACK_ACTIONS.CG_TAKEN}:${transition.medication_id}:${scheduledTimeMs}` }
+                  ]
+                ]
+              };
+
+              for (const cg of caregivers) {
+                try {
+                  await bot.sendMessage(cg.caregiver_chat_id, alertMessage, { parse_mode: 'HTML', reply_markup: alertButtons });
+                  console.log(`[Scheduler] Sent missed dose alert to Caregiver: ${cg.caregiver_chat_id}`);
+                } catch (tgErr) {
+                  console.error(`[Scheduler] Telegram failed to send caregiver alert to ${cg.caregiver_chat_id}:`, tgErr.message || tgErr);
+                }
+                await sendBrowserPush(cg.caregiver_chat_id, {
+                  title: `⚠️ ${patientName} Missed Medication`,
+                  body: `${patientName} has not taken ${transition.drug_name}. Action required.`,
+                  eventId: transition.event_id
+                });
+              }
+
+              // Update event to indicate caregiver has been notified
+              await supabase
+                .from('reminder_events')
+                .update({ caregiver_notified: true })
+                .eq('id', transition.event_id);
             }
-            await sendBrowserPush(med.telegram_id, {
-              title: '⏰ Reminder — Please Respond',
-              body: `Have you taken ${med.drug_name} yet? This is a follow-up reminder.`,
-              eventId: event.id
-            });
-            await delay(200); // flood limit delay
-          } catch (sendErr) {
-            console.error(`[Scheduler] Failed to send retry to ${med.telegram_id}:`, sendErr);
+          } else if (transition.new_status === 'PENDING_REVIEW') {
+            console.log(`[Workflow State Change] Event ID ${transition.event_id} transitioned to PENDING_REVIEW (silenced)`);
           }
         }
       }
 
-      // 1.7. Check for unresolved caregiver notifications (Missed / Emergency Escalations)
-      console.log(`[Scheduler] Checking for unresolved caregiver notifications at ${now.toISOString()}...`);
-      
-      const { data: pendingEscalations, error: escError } = await supabase
+      // Check for expired snoozes and transition them back to SENT
+      console.log(`[Scheduler] Checking for expired snoozes...`);
+      const { data: expiredSnoozes, error: snoozeError } = await supabase
         .from('reminder_events')
         .select(`
           *,
@@ -553,111 +428,70 @@ const initScheduler = () => {
             *
           )
         `)
-        .eq('reminder_status', 'ESCALATED_TO_CG');
+        .eq('reminder_status', 'SNOOZED')
+        .lte('retry_reminder_at', now.toISOString());
 
-      if (!escError && pendingEscalations && pendingEscalations.length > 0) {
-        console.log(`[Scheduler] Found ${pendingEscalations.length} medication events waiting for caregiver action.`);
-        for (const event of pendingEscalations) {
+      if (snoozeError) {
+        console.error('[Scheduler] Error fetching expired snoozes:', snoozeError);
+      } else if (expiredSnoozes && expiredSnoozes.length > 0) {
+        for (const event of expiredSnoozes) {
           const med = event.medications;
           if (!med || !med.active) continue;
 
-          const escalationTime = event.escalated_at ? new Date(event.escalated_at) : new Date(event.scheduled_for);
-          const elapsedMinutes = Math.floor((now.getTime() - escalationTime.getTime()) / 60000);
-          
-          // Timeout limit: 15 minutes for critical, 60 minutes for other priorities
-          const timeoutLimit = med.priority_level === 'critical' ? 15 : 60;
+          try {
+            const { data: updateData, error: updateErr } = await supabase
+              .from('reminder_events')
+              .update({
+                reminder_status: 'SENT',
+                retry_reminder_at: null
+              })
+              .eq('id', event.id)
+              .eq('reminder_status', 'SNOOZED')
+              .select();
 
-          if (elapsedMinutes >= timeoutLimit) {
-            try {
-              // Lock the record atomically to prevent concurrent resolutions
-              const { data: updateData, error: updateErr } = await supabase
-                .from('reminder_events')
-                .update({
-                  reminder_status: 'MISSED',
-                  resolved_at: now.toISOString(),
-                  resolved_by: 'SYSTEM',
-                  retry_reminder_at: null,
-                  retry_count: 0
-                })
-                .eq('id', event.id)
-                .eq('reminder_status', 'ESCALATED_TO_CG')
-                .select();
+            if (updateErr || !updateData || updateData.length === 0) continue;
 
-              if (updateErr || !updateData || updateData.length === 0) {
-                console.log(`[Scheduler] Event ${event.id} was already resolved. Skipping auto-MISSED.`);
-                continue;
-              }
+            console.log(`[Workflow State Change] Snooze expired for Event ID ${event.id}. Transitioned status from SNOOZED to SENT`);
+            const scheduledTimeMs = new Date(event.scheduled_for).getTime();
+            const currentSnoozes = event.snooze_count;
+            const buttons = [
+              { text: '✅ TAKEN', callback_data: `${CALLBACK_ACTIONS.TAKEN}:${med.id}:${scheduledTimeMs}` },
+              { text: '⏭ SKIP', callback_data: `${CALLBACK_ACTIONS.SKIP}:${med.id}:${scheduledTimeMs}` }
+            ];
 
-              console.log(`[Workflow State Change] Event ID ${event.id} caregiver response timed out (${elapsedMinutes}m). Transitioned status from ESCALATED_TO_CG to MISSED`);
-              console.log(`[Scheduler] Event ${event.id} caregiver response timed out (${elapsedMinutes}m). Auto-logging MISSED.`);
-
-              // 1. Log MISSED in reminder_logs
-              const formattedScheduledTime = new Date(event.scheduled_for).toISOString();
-              await supabase.from('reminder_logs').insert([{
-                telegram_id: med.telegram_id,
-                medication_id: med.id,
-                scheduled_time: formattedScheduledTime,
-                response: 'MISSED'
-              }]);
-
-              // 2. Notify patient (Telegram + Browser Push)
-              try {
-                try {
-                  await bot.sendMessage(med.telegram_id, `❌ You missed your medication: <b>${escapeHTML(med.drug_name)}</b>.`, { parse_mode: 'HTML' });
-                } catch (tgErr) {
-                  console.error(`[Scheduler] Telegram failed to send missed dose alert to patient ${med.telegram_id}:`, tgErr.message || tgErr);
-                }
-                await sendBrowserPush(med.telegram_id, {
-                  title: '❌ Medication Missed',
-                  body: `You missed your scheduled dose of ${med.drug_name}.`,
-                  eventId: event.id
-                });
-              } catch (err) {
-                console.error(`[Scheduler] Failed to notify patient ${med.telegram_id} of missed dose:`, err);
-              }
-
-              // 3. If critical, send emergency escalation warning to caregiver
-              if (med.priority_level === 'critical') {
-                const { data: caregivers } = await supabase
-                  .from('caregiver_info')
-                  .select('caregiver_chat_id')
-                  .eq('patient_telegram_id', med.telegram_id)
-                  .eq('connection_status', 'ACCEPTED')
-                  .eq('is_active', true);
-
-                if (caregivers && caregivers.length > 0) {
-                  let patientName = 'Patient';
-                  try {
-                    const chatInfo = await bot.getChat(med.telegram_id);
-                    patientName = `${chatInfo.first_name || ''} ${chatInfo.last_name || ''}`.trim() || 'Patient';
-                  } catch (chatErr) {}
-
-                  const alertMsg = `⚠️ <b>CRITICAL ESCALATION</b>\n\nPatient <b>${escapeHTML(patientName)}</b> did NOT take their critical medication:\n💊 <b>${escapeHTML(med.drug_name)}</b>\n\n⚠️ <b>Please check on the patient immediately.</b>`;
-                  
-                  for (const cg of caregivers) {
-                    try {
-                      try {
-                        await bot.sendMessage(cg.caregiver_chat_id, alertMsg, { parse_mode: 'HTML' });
-                        console.log(`[Scheduler] Sent critical escalation alert to Caregiver: ${cg.caregiver_chat_id}`);
-                      } catch (tgErr) {
-                        console.error(`[Scheduler] Telegram failed to send critical alert to caregiver ${cg.caregiver_chat_id}:`, tgErr.message || tgErr);
-                      }
-                      await sendBrowserPush(cg.caregiver_chat_id, {
-                        title: '🔴 CRITICAL — Patient Missed Medication',
-                        body: `${patientName} did NOT take critical medication ${med.drug_name}. Check on patient immediately.`,
-                        eventId: event.id
-                      });
-                    } catch (cgSendErr) {
-                      console.error(`Failed to send emergency alert to caregiver ${cg.caregiver_chat_id}:`, cgSendErr);
-                    }
-                  }
-                }
-              }
-            } catch (pErr) {
-              console.error(`[Scheduler] Error auto-logging MISSED for Event ID ${event.id}:`, pErr);
+            if (currentSnoozes < MAX_SNOOZES) {
+              buttons.splice(1, 0, { text: '⏰ Snooze 10m', callback_data: `${CALLBACK_ACTIONS.SNOOZE}:${med.id}:${scheduledTimeMs}` });
             }
+
+            const inlineKeyboard = {
+              inline_keyboard: [ buttons ]
+            };
+
+            const message = `💊 Time to take <b>${escapeHTML(med.drug_name)}</b>${med.dosage ? ` (${escapeHTML(med.dosage)})` : ''}`;
+            try {
+              await bot.sendMessage(med.telegram_id, message, { parse_mode: 'HTML', reply_markup: inlineKeyboard });
+            } catch (tgErr) {
+              console.error(`[Scheduler] Telegram failed to send snooze reminder to ${med.telegram_id}:`, tgErr.message || tgErr);
+            }
+            await sendBrowserPush(med.telegram_id, {
+              title: '⏰ Snooze Reminder',
+              body: `Time to take ${med.drug_name}${med.dosage ? ` (${med.dosage})` : ''}.`,
+              eventId: event.id
+            });
+            await delay(200);
+          } catch (snoozeErr) {
+            console.error(`[Scheduler] Failed to process snooze expiration for Event ID ${event.id}:`, snoozeErr);
           }
         }
+      }
+
+      // Close daily medications if past closure window
+      console.log(`[Scheduler] Closing daily medications if past closure window...`);
+      const { error: closeErr } = await supabase.rpc('close_daily_medications');
+      if (closeErr) {
+        console.error('[Scheduler] Error running close_daily_medications:', closeErr);
+      } else {
+        console.log('[Scheduler] close_daily_medications run successfully.');
       }
     } catch (err) {
       console.error('Scheduler error:', err);

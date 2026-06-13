@@ -12,7 +12,6 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [role, setRole] = useState<'PATIENT' | 'CAREGIVER'>('PATIENT');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -32,7 +31,6 @@ export default function RegisterPage() {
       options: {
         data: {
           full_name: fullName,
-          role: role,
         },
         emailRedirectTo: `${window.location.origin}/api/auth/callback?next=/link-account`,
       },
@@ -137,41 +135,6 @@ export default function RegisterPage() {
               )}
             </button>
           </div>
-        </div>
-
-        <div>
-          <label className={labelClass}>I am registering as a:</label>
-          <div className="mt-2 grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => setRole('PATIENT')}
-              className={`flex flex-col items-center gap-3 p-4 text-sm font-medium border rounded-2xl transition-all cursor-pointer ${
-                role === 'PATIENT'
-                  ? 'border-primary ring-2 ring-primary/20 bg-primary/10 text-primary'
-                  : 'border-border bg-card text-foreground hover:bg-muted'
-              } ${isElderly ? 'p-6 text-lg' : ''}`}
-            >
-              <span className={isElderly ? 'text-4xl' : 'text-2xl'}>💊</span>
-              Patient
-            </button>
-            <button
-              type="button"
-              onClick={() => setRole('CAREGIVER')}
-              className={`flex flex-col items-center gap-3 p-4 text-sm font-medium border rounded-2xl transition-all cursor-pointer ${
-                role === 'CAREGIVER'
-                  ? 'border-primary ring-2 ring-primary/20 bg-primary/10 text-primary'
-                  : 'border-border bg-card text-foreground hover:bg-muted'
-              } ${isElderly ? 'p-6 text-lg' : ''}`}
-            >
-              <span className={isElderly ? 'text-4xl' : 'text-2xl'}>👨‍⚕️</span>
-              Caregiver
-            </button>
-          </div>
-          <p className={`mt-2 text-muted-foreground ${isElderly ? 'text-base' : 'text-xs'}`}>
-            {role === 'PATIENT'
-              ? 'Patients can schedule medications, log intake, and link a caregiver.'
-              : 'Caregivers can view patient adherence and receive escalation reminders.'}
-          </p>
         </div>
 
         <button

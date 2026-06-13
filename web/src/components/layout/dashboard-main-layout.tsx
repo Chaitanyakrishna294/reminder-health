@@ -23,12 +23,10 @@ import {
 
 export default function DashboardMainLayout({ 
   children,
-  userRole = 'PATIENT',
   patientName = '',
   patientPhone = ''
 }: { 
   children: React.ReactNode;
-  userRole?: 'PATIENT' | 'CAREGIVER';
   patientName?: string;
   patientPhone?: string;
 }) {
@@ -64,7 +62,7 @@ export default function DashboardMainLayout({
   // Query database for active escalations if viewing a monitored patient
   React.useEffect(() => {
     async function checkEscalations() {
-      if (viewMode === 'PATIENT_MONITOR' && userRole === 'CAREGIVER') {
+      if (viewMode === 'PATIENT_MONITOR') {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
@@ -96,7 +94,7 @@ export default function DashboardMainLayout({
       }
     }
     checkEscalations();
-  }, [viewMode, pathname, userRole, supabase]);
+  }, [viewMode, pathname, supabase]);
 
   const isLinkActive = (path: string) => {
     if (path.includes('#')) return false;
@@ -244,7 +242,7 @@ export default function DashboardMainLayout({
             : 'p-6 md:p-8 md:pl-32 pb-24 md:pb-8'
         }`}
       >
-        {viewMode === 'PATIENT_MONITOR' && userRole === 'CAREGIVER' && (
+        {viewMode === 'PATIENT_MONITOR' && (
           <div className="sticky top-0 z-50 mb-6 bg-white border border-border rounded-3xl p-4 shadow-md flex flex-col md:flex-row items-center justify-between gap-4 animate-fade-in">
             {/* Left section: Badges & Patient Selector */}
             <div className="flex flex-wrap items-center gap-3">

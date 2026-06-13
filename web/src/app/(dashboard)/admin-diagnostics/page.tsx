@@ -47,6 +47,20 @@ export default function AdminDiagnosticsPage() {
     openRate: 0,
     lastPushTime: null as string | null,
   });
+  const [adherenceStats, setAdherenceStats] = useState({
+    takenImmediately: 0,
+    takenAfterReview: 0,
+    skippedImmediately: 0,
+    skippedAfterReview: 0,
+    neverConfirmed: 0,
+    channelCounts: {
+      WEB_DASHBOARD: 0,
+      PUSH_NOTIFICATION: 0,
+      TELEGRAM: 0,
+      REVIEW_QUEUE: 0,
+      CAREGIVER_CONSOLE: 0,
+    } as Record<string, number>,
+  });
   const [logs, setLogs] = useState<PushLog[]>([]);
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
@@ -116,6 +130,66 @@ export default function AdminDiagnosticsPage() {
         deliveryRate: sent > 0 ? parseFloat(((displayed / sent) * 100).toFixed(1)) : 100,
         openRate: sent > 0 ? parseFloat(((opened / sent) * 100).toFixed(1)) : 0,
         lastPushTime: lastPush,
+      });
+
+      // 4. Fetch 30-day medication events for adherence outcomes
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const { data: adhEvents, error: adhErr } = await supabase
+        .from('reminder_events')
+        .select('reminder_status, reviewed_at, reviewed_from_status, resolution_channel')
+        .gte('scheduled_for', thirtyDaysAgo.toISOString());
+
+      if (adhErr) throw adhErr;
+
+      let takenImmediately = 0;
+      let takenAfterReview = 0;
+      let skippedImmediately = 0;
+      let skippedAfterReview = 0;
+      let neverConfirmed = 0;
+      
+      const channelCounts = {
+        WEB_DASHBOARD: 0,
+        PUSH_NOTIFICATION: 0,
+        TELEGRAM: 0,
+        REVIEW_QUEUE: 0,
+        CAREGIVER_CONSOLE: 0,
+      };
+
+      adhEvents?.forEach(event => {
+        const status = event.reminder_status;
+        const fromStatus = event.reviewed_from_status;
+        
+        if (status === 'TAKEN') {
+          if (fromStatus === 'UNCONFIRMED') {
+            takenAfterReview++;
+          } else {
+            takenImmediately++;
+          }
+        } else if (status === 'SKIPPED') {
+          if (fromStatus === 'UNCONFIRMED') {
+            skippedAfterReview++;
+          } else {
+            skippedImmediately++;
+          }
+        } else if (status === 'UNCONFIRMED') {
+          neverConfirmed++;
+        }
+
+        const channel = event.resolution_channel;
+        if (channel && channel in channelCounts) {
+          channelCounts[channel as keyof typeof channelCounts]++;
+        }
+      });
+
+      setAdherenceStats({
+        takenImmediately,
+        takenAfterReview,
+        skippedImmediately,
+        skippedAfterReview,
+        neverConfirmed,
+        channelCounts,
       });
 
     } catch (err) {
@@ -294,6 +368,84 @@ export default function AdminDiagnosticsPage() {
             </div>
           </div>
 
+        </div>
+
+        {/* Adherence Outcomes Section */}
+        <div className="mt-8 space-y-6">
+          <div>
+            <h3 className="text-base font-bold text-white">Medication Adherence & Confirmation Outcomes</h3>
+            <p className="text-xs text-slate-400">Analysis of critical grace-period outcomes and late-resolution channels (30-day window)</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            {/* Outcome Segments */}
+            <div className="md:col-span-2 bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 space-y-6">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Adherence Segmentations</h4>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/60 flex flex-col justify-between">
+                  <span className="text-[10px] text-slate-400 font-bold tracking-wider uppercase">Taken Immediately</span>
+                  <p className="text-2xl font-black text-emerald-400 mt-1">{adherenceStats.takenImmediately}</p>
+                  <p className="text-[9px] text-slate-500 mt-2 font-medium">Logged within grace periods</p>
+                </div>
+
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/60 flex flex-col justify-between">
+                  <span className="text-[10px] text-slate-400 font-bold tracking-wider uppercase">Taken After Review</span>
+                  <p className="text-2xl font-black text-teal-400 mt-1">{adherenceStats.takenAfterReview}</p>
+                  <p className="text-[9px] text-slate-500 mt-2 font-medium">Resolved late via review queue</p>
+                </div>
+
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/60 flex flex-col justify-between">
+                  <span className="text-[10px] text-slate-400 font-bold tracking-wider uppercase">Skipped After Review</span>
+                  <p className="text-2xl font-black text-amber-400 mt-1">{adherenceStats.skippedAfterReview}</p>
+                  <p className="text-[9px] text-slate-500 mt-2 font-medium">Logged late as skipped dose</p>
+                </div>
+
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/60 flex flex-col justify-between">
+                  <span className="text-[10px] text-slate-450 font-bold tracking-wider uppercase text-red-400">Never Confirmed</span>
+                  <p className="text-2xl font-black text-red-500 mt-1">{adherenceStats.neverConfirmed}</p>
+                  <p className="text-[9px] text-slate-500 mt-2 font-medium">Remaining in unconfirmed history</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Resolution Channel breakdown */}
+            <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 space-y-6">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Confirmation Channels</h4>
+              
+              <div className="space-y-4">
+                {Object.entries(adherenceStats.channelCounts).map(([channel, count]) => {
+                  const totalResolutions = Object.values(adherenceStats.channelCounts).reduce((a, b) => a + b, 0);
+                  const pct = totalResolutions > 0 ? Math.round((count / totalResolutions) * 100) : 0;
+                  
+                  const channelLabels: Record<string, string> = {
+                    WEB_DASHBOARD: 'Web Patient Dashboard',
+                    PUSH_NOTIFICATION: 'Patient Browser Push',
+                    TELEGRAM: 'Telegram Chat Bot',
+                    REVIEW_QUEUE: 'Medication Review Queue',
+                    CAREGIVER_CONSOLE: 'Caregiver Console',
+                  };
+
+                  return (
+                    <div key={channel} className="space-y-1">
+                      <div className="flex justify-between items-center text-[11px] font-semibold text-slate-350">
+                        <span>{channelLabels[channel] || channel}</span>
+                        <span className="text-white font-mono">{count} ({pct}%)</span>
+                      </div>
+                      <div className="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden">
+                        <div 
+                          className="bg-teal-400 h-1.5 rounded-full transition-all duration-500" 
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+          </div>
         </div>
 
         {/* Audit Trail Section */}

@@ -1181,7 +1181,7 @@ const initCommands = () => {
       const [action, medId, scheduledTime] = data.split(':');
       
       const isPatientAction = [CALLBACK_ACTIONS.TAKEN, CALLBACK_ACTIONS.SKIP, CALLBACK_ACTIONS.SNOOZE].includes(action);
-      const isCaregiverAction = [CALLBACK_ACTIONS.CG_TAKEN, CALLBACK_ACTIONS.CG_SKIP].includes(action);
+      const isCaregiverAction = [CALLBACK_ACTIONS.CG_TAKEN, CALLBACK_ACTIONS.CG_SKIP, CALLBACK_ACTIONS.CG_ACKNOWLEDGE].includes(action);
 
       if (!isPatientAction && !isCaregiverAction) return;
 
@@ -1200,7 +1200,7 @@ const initCommands = () => {
         .select('*')
         .eq('medication_id', medId)
         .eq('scheduled_for', formattedScheduledTime)
-        .in('reminder_status', ['PENDING_PATIENT', 'RETRYING_PATIENT', 'ESCALATED_TO_CG', 'SNOOZED']);
+        .in('reminder_status', ['SENT', 'DISPLAYED', 'OPENED', 'GENTLE_REMINDER', 'ESCALATED', 'CAREGIVER_ACKNOWLEDGED', 'SNOOZED']);
 
       if (getErr || !activeEvents || activeEvents.length === 0) {
         await bot.answerCallbackQuery(query.id, { text: 'This dose has already been resolved.', show_alert: true });
@@ -1272,23 +1272,34 @@ const initCommands = () => {
         resolvedStatus = 'SKIPPED';
         resolvedBy = 'PATIENT';
       } else if (action === CALLBACK_ACTIONS.CG_TAKEN) {
-        resolvedStatus = 'RESOLVED_BY_CG';
-        resolvedBy = 'CAREGIVER';
+        resolvedStatus = 'TAKEN';
+        resolvedBy = 'CAREGIVER_CONFIRMED';
       } else if (action === CALLBACK_ACTIONS.CG_SKIP) {
-        resolvedStatus = 'RESOLVED_BY_CG';
-        resolvedBy = 'CAREGIVER';
+        resolvedStatus = 'SKIPPED';
+        resolvedBy = 'CAREGIVER_CONFIRMED';
+      }
+
+      let updatePayload = {};
+      if (action === CALLBACK_ACTIONS.CG_ACKNOWLEDGE) {
+        updatePayload = {
+          reminder_status: 'CAREGIVER_ACKNOWLEDGED',
+          resolution_channel: 'TELEGRAM'
+        };
+      } else {
+        updatePayload = {
+          reminder_status: resolvedStatus,
+          resolved_at: new Date().toISOString(),
+          resolved_by: resolvedBy,
+          retry_reminder_at: null,
+          retry_count: 0,
+          resolution_channel: 'TELEGRAM'
+        };
       }
 
       // Try to update/lock the event atomically
       const { data: updateData, error: updateErr } = await supabase
         .from('reminder_events')
-        .update({
-          reminder_status: resolvedStatus,
-          resolved_at: new Date().toISOString(),
-          resolved_by: resolvedBy,
-          retry_reminder_at: null,
-          retry_count: 0
-        })
+        .update(updatePayload)
         .eq('id', event.id)
         .eq('reminder_status', event.reminder_status)
         .select();
@@ -1302,6 +1313,16 @@ const initCommands = () => {
             reply_markup: { inline_keyboard: [] }
           });
         } catch (e) {}
+        return;
+      }
+
+      if (action === CALLBACK_ACTIONS.CG_ACKNOWLEDGE) {
+        await bot.editMessageText(`${query.message.text}\n\n[Status: Alert Acknowledged by Caregiver]`, {
+          chat_id: chatId,
+          message_id: messageId,
+          reply_markup: { inline_keyboard: [] }
+        });
+        await bot.answerCallbackQuery(query.id, { text: 'Alert acknowledged 🤝' });
         return;
       }
 
@@ -1358,7 +1379,9 @@ const initCommands = () => {
         medication_id: medId,
         scheduled_time: formattedScheduledTime,
         response: responseType,
-        delay_minutes: responseType === 'TAKEN' ? delayMinutes : null
+        delay_minutes: responseType === 'TAKEN' ? delayMinutes : null,
+        resolved_by: resolvedBy,
+        resolution_channel: 'TELEGRAM'
       }]);
 
       if (error) throw error;

@@ -39,7 +39,6 @@ export default function SchedulePlannerPage() {
   const [newOverrideTime, setNewOverrideTime] = useState('');
   const [skipForToday, setSkipForToday] = useState(false);
   const [patientName, setPatientName] = useState<string | null>(null);
-  const [userRole, setUserRole] = useState<'PATIENT' | 'CAREGIVER' | null>(null);
   const activeRole = activeViewMode === 'PATIENT_MONITOR' ? 'CAREGIVER' : 'PATIENT';
   
   const supabase = createClient();
@@ -64,12 +63,10 @@ export default function SchedulePlannerPage() {
           .single();
 
         if (!profile) return;
-
-        setUserRole(profile.role);
         
         let targetChatId = profile.telegram_chat_id;
 
-        if (activeViewMode === 'PATIENT_MONITOR' && profile.role === 'CAREGIVER') {
+        if (activeViewMode === 'PATIENT_MONITOR') {
           const { data: caregiverLink } = await supabase
             .from('caregiver_info')
             .select('patient_telegram_id, connection_status')

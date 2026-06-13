@@ -95,7 +95,6 @@ export default function NewMedicationPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [targetTelegramChatId, setTargetTelegramChatId] = useState<string | null>(null);
-  const [userRole, setUserRole] = useState<'PATIENT' | 'CAREGIVER' | null>(null);
 
   // Step transition animation state
   const [stepDirection, setStepDirection] = useState<'forward' | 'backward'>('forward');
@@ -131,7 +130,6 @@ export default function NewMedicationPage() {
         return;
       }
 
-      setUserRole(profile.role);
       const currentActiveRole = viewMode === 'PATIENT_MONITOR' ? 'CAREGIVER' : 'PATIENT';
 
       if (currentActiveRole === 'CAREGIVER') {

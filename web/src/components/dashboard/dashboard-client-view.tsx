@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useUiMode } from '@/context/ui-mode-context';
 import TodaysSchedule, { ReminderEvent } from '@/components/dashboard/todays-schedule';
+import MedicationReviewQueue from '@/components/dashboard/medication-review-queue';
 import { registerPush } from '@/lib/push/register-push';
 import dynamic from 'next/dynamic';
 import { resolveReminderEvent } from '@/lib/reminder-events';
@@ -262,8 +263,7 @@ export default function DashboardClientView({
   peopleICareFor = [],
   peopleCaringForMe = [],
 }: DashboardClientViewProps) {
-  const { isElderly, toggleMode } = useUiMode();
-  const viewMode = 'PATIENT' as string;
+  const { isElderly, toggleMode, viewMode } = useUiMode();
 
   const [events, setEvents] = useState<ReminderEvent[]>([]);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
@@ -272,6 +272,7 @@ export default function DashboardClientView({
   const [toasts, setToasts] = useState<{ id: string; title: string; message: string; type: 'success' | 'error' }[]>([]);
   const [showPushBanner, setShowPushBanner] = useState(false);
   const [showIosPwaBanner, setShowIosPwaBanner] = useState(false);
+  const [showSetupWizard, setShowSetupWizard] = useState(false);
 
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
 
@@ -294,6 +295,12 @@ export default function DashboardClientView({
 
       if (isIos && !isStandalone && !dismissed) {
         setShowIosPwaBanner(true);
+      }
+
+      const dismissedWizard = localStorage.getItem('dismissedSetupWizard') === 'true';
+      const isBrandNew = medications.length === 0 && peopleICareFor.length === 0 && peopleCaringForMe.length === 0;
+      if (isBrandNew && !dismissedWizard) {
+        setShowSetupWizard(true);
       }
     }
 
@@ -862,6 +869,76 @@ export default function DashboardClientView({
 
       {/* Patient Active Missed Alarm Alert (Disabled) */}
 
+      {/* Onboarding Setup Wizard Banner */}
+      {showSetupWizard && (
+        <div className="bg-white border border-border rounded-[28px] p-6 shadow-md relative overflow-hidden animate-fade-in space-y-6">
+          <div className="flex justify-between items-start gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                <Sparkles className="w-6 h-6 animate-pulse" />
+              </div>
+              <div>
+                <h2 className="text-base font-black text-foreground">Welcome to Re-MIND-eЯ</h2>
+                <p className="text-xs text-muted-foreground font-semibold mt-1">
+                  What would you like to do?
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                localStorage.setItem('dismissedSetupWizard', 'true');
+                setShowSetupWizard(false);
+              }}
+              aria-label="Dismiss setup guide"
+              className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted/45 rounded-full transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            <Link
+              href="/medications"
+              className="flex flex-col items-center text-center p-5 border border-border hover:border-primary/40 bg-card hover:bg-primary/[0.02] rounded-2xl cursor-pointer transition-all hover:scale-[1.02] group"
+            >
+              <span className="text-2xl mb-2 group-hover:scale-110 transition-transform">💊</span>
+              <span className="text-xs font-black text-foreground">Manage my medications</span>
+              <span className="text-[10px] text-muted-foreground mt-1 font-semibold leading-relaxed">Add drug inventory, schedule recurring reminder times, and log intake.</span>
+            </Link>
+
+            <Link
+              href="/settings"
+              className="flex flex-col items-center text-center p-5 border border-border hover:border-primary/40 bg-card hover:bg-primary/[0.02] rounded-2xl cursor-pointer transition-all hover:scale-[1.02] group"
+            >
+              <span className="text-2xl mb-2 group-hover:scale-110 transition-transform">🤝</span>
+              <span className="text-xs font-black text-foreground">Invite someone to support me</span>
+              <span className="text-[10px] text-muted-foreground mt-1 font-semibold leading-relaxed">Share your profile access code so family members can monitor adherence.</span>
+            </Link>
+
+            <Link
+              href="/settings"
+              className="flex flex-col items-center text-center p-5 border border-border hover:border-primary/40 bg-card hover:bg-primary/[0.02] rounded-2xl cursor-pointer transition-all hover:scale-[1.02] group"
+            >
+              <span className="text-2xl mb-2 group-hover:scale-110 transition-transform">👨‍⚕️</span>
+              <span className="text-xs font-black text-foreground">Help care for someone else</span>
+              <span className="text-[10px] text-muted-foreground mt-1 font-semibold leading-relaxed">Register your caregiver ID and link connected patient profiles.</span>
+            </Link>
+
+            <button
+              onClick={() => {
+                localStorage.setItem('dismissedSetupWizard', 'true');
+                setShowSetupWizard(false);
+              }}
+              className="flex flex-col items-center text-center p-5 border border-border hover:border-primary/40 bg-card hover:bg-primary/[0.02] rounded-2xl cursor-pointer transition-all hover:scale-[1.02] group"
+            >
+              <span className="text-2xl mb-2 group-hover:scale-110 transition-transform">⏭️</span>
+              <span className="text-xs font-black text-foreground">Skip for now</span>
+              <span className="text-[10px] text-muted-foreground mt-1 font-semibold leading-relaxed">Close this guide and explore the workspace dashboard at your own pace.</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Welcome Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-transparent border-none shadow-none p-0">
         <div className="flex items-center gap-4 w-full sm:w-auto">
@@ -1347,6 +1424,11 @@ export default function DashboardClientView({
               <Plus className="w-3.5 h-3.5" /> Manage Inventory
             </Link>
           </div>
+
+          <MedicationReviewQueue
+            patientTelegramChatId={targetTelegramChatId || myTelegramChatId || ''}
+            userRole={userRole}
+          />
 
           <TodaysSchedule 
             events={events}

@@ -29,14 +29,14 @@ interface SettingsClientViewProps {
     role: 'PATIENT' | 'CAREGIVER';
     telegramChatId: string;
   };
-  linkedCaregiver: {
+  linkedCaregivers: Array<{
     id: number | string;
     caregiver_id: string;
     caregiver_name: string;
     caregiver_chat_id: string;
     connection_status?: string | null;
-    source?: 'connections' | 'legacy';
-  } | null;
+    source: 'connections' | 'legacy';
+  }>;
   caregiverRecord: {
     id: number;
     caregiver_id: string;
@@ -48,7 +48,7 @@ interface SettingsClientViewProps {
 
 export default function SettingsClientView({
   user,
-  linkedCaregiver: initialLinkedCaregiver,
+  linkedCaregivers: initialLinkedCaregivers = [],
   caregiverRecord: initialCaregiverRecord,
   linkedPatientName: initialLinkedPatientName,
 }: SettingsClientViewProps) {
@@ -57,7 +57,7 @@ export default function SettingsClientView({
   const { isElderly, toggleMode, viewMode, setViewMode } = useUiMode();
 
   // State management
-  const [linkedCaregiver, setLinkedCaregiver] = useState(initialLinkedCaregiver);
+  const [linkedCaregivers, setLinkedCaregivers] = useState(initialLinkedCaregivers);
   const [caregiverRecord, setCaregiverRecord] = useState(initialCaregiverRecord);
   const [linkedPatientName, setLinkedPatientName] = useState(initialLinkedPatientName);
 
@@ -209,14 +209,15 @@ export default function SettingsClientView({
         })
         .eq('caregiver_id', formattedId);
 
-      setLinkedCaregiver({
+      const newLinked = {
         id: newConn?.id || caregiver.id,
         caregiver_id: caregiver.caregiver_id,
         caregiver_name: caregiver.caregiver_name || 'Caregiver',
         caregiver_chat_id: caregiver.caregiver_chat_id || '',
         connection_status: 'PENDING',
-        source: 'connections',
-      });
+        source: 'connections' as const,
+      };
+      setLinkedCaregivers(prev => [newLinked, ...prev]);
       setSuccessMsg(`Connection request sent to ${caregiver.caregiver_name || 'Caregiver'}. Waiting for approval.`);
       setCgIdInput('');
       router.refresh();
@@ -229,8 +230,7 @@ export default function SettingsClientView({
   };
 
   // --- PATIENT: Unlink Caregiver (supports both caregiver_connections and legacy) ---
-  const handleUnlinkCaregiver = async () => {
-    if (!linkedCaregiver) return;
+  const handleUnlinkCaregiver = async (id: number | string, source: 'connections' | 'legacy') => {
     if (!confirm('Are you sure you want to disconnect from this caregiver?')) return;
 
     setErrorMsg(null);
@@ -238,24 +238,24 @@ export default function SettingsClientView({
     setProcessing(true);
 
     try {
-      if ((linkedCaregiver as any).source === 'connections') {
+      if (source === 'connections') {
         // New architecture: update caregiver_connections
         const { error } = await supabase
           .from('caregiver_connections')
           .update({ is_active: false, connection_status: 'REJECTED' })
-          .eq('id', linkedCaregiver.id);
+          .eq('id', id);
         if (error) throw error;
       } else {
         // Legacy: update caregiver_info
         const { error } = await supabase
           .from('caregiver_info')
           .update({ patient_telegram_id: null })
-          .eq('id', linkedCaregiver.id);
+          .eq('id', id);
         if (error) throw error;
       }
 
-      setLinkedCaregiver(null);
-      setSuccessMsg('Successfully disconnected from your caregiver.');
+      setLinkedCaregivers(prev => prev.filter(c => c.id !== id));
+      setSuccessMsg('Successfully disconnected from caregiver.');
       router.refresh();
     } catch (err: any) {
       console.error('[Settings] Unlink Caregiver Error:', err);
@@ -483,13 +483,6 @@ export default function SettingsClientView({
           </div>
         </div>
         <div className="flex flex-wrap gap-2.5 pt-2">
-          <span className={`inline-flex items-center px-3 py-1 rounded-full font-black border uppercase tracking-wider ${
-            user.role === 'CAREGIVER' 
-              ? 'bg-success/10 text-success border-success/30' 
-              : 'bg-primary/10 text-primary border-primary/30'
-          } ${isElderly ? 'text-base' : 'text-[10px]'}`}>
-            Role: {user.role}
-          </span>
           {user.telegramChatId && !user.telegramChatId.startsWith('WEB-') ? (
             <span className={`inline-flex items-center px-3 py-1 rounded-full font-bold bg-muted text-muted-foreground border border-border ${
               isElderly ? 'text-base' : 'text-[10px]'
@@ -550,266 +543,280 @@ export default function SettingsClientView({
         </div>
       </div>
 
-      {/* SECTION 3: CAREGIVER / PATIENT OPTION (THE CORE REQUEST) */}
-      <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4">
+      {/* SECTION 3: UNIFIED CAREGIVER & CLIENT MANAGEMENT */}
+      <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-6">
         <div className="space-y-1">
           <h3 className={`font-black text-foreground flex items-center gap-1.5 ${isElderly ? 'text-2xl' : 'text-sm'}`}>
             <Stethoscope className="w-5 h-5 text-primary" />
-            Caregiver Management
+            Care Circle Management
           </h3>
           <p className={`text-muted-foreground ${isElderly ? 'text-lg' : 'text-xs'}`}>
-            {user.role === 'PATIENT' 
-              ? 'Connect with a health caregiver to oversee your medication progress.' 
-              : 'Monitor medication events and receive instant notifications for patients.'}
+            Connect with a health caregiver to support your medication progress, or register as a caregiver to support others.
           </p>
         </div>
 
-        {/* PATIENT INTERFACE FOR CAREGIVER */}
-        {user.role === 'PATIENT' && (
-          <div className="space-y-4">
-            {linkedCaregiver ? (
-              linkedCaregiver.connection_status === 'ACCEPTED' ? (
-                <div className="border border-border rounded-2xl p-4 bg-success/5 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-success/15 text-success flex items-center justify-center">
-                        <Stethoscope className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <span className={`block font-black text-foreground ${isElderly ? 'text-xl' : 'text-sm'}`}>
-                          {linkedCaregiver.caregiver_name}
-                        </span>
-                        <span className={`block text-muted-foreground font-semibold ${isElderly ? 'text-base' : 'text-[11px]'}`}>
-                          Caregiver ID: {linkedCaregiver.caregiver_id}
-                        </span>
-                      </div>
-                    </div>
-                    <Link
-                      href="/care-circle/manage"
-                      className="px-3.5 py-2 text-xs font-bold text-primary bg-primary/10 hover:bg-primary/20 rounded-xl cursor-pointer transition-all flex items-center gap-1 shrink-0"
-                    >
-                      Manage Shared Trust
-                    </Link>
-                  </div>
-                  <div className={`p-3 bg-white border border-border rounded-xl text-muted-foreground font-medium ${isElderly ? 'text-base' : 'text-[11px]'}`}>
-                    Connected! Your caregiver is now synced to your routine alerts and can review your compliance ring.
-                  </div>
-                </div>
-              ) : (
-                <div className="border border-warning/30 rounded-2xl p-4 bg-warning/5 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-warning/15 text-warning flex items-center justify-center">
-                        <Clock className="w-4 h-4 animate-pulse" />
-                      </div>
-                      <div>
-                        <span className={`block font-black text-foreground ${isElderly ? 'text-xl' : 'text-sm'}`}>
-                          {linkedCaregiver.caregiver_name}
-                        </span>
-                        <span className={`block text-muted-foreground font-semibold ${isElderly ? 'text-base' : 'text-[11px]'}`}>
-                          Connection Status: <b className="text-warning">PENDING APPROVAL</b>
-                        </span>
-                      </div>
-                    </div>
-                    <button
-                      onClick={handleUnlinkCaregiver}
-                      disabled={processing}
-                      className="px-3 py-1.5 text-xs font-bold text-danger bg-danger/10 hover:bg-danger/20 rounded-lg cursor-pointer transition-all disabled:opacity-50 shrink-0"
-                      title="Cancel Request"
-                    >
-                      Cancel Request
-                    </button>
-                  </div>
-                  <div className={`p-3 bg-white border border-border rounded-xl text-muted-foreground font-medium ${isElderly ? 'text-base' : 'text-[11px]'}`}>
-                    Waiting for your caregiver to accept the link request. You can ask them to check their dashboard or settings page to approve.
-                  </div>
-                </div>
-              )
-            ) : (
-              <form onSubmit={handleLinkCaregiver} className="space-y-4">
-                <div className="bg-muted/10 border border-border/80 rounded-2xl p-4 space-y-3">
-                  <p className={`text-muted-foreground font-semibold ${isElderly ? 'text-lg' : 'text-xs'}`}>
-                    You are currently not connected to a caregiver. Ask your caregiver for their <b>Caregiver ID</b> and enter it below:
-                  </p>
-                  
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <input
-                      type="text"
-                      placeholder="CG123456"
-                      value={cgIdInput}
-                      onChange={(e) => setCgIdInput(e.target.value)}
-                      disabled={processing}
-                      maxLength={8}
-                      className={`flex-1 bg-white border border-border rounded-xl focus:outline-none focus:border-primary font-mono uppercase font-black text-center ${
-                        isElderly ? 'h-16 px-4 text-2xl border-2' : 'h-10 px-3 text-sm'
-                      }`}
-                    />
-                    <button
-                      type="submit"
-                      disabled={processing || !cgIdInput.trim()}
-                      className={`font-black rounded-xl bg-primary text-primary-foreground hover:bg-primary/95 transition-all shadow-sm cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 ${
-                        isElderly ? 'h-16 px-8 text-xl' : 'h-10 px-5 text-xs'
-                      }`}
-                    >
-                      <Link2 className="w-4 h-4" />
-                      <span>{processing ? 'Linking...' : 'Link Caregiver'}</span>
-                    </button>
-                  </div>
-                </div>
-              </form>
-            )}
-          </div>
-        )}
-
-        {/* CAREGIVER INTERFACE */}
-        {user.role === 'CAREGIVER' && (
-          <div className="space-y-4">
-            {caregiverRecord ? (
-              <div className="space-y-4">
-                {/* ID Display Box */}
-                <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div>
-                    <span className={`block text-muted-foreground font-semibold ${isElderly ? 'text-lg' : 'text-xs'}`}>
-                      Your Caregiver ID
-                    </span>
-                    <span className={`block font-black text-primary font-mono tracking-wide mt-1 ${isElderly ? 'text-3xl' : 'text-xl'}`}>
-                      {caregiverRecord.caregiver_id}
-                    </span>
-                  </div>
-
-                  <button
-                    onClick={handleCopyId}
-                    type="button"
-                    className={`flex items-center gap-1.5 font-bold rounded-xl border border-primary/30 bg-white hover:bg-primary/5 text-primary transition-all cursor-pointer ${
-                      isElderly ? 'h-14 px-6 text-lg' : 'h-9 px-3.5 text-xs'
-                    }`}
-                  >
-                    {copied ? (
-                      <>
-                        <Check className="w-4 h-4" />
-                        <span>Copied!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-4 h-4" />
-                        <span>Copy ID</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                {/* Patient Connection Status */}
-                {caregiverRecord.patient_telegram_id ? (
-                  caregiverRecord.connection_status === 'ACCEPTED' ? (
-                    <div className="border border-border rounded-2xl p-4 bg-success/5 space-y-4">
-                      <div className="flex items-center justify-between border-b border-border/40 pb-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-success/15 text-success flex items-center justify-center">
-                            <User className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <span className={`block font-black text-foreground ${isElderly ? 'text-xl' : 'text-sm'}`}>
-                              Connected Patient: {linkedPatientName || 'Your Patient'}
-                            </span>
-                            <span className={`block text-muted-foreground font-semibold ${isElderly ? 'text-base' : 'text-[11px]'}`}>
-                              Telegram Chat ID: {caregiverRecord.patient_telegram_id}
-                            </span>
-                          </div>
+        {/* INCOMING SUPPORT: PATIENT ROLE FLOW */}
+        <div className="space-y-6 border-b border-border/40 pb-6">
+          <h4 className="text-xs font-black text-foreground uppercase tracking-wider">People Who Care For Me</h4>
+          {/* List of Connected Caregivers */}
+          {linkedCaregivers.length > 0 && (
+            <div className="space-y-4">
+              {linkedCaregivers.map((cg) => (
+                cg.connection_status === 'ACCEPTED' ? (
+                  <div key={cg.id} className="border border-border rounded-2xl p-4 bg-success/5 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-success/15 text-success flex items-center justify-center">
+                          <Stethoscope className="w-4 h-4" />
                         </div>
+                        <div>
+                          <span className={`block font-black text-foreground ${isElderly ? 'text-xl' : 'text-sm'}`}>
+                            {cg.caregiver_name}
+                          </span>
+                          <span className={`block text-muted-foreground font-semibold ${isElderly ? 'text-base' : 'text-[11px]'}`}>
+                            Caregiver ID: {cg.caregiver_id || 'N/A'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href="/care-circle/manage"
+                          className="px-3.5 py-2 text-xs font-bold text-primary bg-primary/10 hover:bg-primary/20 rounded-xl cursor-pointer transition-all flex items-center gap-1 shrink-0"
+                        >
+                          Manage Shared Trust
+                        </Link>
                         <button
-                          onClick={handleUnlinkPatient}
+                          onClick={() => handleUnlinkCaregiver(cg.id, cg.source || 'connections')}
                           disabled={processing}
-                          className="p-2.5 text-danger bg-danger/10 hover:bg-danger/20 rounded-xl cursor-pointer transition-all disabled:opacity-50 shrink-0"
-                          title="Disconnect Patient"
+                          className="p-2 text-danger bg-danger/10 hover:bg-danger/20 rounded-lg cursor-pointer transition-all disabled:opacity-50 shrink-0"
+                          title="Disconnect Caregiver"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
-
+                    </div>
+                    <div className={`p-3 bg-white border border-border rounded-xl text-muted-foreground font-medium ${isElderly ? 'text-base' : 'text-[11px]'}`}>
+                      Connected! Your caregiver is now synced to your routine alerts and can review your compliance ring.
+                    </div>
+                  </div>
+                ) : (
+                  <div key={cg.id} className="border border-warning/30 rounded-2xl p-4 bg-warning/5 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-warning/15 text-warning flex items-center justify-center">
+                          <Clock className="w-4 h-4 animate-pulse" />
+                        </div>
+                        <div>
+                          <span className={`block font-black text-foreground ${isElderly ? 'text-xl' : 'text-sm'}`}>
+                            {cg.caregiver_name}
+                          </span>
+                          <span className={`block text-muted-foreground font-semibold ${isElderly ? 'text-base' : 'text-[11px]'}`}>
+                            Connection Status: <b className="text-warning">PENDING APPROVAL</b>
+                          </span>
+                        </div>
+                      </div>
                       <button
-                        onClick={handleMonitorPatient}
+                        onClick={() => handleUnlinkCaregiver(cg.id, cg.source || 'connections')}
                         disabled={processing}
-                        className={`w-full font-black rounded-xl bg-primary text-primary-foreground hover:bg-primary/95 transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2 ${
+                        className="px-3 py-1.5 text-xs font-bold text-danger bg-danger/10 hover:bg-danger/20 rounded-lg cursor-pointer transition-all disabled:opacity-50 shrink-0"
+                        title="Cancel Request"
+                      >
+                        Cancel Request
+                      </button>
+                    </div>
+                    <div className={`p-3 bg-white border border-border rounded-xl text-muted-foreground font-medium ${isElderly ? 'text-base' : 'text-[11px]'}`}>
+                      Waiting for your caregiver to accept the link request. You can ask them to check their dashboard or settings page to approve.
+                    </div>
+                  </div>
+                )
+              ))}
+            </div>
+          )}
+
+          {/* Form to Link Additional Caregiver (Always Visible) */}
+          <form onSubmit={handleLinkCaregiver} className="space-y-4 pt-2">
+            <div className="bg-muted/10 border border-border/80 rounded-2xl p-4 space-y-3">
+              <p className={`text-muted-foreground font-semibold ${isElderly ? 'text-lg' : 'text-xs'}`}>
+                {linkedCaregivers.length > 0 
+                  ? 'Link another caregiver to support your routine. Enter their Caregiver ID below:' 
+                  : 'You are currently not connected to a caregiver. Ask your caregiver for their Caregiver ID and enter it below:'}
+              </p>
+              
+              <div className="flex flex-col sm:flex-row gap-3">
+                <input
+                  type="text"
+                  placeholder="CG123456"
+                  value={cgIdInput}
+                  onChange={(e) => setCgIdInput(e.target.value)}
+                  disabled={processing}
+                  maxLength={8}
+                  className={`flex-1 bg-white border border-border rounded-xl focus:outline-none focus:border-primary font-mono uppercase font-black text-center ${
+                    isElderly ? 'h-16 px-4 text-2xl border-2' : 'h-10 px-3 text-sm'
+                  }`}
+                />
+                <button
+                  type="submit"
+                  disabled={processing || !cgIdInput.trim()}
+                  className={`font-black rounded-xl bg-primary text-primary-foreground hover:bg-primary/95 transition-all shadow-sm cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 ${
+                    isElderly ? 'h-16 px-8 text-xl' : 'h-10 px-5 text-xs'
+                  }`}
+                >
+                  <Link2 className="w-4 h-4" />
+                  <span>{processing ? 'Linking...' : 'Link Caregiver'}</span>
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        {/* OUTGOING SUPPORT: CAREGIVER ROLE FLOW */}
+        <div className="space-y-4">
+          <h4 className="text-xs font-black text-foreground uppercase tracking-wider">People I Care For</h4>
+          {caregiverRecord ? (
+            <div className="space-y-4">
+              {/* ID Display Box */}
+              <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div>
+                  <span className={`block text-muted-foreground font-semibold ${isElderly ? 'text-lg' : 'text-xs'}`}>
+                    Your Caregiver ID (for others to link you)
+                  </span>
+                  <span className={`block font-black text-primary font-mono tracking-wide mt-1 ${isElderly ? 'text-3xl' : 'text-xl'}`}>
+                    {caregiverRecord.caregiver_id}
+                  </span>
+                </div>
+
+                <button
+                  onClick={handleCopyId}
+                  type="button"
+                  className={`flex items-center gap-1.5 font-bold rounded-xl border border-primary/30 bg-white hover:bg-primary/5 text-primary transition-all cursor-pointer ${
+                    isElderly ? 'h-14 px-6 text-lg' : 'h-9 px-3.5 text-xs'
+                  }`}
+                >
+                  {copied ? (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" />
+                      <span>Copy ID</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Patient Connection Status */}
+              {caregiverRecord.patient_telegram_id ? (
+                caregiverRecord.connection_status === 'ACCEPTED' ? (
+                  <div className="border border-border rounded-2xl p-4 bg-success/5 space-y-4">
+                    <div className="flex items-center justify-between border-b border-border/40 pb-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-success/15 text-success flex items-center justify-center">
+                          <User className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <span className={`block font-black text-foreground ${isElderly ? 'text-xl' : 'text-sm'}`}>
+                            Connected Patient: {linkedPatientName || 'Your Patient'}
+                          </span>
+                          <span className={`block text-muted-foreground font-semibold ${isElderly ? 'text-base' : 'text-[11px]'}`}>
+                            Telegram Chat ID: {caregiverRecord.patient_telegram_id}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleUnlinkPatient}
+                        disabled={processing}
+                        className="p-2.5 text-danger bg-danger/10 hover:bg-danger/20 rounded-xl cursor-pointer transition-all disabled:opacity-50 shrink-0"
+                        title="Disconnect Patient"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <button
+                      onClick={handleMonitorPatient}
+                      disabled={processing}
+                      className={`w-full font-black rounded-xl bg-primary text-primary-foreground hover:bg-primary/95 transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2 ${
+                        isElderly ? 'h-[72px] text-2xl' : 'h-10 text-xs'
+                      }`}
+                    >
+                      <Stethoscope className="w-4 h-4" />
+                      <span>Monitor Patient Dashboard</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="border border-warning/30 rounded-2xl p-4 bg-warning/5 space-y-4">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-border/40 pb-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-warning/15 text-warning flex items-center justify-center">
+                          <User className="w-4 h-4 animate-bounce" />
+                        </div>
+                        <div>
+                          <span className={`block font-black text-foreground ${isElderly ? 'text-xl' : 'text-sm'}`}>
+                            Pending Connection Request: {linkedPatientName || 'New Patient'}
+                          </span>
+                          <span className={`block text-muted-foreground font-semibold ${isElderly ? 'text-base' : 'text-[11px]'}`}>
+                            Telegram Chat ID: {caregiverRecord.patient_telegram_id}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <button
+                        onClick={handleAcceptPatient}
+                        disabled={processing}
+                        className={`flex-1 font-black rounded-xl bg-success text-success-foreground hover:bg-success/90 transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2 ${
                           isElderly ? 'h-[72px] text-2xl' : 'h-10 text-xs'
                         }`}
                       >
-                        <Stethoscope className="w-4 h-4" />
-                        <span>Monitor Patient Dashboard</span>
+                        <Check className="w-4 h-4" />
+                        <span>Accept Connection Request</span>
+                      </button>
+                      <button
+                        onClick={handleUnlinkPatient}
+                        disabled={processing}
+                        className={`font-bold rounded-xl bg-danger/10 text-danger hover:bg-danger/20 transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                          isElderly ? 'h-[72px] px-8 text-2xl' : 'h-10 px-5 text-xs'
+                        }`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span>Reject</span>
                       </button>
                     </div>
-                  ) : (
-                    <div className="border border-warning/30 rounded-2xl p-4 bg-warning/5 space-y-4">
-                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-border/40 pb-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-warning/15 text-warning flex items-center justify-center">
-                            <User className="w-4 h-4 animate-bounce" />
-                          </div>
-                          <div>
-                            <span className={`block font-black text-foreground ${isElderly ? 'text-xl' : 'text-sm'}`}>
-                              Pending Connection Request: {linkedPatientName || 'New Patient'}
-                            </span>
-                            <span className={`block text-muted-foreground font-semibold ${isElderly ? 'text-base' : 'text-[11px]'}`}>
-                              Telegram Chat ID: {caregiverRecord.patient_telegram_id}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col sm:flex-row gap-3">
-                        <button
-                          onClick={handleAcceptPatient}
-                          disabled={processing}
-                          className={`flex-1 font-black rounded-xl bg-success text-success-foreground hover:bg-success/90 transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2 ${
-                            isElderly ? 'h-[72px] text-2xl' : 'h-10 text-xs'
-                          }`}
-                        >
-                          <Check className="w-4 h-4" />
-                          <span>Accept Connection Request</span>
-                        </button>
-                        <button
-                          onClick={handleUnlinkPatient}
-                          disabled={processing}
-                          className={`font-bold rounded-xl bg-danger/10 text-danger hover:bg-danger/20 transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                            isElderly ? 'h-[72px] px-8 text-2xl' : 'h-10 px-5 text-xs'
-                          }`}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                          <span>Reject</span>
-                        </button>
-                      </div>
-                    </div>
-                  )
-                ) : (
-                  <div className="border border-border border-dashed rounded-2xl p-6 text-center space-y-2 bg-muted/10">
-                    <Smartphone className="w-8 h-8 text-muted-foreground mx-auto" />
-                    <p className={`font-black text-foreground ${isElderly ? 'text-xl' : 'text-sm'}`}>
-                      Waiting for patient connection...
-                    </p>
-                    <p className={`text-muted-foreground max-w-md mx-auto font-semibold ${isElderly ? 'text-lg' : 'text-xs'}`}>
-                      Provide your Caregiver ID (<b>{caregiverRecord.caregiver_id}</b>) to your patient. They can enter this ID in their profile settings or Telegram Bot to link up.
-                    </p>
                   </div>
-                )}
-              </div>
-            ) : (
-              <div className="bg-muted/10 border border-border rounded-2xl p-6 text-center space-y-4">
-                <p className={`text-muted-foreground max-w-md mx-auto font-semibold ${isElderly ? 'text-xl' : 'text-xs'}`}>
-                  You do not have a Caregiver ID generated yet. Generate your registration ID to link up with your patient.
-                </p>
-                <button
-                  onClick={handleBecomeCaregiver}
-                  disabled={processing}
-                  className={`font-black rounded-xl bg-primary text-primary-foreground hover:bg-primary/95 transition-all shadow-sm cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 mx-auto ${
-                    isElderly ? 'h-[72px] px-10 text-2xl' : 'h-10 px-6 text-xs'
-                  }`}
-                >
-                  <Sparkles className="w-4 h-4" />
-                  <span>{processing ? 'Registering...' : 'Register Caregiver ID'}</span>
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+                )
+              ) : (
+                <div className="border border-border border-dashed rounded-2xl p-6 text-center space-y-2 bg-muted/10">
+                  <Smartphone className="w-8 h-8 text-muted-foreground mx-auto" />
+                  <p className={`font-black text-foreground ${isElderly ? 'text-xl' : 'text-sm'}`}>
+                    Waiting for patient connection...
+                  </p>
+                  <p className={`text-muted-foreground max-w-md mx-auto font-semibold ${isElderly ? 'text-lg' : 'text-xs'}`}>
+                    Provide your Caregiver ID (<b>{caregiverRecord.caregiver_id}</b>) to your patient. They can enter this ID in their profile settings or Telegram Bot to link up.
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="bg-muted/10 border border-border rounded-2xl p-6 text-center space-y-4">
+              <p className={`text-muted-foreground max-w-md mx-auto font-semibold ${isElderly ? 'text-xl' : 'text-xs'}`}>
+                You do not have a Caregiver ID generated yet. Generate your registration ID to link up with your patient.
+              </p>
+              <button
+                onClick={handleBecomeCaregiver}
+                disabled={processing}
+                className={`font-black rounded-xl bg-primary text-primary-foreground hover:bg-primary/95 transition-all shadow-sm cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 mx-auto ${
+                  isElderly ? 'h-[72px] px-10 text-2xl' : 'h-10 px-6 text-xs'
+                }`}
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>{processing ? 'Registering...' : 'Register Caregiver ID'}</span>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* SECTION 4: SESSION CONTROLS */}
