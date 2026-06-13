@@ -11,6 +11,7 @@ import { registerPush } from '@/lib/push/register-push';
 import dynamic from 'next/dynamic';
 import { resolveReminderEvent } from '@/lib/reminder-events';
 import { PremiumToast } from '@/components/ui/premium-toast';
+import moment from 'moment-timezone';
 
 const AdherenceChart = dynamic(() => import('@/components/dashboard/adherence-chart'), {
   ssr: false,
@@ -368,51 +369,75 @@ export default function DashboardClientView({
   const supabase = createClient();
   const router = useRouter();
 
-  // Generate virtual events and filter database events to user's local day client-side
+  // Generate virtual events and filter database events to the day client-side.
+  // Timezone-aware: virtual events are built in each medication's own timezone (e.g.
+  // Asia/Kolkata) rather than the browser's local timezone. This keeps the generated
+  // scheduled_for aligned with the medication's registered reminder_times, so the
+  // resolve_reminder_event RPC (which formats AT TIME ZONE med.timezone) no longer
+  // throws INVALID_SCHEDULED_TIME when the browser is in a different zone (e.g. UTC).
   useEffect(() => {
     const now = new Date();
-    
-    // Start/end of local day
-    const clientStartOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    const clientEndOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
 
-    // Filter database events to the client's local day
+    // Reference timezone for the "today" window: first medication's tz, else browser guess.
+    const refTz =
+      (medications && medications.length > 0 && medications[0]?.timezone) ||
+      moment.tz.guess();
+
+    const refToday = moment().tz(refTz);
+    const startOfToday = refToday.clone().startOf('day');
+    const endOfToday = refToday.clone().endOf('day');
+
+    // Filter database events to the reference timezone's day boundaries
     const dbEventsToday = todayEvents.filter((e) => {
-      const eTime = new Date(e.scheduled_for).getTime();
-      return eTime >= clientStartOfToday && eTime <= clientEndOfToday;
+      const m = moment(e.scheduled_for);
+      return m.isSameOrAfter(startOfToday) && m.isSameOrBefore(endOfToday);
     });
 
     const generatedEvents: ReminderEvent[] = [...dbEventsToday];
 
     if (medications && medications.length > 0) {
       medications.forEach((med) => {
+        const medTz = med.timezone || refTz;
+        const localToday = moment().tz(medTz);
         const times = (med.reminder_times || []) as string[];
         times.forEach((timeStr) => {
           const [hours, minutes] = timeStr.split(':').map(Number);
-          
-          // Construct local date/time in client's local timezone
-          const reminderDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
-          
-          // Check if database event already covers this medication scheduled at this local time today
+
+          // Build the dose moment at this wall-clock time in the medication's timezone
+          const reminderMoment = moment.tz(
+            {
+              year: localToday.year(),
+              month: localToday.month(),
+              day: localToday.date(),
+              hour: hours,
+              minute: minutes,
+              second: 0,
+              millisecond: 0,
+            },
+            medTz
+          );
+
+          // Check if a database event already covers this med at this time today,
+          // comparing hours/minutes in the medication's timezone (not browser local)
           const eventExists = dbEventsToday.some((e) => {
-            const eDate = new Date(e.scheduled_for);
+            const em = moment(e.scheduled_for).tz(medTz);
             return (
               e.medication_id === med.id &&
-              eDate.getHours() === hours &&
-              eDate.getMinutes() === minutes
+              em.hours() === hours &&
+              em.minutes() === minutes
             );
           });
 
           if (!eventExists) {
             const virtualId = -(med.id * 1000 + hours * 60 + minutes);
             // 10-minute grace period for virtual events to become MISSED
-            const isPast = reminderDate.getTime() < (now.getTime() - 10 * 60 * 1000);
-            
+            const isPast = reminderMoment.valueOf() < now.getTime() - 10 * 60 * 1000;
+
             generatedEvents.push({
               id: virtualId,
               medication_id: med.id,
               telegram_id: targetTelegramChatId || myTelegramChatId || '',
-              scheduled_for: reminderDate.toISOString(),
+              scheduled_for: reminderMoment.toISOString(),
               reminder_status: isPast ? 'MISSED' : 'FUTURE_SCHEDULED',
               snooze_count: 0,
               medications: {
@@ -427,7 +452,7 @@ export default function DashboardClientView({
           }
         });
       });
-      
+
       // Sort chronologically
       generatedEvents.sort((a, b) => new Date(a.scheduled_for).getTime() - new Date(b.scheduled_for).getTime());
     }

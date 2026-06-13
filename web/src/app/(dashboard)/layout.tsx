@@ -39,6 +39,7 @@ export default async function DashboardLayout({
       <DashboardMainLayout 
         patientName={patientName}
         patientPhone={patientPhone}
+        patientChatId={targetChatId}
       >
         {children}
       </DashboardMainLayout>

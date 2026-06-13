@@ -38,19 +38,27 @@ interface SettingsClientViewProps {
     source: 'connections' | 'legacy';
   }>;
   caregiverRecord: {
-    id: number;
+    id: number | string;
     caregiver_id: string;
+    caregiver_chat_id?: string | null;
+    is_active?: boolean | null;
+  } | null;
+  // Many-to-many: every patient this caregiver is linked to (PENDING or ACCEPTED)
+  linkedPatients: Array<{
+    id: number | string;
+    patient_profile_id: string | null;
+    patient_name: string;
     patient_telegram_id: string | null;
     connection_status?: string | null;
-  } | null;
-  linkedPatientName: string | null;
+    source: 'connections' | 'legacy';
+  }>;
 }
 
 export default function SettingsClientView({
   user,
   linkedCaregivers: initialLinkedCaregivers = [],
   caregiverRecord: initialCaregiverRecord,
-  linkedPatientName: initialLinkedPatientName,
+  linkedPatients: initialLinkedPatients = [],
 }: SettingsClientViewProps) {
   const router = useRouter();
   const supabase = createClient();
@@ -59,7 +67,7 @@ export default function SettingsClientView({
   // State management
   const [linkedCaregivers, setLinkedCaregivers] = useState(initialLinkedCaregivers);
   const [caregiverRecord, setCaregiverRecord] = useState(initialCaregiverRecord);
-  const [linkedPatientName, setLinkedPatientName] = useState(initialLinkedPatientName);
+  const [linkedPatients, setLinkedPatients] = useState(initialLinkedPatients);
 
   const [cgIdInput, setCgIdInput] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -153,16 +161,8 @@ export default function SettingsClientView({
 
           if (reactivateErr) throw reactivateErr;
 
-          // Insert notification for the caregiver
-          await supabase
-            .from('notifications')
-            .insert({
-              user_id: cgProfile.id,
-              title: 'Care Circle Request',
-              message: `${user.fullName} would like you to support their medication routine.`,
-              type: 'CARE_CIRCLE_ACCESS_REQUEST',
-              connection_id: existingConn.id,
-            });
+          // The caregiver_connections AFTER UPDATE trigger (security definer) emits the
+          // CARE_CIRCLE_ACCESS_REQUEST notification on reactivation — no client-side insert.
 
           setSuccessMsg(`Connection request re-sent to ${caregiver.caregiver_name || 'Caregiver'}. Waiting for approval.`);
         }
@@ -187,27 +187,12 @@ export default function SettingsClientView({
 
       if (connErr) throw connErr;
 
-      // 5. Insert CARE_CIRCLE_ACCESS_REQUEST notification for the caregiver
-      if (newConn) {
-        await supabase
-          .from('notifications')
-          .insert({
-            user_id: cgProfile.id,
-            title: 'Care Circle Request',
-            message: `${user.fullName} would like you to support their medication routine.`,
-            type: 'CARE_CIRCLE_ACCESS_REQUEST',
-            connection_id: newConn.id,
-          });
-      }
-
-      // 6. Also update legacy caregiver_info for backward compatibility
-      await supabase
-        .from('caregiver_info')
-        .update({ 
-          patient_telegram_id: user.telegramChatId,
-          connection_status: 'PENDING'
-        })
-        .eq('caregiver_id', formattedId);
+      // 5. The caregiver_connections AFTER INSERT trigger (security definer) creates the
+      // CARE_CIRCLE_ACCESS_REQUEST notification for the caregiver, bypassing RLS. We no
+      // longer insert it client-side (the patient's auth.uid() cannot write the caregiver's row).
+      // We also no longer write caregiver_info.patient_telegram_id — that single-column legacy
+      // write is what hijacked a shared caregiver between patients. Relationships live purely
+      // in caregiver_connections (surfaced via the active_caregiver_links compatibility view).
 
       const newLinked = {
         id: newConn?.id || caregiver.id,
@@ -239,7 +224,10 @@ export default function SettingsClientView({
 
     try {
       if (source === 'connections') {
-        // New architecture: update caregiver_connections
+        // New architecture: update caregiver_connections. We deliberately do NOT touch
+        // is_primary here — the DB validation trigger forbids caregivers from changing it,
+        // and the AFTER-UPDATE reassign trigger promotes a replacement primary once this
+        // row leaves the active-accepted set.
         const { error } = await supabase
           .from('caregiver_connections')
           .update({ is_active: false, connection_status: 'REJECTED' })
@@ -324,14 +312,16 @@ export default function SettingsClientView({
     }
   };
 
-  // --- CAREGIVER: Unlink Patient / Reject Connection Request ---
-  const handleUnlinkPatient = async () => {
-    if (!caregiverRecord) return;
-    const isPending = caregiverRecord.connection_status === 'PENDING';
-    const confirmMessage = isPending 
-      ? 'Are you sure you want to reject this patient connection request?' 
-      : 'Are you sure you want to disconnect from this patient?';
-    
+  type LinkedPatient = SettingsClientViewProps['linkedPatients'][number];
+
+  // --- CAREGIVER: Unlink Patient / Reject a SPECIFIC Connection Request ---
+  // Filters by the individual connection id so we never touch sibling patients (no "unlink-all").
+  const handleUnlinkPatient = async (patient: LinkedPatient) => {
+    const isPending = patient.connection_status === 'PENDING';
+    const confirmMessage = isPending
+      ? `Reject the connection request from ${patient.patient_name}?`
+      : `Disconnect from ${patient.patient_name}?`;
+
     if (!confirm(confirmMessage)) return;
 
     setErrorMsg(null);
@@ -339,23 +329,26 @@ export default function SettingsClientView({
     setProcessing(true);
 
     try {
-      const { error } = await supabase
-        .from('caregiver_info')
-        .update({ 
-          patient_telegram_id: null,
-          connection_status: null 
-        })
-        .eq('id', caregiverRecord.id);
+      if (patient.source === 'connections') {
+        // Revoke this one relationship. We do NOT touch is_primary (the DB validation trigger
+        // forbids caregivers from changing it). The AFTER-UPDATE triggers emit the revoke
+        // notification and promote a replacement primary once this row is deactivated.
+        const { error } = await supabase
+          .from('caregiver_connections')
+          .update({ connection_status: 'REJECTED', is_active: false })
+          .eq('id', patient.id);
+        if (error) throw error;
+      } else {
+        // Legacy row: clear the single caregiver_info link for this record only.
+        const { error } = await supabase
+          .from('caregiver_info')
+          .update({ patient_telegram_id: null, connection_status: null })
+          .eq('id', patient.id);
+        if (error) throw error;
+      }
 
-      if (error) throw error;
-
-      setCaregiverRecord({
-        ...caregiverRecord,
-        patient_telegram_id: null,
-        connection_status: null
-      });
-      setLinkedPatientName(null);
-      setSuccessMsg(isPending ? 'Rejected patient connection request.' : 'Successfully disconnected from your patient.');
+      setLinkedPatients(prev => prev.filter(p => p.id !== patient.id));
+      setSuccessMsg(isPending ? 'Rejected patient connection request.' : `Disconnected from ${patient.patient_name}.`);
       router.refresh();
     } catch (err: any) {
       console.error('[Settings] Unlink Patient Error:', err);
@@ -365,40 +358,34 @@ export default function SettingsClientView({
     }
   };
 
-  // --- CAREGIVER: Accept Patient Connection Request ---
-  const handleAcceptPatient = async () => {
-    if (!caregiverRecord) return;
-
+  // --- CAREGIVER: Accept a SPECIFIC Patient Connection Request ---
+  // Filters by the individual connection id — fixes the "accept-all" glitch where every
+  // pending request flipped to ACCEPTED at once.
+  const handleAcceptPatient = async (patient: LinkedPatient) => {
     setErrorMsg(null);
     setSuccessMsg(null);
     setProcessing(true);
 
     try {
-      // Update legacy caregiver_info
-      const { error } = await supabase
-        .from('caregiver_info')
-        .update({ connection_status: 'ACCEPTED' })
-        .eq('id', caregiverRecord.id);
-
-      if (error) throw error;
-
-      // Also update caregiver_connections if a matching record exists
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (authUser) {
-        await supabase
+      if (patient.source === 'connections') {
+        const { error } = await supabase
           .from('caregiver_connections')
           .update({ connection_status: 'ACCEPTED' })
-          .eq('caregiver_profile_id', authUser.id)
-          .eq('connection_status', 'PENDING')
-          .eq('is_active', true);
+          .eq('id', patient.id);
+        if (error) throw error;
+      } else {
+        // Legacy fallback: accept the single caregiver_info row.
+        const { error } = await supabase
+          .from('caregiver_info')
+          .update({ connection_status: 'ACCEPTED' })
+          .eq('id', patient.id);
+        if (error) throw error;
       }
 
-      setCaregiverRecord({
-        ...caregiverRecord,
-        connection_status: 'ACCEPTED'
-      });
-      
-      setSuccessMsg('Successfully accepted connection request! You are now linked.');
+      setLinkedPatients(prev =>
+        prev.map(p => (p.id === patient.id ? { ...p, connection_status: 'ACCEPTED' } : p))
+      );
+      setSuccessMsg(`Accepted connection request from ${patient.patient_name}. You are now linked.`);
       router.refresh();
     } catch (err: any) {
       console.error('[Settings] Accept Patient Error:', err);
@@ -408,8 +395,8 @@ export default function SettingsClientView({
     }
   };
 
-  const handleMonitorPatient = async () => {
-    if (!caregiverRecord?.patient_telegram_id) return;
+  const handleMonitorPatient = async (patient: LinkedPatient) => {
+    if (!patient.patient_telegram_id) return;
     setProcessing(true);
     try {
       // Compliance logging
@@ -418,17 +405,19 @@ export default function SettingsClientView({
         .insert([{
           user_id: user.id,
           action: 'Entered Monitoring Mode',
-          details: { 
-            patient_name: linkedPatientName || 'Your Patient',
-            patient_chat_id: caregiverRecord.patient_telegram_id
+          details: {
+            patient_name: patient.patient_name || 'Your Patient',
+            patient_chat_id: patient.patient_telegram_id
           }
         }]);
     } catch (err) {
       console.error('[Settings] Compliance audit log error:', err);
     } finally {
+      document.cookie = `monitored-patient-id=${patient.patient_telegram_id}; path=/; max-age=31536000; SameSite=Lax`;
       setViewMode('PATIENT_MONITOR');
       setProcessing(false);
       router.push('/dashboard');
+      router.refresh();
     }
   };
 
@@ -706,87 +695,91 @@ export default function SettingsClientView({
                 </button>
               </div>
 
-              {/* Patient Connection Status */}
-              {caregiverRecord.patient_telegram_id ? (
-                caregiverRecord.connection_status === 'ACCEPTED' ? (
-                  <div className="border border-border rounded-2xl p-4 bg-success/5 space-y-4">
-                    <div className="flex items-center justify-between border-b border-border/40 pb-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-success/15 text-success flex items-center justify-center">
-                          <User className="w-4 h-4" />
+              {/* Patient Connections (many-to-many): one card per linked patient */}
+              {linkedPatients.length > 0 ? (
+                <div className="space-y-4">
+                  {linkedPatients.map((patient) => (
+                    patient.connection_status === 'ACCEPTED' ? (
+                      <div key={patient.id} className="border border-border rounded-2xl p-4 bg-success/5 space-y-4">
+                        <div className="flex items-center justify-between border-b border-border/40 pb-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-success/15 text-success flex items-center justify-center">
+                              <User className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <span className={`block font-black text-foreground ${isElderly ? 'text-xl' : 'text-sm'}`}>
+                                Connected Patient: {patient.patient_name || 'Your Patient'}
+                              </span>
+                              <span className={`block text-muted-foreground font-semibold ${isElderly ? 'text-base' : 'text-[11px]'}`}>
+                                Telegram Chat ID: {patient.patient_telegram_id || 'N/A'}
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleUnlinkPatient(patient)}
+                            disabled={processing}
+                            className="p-2.5 text-danger bg-danger/10 hover:bg-danger/20 rounded-xl cursor-pointer transition-all disabled:opacity-50 shrink-0"
+                            title="Disconnect Patient"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
-                        <div>
-                          <span className={`block font-black text-foreground ${isElderly ? 'text-xl' : 'text-sm'}`}>
-                            Connected Patient: {linkedPatientName || 'Your Patient'}
-                          </span>
-                          <span className={`block text-muted-foreground font-semibold ${isElderly ? 'text-base' : 'text-[11px]'}`}>
-                            Telegram Chat ID: {caregiverRecord.patient_telegram_id}
-                          </span>
+
+                        <button
+                          onClick={() => handleMonitorPatient(patient)}
+                          disabled={processing || !patient.patient_telegram_id}
+                          className={`w-full font-black rounded-xl bg-primary text-primary-foreground hover:bg-primary/95 transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 ${
+                            isElderly ? 'h-[72px] text-2xl' : 'h-10 text-xs'
+                          }`}
+                        >
+                          <Stethoscope className="w-4 h-4" />
+                          <span>Monitor Patient Dashboard</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <div key={patient.id} className="border border-warning/30 rounded-2xl p-4 bg-warning/5 space-y-4">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-border/40 pb-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-warning/15 text-warning flex items-center justify-center">
+                              <User className="w-4 h-4 animate-bounce" />
+                            </div>
+                            <div>
+                              <span className={`block font-black text-foreground ${isElderly ? 'text-xl' : 'text-sm'}`}>
+                                Pending Connection Request: {patient.patient_name || 'New Patient'}
+                              </span>
+                              <span className={`block text-muted-foreground font-semibold ${isElderly ? 'text-base' : 'text-[11px]'}`}>
+                                Telegram Chat ID: {patient.patient_telegram_id || 'N/A'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row gap-3">
+                          <button
+                            onClick={() => handleAcceptPatient(patient)}
+                            disabled={processing}
+                            className={`flex-1 font-black rounded-xl bg-success text-success-foreground hover:bg-success/90 transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2 ${
+                              isElderly ? 'h-[72px] text-2xl' : 'h-10 text-xs'
+                            }`}
+                          >
+                            <Check className="w-4 h-4" />
+                            <span>Accept Connection Request</span>
+                          </button>
+                          <button
+                            onClick={() => handleUnlinkPatient(patient)}
+                            disabled={processing}
+                            className={`font-bold rounded-xl bg-danger/10 text-danger hover:bg-danger/20 transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                              isElderly ? 'h-[72px] px-8 text-2xl' : 'h-10 px-5 text-xs'
+                            }`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            <span>Reject</span>
+                          </button>
                         </div>
                       </div>
-                      <button
-                        onClick={handleUnlinkPatient}
-                        disabled={processing}
-                        className="p-2.5 text-danger bg-danger/10 hover:bg-danger/20 rounded-xl cursor-pointer transition-all disabled:opacity-50 shrink-0"
-                        title="Disconnect Patient"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-
-                    <button
-                      onClick={handleMonitorPatient}
-                      disabled={processing}
-                      className={`w-full font-black rounded-xl bg-primary text-primary-foreground hover:bg-primary/95 transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2 ${
-                        isElderly ? 'h-[72px] text-2xl' : 'h-10 text-xs'
-                      }`}
-                    >
-                      <Stethoscope className="w-4 h-4" />
-                      <span>Monitor Patient Dashboard</span>
-                    </button>
-                  </div>
-                ) : (
-                  <div className="border border-warning/30 rounded-2xl p-4 bg-warning/5 space-y-4">
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-border/40 pb-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-warning/15 text-warning flex items-center justify-center">
-                          <User className="w-4 h-4 animate-bounce" />
-                        </div>
-                        <div>
-                          <span className={`block font-black text-foreground ${isElderly ? 'text-xl' : 'text-sm'}`}>
-                            Pending Connection Request: {linkedPatientName || 'New Patient'}
-                          </span>
-                          <span className={`block text-muted-foreground font-semibold ${isElderly ? 'text-base' : 'text-[11px]'}`}>
-                            Telegram Chat ID: {caregiverRecord.patient_telegram_id}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row gap-3">
-                      <button
-                        onClick={handleAcceptPatient}
-                        disabled={processing}
-                        className={`flex-1 font-black rounded-xl bg-success text-success-foreground hover:bg-success/90 transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2 ${
-                          isElderly ? 'h-[72px] text-2xl' : 'h-10 text-xs'
-                        }`}
-                      >
-                        <Check className="w-4 h-4" />
-                        <span>Accept Connection Request</span>
-                      </button>
-                      <button
-                        onClick={handleUnlinkPatient}
-                        disabled={processing}
-                        className={`font-bold rounded-xl bg-danger/10 text-danger hover:bg-danger/20 transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                          isElderly ? 'h-[72px] px-8 text-2xl' : 'h-10 px-5 text-xs'
-                        }`}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        <span>Reject</span>
-                      </button>
-                    </div>
-                  </div>
-                )
+                    )
+                  ))}
+                </div>
               ) : (
                 <div className="border border-border border-dashed rounded-2xl p-6 text-center space-y-2 bg-muted/10">
                   <Smartphone className="w-8 h-8 text-muted-foreground mx-auto" />
@@ -794,7 +787,7 @@ export default function SettingsClientView({
                     Waiting for patient connection...
                   </p>
                   <p className={`text-muted-foreground max-w-md mx-auto font-semibold ${isElderly ? 'text-lg' : 'text-xs'}`}>
-                    Provide your Caregiver ID (<b>{caregiverRecord.caregiver_id}</b>) to your patient. They can enter this ID in their profile settings or Telegram Bot to link up.
+                    Provide your Caregiver ID (<b>{caregiverRecord.caregiver_id}</b>) to your patients. They can enter this ID in their profile settings or Telegram Bot to link up. You can support multiple patients at once.
                   </p>
                 </div>
               )}

@@ -90,40 +90,49 @@ export default async function SettingsPage() {
     }
   }
 
-  // Load outgoing caregiver details (where I am the caregiver)
+  // Outgoing patient connections (where I am the caregiver)
+  let linkedPatients: any[] = [];
+
   if (myTelegramChatId) {
-    const { data } = await supabase
+    // 1. Load caregiver ID registration record
+    const { data: cgInfo } = await supabase
       .from('caregiver_info')
-      .select('id, caregiver_id, patient_telegram_id, connection_status')
+      .select('id, caregiver_id, caregiver_chat_id, is_active')
       .eq('caregiver_chat_id', myTelegramChatId)
       .eq('is_active', true)
       .maybeSingle();
-    caregiverRecord = data;
+    caregiverRecord = cgInfo;
 
-    const { data: ccOutgoing } = await supabase
-      .from('caregiver_connections')
-      .select('id, patient_profile_id, connection_status, created_at')
-      .eq('caregiver_profile_id', user.id)
+    // 2. Load all active/pending patient connections via unified compatibility view
+    const { data: links } = await supabase
+      .from('active_caregiver_links')
+      .select('connection_id, patient_telegram_id, connection_status, is_migrated')
+      .eq('caregiver_chat_id', myTelegramChatId)
       .eq('is_active', true)
       .in('connection_status', ['PENDING', 'ACCEPTED'])
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .order('created_at', { ascending: false });
 
-    if (ccOutgoing) {
-      const { data: patientProf } = await supabase
+    if (links && links.length > 0) {
+      const patientChatIds = links.map(l => l.patient_telegram_id).filter(Boolean);
+      
+      const { data: patientProfiles } = await supabase
         .from('profiles')
-        .select('full_name')
-        .eq('id', ccOutgoing.patient_profile_id)
-        .single();
-      linkedPatientProfile = patientProf;
-    } else if (caregiverRecord && caregiverRecord.patient_telegram_id) {
-      const { data: patientProf } = await supabase
-        .from('profiles')
-        .select('full_name')
-        .eq('telegram_chat_id', caregiverRecord.patient_telegram_id)
-        .maybeSingle();
-      linkedPatientProfile = patientProf;
+        .select('id, full_name, telegram_chat_id')
+        .in('telegram_chat_id', patientChatIds);
+
+      const profileMap = new Map(patientProfiles?.map(p => [p.telegram_chat_id, p]) || []);
+
+      linkedPatients = links.map(link => {
+        const prof = profileMap.get(link.patient_telegram_id);
+        return {
+          id: link.connection_id,
+          patient_profile_id: prof?.id || null,
+          patient_name: prof?.full_name || 'Patient',
+          patient_telegram_id: link.patient_telegram_id,
+          connection_status: link.connection_status,
+          source: link.is_migrated ? ('connections' as const) : ('legacy' as const),
+        };
+      });
     }
   }
 
@@ -138,7 +147,7 @@ export default async function SettingsPage() {
       }}
       linkedCaregivers={linkedCaregivers}
       caregiverRecord={caregiverRecord}
-      linkedPatientName={linkedPatientProfile?.full_name || null}
+      linkedPatients={linkedPatients}
     />
   );
 }

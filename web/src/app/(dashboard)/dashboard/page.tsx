@@ -35,7 +35,7 @@ export default async function DashboardPage() {
   const [medsResult, eventsResult, logsResult, monthlyLogsResult] = await Promise.all([
     supabase
       .from('medications')
-      .select('id, drug_name, dosage, frequency, tablet_count, low_stock_alert_enabled, reminder_times, priority_level, unit_type, dosage_amount, medication_reason')
+      .select('id, drug_name, dosage, frequency, tablet_count, low_stock_alert_enabled, reminder_times, priority_level, unit_type, dosage_amount, medication_reason, timezone')
       .eq('telegram_id', targetChatId)
       .eq('active', true),
     supabase

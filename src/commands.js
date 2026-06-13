@@ -6,6 +6,17 @@ const { isValidTime, calculateNextReminder, escapeHTML, activeSnoozes } = requir
 
 const userStates = {};
 
+// Resolve a web profile UUID from a telegram chat id. Returns null for telegram-only users
+// who have not yet created a web account (those fall back to the legacy caregiver_info path).
+const resolveProfileId = async (telegramChatId) => {
+  const { data } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('telegram_chat_id', telegramChatId.toString())
+    .maybeSingle();
+  return data ? data.id : null;
+};
+
 const calculateStreak = (logs) => {
   if (!logs || logs.length === 0) return 0;
 
@@ -134,13 +145,13 @@ const handleCaregiver = async (chatId) => {
 
 const handleCaregiverPanel = async (chatId) => {
   try {
-    // Find active linkings
+    // Find all accepted patient links via the unified compatibility view (many-to-many)
     const { data: links, error: linkErr } = await supabase
-      .from('caregiver_info')
+      .from('active_caregiver_links')
       .select('*')
       .eq('caregiver_chat_id', chatId.toString())
       .eq('is_active', true)
-      .not('patient_telegram_id', 'is', null);
+      .eq('connection_status', 'ACCEPTED');
 
     if (linkErr) throw linkErr;
 
@@ -573,45 +584,100 @@ const initCommands = () => {
           }
 
           const caregiver = cgData[0];
+          const patientName = `${msg.from.first_name || ''} ${msg.from.last_name || ''}`.trim() || 'Your patient';
 
-          // Check if patient already has a linked caregiver
-          const { data: patientLinks } = await supabase
-            .from('caregiver_info')
-            .select('*')
-            .eq('patient_telegram_id', chatId.toString())
-            .eq('is_active', true);
+          // Resolve web profile UUIDs for the many-to-many connection model
+          const patientProfileId = await resolveProfileId(chatId);
+          const caregiverProfileId = caregiver.caregiver_chat_id
+            ? await resolveProfileId(caregiver.caregiver_chat_id)
+            : null;
 
-          if (patientLinks && patientLinks.length > 0) {
-            await bot.sendMessage(chatId, '❌ You already have a caregiver linked to your account. For Version 1, a patient can only have one caregiver.');
+          if (patientProfileId && caregiverProfileId) {
+            // New architecture: relationship lives in caregiver_connections. The AFTER
+            // INSERT/UPDATE security-definer trigger creates the in-app notification (RLS-safe).
+            // A patient may link multiple caregivers and a caregiver may serve multiple patients.
+            const { data: existingConn } = await supabase
+              .from('caregiver_connections')
+              .select('id, connection_status, is_active')
+              .eq('caregiver_profile_id', caregiverProfileId)
+              .eq('patient_profile_id', patientProfileId)
+              .maybeSingle();
+
+            if (existingConn && existingConn.is_active && existingConn.connection_status === 'ACCEPTED') {
+              await bot.sendMessage(chatId, `✅ You are already connected with <b>${escapeHTML(caregiver.caregiver_name)}</b>.`, { parse_mode: 'HTML' });
+              delete userStates[chatId];
+              return;
+            }
+            if (existingConn && existingConn.is_active && existingConn.connection_status === 'PENDING') {
+              await bot.sendMessage(chatId, `⏳ A request to <b>${escapeHTML(caregiver.caregiver_name)}</b> is already pending approval.`, { parse_mode: 'HTML' });
+              delete userStates[chatId];
+              return;
+            }
+
+            const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+            let connErr;
+            if (existingConn) {
+              // Reactivate a previously rejected/expired connection
+              ({ error: connErr } = await supabase
+                .from('caregiver_connections')
+                .update({ connection_status: 'PENDING', is_active: true, expires_at: expiresAt })
+                .eq('id', existingConn.id));
+            } else {
+              ({ error: connErr } = await supabase
+                .from('caregiver_connections')
+                .insert({
+                  caregiver_profile_id: caregiverProfileId,
+                  patient_profile_id: patientProfileId,
+                  connection_status: 'PENDING',
+                  is_active: true,
+                  expires_at: expiresAt,
+                }));
+            }
+
+            if (connErr) {
+              console.error('[Caregiver] Connection request error:', connErr);
+              await bot.sendMessage(chatId, '❌ Failed to send connection request. Please try again later.');
+              delete userStates[chatId];
+              return;
+            }
+
+            await bot.sendMessage(chatId, `⏳ Connection request sent to caregiver: <b>${escapeHTML(caregiver.caregiver_name)}</b>!\n\nThey have been notified and must approve the connection from their settings page before linking is complete.`, { parse_mode: 'HTML' });
+
+            // Courtesy Telegram ping (in addition to the in-app notification)
+            try {
+              await bot.sendMessage(caregiver.caregiver_chat_id, `🔔 <b>Caregiver Connection Request!</b>\n\nPatient <b>${escapeHTML(patientName)}</b> has requested to link with you as their caregiver.\n\nPlease go to your dashboard settings page to review and <b>Accept</b> this connection request.`, { parse_mode: 'HTML' });
+            } catch (notifyErr) {
+              console.error('[Caregiver] Failed to notify caregiver:', notifyErr);
+            }
+
             delete userStates[chatId];
             return;
           }
 
-          // Check if this ID is already used by another patient
-          if (caregiver.patient_telegram_id) {
-            await bot.sendMessage(chatId, '❌ This Caregiver ID has already been linked by another patient. Please ask your caregiver to generate a new ID.');
+          // Legacy fallback: one party has no web profile yet. Use caregiver_info.
+          // We no longer globally block a patient from having multiple caregivers, but
+          // a single legacy caregiver_info row can only carry one patient link.
+          if (caregiver.patient_telegram_id && caregiver.patient_telegram_id !== chatId.toString()) {
+            await bot.sendMessage(chatId, '❌ This Caregiver ID is currently linked to another patient and the caregiver has not yet set up a web account for multi-patient support. Please ask them to sign in on the web app.');
             delete userStates[chatId];
             return;
           }
 
-          // Update caregiver record to link patient and set status to PENDING
           const { error: linkErr } = await supabase
             .from('caregiver_info')
-            .update({ 
+            .update({
               patient_telegram_id: chatId.toString(),
               connection_status: 'PENDING'
             })
             .eq('caregiver_id', cgId);
 
           if (linkErr) {
-            console.error('[Caregiver] Linking error:', linkErr);
+            console.error('[Caregiver] Legacy linking error:', linkErr);
             await bot.sendMessage(chatId, '❌ Failed to link caregiver. Please try again later.');
           } else {
             await bot.sendMessage(chatId, `⏳ Connection request sent to caregiver: <b>${escapeHTML(caregiver.caregiver_name)}</b>!\n\nThey have been notified and must approve the connection from their settings page before linking is complete.`, { parse_mode: 'HTML' });
-            
-            // Notify the caregiver
+
             try {
-              const patientName = `${msg.from.first_name || ''} ${msg.from.last_name || ''}`.trim() || 'Your patient';
               await bot.sendMessage(caregiver.caregiver_chat_id, `🔔 <b>Caregiver Connection Request!</b>\n\nPatient <b>${escapeHTML(patientName)}</b> has requested to link with you as their caregiver.\n\nPlease go to your dashboard settings page to review and <b>Accept</b> this connection request.`, { parse_mode: 'HTML' });
             } catch (notifyErr) {
               console.error('[Caregiver] Failed to notify caregiver:', notifyErr);
@@ -890,7 +956,17 @@ const initCommands = () => {
 
         if (existingRecords && existingRecords.length > 0) {
           const caregiver = existingRecords[0];
-          const statusStr = caregiver.patient_telegram_id ? '✅ Patient Connected' : 'No patient linked yet';
+          // Count accepted patient links via the unified compatibility view (many-to-many)
+          const { data: patientLinks } = await supabase
+            .from('active_caregiver_links')
+            .select('connection_status')
+            .eq('caregiver_chat_id', chatId.toString())
+            .eq('is_active', true)
+            .eq('connection_status', 'ACCEPTED');
+          const count = patientLinks ? patientLinks.length : 0;
+          const statusStr = count > 0
+            ? `✅ ${count} patient${count !== 1 ? 's' : ''} connected`
+            : 'No patients linked yet';
           await bot.sendMessage(chatId, `Your Caregiver ID:\n<b>${escapeHTML(caregiver.caregiver_id)}</b>\n\nStatus:\n${escapeHTML(statusStr)}`, { parse_mode: 'HTML' });
         } else {
           await bot.sendMessage(chatId, '❌ You are not registered as a caregiver yet. Please select the **👨‍⚕ Become Caregiver** option to register first.');
@@ -899,19 +975,8 @@ const initCommands = () => {
       }
       if (data === CALLBACK_ACTIONS.CG_ADD) {
         await bot.answerCallbackQuery(query.id);
-        
-        // 1-to-1 checks: Check if patient already has a linked caregiver
-        const { data: patientLinks } = await supabase
-          .from('caregiver_info')
-          .select('*')
-          .eq('patient_telegram_id', chatId.toString())
-          .eq('is_active', true);
 
-        if (patientLinks && patientLinks.length > 0) {
-          await bot.sendMessage(chatId, '❌ You already have a caregiver linked to your account. For Version 1, a patient can only have one caregiver.');
-          return;
-        }
-
+        // Many-to-many: a patient may link multiple caregivers, so no global blocker here.
         userStates[chatId] = { step: 'waiting_for_cg_id' };
         await bot.sendMessage(chatId, '👨‍⚕ Please enter the Caregiver ID shared by your caregiver (e.g., CG483920):');
         return;

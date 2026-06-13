@@ -72,7 +72,7 @@ export const getCachedPatientProfile = cache(async (patientTelegramId: string) =
 });
 
 
-// Resolve full user context data in a single request cache (strictly user-centric for main dashboard)
+// Resolve full user context data in a single request cache (strictly user-centric for main dashboard, cookie-aware for caregiver monitoring)
 export const resolveUserData = cache(async () => {
   const user = await getCachedUser();
   if (!user) return null;
@@ -83,11 +83,29 @@ export const resolveUserData = cache(async () => {
   const userRole = profile.role as 'PATIENT' | 'CAREGIVER';
   const myTelegramChatId = profile.telegram_chat_id;
 
-  // Since Sprint 5.6B uses Care Circle Driven Navigation, the main dashboard 
-  // target is always the user's own profile space.
-  const targetChatId = myTelegramChatId;
-  const patientName = profile.full_name || '';
-  const patientPhone = profile.phone_number || '';
+  let targetChatId = myTelegramChatId;
+  let patientName = profile.full_name || '';
+  let patientPhone = profile.phone_number || '';
+
+  // Check if viewing a monitored patient
+  const cookieStore = await cookies();
+  const viewMode = cookieStore.get('view-mode')?.value;
+  const monitoredPatientId = cookieStore.get('monitored-patient-id')?.value;
+
+  if (viewMode === 'PATIENT_MONITOR' && monitoredPatientId && myTelegramChatId) {
+    // Verify connection exists and is accepted
+    const links = await getCachedCaregiverLinks(myTelegramChatId);
+    const connection = links.find(l => l.patient_telegram_id === monitoredPatientId && l.connection_status === 'ACCEPTED');
+    
+    if (connection) {
+      const patientProfile = await getCachedPatientProfile(monitoredPatientId);
+      if (patientProfile) {
+        targetChatId = monitoredPatientId;
+        patientName = patientProfile.full_name || '';
+        patientPhone = patientProfile.phone_number || '';
+      }
+    }
+  }
 
   return {
     user,
@@ -99,4 +117,5 @@ export const resolveUserData = cache(async () => {
     patientPhone,
   };
 });
+
 
