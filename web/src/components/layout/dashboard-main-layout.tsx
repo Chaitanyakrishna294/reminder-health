@@ -24,11 +24,13 @@ import {
 export default function DashboardMainLayout({ 
   children,
   patientName = '',
-  patientPhone = ''
+  patientPhone = '',
+  patientChatId = ''
 }: { 
   children: React.ReactNode;
   patientName?: string;
   patientPhone?: string;
+  patientChatId?: string | null;
 }) {
   const { isElderly, viewMode, setViewMode } = useUiMode();
   const pathname = usePathname();
@@ -37,6 +39,7 @@ export default function DashboardMainLayout({
   const [showCallPopover, setShowCallPopover] = useState(false);
   const [copied, setCopied] = useState(false);
   const [hasEscalation, setHasEscalation] = useState(false);
+  const [monitoredPatients, setMonitoredPatients] = useState<any[]>([]);
 
   // Smooth hash scroll listener for Next.js routing transitions
   React.useEffect(() => {
@@ -62,6 +65,23 @@ export default function DashboardMainLayout({
   // Query database for active escalations if viewing a monitored patient
   React.useEffect(() => {
     async function checkEscalations() {
+      if (viewMode === 'PATIENT_MONITOR' && patientChatId) {
+        const { data: events } = await supabase
+          .from('reminder_events')
+          .select('id')
+          .eq('telegram_id', patientChatId)
+          .eq('reminder_status', 'ESCALATED_TO_CG')
+          .limit(1);
+
+        setHasEscalation(!!events && events.length > 0);
+      }
+    }
+    checkEscalations();
+  }, [viewMode, pathname, supabase, patientChatId]);
+
+  // Load all accepted patient links for the caregiver selector dropdown
+  React.useEffect(() => {
+    async function loadPatients() {
       if (viewMode === 'PATIENT_MONITOR') {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
@@ -74,27 +94,31 @@ export default function DashboardMainLayout({
 
         if (!profile?.telegram_chat_id) return;
 
-        const { data: link } = await supabase
-          .from('caregiver_info')
-          .select('patient_telegram_id, connection_status')
+        const { data: links } = await supabase
+          .from('active_caregiver_links')
+          .select('*')
           .eq('caregiver_chat_id', profile.telegram_chat_id)
           .eq('is_active', true)
-          .single();
+          .eq('connection_status', 'ACCEPTED');
 
-        if (!link?.patient_telegram_id || link.connection_status !== 'ACCEPTED') return;
+        if (links) {
+          const patientChatIds = links.map(l => l.patient_telegram_id).filter(Boolean);
+          const { data: patientProfiles } = await supabase
+            .from('profiles')
+            .select('full_name, telegram_chat_id')
+            .in('telegram_chat_id', patientChatIds);
 
-        const { data: events } = await supabase
-          .from('reminder_events')
-          .select('id')
-          .eq('telegram_id', link.patient_telegram_id)
-          .eq('reminder_status', 'ESCALATED_TO_CG')
-          .limit(1);
+          const nameMap = new Map(patientProfiles?.map(p => [p.telegram_chat_id, p.full_name]) || []);
 
-        setHasEscalation(!!events && events.length > 0);
+          setMonitoredPatients(links.map(l => ({
+            telegram_chat_id: l.patient_telegram_id,
+            full_name: nameMap.get(l.patient_telegram_id) || l.patient_telegram_id || 'Patient'
+          })));
+        }
       }
     }
-    checkEscalations();
-  }, [viewMode, pathname, supabase]);
+    loadPatients();
+  }, [viewMode, supabase]);
 
   const isLinkActive = (path: string) => {
     if (path.includes('#')) return false;
@@ -262,12 +286,27 @@ export default function DashboardMainLayout({
                   <span>Monitoring: {patientName}</span>
                   <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                 </button>
-                <div className="hidden group-hover:block absolute left-0 top-9 w-48 bg-white border border-border rounded-xl shadow-lg z-50 p-1.5 animate-fade-in">
-                  <div className="flex items-center justify-between px-3 py-2 text-xs font-black text-foreground hover:bg-muted rounded-lg cursor-default">
-                    <span>{patientName}</span>
-                    <Check className="w-3.5 h-3.5 text-success shrink-0" />
+                {monitoredPatients.length > 0 && (
+                  <div className="hidden group-hover:block absolute left-0 top-9 w-48 bg-white border border-border rounded-xl shadow-lg z-50 p-1.5 animate-fade-in space-y-1">
+                    {monitoredPatients.map((p) => {
+                      const isActive = p.telegram_chat_id === patientChatId;
+                      return (
+                        <button
+                          key={p.telegram_chat_id}
+                          onClick={() => {
+                            if (isActive) return;
+                            document.cookie = `monitored-patient-id=${p.telegram_chat_id}; path=/; max-age=31536000; SameSite=Lax`;
+                            router.refresh();
+                          }}
+                          className="w-full flex items-center justify-between px-3 py-2 text-xs font-black text-foreground hover:bg-muted rounded-lg cursor-pointer text-left"
+                        >
+                          <span>{p.full_name}</span>
+                          {isActive && <Check className="w-3.5 h-3.5 text-success shrink-0" />}
+                        </button>
+                      );
+                    })}
                   </div>
-                </div>
+                )}
               </div>
             </div>
 
