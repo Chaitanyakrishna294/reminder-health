@@ -228,7 +228,15 @@ export default function TodaysSchedule({
   };
 
   const isPendingState = (status: string) => {
-    return ['PENDING_PATIENT', 'RETRYING_PATIENT', 'SNOOZED', 'ESCALATED_TO_CG', 'FUTURE_SCHEDULED'].includes(status);
+    return [
+      // Client-side virtual / legacy states
+      'PENDING_PATIENT', 'RETRYING_PATIENT', 'SNOOZED', 'ESCALATED_TO_CG', 'FUTURE_SCHEDULED',
+      // Real reminder_events statuses for a fired-but-unresolved dose, so each due dose keeps
+      // its own Take/Skip here (this is where the patient resolves doses individually —
+      // e.g. take 2 of 5 and skip the other 3).
+      'SENT', 'DISPLAYED', 'OPENED', 'GENTLE_REMINDER', 'REMINDED', 'RETRYING',
+      'ESCALATED', 'CAREGIVER_ACKNOWLEDGED',
+    ].includes(status);
   };
 
   if (isElderly) {
