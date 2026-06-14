@@ -534,14 +534,23 @@ export default function DashboardClientView({
   const todayTaken = events.filter(e => e.reminder_status === 'TAKEN' || e.reminder_status === 'RESOLVED_BY_CG').length;
   const todaySkipped = events.filter(e => e.reminder_status === 'SKIPPED').length;
   const todayMissed = events.filter(e => e.reminder_status === 'MISSED').length;
-  const activeEscalations = events.filter(e => e.reminder_status === 'ESCALATED_TO_CG').length;
+  const activeEscalations = events.filter(e => e.reminder_status === 'ESCALATED_TO_CG' || e.reminder_status === 'ESCALATED').length;
   const todayTotal = events.length;
 
   const isGravityState = activeEscalations > 0 || todayMissed > 0;
 
-  // Find next pending event
+  // Find next pending event. This must include the REAL reminder_events statuses the scheduler
+  // writes once a dose fires (SENT, GENTLE_REMINDER, ESCALATED, …) — otherwise a dose vanishes
+  // from "Next Medication" the moment its time arrives (when the virtual FUTURE_SCHEDULED event
+  // is replaced by a real SENT row). It should stay until the patient takes or skips it.
   const isPendingState = (status: string) => {
-    return ['PENDING_PATIENT', 'RETRYING_PATIENT', 'SNOOZED', 'ESCALATED_TO_CG', 'FUTURE_SCHEDULED'].includes(status);
+    return [
+      // Client-side virtual / legacy states
+      'PENDING_PATIENT', 'RETRYING_PATIENT', 'SNOOZED', 'ESCALATED_TO_CG', 'FUTURE_SCHEDULED',
+      // Real reminder_events statuses for a fired-but-unresolved dose
+      'SENT', 'DISPLAYED', 'OPENED', 'GENTLE_REMINDER', 'REMINDED', 'RETRYING',
+      'ESCALATED', 'CAREGIVER_ACKNOWLEDGED',
+    ].includes(status);
   };
   const nextPendingEvent = [...events]
     .filter(e => isPendingState(e.reminder_status))
@@ -588,6 +597,52 @@ export default function DashboardClientView({
       const message = err instanceof Error ? err.message : String(err);
       console.error('[Elderly Dashboard Action] Error:', message, err);
       showToast('Error', 'Failed to update event. Please try again.', 'error');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  // Doses that are due right now (pending and their scheduled time has arrived). When several
+  // land at the same / near time, the patient can confirm them together via "Take all" rather
+  // than one-by-one.
+  const dueNowEvents = [...events]
+    .filter(e => isPendingState(e.reminder_status) && new Date(e.scheduled_for).getTime() <= currentTime.getTime())
+    .sort((a, b) => new Date(a.scheduled_for).getTime() - new Date(b.scheduled_for).getTime());
+
+  const BATCH_SENTINEL = -99999;
+  const handleResolveAll = async (action: 'TAKEN' | 'SKIP') => {
+    if (updatingId !== null || dueNowEvents.length === 0) return;
+    setUpdatingId(BATCH_SENTINEL);
+    let ok = 0;
+    try {
+      for (const ev of dueNowEvents) {
+        try {
+          const resolved = await resolveReminderEvent({
+            supabase,
+            eventId: ev.id,
+            medicationId: ev.medication_id,
+            scheduledFor: ev.scheduled_for,
+            action,
+            actorRole: userRole,
+          });
+          setEvents((prev) =>
+            prev.map((e) =>
+              e.id === ev.id
+                ? { ...e, id: resolved.event_id ?? e.id, reminder_status: resolved.reminder_status }
+                : e
+            )
+          );
+          ok += 1;
+        } catch (err) {
+          console.error('[Take All] Failed for event', ev.id, err);
+        }
+      }
+      showToast(
+        action === 'TAKEN' ? 'Doses confirmed' : 'Doses skipped',
+        `${ok} medication${ok === 1 ? '' : 's'} updated.`,
+        ok > 0 ? 'success' : 'error'
+      );
+      router.refresh();
     } finally {
       setUpdatingId(null);
     }
@@ -751,21 +806,33 @@ export default function DashboardClientView({
                     <span>Read-Only Monitor Mode</span>
                   </div>
                 ) : (new Date(nextPendingEvent.scheduled_for).getTime() <= new Date().getTime()) ? (
-                  <div className="flex flex-col sm:flex-row gap-4 mt-6">
-                    <button
-                      onClick={() => handleElderlyTakeNow(nextPendingEvent, 'TAKEN')}
-                      disabled={updatingId !== null}
-                      className="flex-1 h-[88px] flex items-center justify-center text-3xl font-black rounded-2xl bg-success text-success-foreground hover:bg-success/90 transition-all cursor-pointer shadow-lg disabled:opacity-50"
-                    >
-                      {updatingId === nextPendingEvent.id ? 'Updating...' : 'I TOOK IT'}
-                    </button>
-                    <button
-                      onClick={() => handleElderlyTakeNow(nextPendingEvent, 'SKIP')}
-                      disabled={updatingId !== null}
-                      className="h-[88px] px-8 flex items-center justify-center text-2xl font-black rounded-2xl bg-warning text-warning-foreground hover:bg-warning/90 transition-all cursor-pointer shadow-lg disabled:opacity-50"
-                    >
-                      SKIP
-                    </button>
+                  <div className="space-y-4 mt-6">
+                    {dueNowEvents.length > 1 && (
+                      <button
+                        onClick={() => handleResolveAll('TAKEN')}
+                        disabled={updatingId !== null}
+                        className="w-full h-[72px] flex items-center justify-center gap-2 text-2xl font-black rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all cursor-pointer shadow-lg disabled:opacity-50"
+                      >
+                        <Check className="w-6 h-6" />
+                        {updatingId === BATCH_SENTINEL ? 'Confirming…' : `I TOOK ALL ${dueNowEvents.length}`}
+                      </button>
+                    )}
+                    <div className="flex flex-col sm:flex-row gap-4">
+                      <button
+                        onClick={() => handleElderlyTakeNow(nextPendingEvent, 'TAKEN')}
+                        disabled={updatingId !== null}
+                        className="flex-1 h-[88px] flex items-center justify-center text-3xl font-black rounded-2xl bg-success text-success-foreground hover:bg-success/90 transition-all cursor-pointer shadow-lg disabled:opacity-50"
+                      >
+                        {updatingId === nextPendingEvent.id ? 'Updating...' : 'I TOOK IT'}
+                      </button>
+                      <button
+                        onClick={() => handleElderlyTakeNow(nextPendingEvent, 'SKIP')}
+                        disabled={updatingId !== null}
+                        className="h-[88px] px-8 flex items-center justify-center text-2xl font-black rounded-2xl bg-warning text-warning-foreground hover:bg-warning/90 transition-all cursor-pointer shadow-lg disabled:opacity-50"
+                      >
+                        SKIP
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div className="mt-6 p-6 bg-muted/60 border border-border rounded-2xl flex items-center justify-center gap-2.5 text-xl font-black text-muted-foreground">
@@ -1203,19 +1270,31 @@ export default function DashboardClientView({
                   />
                 </div>
               ) : (
-                <div className="mt-6 flex flex-wrap gap-2.5">
+                <div className="mt-6 flex flex-wrap items-center gap-2.5">
                   <button
                     onClick={() => handleElderlyTakeNow(nextPendingEvent, 'TAKEN')}
-                    className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-success/20 backdrop-blur-md border border-success/40 text-success text-xs font-black rounded-full hover:bg-success/30 active:scale-[0.98] transition-all cursor-pointer shadow-sm"
+                    disabled={updatingId !== null}
+                    className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-success/20 backdrop-blur-md border border-success/40 text-success text-xs font-black rounded-full hover:bg-success/30 active:scale-[0.98] transition-all cursor-pointer shadow-sm disabled:opacity-50"
                   >
                     <Check className="w-4 h-4" /> Take Now
                   </button>
                   <button
                     onClick={() => handleElderlyTakeNow(nextPendingEvent, 'SKIP')}
-                    className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-white/55 backdrop-blur-md border border-white/70 text-muted-foreground text-xs font-bold rounded-full hover:bg-white/80 active:scale-[0.98] transition-all cursor-pointer shadow-sm"
+                    disabled={updatingId !== null}
+                    className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-white/55 backdrop-blur-md border border-white/70 text-muted-foreground text-xs font-bold rounded-full hover:bg-white/80 active:scale-[0.98] transition-all cursor-pointer shadow-sm disabled:opacity-50"
                   >
                     <X className="w-4 h-4" /> Skip
                   </button>
+                  {dueNowEvents.length > 1 && (
+                    <button
+                      onClick={() => handleResolveAll('TAKEN')}
+                      disabled={updatingId !== null}
+                      className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-primary text-primary-foreground text-xs font-black rounded-full hover:bg-primary/90 active:scale-[0.98] transition-all cursor-pointer shadow-sm disabled:opacity-50"
+                    >
+                      <Check className="w-4 h-4" />
+                      {updatingId === BATCH_SENTINEL ? 'Confirming…' : `Take all ${dueNowEvents.length} due now`}
+                    </button>
+                  )}
                 </div>
               )
             ) : (

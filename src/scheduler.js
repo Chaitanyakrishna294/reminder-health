@@ -717,10 +717,12 @@ const initScheduler = () => {
 
       const activePatientIds = [...new Set(meds.map(m => m.telegram_id))];
 
-      // 2. Fetch active caregiver links for these patients
+      // 2. Fetch active caregiver links for these patients via the unified compatibility
+      //    view (caregiver_connections + legacy), so caregivers linked through the new flow
+      //    receive the summary. The legacy caregiver_info table no longer stores relationships.
       const { data: links, error: linkErr } = await supabase
-        .from('caregiver_info')
-        .select('*')
+        .from('active_caregiver_links')
+        .select('caregiver_chat_id, caregiver_name, patient_telegram_id, connection_status, is_active')
         .eq('is_active', true)
         .eq('connection_status', 'ACCEPTED')
         .in('patient_telegram_id', activePatientIds);
