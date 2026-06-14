@@ -49,6 +49,32 @@ interface HealthVaultClientViewProps {
 const ALLOWED_EXTENSIONS = ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.doc', '.docx', '.txt', '.zip'];
 const LIMIT = 20;
 
+// Map a file extension to a correct MIME type. The browser's File.type is often empty on mobile
+// or for some files; storing the right content-type lets the signed URL render inline (esp. PDFs).
+const MIME_BY_EXT: Record<string, string> = {
+  pdf: 'application/pdf',
+  jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif',
+  txt: 'text/plain',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  zip: 'application/zip',
+};
+
+const getExt = (name: string) => (name.split('.').pop() || '').toLowerCase();
+
+const mimeFor = (fileName: string, fallbackType?: string | null) =>
+  MIME_BY_EXT[getExt(fileName)] || (fallbackType && fallbackType !== '' ? fallbackType : 'application/octet-stream');
+
+// Decide how to preview, primarily by extension (robust across devices) then MIME.
+type PreviewKind = 'image' | 'pdf' | 'text' | 'other';
+const previewKindOf = (fileName: string, fileType?: string | null): PreviewKind => {
+  const ext = getExt(fileName);
+  if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'svg'].includes(ext) || fileType?.startsWith('image/')) return 'image';
+  if (ext === 'pdf' || fileType === 'application/pdf') return 'pdf';
+  if (ext === 'txt' || fileType?.startsWith('text/')) return 'text';
+  return 'other';
+};
+
 export default function HealthVaultClientView({
   categories,
   userRole,
@@ -103,6 +129,7 @@ export default function HealthVaultClientView({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewType, setPreviewType] = useState<string | null>(null);
   const [previewTitle, setPreviewTitle] = useState<string | null>(null);
+  const [previewName, setPreviewName] = useState<string | null>(null);
 
   // Drag and drop state
   const [isDragging, setIsDragging] = useState(false);
@@ -198,7 +225,7 @@ export default function HealthVaultClientView({
     try {
       const { data, error } = await supabase.storage
         .from('health-vault')
-        .createSignedUrl(path, 60);
+        .createSignedUrl(path, 60, { download: fileName });
 
       if (error) throw error;
 
@@ -206,6 +233,7 @@ export default function HealthVaultClientView({
       a.href = data.signedUrl;
       a.download = fileName;
       a.target = '_blank';
+      a.rel = 'noopener noreferrer';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -215,18 +243,34 @@ export default function HealthVaultClientView({
     }
   };
 
+  // Trigger a browser download from an already-signed URL (used inside the preview modal).
+  const handleDownloadUrl = (url: string, fileName: string) => {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
   // Safe signed-url preview trigger
-  const handlePreview = async (path: string, type: string, title: string) => {
+  const handlePreview = async (path: string, type: string, title: string, fileName: string) => {
     try {
+      // Longer TTL so the "Open in new tab" link is still valid if tapped a bit later,
+      // and force inline rendering so PDFs open in the browser's native viewer rather than
+      // downloading. The MIME is derived from the file name extension for reliability.
       const { data, error } = await supabase.storage
         .from('health-vault')
-        .createSignedUrl(path, 60);
+        .createSignedUrl(path, 600, { download: false });
 
       if (error) throw error;
 
       setPreviewUrl(data.signedUrl);
-      setPreviewType(type);
+      setPreviewType(mimeFor(fileName, type));
       setPreviewTitle(title);
+      setPreviewName(fileName);
     } catch (err) {
       console.error('Preview generation error:', err);
       alert('Failed to load document preview.');
@@ -594,6 +638,9 @@ export default function HealthVaultClientView({
         .upload(uniquePath, selectedFile, {
           cacheControl: '3600',
           upsert: false,
+          // Store the correct content-type (derived from extension when the browser omits it),
+          // so the file renders inline in the native viewer instead of downloading.
+          contentType: mimeFor(selectedFile.name, selectedFile.type),
         });
 
       if (storageError) {
@@ -609,7 +656,7 @@ export default function HealthVaultClientView({
           record_date: recordDate,
           file_name: selectedFile.name,
           file_url: storageData.path,
-          file_type: selectedFile.type || `application/${fileExt}`,
+          file_type: mimeFor(selectedFile.name, selectedFile.type),
           file_size: selectedFile.size,
         }]);
 
@@ -994,7 +1041,7 @@ export default function HealthVaultClientView({
                                 {!viewingTrash ? (
                                   <>
                                     <button
-                                      onClick={() => handlePreview(item.file_url, item.file_type, item.title)}
+                                      onClick={() => handlePreview(item.file_url, item.file_type, item.title, item.file_name)}
                                       className={`font-black rounded bg-muted text-foreground hover:bg-muted/80 border border-border flex items-center justify-center cursor-pointer transition-all ${
                                         isElderly ? 'px-4 py-2 text-xs' : 'px-2.5 py-1 text-[10px]'
                                       }`}
@@ -1525,62 +1572,141 @@ export default function HealthVaultClientView({
                   Secure Document Preview
                 </p>
               </div>
-              <button
-                onClick={() => {
-                  setPreviewUrl(null);
-                  setPreviewType(null);
-                  setPreviewTitle(null);
-                }}
-                className="text-muted-foreground hover:text-foreground hover:bg-muted p-1.5 rounded-full transition-all cursor-pointer"
-              >
-                <X className="w-5 h-5 shrink-0" />
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                {/* Universal cross-device action: opens the file in a new tab so the device's
+                    native viewer renders it (the only reliable way to view PDFs on mobile). */}
+                <a
+                  href={previewUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`font-black rounded bg-primary text-primary-foreground hover:bg-primary-hover transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    isElderly ? 'px-5 py-2.5 text-sm' : 'px-3 py-1.5 text-xs'
+                  }`}
+                >
+                  <Eye className="w-4 h-4 shrink-0" />
+                  <span>Open</span>
+                </a>
+                <button
+                  onClick={() => {
+                    setPreviewUrl(null);
+                    setPreviewType(null);
+                    setPreviewTitle(null);
+                    setPreviewName(null);
+                  }}
+                  className="text-muted-foreground hover:text-foreground hover:bg-muted p-1.5 rounded-full transition-all cursor-pointer"
+                >
+                  <X className="w-5 h-5 shrink-0" />
+                </button>
+              </div>
             </div>
 
             {/* Preview Display Zone */}
             <div className="flex-1 bg-muted/20 rounded-2xl overflow-hidden flex items-center justify-center relative min-h-[320px]">
-              {previewType?.startsWith('image/') ? (
-                <img 
-                  src={previewUrl} 
-                  alt={previewTitle || 'Preview'} 
-                  className="max-w-full max-h-full object-contain p-2 rounded-2xl"
-                />
-              ) : previewType === 'application/pdf' || previewType === 'text/plain' || previewType?.startsWith('text/') ? (
-                <iframe 
-                  src={previewUrl} 
-                  title={previewTitle || 'PDF Preview'} 
-                  className="w-full h-full border-none rounded-2xl bg-white"
-                />
-              ) : (
-                <div className="text-center space-y-4 p-8">
-                  <AlertCircle className="w-12 h-12 text-warning mx-auto shrink-0" />
-                  <div>
-                    <h4 className="font-black text-foreground">Preview not available</h4>
-                    <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto leading-relaxed">
-                      This file format ({previewType?.split('/').pop() || 'unknown'}) cannot be previewed directly. Please download the file to view its contents.
-                    </p>
+              {(() => {
+                const kind = previewKindOf(previewName || previewTitle || '', previewType);
+
+                if (kind === 'image') {
+                  return (
+                    <img
+                      src={previewUrl}
+                      alt={previewTitle || 'Preview'}
+                      className="max-w-full max-h-full object-contain p-2 rounded-2xl"
+                    />
+                  );
+                }
+
+                if (kind === 'pdf') {
+                  // <object> renders the PDF inline on desktop. Mobile browsers can't embed a
+                  // PDF, so they show the fallback (an "Open / Download" action that hands off
+                  // to the device's native PDF viewer). The header "Open" button works too.
+                  return (
+                    <object
+                      data={previewUrl || undefined}
+                      type="application/pdf"
+                      className="w-full h-full rounded-2xl bg-white"
+                    >
+                      <div className="w-full h-full flex flex-col items-center justify-center text-center gap-4 p-8">
+                        <FileText className="w-12 h-12 text-primary mx-auto shrink-0" />
+                        <div>
+                          <h4 className="font-black text-foreground">Tap to view this PDF</h4>
+                          <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto leading-relaxed">
+                            Inline preview isn't supported in this browser. Open it in your device's
+                            viewer instead.
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap items-center justify-center gap-2.5">
+                          <a
+                            href={previewUrl || undefined}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`font-black rounded bg-primary text-primary-foreground hover:bg-primary-hover transition-all cursor-pointer shadow-sm flex items-center justify-center ${
+                              isElderly ? 'px-6 py-3.5 text-base' : 'px-4 py-2 text-xs'
+                            }`}
+                          >
+                            <Eye className="w-4 h-4 mr-1.5 shrink-0" />
+                            <span>Open PDF</span>
+                          </a>
+                          <button
+                            onClick={() => previewName && previewUrl && handleDownloadUrl(previewUrl, previewName)}
+                            className={`font-black rounded bg-muted text-foreground hover:bg-muted/80 border border-border transition-all cursor-pointer flex items-center justify-center ${
+                              isElderly ? 'px-6 py-3.5 text-base' : 'px-4 py-2 text-xs'
+                            }`}
+                          >
+                            <Download className="w-4 h-4 mr-1.5 shrink-0" />
+                            <span>Download</span>
+                          </button>
+                        </div>
+                      </div>
+                    </object>
+                  );
+                }
+
+                if (kind === 'text') {
+                  return (
+                    <iframe
+                      src={previewUrl || undefined}
+                      title={previewTitle || 'Document Preview'}
+                      className="w-full h-full border-none rounded-2xl bg-white"
+                    />
+                  );
+                }
+
+                // Office docs, zip, etc. — cannot be rendered in-browser; offer open/download.
+                return (
+                  <div className="text-center space-y-4 p-8">
+                    <AlertCircle className="w-12 h-12 text-warning mx-auto shrink-0" />
+                    <div>
+                      <h4 className="font-black text-foreground">Preview not available in-app</h4>
+                      <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto leading-relaxed">
+                        {getExt(previewName || '') ? `.${getExt(previewName || '')} files` : 'This file type'} can't
+                        be shown here. Open it in your device's app or download it.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-center gap-2.5">
+                      <a
+                        href={previewUrl || undefined}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`font-black rounded bg-primary text-primary-foreground hover:bg-primary-hover transition-all cursor-pointer shadow-sm flex items-center justify-center ${
+                          isElderly ? 'px-6 py-3.5 text-base' : 'px-4 py-2 text-xs'
+                        }`}
+                      >
+                        <Eye className="w-4 h-4 mr-1.5 shrink-0" />
+                        <span>Open</span>
+                      </a>
+                      <button
+                        onClick={() => previewName && previewUrl && handleDownloadUrl(previewUrl, previewName)}
+                        className={`font-black rounded bg-muted text-foreground hover:bg-muted/80 border border-border transition-all cursor-pointer flex items-center justify-center ${
+                          isElderly ? 'px-6 py-3.5 text-base' : 'px-4 py-2 text-xs'
+                        }`}
+                      >
+                        <Download className="w-4 h-4 mr-1.5 shrink-0" />
+                        <span>Download File</span>
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    onClick={() => {
-                      if (previewUrl && previewTitle) {
-                        const a = document.createElement('a');
-                        a.href = previewUrl;
-                        a.download = previewTitle;
-                        a.target = '_blank';
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                      }
-                    }}
-                    className={`font-black rounded bg-primary text-primary-foreground hover:bg-primary-hover transition-all cursor-pointer shadow-sm flex items-center justify-center mx-auto ${
-                      isElderly ? 'px-6 py-3.5 text-base' : 'px-4 py-2 text-xs'
-                    }`}
-                  >
-                    <Download className="w-4 h-4 mr-1.5 shrink-0" />
-                    <span>Download File</span>
-                  </button>
-                </div>
-              )}
+                );
+              })()}
             </div>
           </div>
         </div>
