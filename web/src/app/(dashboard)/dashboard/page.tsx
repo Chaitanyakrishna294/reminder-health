@@ -2,7 +2,7 @@ import React from 'react';
 import { createClient } from '@/lib/supabase/server';
 import DashboardClientView from '@/components/dashboard/dashboard-client-view';
 import { ReminderEvent } from '@/components/dashboard/todays-schedule';
-import { resolveUserData } from '@/lib/supabase/cached-queries';
+import { resolveUserData, getMedicalProfile } from '@/lib/supabase/cached-queries';
 import { getCareCircleConnections } from '@/lib/supabase/care-circle-service';
 import { Stethoscope } from 'lucide-react';
 
@@ -19,6 +19,16 @@ export default async function DashboardPage() {
   const caregiverId = profile.telegram_chat_id ? `CG${profile.telegram_chat_id.substring(0, 6)}` : 'N/A';
 
   const supabase = await createClient();
+
+  // Logged-in user's profile photo for the greeting avatar (private bucket → signed URL).
+  let avatarUrl: string | null = null;
+  const ownMedical = await getMedicalProfile(user.id);
+  if (ownMedical?.avatar_path) {
+    const { data: signed } = await supabase.storage
+      .from('avatars')
+      .createSignedUrl(ownMedical.avatar_path, 600);
+    avatarUrl = signed?.signedUrl ?? null;
+  }
 
   // 3. Fetch data for target patient in parallel
   const now = new Date();
@@ -145,6 +155,7 @@ export default async function DashboardPage() {
     <DashboardClientView 
       userRole={userRole}
       userName={profile.full_name || 'User'}
+      avatarUrl={avatarUrl}
       patientName={patientName}
       monthlyAdherence={monthlyAdherence}
       todayTaken={0}

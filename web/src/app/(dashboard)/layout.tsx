@@ -2,7 +2,8 @@ import React from 'react';
 import { redirect } from 'next/navigation';
 import Navbar from '@/components/layout/navbar';
 import DashboardMainLayout from '@/components/layout/dashboard-main-layout';
-import { resolveUserData } from '@/lib/supabase/cached-queries';
+import { resolveUserData, getMedicalProfile } from '@/lib/supabase/cached-queries';
+import { createClient } from '@/lib/supabase/server';
 
 export default async function DashboardLayout({
   children,
@@ -21,6 +22,17 @@ export default async function DashboardLayout({
     redirect('/link-account');
   }
 
+  // Profile photo for the navbar avatar (private avatars bucket → signed URL).
+  let avatarUrl: string | null = null;
+  const medical = await getMedicalProfile(user.id);
+  if (medical?.avatar_path) {
+    const supabase = await createClient();
+    const { data: signed } = await supabase.storage
+      .from('avatars')
+      .createSignedUrl(medical.avatar_path, 600);
+    avatarUrl = signed?.signedUrl ?? null;
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       {/* Navbar passing user profile details */}
@@ -32,7 +44,8 @@ export default async function DashboardLayout({
           role: profile.role,
           telegramChatId: profile.telegram_chat_id,
           patientChatId: targetChatId,
-          patientName
+          patientName,
+          avatarUrl
         }}
       />
 

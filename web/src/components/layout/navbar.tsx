@@ -17,6 +17,7 @@ interface NavbarProps {
     telegramChatId: string;
     patientChatId?: string | null;
     patientName?: string | null;
+    avatarUrl?: string | null;
   };
 }
 
@@ -83,9 +84,14 @@ export default function Navbar({ user }: NavbarProps) {
                 onClick={() => setUserDropdownOpen(!userDropdownOpen)}
                 className="flex items-center space-x-2 focus:outline-none cursor-pointer font-mono"
               >
-                <div className={`rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold border border-primary/20 transition-all ${isElderly ? 'w-10 h-10 text-base' : 'w-8 h-8 text-sm'
+                <div className={`rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold border border-primary/20 transition-all overflow-hidden ${isElderly ? 'w-10 h-10 text-base' : 'w-8 h-8 text-sm'
                   }`}>
-                  {user.fullName.substring(0, 2).toUpperCase()}
+                  {user.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={user.avatarUrl} alt="Profile photo" className="w-full h-full object-cover" />
+                  ) : (
+                    user.fullName.substring(0, 2).toUpperCase()
+                  )}
                 </div>
                 <span className={`hidden sm:inline font-semibold text-foreground ${isElderly ? 'text-base' : 'text-sm'
                   }`}>

@@ -273,6 +273,7 @@ interface DashboardClientViewProps {
   lastTaken: { drug_name: string; time: string } | null;
   peopleICareFor?: any[];
   peopleCaringForMe?: any[];
+  avatarUrl?: string | null;
 }
 
 export default function DashboardClientView({
@@ -297,6 +298,7 @@ export default function DashboardClientView({
   lastTaken,
   peopleICareFor = [],
   peopleCaringForMe = [],
+  avatarUrl = null,
 }: DashboardClientViewProps) {
   const { isElderly, toggleMode, viewMode } = useUiMode();
 
@@ -1069,9 +1071,14 @@ export default function DashboardClientView({
       {/* Welcome Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-transparent border-none shadow-none p-0">
         <div className="flex items-center gap-4 w-full sm:w-auto">
-          {/* Initials avatar circle */}
-          <div className="w-12 h-12 rounded-full bg-primary/10 text-primary border border-primary/20 flex items-center justify-center font-mono font-black text-lg shadow-inner shrink-0">
-            {userName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'U'}
+          {/* Profile photo (falls back to initials) */}
+          <div className="w-12 h-12 rounded-full bg-primary/10 text-primary border border-primary/20 flex items-center justify-center font-mono font-black text-lg shadow-inner shrink-0 overflow-hidden">
+            {avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={avatarUrl} alt="Profile photo" className="w-full h-full object-cover" />
+            ) : (
+              userName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'U'
+            )}
           </div>
           <div className="min-w-0">
             <h1 className="text-xl font-black text-foreground tracking-tight flex items-center gap-2">
