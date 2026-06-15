@@ -153,9 +153,16 @@ export default function DashboardMainLayout({
       alert('No phone number is registered for this patient.');
       return;
     }
+    // Strip to dial-safe characters so a malformed/poisoned phone value can't
+    // inject a different URI scheme (e.g. "javascript:") into the navigation.
+    const dialSafePhone = patientPhone.replace(/[^\d+]/g, '');
+    if (!dialSafePhone) {
+      alert('The registered phone number is invalid.');
+      return;
+    }
     const isMobile = /Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent);
     if (isMobile) {
-      window.location.href = `tel:${patientPhone}`;
+      window.location.href = `tel:${dialSafePhone}`;
     } else {
       setShowCallPopover(!showCallPopover);
     }

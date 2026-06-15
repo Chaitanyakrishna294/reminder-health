@@ -1,10 +1,19 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
+// Only allow internal redirect targets. Rejects absolute URLs and
+// protocol-relative paths like "//evil.com" or "/\evil.com" (open redirect).
+function safeNext(raw: string | null): string {
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//') || raw.startsWith('/\\')) {
+    return '/dashboard';
+  }
+  return raw;
+}
+
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
-  const next = searchParams.get('next') ?? '/dashboard';
+  const next = safeNext(searchParams.get('next'));
 
   if (code) {
     const supabase = await createClient();

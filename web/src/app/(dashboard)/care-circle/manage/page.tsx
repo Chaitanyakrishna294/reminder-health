@@ -408,14 +408,15 @@ export default function SharedTrustCenter() {
         }
       });
 
-      const message = changeDescriptions.length > 0 
-        ? `You updated permissions for <b>${log.caregiver_name}</b> (${changeDescriptions.join(', ')}).`
-        : `You updated permissions for <b>${log.caregiver_name}</b>.`;
-
+      // Rendered as JSX (not dangerouslySetInnerHTML) so caregiver_name — a
+      // user-controlled value — cannot inject HTML/script (stored XSS).
       return (
         <div className="space-y-0.5">
           <p className="text-xs text-foreground font-bold">❤️ Shared Trust Updated</p>
-          <p className="text-[11px] text-muted-foreground" dangerouslySetInnerHTML={{ __html: message }} />
+          <p className="text-[11px] text-muted-foreground">
+            You updated permissions for <b>{log.caregiver_name}</b>
+            {changeDescriptions.length > 0 ? ` (${changeDescriptions.join(', ')}).` : '.'}
+          </p>
           <span className="text-[9px] text-muted-foreground block pt-0.5">{timeStr}</span>
         </div>
       );

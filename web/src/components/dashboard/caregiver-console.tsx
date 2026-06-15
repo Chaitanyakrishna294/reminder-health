@@ -71,7 +71,7 @@ export default function CaregiverConsole({
               <a
                 href="https://t.me/reminder_health_bot"
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
                 className="flex items-center justify-center gap-2 px-6 py-4 rounded-2xl bg-sky-500 text-white font-extrabold text-sm hover:scale-[1.02] active:scale-[0.98] transition-all shadow-sm cursor-pointer"
               >
                 <Send className="w-4 h-4 shrink-0" /> Telegram
