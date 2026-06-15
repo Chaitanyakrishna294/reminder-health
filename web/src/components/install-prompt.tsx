@@ -9,17 +9,21 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
-const DISMISS_KEY = 'dismissedInstallPrompt';
+// Once the user closes the banner we remember it and only show the compact icon
+// from then on (across pages/sessions), so they're never nagged by the full banner again.
+const COLLAPSED_KEY = 'installPromptCollapsed';
 
 /**
- * App-wide "Install app" suggestion. Captures the browser's beforeinstallprompt
- * event and offers a one-tap install. Hidden when already installed (standalone)
- * or previously dismissed. iOS Safari doesn't fire this event, so iOS continues
- * to use the manual "Add to Home Screen" hint shown elsewhere.
+ * App-wide "Install app" suggestion.
+ * - First time: a full banner with an Install button.
+ * - After the user taps ✕: collapses to a small floating download icon that
+ *   persists across navigation; tapping it runs the install.
+ * Only rendered when the app is actually installable (beforeinstallprompt fired)
+ * and not already installed. iOS Safari uses the separate Add-to-Home-Screen hint.
  */
 export default function InstallPrompt() {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
-  const [visible, setVisible] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -30,19 +34,22 @@ export default function InstallPrompt() {
     if (isStandalone) return;
 
     try {
-      if (localStorage.getItem(DISMISS_KEY) === 'true') return;
+      if (localStorage.getItem(COLLAPSED_KEY) === '1') setCollapsed(true);
     } catch {
       /* ignore */
     }
 
     const onBeforeInstall = (e: Event) => {
-      e.preventDefault(); // stop the default mini-infobar so we can show our own
+      e.preventDefault(); // suppress the default mini-infobar; we render our own UI
       setDeferred(e as BeforeInstallPromptEvent);
-      setVisible(true);
     };
     const onInstalled = () => {
-      setVisible(false);
       setDeferred(null);
+      try {
+        localStorage.removeItem(COLLAPSED_KEY);
+      } catch {
+        /* ignore */
+      }
     };
 
     window.addEventListener('beforeinstallprompt', onBeforeInstall);
@@ -57,25 +64,40 @@ export default function InstallPrompt() {
     if (!deferred) return;
     await deferred.prompt();
     try {
-      await deferred.userChoice;
+      const { outcome } = await deferred.userChoice;
+      if (outcome === 'accepted') setDeferred(null); // a used prompt can't be reused
     } catch {
-      /* user dismissed */
+      /* user dismissed the native dialog */
     }
-    setVisible(false);
-    setDeferred(null);
   };
 
-  const handleDismiss = () => {
+  const handleCollapse = () => {
     try {
-      localStorage.setItem(DISMISS_KEY, 'true');
+      localStorage.setItem(COLLAPSED_KEY, '1');
     } catch {
       /* ignore */
     }
-    setVisible(false);
+    setCollapsed(true);
   };
 
-  if (!visible) return null;
+  // Nothing to offer unless the browser says the app is installable.
+  if (!deferred) return null;
 
+  // Collapsed: unobtrusive floating icon that survives page navigation.
+  if (collapsed) {
+    return (
+      <button
+        onClick={handleInstall}
+        aria-label="Install Re-MIND-eЯ app"
+        title="Install app"
+        className="fixed bottom-4 right-4 z-[90] w-12 h-12 rounded-full bg-primary text-primary-foreground shadow-2xl flex items-center justify-center hover:bg-primary-hover transition-all cursor-pointer"
+      >
+        <Download className="w-5 h-5" />
+      </button>
+    );
+  }
+
+  // First-run: full banner.
   return (
     <div
       role="dialog"
@@ -97,8 +119,8 @@ export default function InstallPrompt() {
           Install
         </button>
         <button
-          onClick={handleDismiss}
-          aria-label="Dismiss install suggestion"
+          onClick={handleCollapse}
+          aria-label="Minimize install suggestion"
           className="shrink-0 text-muted-foreground hover:text-foreground p-1 rounded-full transition-colors cursor-pointer"
         >
           <X className="w-4 h-4" />
