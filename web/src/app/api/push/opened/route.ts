@@ -1,15 +1,25 @@
 import { createServiceClient } from '@/lib/supabase/service-role';
 import { NextResponse } from 'next/server';
 import { createHash } from 'crypto';
+import { z } from 'zod';
+import { checkRateLimit, getClientIp, tooManyRequests } from '@/lib/rate-limit';
+
+const CallbackSchema = z.object({
+  eventId: z.union([z.number().int().positive(), z.string().min(1).max(64)]),
+  trackingToken: z.string().min(1).max(512),
+});
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { eventId, trackingToken } = body;
+    if (!(await checkRateLimit(`push:opened:${getClientIp(request)}`, 60, 60))) {
+      return tooManyRequests();
+    }
 
-    if (!eventId || !trackingToken) {
+    const parsed = CallbackSchema.safeParse(await request.json());
+    if (!parsed.success) {
       return NextResponse.json({ error: 'Missing eventId or trackingToken.' }, { status: 400 });
     }
+    const { eventId, trackingToken } = parsed.data;
 
     // 1. Verify token authorization using SHA-256 hash matching
     const tokenHash = createHash('sha256').update(trackingToken).digest('hex');

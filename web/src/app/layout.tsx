@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { UiModeProvider } from "@/context/ui-mode-context";
+import CookieConsent from "@/components/cookie-consent";
 
 const inter = Inter({
   variable: "--font-sans",
@@ -39,6 +40,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <UiModeProvider>
           {children}
+          <CookieConsent />
         </UiModeProvider>
       </body>
     </html>

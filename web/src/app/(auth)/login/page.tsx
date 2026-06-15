@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useUiMode } from '@/context/ui-mode-context';
 import { Eye, EyeOff, Sparkles, AlertTriangle, Info } from 'lucide-react';
+import Turnstile, { captchaEnabled } from '@/components/turnstile';
 
 function LoginForm() {
   const [email, setEmail] = useState('');
@@ -15,6 +16,7 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -30,6 +32,10 @@ function LoginForm() {
 
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (captchaEnabled && !captchaToken) {
+      setError('Please complete the verification challenge.');
+      return;
+    }
     setLoading(true);
     setError(null);
     setInfo(null);
@@ -37,6 +43,7 @@ function LoginForm() {
     const { error: loginErr } = await supabase.auth.signInWithPassword({
       email,
       password,
+      options: { captchaToken: captchaToken ?? undefined },
     });
 
     if (loginErr) {
@@ -57,10 +64,15 @@ function LoginForm() {
     setError(null);
     setInfo(null);
 
+    if (captchaEnabled && !captchaToken) {
+      setError('Please complete the verification challenge.');
+      return;
+    }
     const { error: magicErr } = await supabase.auth.signInWithOtp({
       email,
       options: {
         emailRedirectTo: `${window.location.origin}/api/auth/callback?next=/dashboard`,
+        captchaToken: captchaToken ?? undefined,
       },
     });
 
@@ -139,6 +151,8 @@ function LoginForm() {
             </button>
           </div>
         </div>
+
+        <Turnstile onVerify={setCaptchaToken} />
 
         <button
           type="submit"

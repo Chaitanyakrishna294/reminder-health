@@ -97,6 +97,33 @@ export default function SettingsClientView({
     router.push('/login');
   };
 
+  // --- Account deletion (GDPR right to erasure) ---
+  const [deleting, setDeleting] = useState(false);
+  const handleDeleteAccount = async () => {
+    const confirmText = window.prompt(
+      'This permanently deletes your account and ALL your data (medications, reminders, ' +
+      'health vault files, caregiver links). This cannot be undone.\n\n' +
+      'Type DELETE to confirm.'
+    );
+    if (confirmText !== 'DELETE') return;
+
+    setDeleting(true);
+    setErrorMsg(null);
+    try {
+      const res = await fetch('/api/account/delete', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error || 'Failed to delete account.');
+      }
+      await supabase.auth.signOut();
+      router.refresh();
+      router.push('/login');
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Failed to delete account.');
+      setDeleting(false);
+    }
+  };
+
   const handleCopyId = () => {
     if (!caregiverRecord?.caregiver_id) return;
     navigator.clipboard.writeText(caregiverRecord.caregiver_id);
@@ -811,6 +838,32 @@ export default function SettingsClientView({
         >
           <LogOut className={isElderly ? 'w-6 h-6' : 'w-4 h-4'} />
           <span>Sign Out</span>
+        </button>
+      </div>
+
+      {/* SECTION 5: DANGER ZONE — DELETE ACCOUNT */}
+      <div className="bg-card border-2 border-danger/40 rounded-3xl p-6 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+        <div className="space-y-0.5">
+          <span className={`font-extrabold text-danger block ${isElderly ? 'text-xl' : 'text-sm'}`}>
+            Delete Account
+          </span>
+          <span className={`text-muted-foreground block font-semibold ${isElderly ? 'text-base' : 'text-xs'}`}>
+            Permanently erase your account and all data (medications, reminders, health vault,
+            caregiver links). This cannot be undone.
+          </span>
+        </div>
+
+        <button
+          onClick={handleDeleteAccount}
+          disabled={deleting}
+          className={`flex items-center justify-center font-black rounded-xl transition-all cursor-pointer shadow-sm disabled:opacity-60 disabled:cursor-not-allowed ${
+            isElderly
+              ? 'bg-danger text-danger-foreground hover:bg-danger/90 h-[80px] px-10 text-2xl gap-2'
+              : 'bg-danger/10 hover:bg-danger/20 text-danger px-4 py-2.5 text-xs font-semibold gap-1.5'
+          }`}
+        >
+          <Trash2 className={isElderly ? 'w-6 h-6' : 'w-4 h-4'} />
+          <span>{deleting ? 'Deleting…' : 'Delete Account'}</span>
         </button>
       </div>
     </div>

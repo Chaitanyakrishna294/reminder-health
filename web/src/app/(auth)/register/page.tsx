@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useUiMode } from '@/context/ui-mode-context';
 import { Eye, EyeOff } from 'lucide-react';
+import Turnstile, { captchaEnabled } from '@/components/turnstile';
 
 export default function RegisterPage() {
   const [fullName, setFullName] = useState('');
@@ -15,6 +16,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   const router = useRouter();
   const supabase = createClient();
@@ -22,6 +24,10 @@ export default function RegisterPage() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (captchaEnabled && !captchaToken) {
+      setError('Please complete the verification challenge.');
+      return;
+    }
     setLoading(true);
     setError(null);
 
@@ -33,6 +39,7 @@ export default function RegisterPage() {
           full_name: fullName,
         },
         emailRedirectTo: `${window.location.origin}/api/auth/callback?next=/link-account`,
+        captchaToken: captchaToken ?? undefined,
       },
     });
 
@@ -136,6 +143,8 @@ export default function RegisterPage() {
             </button>
           </div>
         </div>
+
+        <Turnstile onVerify={setCaptchaToken} />
 
         <button
           type="submit"
