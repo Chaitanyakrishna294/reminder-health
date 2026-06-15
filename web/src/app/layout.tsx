@@ -3,6 +3,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { UiModeProvider } from "@/context/ui-mode-context";
 import CookieConsent from "@/components/cookie-consent";
+import InstallPrompt from "@/components/install-prompt";
 
 const inter = Inter({
   variable: "--font-sans",
@@ -40,6 +41,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <UiModeProvider>
           {children}
+          <InstallPrompt />
           <CookieConsent />
         </UiModeProvider>
       </body>
