@@ -18,9 +18,7 @@ import {
   LogOut,
   Check,
   FolderHeart,
-  ChevronDown,
-  HeartPulse,
-  Siren
+  ChevronDown
 } from 'lucide-react';
 
 export default function DashboardMainLayout({ 
@@ -128,19 +126,19 @@ export default function DashboardMainLayout({
   };
 
   const getNavItems = () => {
+    // Mobile-first: keep the nav to exactly 5 icons. Secondary destinations
+    // (Medical Profile, Emergency) live in the profile menu, not here.
     const baseItems = [
       { href: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
       { href: '/medications', label: 'Medications', icon: <Pill className="w-5 h-5" /> },
       { href: '/schedule-planner', label: 'Scheduler', icon: <Calendar className="w-5 h-5" /> },
       { href: '/health-vault', label: 'Health Vault', icon: <FolderHeart className="w-5 h-5" /> },
-      { href: '/medical-profile', label: 'Medical Profile', icon: <HeartPulse className="w-5 h-5" /> },
-      { href: '/emergency', label: 'Emergency', icon: <Siren className="w-5 h-5" /> },
       { href: '/settings', label: 'Settings', icon: <Settings className="w-5 h-5" /> },
     ];
 
     if (viewMode === 'PATIENT_MONITOR') {
-      // Hide the patient's own medical/emergency/medication editing in caregiver monitoring view
-      return baseItems.filter(item => !['/medications', '/medical-profile', '/emergency'].includes(item.href));
+      // Hide medications in monitoring view
+      return baseItems.filter(item => item.href !== '/medications');
     }
     return baseItems;
   };

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useUiMode } from '@/context/ui-mode-context';
-import { Pill, ChevronDown, LogOut, Glasses } from 'lucide-react';
+import { Pill, ChevronDown, LogOut, Glasses, HeartPulse, Siren } from 'lucide-react';
 import NotificationCenter from '@/components/shared/notification-center';
 
 interface NavbarProps {
@@ -110,6 +110,26 @@ export default function Navbar({ user }: NavbarProps) {
                   <div className="px-4 py-1.5 border-b border-border text-[11px] text-muted-foreground">
                     Telegram: {user.telegramChatId}
                   </div>
+                  {viewMode !== 'PATIENT_MONITOR' && (
+                    <>
+                      <Link
+                        href="/medical-profile"
+                        onClick={() => setUserDropdownOpen(false)}
+                        className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted font-medium transition-colors cursor-pointer flex items-center gap-2 font-mono"
+                      >
+                        <HeartPulse className="w-3.5 h-3.5 text-primary" />
+                        <span>Medical Profile</span>
+                      </Link>
+                      <Link
+                        href="/emergency"
+                        onClick={() => setUserDropdownOpen(false)}
+                        className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted font-medium transition-colors cursor-pointer flex items-center gap-2 font-mono border-b border-border"
+                      >
+                        <Siren className="w-3.5 h-3.5 text-red-500" />
+                        <span>Emergency Card</span>
+                      </Link>
+                    </>
+                  )}
                   <button
                     onClick={handleLogout}
                     className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted font-medium transition-colors cursor-pointer flex items-center gap-2 font-mono"

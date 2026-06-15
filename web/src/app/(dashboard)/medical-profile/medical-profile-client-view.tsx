@@ -183,7 +183,7 @@ export default function MedicalProfileClientView({ userId, fullName, email, init
   const sectionTitle = `font-black text-foreground ${isElderly ? 'text-xl' : 'text-sm'}`;
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 pb-28">
+    <div className="max-w-3xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
         <div className="w-11 h-11 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
           <HeartPulse className="w-6 h-6" />
@@ -338,16 +338,15 @@ export default function MedicalProfileClientView({ userId, fullName, email, init
         </div>
       </div>
 
-      <div className="fixed bottom-0 inset-x-0 sm:static bg-background/90 sm:bg-transparent backdrop-blur sm:backdrop-blur-none border-t border-border sm:border-0 p-4 sm:p-0 z-40">
-        <button
-          onClick={handleSave}
-          disabled={saving || uploading}
-          className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-primary text-primary-foreground font-black hover:bg-primary-hover transition-all disabled:opacity-50 cursor-pointer"
-        >
-          <Save className="w-5 h-5" />
-          <span>{saving ? 'Saving…' : 'Save Medical Profile'}</span>
-        </button>
-      </div>
+      {/* Inline save button — not fixed, so it never collides with the mobile nav dock. */}
+      <button
+        onClick={handleSave}
+        disabled={saving || uploading}
+        className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-primary text-primary-foreground font-black hover:bg-primary-hover transition-all disabled:opacity-50 cursor-pointer"
+      >
+        <Save className="w-5 h-5" />
+        <span>{saving ? 'Saving…' : 'Save Medical Profile'}</span>
+      </button>
     </div>
   );
 }
