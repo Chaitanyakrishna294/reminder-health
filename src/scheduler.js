@@ -118,8 +118,38 @@ async function sendBrowserPush(telegramId, payload) {
   }
 }
 
+// Startup self-check: the minute tick depends on the scheduler-lock RPCs from
+// migration_arch_hardening_2026_06.sql. If that migration hasn't been applied, the
+// RPC errors every tick and the scheduler silently does nothing. Verify once at
+// boot and fail loudly so "deploy code" and "apply migration" stay coupled.
+const verifySchedulerDependencies = async () => {
+  const { error } = await supabase.rpc('try_acquire_scheduler_lock', {
+    p_lock_name: 'startup_self_check',
+    p_ttl_seconds: 1,
+    p_holder: SCHEDULER_INSTANCE_ID
+  });
+  if (error) {
+    console.error(
+      '[Scheduler] FATAL: scheduler-lock RPC missing or failing — the minute tick will not run. ' +
+      'Apply db/migrations/migration_arch_hardening_2026_06.sql before deploying this code.',
+      error
+    );
+    return false;
+  }
+  // Release the probe lease immediately so it doesn't block the first real tick.
+  await supabase.rpc('release_scheduler_lock', {
+    p_lock_name: 'startup_self_check',
+    p_holder: SCHEDULER_INSTANCE_ID
+  });
+  console.log('[Scheduler] Dependency self-check passed (scheduler-lock RPCs present).');
+  return true;
+};
+
 const initScheduler = () => {
   console.log('⏰ Schedulers initialized.');
+
+  // Run the dependency self-check up front (non-blocking; logs FATAL if unmet).
+  verifySchedulerDependencies();
 
   // 1. Every Minute Reminder Checker
   cron.schedule('* * * * *', async () => {
@@ -251,7 +281,7 @@ const initScheduler = () => {
               if (eventErr && eventErr.code === '23505') {
                 console.log(`[Scheduler] Unique constraint violation: Event already exists for Med ID ${med.id} scheduled at ${scheduledFor}. Advancing next_reminder_at to avoid duplicate loop.`);
                 try {
-                  const nextReminder = calculateNextReminder(med.reminder_times);
+                  const nextReminder = calculateNextReminder(med.reminder_times, med.timezone);
                   console.log(`[Scheduler] Updating next_reminder_at for Med ID: ${med.id} to ${nextReminder.toISOString()} (recovering from duplicate)`);
                   await supabase
                     .from('medications')
@@ -284,7 +314,7 @@ const initScheduler = () => {
             });
 
             // 4. Calculate next reminder from the JSONB array
-            const nextReminder = calculateNextReminder(med.reminder_times);
+            const nextReminder = calculateNextReminder(med.reminder_times, med.timezone);
 
             console.log(`[Scheduler] Updating next_reminder_at for Med ID: ${med.id} to ${nextReminder.toISOString()}`);
             // 5. Update record with next_reminder_at, reset old retry columns.
@@ -315,7 +345,7 @@ const initScheduler = () => {
             try {
               await delay(1000);
               await bot.sendMessage(med.telegram_id, message, { parse_mode: 'HTML', reply_markup: inlineKeyboard });
-              const nextReminder = calculateNextReminder(med.reminder_times);
+              const nextReminder = calculateNextReminder(med.reminder_times, med.timezone);
               await supabase
                 .from('medications')
                 .update({
@@ -540,7 +570,7 @@ const initScheduler = () => {
     }
   });
 
-  // 2. Weekly Summary - Sundays at 8 PM (20:00) server time
+  // 2. Weekly Summary - Sundays at 8 PM (20:00) Asia/Kolkata
   cron.schedule('0 20 * * 0', async () => {
     try {
       console.log('📊 Generating weekly summaries...');
@@ -613,6 +643,8 @@ const initScheduler = () => {
     } catch (err) {
       console.error('Weekly summary error:', err);
     }
+  }, {
+    timezone: "Asia/Kolkata"
   });
 
   // 3. Daily Low Stock Alert - Every day at 9:00 AM Asia/Kolkata

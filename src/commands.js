@@ -879,7 +879,9 @@ const initCommands = () => {
            }
            
            state.times.sort((a,b) => a.localeCompare(b));
-           const nextReminderAt = calculateNextReminder(state.times);
+           // state.timezone is undefined today (no TZ picker) → defaults to IST.
+           // When a per-medication timezone is captured in this flow, pass it here.
+           const nextReminderAt = calculateNextReminder(state.times, state.timezone);
            
            const updatePayload = { reminder_times: state.times, next_reminder_at: nextReminderAt.toISOString() };
            if (state.frequency) updatePayload.frequency = state.frequency;
@@ -1106,8 +1108,10 @@ const initCommands = () => {
         
         await bot.editMessageText(query.message.text + '\n\n[✅ Confirmed]', { chat_id: chatId, message_id: messageId, reply_markup: { inline_keyboard: [] } });
         await bot.sendMessage(chatId, 'Saving your medication...');
-        
-        const nextReminderAt = calculateNextReminder(state.times);
+
+        // state.timezone is undefined today (no TZ picker) → defaults to IST, matching
+        // the medications.timezone column default. Thread the real tz here when captured.
+        const nextReminderAt = calculateNextReminder(state.times, state.timezone);
 
         const { error } = await supabase.from('medications').insert([{
           telegram_id: chatId.toString(),

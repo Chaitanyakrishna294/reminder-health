@@ -16,13 +16,20 @@ const isValidTime = (timeStr) => {
   return regex.test(timeStr);
 };
 
+// Default timezone when a medication has none set. Every reminder time string is
+// interpreted as wall-clock time in the medication's own timezone.
+const DEFAULT_TIMEZONE = 'Asia/Kolkata';
+
 /**
- * Calculate next reminder in IST timezone
- * @param {string[]} timesArray
+ * Calculate the next reminder fire time (as a UTC Date) for a set of daily
+ * HH:MM times, interpreted in the medication's own timezone.
+ * @param {string[]} timesArray  daily reminder times in 'HH:MM'
+ * @param {string} [timezone]    IANA tz of the medication; defaults to IST
  * @returns {Date}
  */
-const calculateNextReminder = (timesArray) => {
-  const now = moment().tz('Asia/Kolkata');
+const calculateNextReminder = (timesArray, timezone) => {
+  const tz = timezone && timezone.trim() ? timezone : DEFAULT_TIMEZONE;
+  const now = moment().tz(tz);
 
   // Sort times
   const sortedTimes = [...timesArray].sort((a, b) => a.localeCompare(b));
@@ -32,7 +39,7 @@ const calculateNextReminder = (timesArray) => {
     const [hours, minutes] = timeStr.split(':').map(Number);
 
     const candidate = moment()
-      .tz('Asia/Kolkata')
+      .tz(tz)
       .set({
         hour: hours,
         minute: minutes,
@@ -49,7 +56,7 @@ const calculateNextReminder = (timesArray) => {
   const [firstHours, firstMinutes] = sortedTimes[0].split(':').map(Number);
 
   const tomorrowFirst = moment()
-    .tz('Asia/Kolkata')
+    .tz(tz)
     .add(1, 'day')
     .set({
       hour: firstHours,
@@ -85,6 +92,7 @@ module.exports = {
   isValidTime,
   calculateNextReminder,
   escapeHTML,
-  activeSnoozes
+  activeSnoozes,
+  DEFAULT_TIMEZONE
 };
 
