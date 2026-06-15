@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const cron = require('node-cron');
 const moment = require('moment-timezone');
 const webpush = require('web-push');
@@ -5,6 +6,10 @@ const { bot } = require('./bot');
 const { supabase } = require('./db');
 const { delay, calculateNextReminder, escapeHTML, activeSnoozes } = require('./utils');
 const { CALLBACK_ACTIONS, MAX_SNOOZES } = require('./constants');
+
+// Unique id for this process, used to claim the cross-instance minute-tick lease
+// so two overlapping instances (deploy/restart) can't double-escalate reminders.
+const SCHEDULER_INSTANCE_ID = crypto.randomUUID();
 
 // ── Browser Push Setup ──────────────────────────────────────────────────────
 if (!process.env.VAPID_SUBJECT || !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
@@ -118,9 +123,27 @@ const initScheduler = () => {
 
   // 1. Every Minute Reminder Checker
   cron.schedule('* * * * *', async () => {
+    let lockHeld = false;
     try {
       const now = new Date();
-      
+
+      // Claim the cross-instance minute-tick lease. If another instance holds it
+      // (overlap during deploy/restart), skip this tick rather than double-process.
+      const { data: lockAcquired, error: lockAcquireErr } = await supabase.rpc('try_acquire_scheduler_lock', {
+        p_lock_name: 'minute_tick',
+        p_ttl_seconds: 120,
+        p_holder: SCHEDULER_INSTANCE_ID
+      });
+      if (lockAcquireErr) {
+        console.error('[Scheduler] Failed to acquire minute-tick lock; skipping tick:', lockAcquireErr);
+        return;
+      }
+      if (!lockAcquired) {
+        console.log('[Scheduler] Another instance holds the minute-tick lock; skipping this tick.');
+        return;
+      }
+      lockHeld = true;
+
       console.log(`[Scheduler] Checking for due reminders at ${now.toISOString()}...`);
 
       const sixtySecondsAgo = new Date(Date.now() - 60000).toISOString();
@@ -264,8 +287,10 @@ const initScheduler = () => {
             const nextReminder = calculateNextReminder(med.reminder_times);
 
             console.log(`[Scheduler] Updating next_reminder_at for Med ID: ${med.id} to ${nextReminder.toISOString()}`);
-            // 5. Update record with next_reminder_at, reset old retry columns
-            await supabase
+            // 5. Update record with next_reminder_at, reset old retry columns.
+            // This must succeed — a silent failure leaves next_reminder_at stale and the
+            // medication either re-fires every tick or skips its next dose. Verify it.
+            const { data: advanceData, error: advanceErr } = await supabase
               .from('medications')
               .update({
                 next_reminder_at: nextReminder.toISOString(),
@@ -273,7 +298,12 @@ const initScheduler = () => {
                 retry_reminder_at: null,
                 retry_count: 0
               })
-              .eq('id', med.id);
+              .eq('id', med.id)
+              .select();
+
+            if (advanceErr || !advanceData || advanceData.length === 0) {
+              console.error(`[Scheduler] CRITICAL: Failed to advance next_reminder_at for Med ID ${med.id}; it may re-fire next tick:`, advanceErr || 'no row updated');
+            }
 
             // 6. Add a small delay between sends to avoid Telegram API flood limits
             await delay(200);
@@ -495,6 +525,18 @@ const initScheduler = () => {
       }
     } catch (err) {
       console.error('Scheduler error:', err);
+    } finally {
+      // Release the lease on clean (or errored) completion so the next tick isn't
+      // blocked by the TTL. A crash before this still self-heals when the lease expires.
+      if (lockHeld) {
+        const { error: lockReleaseErr } = await supabase.rpc('release_scheduler_lock', {
+          p_lock_name: 'minute_tick',
+          p_holder: SCHEDULER_INSTANCE_ID
+        });
+        if (lockReleaseErr) {
+          console.error('[Scheduler] Failed to release minute-tick lock:', lockReleaseErr);
+        }
+      }
     }
   });
 

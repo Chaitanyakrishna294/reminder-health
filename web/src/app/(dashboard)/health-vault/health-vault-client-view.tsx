@@ -130,6 +130,9 @@ export default function HealthVaultClientView({
   const [previewType, setPreviewType] = useState<string | null>(null);
   const [previewTitle, setPreviewTitle] = useState<string | null>(null);
   const [previewName, setPreviewName] = useState<string | null>(null);
+  // Storage path of the open preview, kept so we can re-sign before the signed
+  // URL's TTL expires while the user is still reading (e.g. a large PDF).
+  const [previewPath, setPreviewPath] = useState<string | null>(null);
 
   // Drag and drop state
   const [isDragging, setIsDragging] = useState(false);
@@ -256,6 +259,7 @@ export default function HealthVaultClientView({
   };
 
   // Safe signed-url preview trigger
+  const PREVIEW_URL_TTL = 600; // seconds
   const handlePreview = async (path: string, type: string, title: string, fileName: string) => {
     try {
       // Longer TTL so the "Open in new tab" link is still valid if tapped a bit later,
@@ -263,7 +267,7 @@ export default function HealthVaultClientView({
       // downloading. The MIME is derived from the file name extension for reliability.
       const { data, error } = await supabase.storage
         .from('health-vault')
-        .createSignedUrl(path, 600, { download: false });
+        .createSignedUrl(path, PREVIEW_URL_TTL, { download: false });
 
       if (error) throw error;
 
@@ -271,11 +275,32 @@ export default function HealthVaultClientView({
       setPreviewType(mimeFor(fileName, type));
       setPreviewTitle(title);
       setPreviewName(fileName);
+      setPreviewPath(path); // enables auto-refresh of the signed URL (see effect below)
     } catch (err) {
       console.error('Preview generation error:', err);
       alert('Failed to load document preview.');
     }
   };
+
+  // Re-sign the preview URL before its TTL expires so an open document (e.g. a
+  // large PDF being read) doesn't break mid-session with a 403. Runs only while
+  // a preview is open; refreshes at ~90% of the TTL.
+  useEffect(() => {
+    if (!previewPath) return;
+    const intervalMs = PREVIEW_URL_TTL * 0.9 * 1000;
+    const timer = setInterval(async () => {
+      try {
+        const { data, error } = await supabase.storage
+          .from('health-vault')
+          .createSignedUrl(previewPath, PREVIEW_URL_TTL, { download: false });
+        if (error) throw error;
+        setPreviewUrl(data.signedUrl);
+      } catch (err) {
+        console.error('Preview URL refresh error:', err);
+      }
+    }, intervalMs);
+    return () => clearInterval(timer);
+  }, [previewPath]);
 
   // Soft Delete handler
   const handleSoftDelete = async (recordId: string) => {
@@ -1592,6 +1617,7 @@ export default function HealthVaultClientView({
                     setPreviewType(null);
                     setPreviewTitle(null);
                     setPreviewName(null);
+                    setPreviewPath(null); // stops the signed-URL auto-refresh effect
                   }}
                   className="text-muted-foreground hover:text-foreground hover:bg-muted p-1.5 rounded-full transition-all cursor-pointer"
                 >
