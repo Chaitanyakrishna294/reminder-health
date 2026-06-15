@@ -67,7 +67,14 @@ export default function PrivacyPolicyPage() {
         </div>
 
         <div>
-          <h2 className="text-xl font-bold mb-2">7. Contact</h2>
+          <h2 className="text-xl font-bold mb-2">7. Children's privacy</h2>
+          <p>The service is intended for adults (18+) and is not directed to children under 13 (or under 16
+            where required by local law). We do not knowingly collect data from children. If you believe a
+            child has provided us data, contact us and we will delete it.</p>
+        </div>
+
+        <div>
+          <h2 className="text-xl font-bold mb-2">8. Contact</h2>
           <p>Questions or requests: <strong>[your-contact-email]</strong>.</p>
         </div>
       </section>

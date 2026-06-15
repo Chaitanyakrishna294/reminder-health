@@ -17,6 +17,7 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [agreed, setAgreed] = useState(false);
 
   const router = useRouter();
   const supabase = createClient();
@@ -24,6 +25,10 @@ export default function RegisterPage() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!agreed) {
+      setError('Please confirm you are 18+ and accept the Terms and Privacy Policy.');
+      return;
+    }
     if (captchaEnabled && !captchaToken) {
       setError('Please complete the verification challenge.');
       return;
@@ -143,6 +148,21 @@ export default function RegisterPage() {
             </button>
           </div>
         </div>
+
+        <label className="flex items-start gap-2 text-xs text-muted-foreground cursor-pointer">
+          <input
+            type="checkbox"
+            checked={agreed}
+            onChange={(e) => setAgreed(e.target.checked)}
+            className="mt-0.5 shrink-0 cursor-pointer"
+          />
+          <span>
+            I am 18 or older and I agree to the{' '}
+            <Link href="/terms" target="_blank" className="text-primary font-semibold hover:underline">Terms of Service</Link>{' '}
+            and{' '}
+            <Link href="/privacy" target="_blank" className="text-primary font-semibold hover:underline">Privacy Policy</Link>.
+          </span>
+        </label>
 
         <Turnstile onVerify={setCaptchaToken} />
 

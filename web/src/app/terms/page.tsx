@@ -35,33 +35,54 @@ export default function TermsOfServicePage() {
         </div>
 
         <div>
-          <h2 className="text-xl font-bold mb-2">3. Your account</h2>
-          <p>You are responsible for the accuracy of the information you enter and for keeping your login
-            secure. You must be old enough to consent to data processing in your jurisdiction. Only link
-            caregivers you trust; caregivers you authorize can view the data you permit.</p>
+          <h2 className="text-xl font-bold mb-2">3. Eligibility & your account</h2>
+          <p>You must be at least 18 years old (or the age of majority in your jurisdiction) to create an
+            account. The service is not directed to children under 13, and we do not knowingly collect their
+            data. You are responsible for the accuracy of the information you enter and for keeping your login
+            secure. Only link caregivers you trust; caregivers you authorize can view the data you permit.</p>
         </div>
 
         <div>
           <h2 className="text-xl font-bold mb-2">4. Acceptable use</h2>
           <p>Do not misuse the service, attempt to access other users' data, upload unlawful content, or
-            disrupt the platform. We may suspend accounts that violate these terms.</p>
+            disrupt the platform. We may suspend or terminate accounts that violate these terms.</p>
         </div>
 
         <div>
-          <h2 className="text-xl font-bold mb-2">5. Your data</h2>
+          <h2 className="text-xl font-bold mb-2">5. Your content</h2>
+          <p>You retain ownership of the information and documents you upload (e.g. Health Vault files and
+            messages). You grant us a limited licence to store and process that content solely to operate the
+            service for you and the caregivers you authorize. You are responsible for the content you upload.</p>
+        </div>
+
+        <div>
+          <h2 className="text-xl font-bold mb-2">6. Fees & refunds</h2>
+          <p>The service is currently provided free of charge. If paid plans are introduced, billing terms,
+            renewal dates, cancellation, and a refund policy will be presented before you are charged.</p>
+        </div>
+
+        <div>
+          <h2 className="text-xl font-bold mb-2">7. Your data</h2>
           <p>Your use of the service is also governed by our{' '}
             <Link href="/privacy" className="text-primary font-semibold hover:underline">Privacy Policy</Link>.
             You can delete your account and data at any time from Settings.</p>
         </div>
 
         <div>
-          <h2 className="text-xl font-bold mb-2">6. Disclaimer & liability</h2>
+          <h2 className="text-xl font-bold mb-2">8. Disclaimer & liability</h2>
           <p>The service is provided "as is" without warranties of any kind. To the maximum extent permitted
             by law, we are not liable for any indirect or consequential damages arising from use of the service.</p>
         </div>
 
         <div>
-          <h2 className="text-xl font-bold mb-2">7. Changes & contact</h2>
+          <h2 className="text-xl font-bold mb-2">9. Governing law & disputes</h2>
+          <p>These terms are governed by the laws of <strong>[your country/state — e.g., India]</strong>.
+            Any dispute will be resolved in the courts of that jurisdiction, unless applicable law requires
+            otherwise. Confirm this clause with counsel for your situation.</p>
+        </div>
+
+        <div>
+          <h2 className="text-xl font-bold mb-2">10. Changes & contact</h2>
           <p>We may update these terms; continued use means you accept the changes. Questions:
             <strong> [your-contact-email]</strong>.</p>
         </div>

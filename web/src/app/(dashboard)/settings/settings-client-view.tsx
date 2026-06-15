@@ -866,6 +866,13 @@ export default function SettingsClientView({
           <span>{deleting ? 'Deleting…' : 'Delete Account'}</span>
         </button>
       </div>
+
+      {/* SECTION 6: LEGAL */}
+      <div className="text-center text-xs text-muted-foreground pt-2">
+        <Link href="/privacy" className="hover:underline">Privacy Policy</Link>
+        <span className="mx-2">·</span>
+        <Link href="/terms" className="hover:underline">Terms of Service</Link>
+      </div>
     </div>
   );
 }

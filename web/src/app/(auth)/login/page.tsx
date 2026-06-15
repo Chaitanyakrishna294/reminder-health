@@ -184,6 +184,12 @@ function LoginForm() {
           Register
         </Link>
       </div>
+
+      <div className="text-center text-xs text-muted-foreground">
+        <Link href="/privacy" className="hover:underline">Privacy Policy</Link>
+        <span className="mx-2">·</span>
+        <Link href="/terms" className="hover:underline">Terms of Service</Link>
+      </div>
     </div>
   );
 }
