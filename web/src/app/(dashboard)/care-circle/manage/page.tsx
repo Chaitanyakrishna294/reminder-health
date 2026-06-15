@@ -37,6 +37,7 @@ interface CareCircleConnection {
   can_view_reports: boolean;
   can_edit_medications: boolean;
   can_receive_escalations: boolean;
+  can_view_medical_profile: boolean;
   resolved_name?: string;
 }
 
@@ -63,6 +64,7 @@ const PERMISSION_PRESETS = {
       can_view_reports: false,
       can_edit_medications: false,
       can_receive_escalations: true,
+      can_view_medical_profile: false,
     }
   },
   FAMILY: {
@@ -73,6 +75,7 @@ const PERMISSION_PRESETS = {
       can_view_reports: true,
       can_edit_medications: false,
       can_receive_escalations: true,
+      can_view_medical_profile: true,
     }
   },
   FULL: {
@@ -83,6 +86,7 @@ const PERMISSION_PRESETS = {
       can_view_reports: true,
       can_edit_medications: true,
       can_receive_escalations: true,
+      can_view_medical_profile: true,
     }
   },
   CUSTOM: {
@@ -237,6 +241,7 @@ export default function SharedTrustCenter() {
       can_view_reports: conn.can_view_reports,
       can_edit_medications: conn.can_edit_medications,
       can_receive_escalations: conn.can_receive_escalations,
+      can_view_medical_profile: conn.can_view_medical_profile,
     });
   };
 
@@ -405,6 +410,8 @@ export default function SharedTrustCenter() {
           changeDescriptions.push(afterVal ? 'authorized schedule edits' : 'revoked schedule editing');
         } else if (k === 'can_receive_escalations') {
           changeDescriptions.push(afterVal ? 'enabled routine alerts' : 'disabled routine alerts');
+        } else if (k === 'can_view_medical_profile') {
+          changeDescriptions.push(afterVal ? 'shared medical profile' : 'revoked medical profile access');
         }
       });
 
@@ -741,6 +748,7 @@ export default function SharedTrustCenter() {
                   { key: 'can_receive_escalations', label: 'Receive missed dose alerts' },
                   { key: 'can_view_reports', label: 'View compliance reports' },
                   { key: 'can_view_vault', label: 'Access shared health documents' },
+                  { key: 'can_view_medical_profile', label: 'View medical profile (blood group, allergies, conditions)' },
                   { key: 'can_edit_medications', label: 'Modify medication schedules' }
                 ].map(({ key, label }) => (
                   <label key={key} className="flex items-center justify-between cursor-pointer group">

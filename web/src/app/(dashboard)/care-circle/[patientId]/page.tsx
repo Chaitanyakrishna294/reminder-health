@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { resolveUserData } from '@/lib/supabase/cached-queries';
 import MedicationReviewQueue from '@/components/dashboard/medication-review-queue';
+import MedicalCard from '@/components/medical/medical-card';
 import { 
   getActiveConnectionForPatient, 
   getPatientHealthMetrics, 
@@ -156,6 +157,18 @@ export default async function PatientConsolePage({ params }: PageProps) {
     recentLogs = logsRes.data || [];
   }
 
+  // 5b. Medical profile — RLS returns a row ONLY when the patient has granted
+  // can_view_medical_profile to this caregiver, so no explicit flag check needed here.
+  let medicalProfile: any = null;
+  if (patientProfile?.id) {
+    const { data: mp } = await supabase
+      .from('medical_profiles')
+      .select('date_of_birth,gender,blood_group,height_cm,weight_kg,drug_allergies,food_allergies,other_allergies,chronic_conditions,emergency_contact_name,emergency_contact_phone,emergency_contact_relationship')
+      .eq('user_id', patientProfile.id)
+      .maybeSingle();
+    medicalProfile = mp || null;
+  }
+
   return (
     <div className="max-w-5xl mx-auto space-y-8 pb-12 font-sans">
       
@@ -165,6 +178,11 @@ export default async function PatientConsolePage({ params }: PageProps) {
           <ArrowLeft className="w-4 h-4" /> Back to Care Circle
         </Link>
       </div>
+
+      {/* Medical profile (only present when the patient granted permission) */}
+      {medicalProfile && (
+        <MedicalCard name={patientName} data={medicalProfile} />
+      )}
 
       {/* 2. Relationship Header Card */}
       <div className="bg-card border border-border rounded-3xl p-6 md:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-sm">

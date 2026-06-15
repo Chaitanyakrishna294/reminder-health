@@ -18,7 +18,9 @@ import {
   LogOut,
   Check,
   FolderHeart,
-  ChevronDown
+  ChevronDown,
+  HeartPulse,
+  Siren
 } from 'lucide-react';
 
 export default function DashboardMainLayout({ 
@@ -131,12 +133,14 @@ export default function DashboardMainLayout({
       { href: '/medications', label: 'Medications', icon: <Pill className="w-5 h-5" /> },
       { href: '/schedule-planner', label: 'Scheduler', icon: <Calendar className="w-5 h-5" /> },
       { href: '/health-vault', label: 'Health Vault', icon: <FolderHeart className="w-5 h-5" /> },
+      { href: '/medical-profile', label: 'Medical Profile', icon: <HeartPulse className="w-5 h-5" /> },
+      { href: '/emergency', label: 'Emergency', icon: <Siren className="w-5 h-5" /> },
       { href: '/settings', label: 'Settings', icon: <Settings className="w-5 h-5" /> },
     ];
 
     if (viewMode === 'PATIENT_MONITOR') {
-      // Hide medications in monitoring view
-      return baseItems.filter(item => item.href !== '/medications');
+      // Hide the patient's own medical/emergency/medication editing in caregiver monitoring view
+      return baseItems.filter(item => !['/medications', '/medical-profile', '/emergency'].includes(item.href));
     }
     return baseItems;
   };

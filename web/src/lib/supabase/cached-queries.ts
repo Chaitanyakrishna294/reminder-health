@@ -35,6 +35,22 @@ export const getCachedProfile = cache(async (userId: string) => {
   return profile;
 });
 
+// Get the caller's medical profile (1:1 with profiles.id). Returns null if none yet
+// or if the table hasn't been migrated, so callers can render an empty form.
+export const getMedicalProfile = cache(async (userId: string) => {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('medical_profiles')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error) {
+    if (error.code !== 'PGRST116') console.error('getMedicalProfile error:', error);
+    return null;
+  }
+  return data;
+});
+
 // Get active caregiver connection list
 export const getCachedCaregiverLinks = cache(async (telegramChatId: string) => {
   const supabase = await createClient();
