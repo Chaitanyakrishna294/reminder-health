@@ -16,6 +16,14 @@ export default async function SettingsPage() {
 
   const supabase = await createClient();
 
+  // The user's universal Connect Code (shareable to link any account type).
+  const { data: codeRow } = await supabase
+    .from('profiles')
+    .select('connect_code')
+    .eq('id', user.id)
+    .maybeSingle();
+  const connectCode: string = codeRow?.connect_code || '';
+
   let linkedCaregivers: any[] = [];
   let caregiverRecord = null;
   let linkedPatientProfile = null;
@@ -144,6 +152,7 @@ export default async function SettingsPage() {
         fullName: profile.full_name || 'User',
         role: userRole,
         telegramChatId: myTelegramChatId || '',
+        connectCode,
       }}
       linkedCaregivers={linkedCaregivers}
       caregiverRecord={caregiverRecord}

@@ -27,6 +27,7 @@ export interface MedicalProfile {
   preferred_reminder_language: string | null;
   timezone: string | null;
   avatar_path: string | null;
+  share_photo_with_caregivers?: boolean | null;
 }
 
 interface Props {
@@ -92,6 +93,7 @@ export default function MedicalProfileClientView({ userId, fullName, email, init
   const [avatarPath, setAvatarPath] = useState(initial?.avatar_path ?? '');
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl);
   const [uploading, setUploading] = useState(false);
+  const [sharePhoto, setSharePhoto] = useState(initial?.share_photo_with_caregivers ?? true);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -166,6 +168,7 @@ export default function MedicalProfileClientView({ userId, fullName, email, init
         preferred_reminder_language: reminderLang || null,
         timezone: timezone || null,
         avatar_path: avatarPath || null,
+        share_photo_with_caregivers: sharePhoto,
       });
       if (upErr) throw upErr;
       setSuccess(true);
@@ -223,6 +226,17 @@ export default function MedicalProfileClientView({ userId, fullName, email, init
             <input type="file" accept="image/*" className="hidden" onChange={handleAvatar} disabled={uploading} />
           </label>
         </div>
+        <label className="flex items-center justify-between gap-3 cursor-pointer rounded-xl bg-muted/30 border border-border/80 p-3">
+          <span className={`font-semibold text-foreground ${isElderly ? 'text-base' : 'text-sm'}`}>
+            Show my photo to connected caregivers
+          </span>
+          <input
+            type="checkbox"
+            checked={sharePhoto}
+            onChange={(e) => setSharePhoto(e.target.checked)}
+            className="w-5 h-5 accent-primary cursor-pointer shrink-0"
+          />
+        </label>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className={label}>Full Name</label>

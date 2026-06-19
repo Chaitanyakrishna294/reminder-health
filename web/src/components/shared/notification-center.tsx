@@ -3,14 +3,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useRealtimeNotifications, Notification } from '@/hooks/use-realtime-notifications';
-import { Bell, Check, SkipForward, AlertTriangle, XCircle, Heart } from 'lucide-react';
+import { Bell, Check, SkipForward, AlertTriangle, XCircle, Heart, Trash2 } from 'lucide-react';
 
 interface NotificationCenterProps {
   userId: string;
 }
 
 export default function NotificationCenter({ userId }: NotificationCenterProps) {
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useRealtimeNotifications(userId);
+  const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification } = useRealtimeNotifications(userId);
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -104,12 +104,21 @@ export default function NotificationCenter({ userId }: NotificationCenterProps) 
                     <div className="flex-1 space-y-0.5 min-w-0">
                       <div className="flex items-center justify-between">
                         <span className="font-semibold text-xs text-foreground truncate">{n.title}</span>
-                        <span className="text-[10px] text-muted-foreground whitespace-nowrap" suppressHydrationWarning>
-                          {new Date(n.created_at).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="text-[10px] text-muted-foreground whitespace-nowrap" suppressHydrationWarning>
+                            {new Date(n.created_at).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                          <button
+                            onClick={() => deleteNotification(n.id)}
+                            aria-label="Delete notification"
+                            className="text-muted-foreground hover:text-danger transition-colors cursor-pointer p-0.5"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                       <p className="text-xs text-muted-foreground break-words leading-relaxed">{n.message}</p>
                       {!n.is_read && n.type === 'CARE_CIRCLE_ACCESS_REQUEST' ? (

@@ -43,6 +43,38 @@ export default function MedicationList({
 }: MedicationListProps) {
   const [meds, setMeds] = useState<Medication[]>(initialMeds);
   const [loadingId, setLoadingId] = useState<number | null>(null);
+  const [stockBusyId, setStockBusyId] = useState<number | null>(null);
+
+  // Whether the viewer can edit stock: only on their own medications.
+  const isOwnMeds = targetTelegramChatId === myTelegramChatId;
+
+  // Refill: add the entered amount to current_stock (source of truth; a DB trigger
+  // syncs tablet_count). Mirrors the Telegram /refill flow.
+  const handleAddStock = async (med: Medication) => {
+    const raw = window.prompt(`Add stock for ${med.drug_name}. How many ${med.unit_type?.toLowerCase() || 'unit'}(s) did you add?`);
+    if (raw === null) return;
+    const amount = Number(raw);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      alert('Please enter a positive number.');
+      return;
+    }
+    setStockBusyId(med.id);
+    try {
+      const supabase = createClient();
+      const newStock = Number(med.current_stock || 0) + amount;
+      const { error } = await supabase
+        .from('medications')
+        .update({ current_stock: newStock })
+        .eq('id', med.id);
+      if (error) throw error;
+      setMeds(prev => prev.map(m => m.id === med.id ? { ...m, current_stock: newStock } : m));
+    } catch (err: any) {
+      console.error('[Medications] add stock failed:', err);
+      alert('Could not update stock. Please try again.');
+    } finally {
+      setStockBusyId(null);
+    }
+  };
   const [mounted, setMounted] = useState(false);
   
   const supabase = createClient();
@@ -273,6 +305,15 @@ export default function MedicationList({
                           </span>
                         ) : (
                           <span className="text-muted-foreground font-medium">Not tracked</span>
+                        )}
+                        {isOwnMeds && (
+                          <button
+                            onClick={() => handleAddStock(med)}
+                            disabled={stockBusyId === med.id}
+                            className="ml-2 inline-flex items-center gap-1 rounded-lg bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 font-bold px-2 py-0.5 text-[11px] transition-all cursor-pointer disabled:opacity-50"
+                          >
+                            <Plus className="w-3 h-3" /> {stockBusyId === med.id ? '…' : 'Add'}
+                          </button>
                         )}
                       </span>
                     </div>

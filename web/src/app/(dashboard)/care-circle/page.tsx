@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { resolveUserData } from '@/lib/supabase/cached-queries';
 import { getCareCircleConnections, getPatientHealthMetrics, PatientHealthMetrics } from '@/lib/supabase/care-circle-service';
+import { createServiceClient } from '@/lib/supabase/service-role';
 import { 
   Users, 
   ArrowLeft, 
@@ -34,6 +35,27 @@ async function PatientStatusCard({ id, name, relationship, isPrimary, telegramId
     console.error(`Failed to load metrics for patient ${telegramId}:`, err);
   }
 
+  // Patient photo (if they share it). Avatars bucket is owner-only, so mint via
+  // the service client; gated by the patient's share_photo_with_caregivers flag.
+  let avatarUrl: string | null = null;
+  try {
+    const admin = createServiceClient();
+    const { data: prof } = await admin.from('profiles').select('id').eq('telegram_chat_id', telegramId).maybeSingle();
+    if (prof?.id) {
+      const { data: mp } = await admin
+        .from('medical_profiles')
+        .select('avatar_path, share_photo_with_caregivers')
+        .eq('user_id', prof.id)
+        .maybeSingle();
+      if (mp?.avatar_path && mp.share_photo_with_caregivers !== false) {
+        const { data: signed } = await admin.storage.from('avatars').createSignedUrl(mp.avatar_path, 600);
+        avatarUrl = signed?.signedUrl ?? null;
+      }
+    }
+  } catch (err) {
+    console.error(`Failed to load avatar for patient ${telegramId}:`, err);
+  }
+
   const statusLabel = metrics 
     ? metrics.complianceStatus === 'missed' 
       ? '⚠️ Action Needed' 
@@ -56,8 +78,13 @@ async function PatientStatusCard({ id, name, relationship, isPrimary, telegramId
       <div className="space-y-4">
         {/* Profile Info */}
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold border border-primary/20">
-            {name.substring(0, 2).toUpperCase()}
+          <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold border border-primary/20 overflow-hidden">
+            {avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={avatarUrl} alt={`${name} photo`} className="w-full h-full object-cover" />
+            ) : (
+              name.substring(0, 2).toUpperCase()
+            )}
           </div>
           <div>
             <h3 className="font-black text-foreground text-base tracking-tight">{name}</h3>

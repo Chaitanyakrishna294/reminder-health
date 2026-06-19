@@ -11,6 +11,7 @@ import {
   PatientHealthMetrics
 } from '@/lib/supabase/care-circle-service';
 import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service-role';
 import moment from 'moment-timezone';
 import { 
   ArrowLeft, 
@@ -169,6 +170,25 @@ export default async function PatientConsolePage({ params }: PageProps) {
     medicalProfile = mp || null;
   }
 
+  // Patient photo for connected caregivers (any active connection, unless the
+  // patient opted out). Avatars bucket is owner-only by RLS, so mint via the
+  // service client after the connection check above.
+  let patientAvatarUrl: string | null = null;
+  if (patientProfile?.id) {
+    const admin = createServiceClient();
+    const { data: mpPhoto } = await admin
+      .from('medical_profiles')
+      .select('avatar_path, share_photo_with_caregivers')
+      .eq('user_id', patientProfile.id)
+      .maybeSingle();
+    if (mpPhoto?.avatar_path && mpPhoto.share_photo_with_caregivers !== false) {
+      const { data: signed } = await admin.storage
+        .from('avatars')
+        .createSignedUrl(mpPhoto.avatar_path, 600);
+      patientAvatarUrl = signed?.signedUrl ?? null;
+    }
+  }
+
   return (
     <div className="max-w-5xl mx-auto space-y-8 pb-12 font-sans">
       
@@ -187,8 +207,13 @@ export default async function PatientConsolePage({ params }: PageProps) {
       {/* 2. Relationship Header Card */}
       <div className="bg-card border border-border rounded-3xl p-6 md:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-sm">
         <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center font-extrabold border border-primary/20 text-2xl">
-            {patientName.substring(0, 2).toUpperCase()}
+          <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center font-extrabold border border-primary/20 text-2xl overflow-hidden">
+            {patientAvatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={patientAvatarUrl} alt={`${patientName} photo`} className="w-full h-full object-cover" />
+            ) : (
+              patientName.substring(0, 2).toUpperCase()
+            )}
           </div>
           <div>
             <h1 className="text-2xl font-black text-foreground tracking-tight">{patientName}</h1>

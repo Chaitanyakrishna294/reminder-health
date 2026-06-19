@@ -137,63 +137,71 @@ const MedicationSlider = ({ event, onResolve }: MedicationSliderProps) => {
   const [progress, setProgress] = useState(0); // -100 (skip) .. 100 (take)
   const [isDragging, setIsDragging] = useState(false);
   const trackRef = React.useRef<HTMLDivElement>(null);
+  // Refs mirror the live drag state so window-listener handlers read current
+  // values without the effect re-subscribing on every pixel (the prior cause of jank).
+  const positionRef = React.useRef(0);
+  const draggingRef = React.useRef(false);
 
   const handleStart = () => {
+    draggingRef.current = true;
     setIsDragging(true);
   };
 
   const handleMove = (clientX: number) => {
-    if (!isDragging || !trackRef.current) return;
+    if (!draggingRef.current || !trackRef.current) return;
     const rect = trackRef.current.getBoundingClientRect();
     const width = rect.width;
     const center = rect.left + width / 2;
     const offset = clientX - center;
     const maxOffset = width / 2 - 28; // ~knob radius
     const percentage = Math.max(-100, Math.min(100, (offset / maxOffset) * 100));
-    setPosition((percentage / 100) * maxOffset);
+    const px = (percentage / 100) * maxOffset;
+    positionRef.current = px;
+    setPosition(px);
     setProgress(percentage);
   };
 
   const handleEnd = () => {
-    if (!isDragging || !trackRef.current) return;
+    if (!draggingRef.current || !trackRef.current) return;
+    draggingRef.current = false;
     setIsDragging(false);
     const rect = trackRef.current.getBoundingClientRect();
     const maxOffset = rect.width / 2 - 28;
     const threshold = maxOffset * 0.7;
+    const pos = positionRef.current;
 
-    if (position >= threshold) {
+    if (pos >= threshold) {
       onResolve('TAKEN');
-    } else if (position <= -threshold) {
+    } else if (pos <= -threshold) {
       onResolve('SKIP');
     }
+    positionRef.current = 0;
     setPosition(0);
     setProgress(0);
   };
 
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => handleMove(e.clientX);
-    const handleMouseUp = () => handleEnd();
-    const handleTouchMove = (e: TouchEvent) => {
-      if (e.touches.length > 0) {
-        handleMove(e.touches[0].clientX);
-      }
+    if (!isDragging) return;
+    const onMouseMove = (e: MouseEvent) => handleMove(e.clientX);
+    const onMouseUp = () => handleEnd();
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length > 0) handleMove(e.touches[0].clientX);
     };
-    const handleTouchEnd = () => handleEnd();
+    const onTouchEnd = () => handleEnd();
 
-    if (isDragging) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
-      window.addEventListener('touchmove', handleTouchMove);
-      window.addEventListener('touchend', handleTouchEnd);
-    }
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    window.addEventListener('touchmove', onTouchMove, { passive: true });
+    window.addEventListener('touchend', onTouchEnd);
 
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-      window.removeEventListener('touchmove', handleTouchMove);
-      window.removeEventListener('touchend', handleTouchEnd);
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend', onTouchEnd);
     };
-  }, [isDragging, position]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDragging]);
 
   const takeIntensity = Math.max(0, progress) / 100; // 0..1 dragging right (take)
   const skipIntensity = Math.max(0, -progress) / 100; // 0..1 dragging left (skip)
@@ -239,6 +247,7 @@ const MedicationSlider = ({ event, onResolve }: MedicationSliderProps) => {
         style={{
           transform: `translateX(calc(-50% + ${position}px))`,
           left: '50%',
+          willChange: 'transform',
           transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
         }}
         className={`absolute top-1 z-20 w-12 h-12 rounded-full bg-white shadow-lg border-2 cursor-grab active:cursor-grabbing flex items-center justify-center touch-none transition-colors ${
@@ -554,9 +563,17 @@ export default function DashboardClientView({
       'ESCALATED', 'CAREGIVER_ACKNOWLEDGED',
     ].includes(status);
   };
+  // Surface missed/overdue doses first (a dose past its time that isn't resolved),
+  // then the soonest upcoming. Falls back to nothing when all are resolved → card hides.
+  const nowMs = Date.now();
   const nextPendingEvent = [...events]
     .filter(e => isPendingState(e.reminder_status))
-    .sort((a, b) => new Date(a.scheduled_for).getTime() - new Date(b.scheduled_for).getTime())[0];
+    .sort((a, b) => {
+      const aOverdue = new Date(a.scheduled_for).getTime() <= nowMs;
+      const bOverdue = new Date(b.scheduled_for).getTime() <= nowMs;
+      if (aOverdue !== bOverdue) return aOverdue ? -1 : 1; // overdue/missed to the top
+      return new Date(a.scheduled_for).getTime() - new Date(b.scheduled_for).getTime();
+    })[0];
 
   // Resolve medication for Elderly Mode giant button
   const handleElderlyTakeNow = async (event: ReminderEvent, action: 'TAKEN' | 'SKIP') => {

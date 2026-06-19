@@ -106,5 +106,19 @@ export function useRealtimeNotifications(userId: string) {
     }
   };
 
-  return { notifications, unreadCount, markAsRead, markAllAsRead };
+  const deleteNotification = async (notificationId: string) => {
+    // Optimistic remove; RLS (FOR ALL USING user_id = auth.uid()) permits delete.
+    const removed = notifications.find((n) => n.id === notificationId);
+    setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
+    if (removed && !removed.is_read) setUnreadCount((prev) => Math.max(0, prev - 1));
+    try {
+      const { error } = await supabase.from('notifications').delete().eq('id', notificationId);
+      if (error) throw error;
+    } catch (err) {
+      console.error('[Notifications Hook] Error deleting notification:', err);
+      fetchNotifications(); // resync on failure
+    }
+  };
+
+  return { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification };
 }

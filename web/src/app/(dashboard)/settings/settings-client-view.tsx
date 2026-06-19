@@ -28,6 +28,7 @@ interface SettingsClientViewProps {
     fullName: string;
     role: 'PATIENT' | 'CAREGIVER';
     telegramChatId: string;
+    connectCode?: string;
   };
   linkedCaregivers: Array<{
     id: number | string;
@@ -131,6 +132,14 @@ export default function SettingsClientView({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const [copiedCode, setCopiedCode] = useState(false);
+  const handleCopyConnectCode = () => {
+    if (!user.connectCode) return;
+    navigator.clipboard.writeText(user.connectCode);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
+  };
+
   // --- PATIENT: Link Caregiver (Sprint 5.6C: creates caregiver_connections + notification) ---
   const handleLinkCaregiver = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -138,8 +147,10 @@ export default function SettingsClientView({
     setSuccessMsg(null);
     
     const formattedId = cgIdInput.trim().toUpperCase();
-    if (!/^CG\d{6}$/.test(formattedId)) {
-      setErrorMsg('Invalid Caregiver ID. Format must be CG followed by 6 numbers (e.g., CG123456).');
+    const isConnectCode = /^RM[A-Z0-9]{6}$/.test(formattedId);
+    const isLegacyCgId = /^CG\d{6}$/.test(formattedId);
+    if (!isConnectCode && !isLegacyCgId) {
+      setErrorMsg('Invalid code. Enter a Connect Code (e.g. RMAB12CD) or a legacy Caregiver ID (e.g. CG123456).');
       return;
     }
 
@@ -150,25 +161,37 @@ export default function SettingsClientView({
 
     setProcessing(true);
     try {
-      // 1. Resolve the caregiver from their shareable CG-ID via a SECURITY DEFINER RPC.
-      //    Direct reads of caregiver_info/profiles are RLS-restricted to already-linked rows,
-      //    so a patient inviting a NEW caregiver must resolve the code through the RPC.
-      const { data: lk, error: lkErr } = await supabase
-        .rpc('lookup_caregiver_by_code', { p_cg_id: formattedId });
-      if (lkErr) throw lkErr;
+      // Resolve the invitee's profile. A Connect Code (universal, works for web-only
+      // accounts) resolves any profile; a legacy CG-ID resolves a Telegram caregiver.
+      let targetProfileId: string | null = null;
+      let targetName = 'Caregiver';
+      if (isConnectCode) {
+        const { data: lk, error: lkErr } = await supabase
+          .rpc('lookup_profile_by_connect_code', { p_code: formattedId });
+        if (lkErr) throw lkErr;
+        const match = Array.isArray(lk) ? lk[0] : lk;
+        targetProfileId = match?.profile_id ?? null;
+        targetName = match?.full_name || 'Caregiver';
+      } else {
+        const { data: lk, error: lkErr } = await supabase
+          .rpc('lookup_caregiver_by_code', { p_cg_id: formattedId });
+        if (lkErr) throw lkErr;
+        const match = Array.isArray(lk) ? lk[0] : lk;
+        targetProfileId = match?.caregiver_profile_id ?? null;
+        targetName = match?.caregiver_name || 'Caregiver';
+      }
 
-      const match = Array.isArray(lk) ? lk[0] : lk;
-      if (!match || !match.caregiver_profile_id) {
-        setErrorMsg('Caregiver ID not found or inactive. Please ask your caregiver for their correct ID.');
+      if (!targetProfileId) {
+        setErrorMsg('Code not found or inactive. Please ask them for their correct Connect Code.');
         setProcessing(false);
         return;
       }
-      const cgName = match.caregiver_name || 'Caregiver';
+      const cgName = targetName;
 
       // 2. Create/reactivate the request via invite_caregiver (handles dedupe + reactivation
       //    + the request notification trigger, all under SECURITY DEFINER).
       const { data: connId, error: connErr } = await supabase
-        .rpc('invite_caregiver', { caregiver_id: match.caregiver_profile_id });
+        .rpc('invite_caregiver', { caregiver_id: targetProfileId });
 
       if (connErr) {
         const m = (connErr.message || '').toLowerCase();
@@ -494,6 +517,33 @@ export default function SettingsClientView({
             </div>
           )}
         </div>
+
+        {/* Universal Connect Code — share to let anyone (web or Telegram) link with you */}
+        {user.connectCode && (
+          <div className="mt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-primary/5 border border-primary/20 rounded-2xl p-4">
+            <div className="space-y-0.5">
+              <span className={`font-extrabold text-foreground block ${isElderly ? 'text-lg' : 'text-sm'}`}>
+                Your Connect Code
+              </span>
+              <span className={`text-muted-foreground block ${isElderly ? 'text-base' : 'text-xs'}`}>
+                Share this so others can connect with you in Care Circle — works for any account.
+              </span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <code className={`font-mono font-black tracking-widest bg-card border border-border rounded-xl px-3 py-2 ${isElderly ? 'text-xl' : 'text-base'}`}>
+                {user.connectCode}
+              </code>
+              <button
+                onClick={handleCopyConnectCode}
+                aria-label="Copy connect code"
+                className="flex items-center gap-1.5 font-bold rounded-xl bg-primary text-primary-foreground hover:bg-primary-hover transition-all cursor-pointer px-3 py-2 text-xs"
+              >
+                {copiedCode ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                <span>{copiedCode ? 'Copied' : 'Copy'}</span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* SECTION 2: VISUAL MODE PREFERENCE */}
@@ -631,15 +681,15 @@ export default function SettingsClientView({
           <form onSubmit={handleLinkCaregiver} className="space-y-4 pt-2">
             <div className="bg-muted/10 border border-border/80 rounded-2xl p-4 space-y-3">
               <p className={`text-muted-foreground font-semibold ${isElderly ? 'text-lg' : 'text-xs'}`}>
-                {linkedCaregivers.length > 0 
-                  ? 'Link another caregiver to support your routine. Enter their Caregiver ID below:' 
-                  : 'You are currently not connected to a caregiver. Ask your caregiver for their Caregiver ID and enter it below:'}
+                {linkedCaregivers.length > 0
+                  ? 'Link another caregiver to support your routine. Enter their Connect Code (or legacy Caregiver ID) below:'
+                  : 'You are currently not connected to a caregiver. Ask them for their Connect Code (or Caregiver ID) and enter it below:'}
               </p>
-              
+
               <div className="flex flex-col sm:flex-row gap-3">
                 <input
                   type="text"
-                  placeholder="CG123456"
+                  placeholder="RMAB12CD or CG123456"
                   value={cgIdInput}
                   onChange={(e) => setCgIdInput(e.target.value)}
                   disabled={processing}
