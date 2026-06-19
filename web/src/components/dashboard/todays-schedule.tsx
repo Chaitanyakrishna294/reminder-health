@@ -5,7 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { resolveReminderEvent } from '@/lib/reminder-events';
+import { resolveReminderEvent, correctReminderEvent } from '@/lib/reminder-events';
 import { useUiMode } from '@/context/ui-mode-context';
 import { Check, SkipForward, AlertCircle, Clock, AlertTriangle, Pill, CheckCircle, XCircle, X } from 'lucide-react';
 import { PremiumToast } from '@/components/ui/premium-toast';
@@ -182,6 +182,57 @@ export default function TodaysSchedule({
     }
   };
 
+  // Correct a same-day dose that was logged wrong (Taken ↔ Skipped). Stock auto-compensates.
+  const handleCorrect = async (event: ReminderEvent, currentStatus: 'TAKEN' | 'SKIPPED') => {
+    if (updatingId !== null) return;
+    const newAction: 'TAKEN' | 'SKIP' = currentStatus === 'TAKEN' ? 'SKIP' : 'TAKEN';
+    const label = newAction === 'TAKEN' ? 'Taken' : 'Skipped';
+    if (!window.confirm(`Change this dose to "${label}"?`)) return;
+    setUpdatingId(event.id);
+    try {
+      const rec = await correctReminderEvent({
+        supabase,
+        eventId: event.id,
+        medicationId: event.medication_id,
+        scheduledFor: event.scheduled_for,
+        action: newAction,
+        actorRole: userRole,
+      });
+      const updated = events.map((e) =>
+        e.id === event.id ? { ...e, id: rec.event_id ?? e.id, reminder_status: rec.reminder_status } : e
+      );
+      setEvents(updated);
+      if (onEventsChange) onEventsChange(updated);
+      router.refresh();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes('CORRECTION_WINDOW_EXPIRED')) {
+        showToast('Cannot change', 'Doses can only be corrected on the same day.', 'error');
+      } else {
+        console.error('[Today Schedule] Error correcting event:', message, err);
+        showToast('Error', 'Failed to change this dose. Please try again.', 'error');
+      }
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  // Small "Change to …" link shown under a resolved dose's badge.
+  const renderChangeLink = (event: ReminderEvent) => {
+    const s = event.reminder_status;
+    if (!['TAKEN', 'SKIPPED', 'RESOLVED_BY_CG'].includes(s)) return null;
+    const isTaken = s === 'TAKEN' || s === 'RESOLVED_BY_CG';
+    return (
+      <button
+        onClick={() => handleCorrect(event, isTaken ? 'TAKEN' : 'SKIPPED')}
+        disabled={updatingId === event.id}
+        className="text-[10px] text-muted-foreground hover:text-primary underline font-semibold cursor-pointer disabled:opacity-50"
+      >
+        {updatingId === event.id ? 'Changing…' : `Change to ${isTaken ? 'Skipped' : 'Taken'}`}
+      </button>
+    );
+  };
+
   const getStatusBadge = (status: string) => {
     const sizeClasses = isElderly 
       ? "px-4 py-1.5 text-lg rounded-xl border-2" 
@@ -301,8 +352,9 @@ export default function TodaysSchedule({
                         }`}>
                           Priority: {event.medications.priority_level}
                         </span>
-                        <div className="text-lg font-black">
+                        <div className="text-lg font-black flex flex-col items-start gap-1">
                           {getStatusBadge(event.reminder_status)}
+                          {renderChangeLink(event)}
                         </div>
                       </div>
                     </div>
@@ -414,6 +466,7 @@ export default function TodaysSchedule({
           ) : (
             <div className="flex flex-col items-end gap-1">
               {getStatusBadge(event.reminder_status)}
+              {renderChangeLink(event)}
             </div>
           )}
         </div>
