@@ -11,6 +11,8 @@ import { registerPush } from '@/lib/push/register-push';
 import dynamic from 'next/dynamic';
 import { resolveReminderEvent } from '@/lib/reminder-events';
 import { PremiumToast } from '@/components/ui/premium-toast';
+import MedDueGate from '@/components/dashboard/med-due-gate';
+import BrainMascot from '@/components/dashboard/brain-mascot';
 import moment from 'moment-timezone';
 
 const AdherenceChart = dynamic(() => import('@/components/dashboard/adherence-chart'), {
@@ -312,6 +314,7 @@ export default function DashboardClientView({
   const { isElderly, toggleMode, viewMode } = useUiMode();
 
   const [events, setEvents] = useState<ReminderEvent[]>([]);
+  const [gateDone, setGateDone] = useState(false);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [hoveredEvent, setHoveredEvent] = useState<ReminderEvent | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -575,6 +578,25 @@ export default function DashboardClientView({
       return new Date(a.scheduled_for).getTime() - new Date(b.scheduled_for).getTime();
     })[0];
 
+  // "Did you take it?" gate: due/overdue, unresolved doses, shown before the dashboard.
+  // Only for the patient on their own dashboard (never when a caregiver is monitoring).
+  const dueQueue = (userRole === 'PATIENT' && viewMode !== 'PATIENT_MONITOR')
+    ? [...events]
+        .filter(e => isPendingState(e.reminder_status) && new Date(e.scheduled_for).getTime() <= nowMs)
+        .sort((a, b) => new Date(a.scheduled_for).getTime() - new Date(b.scheduled_for).getTime())
+    : [];
+  const showGate = mounted && !gateDone && dueQueue.length > 0;
+  const dueGate = showGate ? (
+    <MedDueGate
+      dueEvents={dueQueue as any}
+      userRole={userRole}
+      onResolved={(eventId, newStatus) =>
+        setEvents(prev => prev.map(e => (e.id === eventId ? { ...e, reminder_status: newStatus } : e)))
+      }
+      onComplete={() => { setGateDone(true); router.refresh(); }}
+    />
+  ) : null;
+
   // Resolve medication for Elderly Mode giant button
   const handleElderlyTakeNow = async (event: ReminderEvent, action: 'TAKEN' | 'SKIP') => {
     // 1. Double-click prevention
@@ -731,6 +753,7 @@ export default function DashboardClientView({
 
     return (
       <>
+        {dueGate}
         <div className={`space-y-8 w-full max-w-4xl mx-auto transition-colors duration-500 ${isGravityState ? 'pb-24' : ''}`}>
           {/* Gravity State Dimmer Backdrop (Disabled) */}
 
@@ -948,6 +971,7 @@ export default function DashboardClientView({
   // ==========================================
   return (
     <>
+      {dueGate}
       <div className={`space-y-8 w-full transition-all duration-500 relative ${isGravityState ? 'gravity-active' : ''}`}>
 
       {/* Push Banner */}
@@ -1123,8 +1147,9 @@ export default function DashboardClientView({
           </div>
         </div>
         
-        {/* Right side: Bell icon and Synced tag */}
+        {/* Right side: brain mascot accent + Synced tag */}
         <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end shrink-0">
+          <BrainMascot size={52} mood={todayMissed > 0 || activeEscalations > 0 ? 'asking' : 'happy'} className="hidden sm:block -my-1" />
           <div className="text-[10px] font-bold text-muted-foreground bg-muted border border-border px-3 py-1.5 rounded-full flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" aria-label="Active Connection Dot" />
             Synced
