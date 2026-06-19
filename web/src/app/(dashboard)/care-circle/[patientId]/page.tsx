@@ -175,17 +175,22 @@ export default async function PatientConsolePage({ params }: PageProps) {
   // service client after the connection check above.
   let patientAvatarUrl: string | null = null;
   if (patientProfile?.id) {
-    const admin = createServiceClient();
-    const { data: mpPhoto } = await admin
-      .from('medical_profiles')
-      .select('avatar_path, share_photo_with_caregivers')
-      .eq('user_id', patientProfile.id)
-      .maybeSingle();
-    if (mpPhoto?.avatar_path && mpPhoto.share_photo_with_caregivers !== false) {
-      const { data: signed } = await admin.storage
-        .from('avatars')
-        .createSignedUrl(mpPhoto.avatar_path, 600);
-      patientAvatarUrl = signed?.signedUrl ?? null;
+    // The photo is non-critical: never let a service-client/storage hiccup 500 the page.
+    try {
+      const admin = createServiceClient();
+      const { data: mpPhoto } = await admin
+        .from('medical_profiles')
+        .select('avatar_path, share_photo_with_caregivers')
+        .eq('user_id', patientProfile.id)
+        .maybeSingle();
+      if (mpPhoto?.avatar_path && mpPhoto.share_photo_with_caregivers !== false) {
+        const { data: signed } = await admin.storage
+          .from('avatars')
+          .createSignedUrl(mpPhoto.avatar_path, 600);
+        patientAvatarUrl = signed?.signedUrl ?? null;
+      }
+    } catch (err) {
+      console.error('[CareCircle] patient avatar load failed (non-fatal):', err);
     }
   }
 
