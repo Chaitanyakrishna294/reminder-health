@@ -8,9 +8,8 @@ import {
   Heart, 
   UserCheck, 
   UserX, 
-  Shield, 
-  Clock, 
-  ChevronDown,
+  Shield,
+  Clock,
   Loader2,
   Inbox,
   CheckCircle2,
@@ -38,70 +37,6 @@ interface SentRequest {
   expires_at: string | null;
 }
 
-type PermissionPreset = 'BASIC' | 'FAMILY' | 'FULL' | 'CUSTOM';
-
-const RELATIONSHIP_OPTIONS = [
-  { value: 'SON', label: 'Son' },
-  { value: 'DAUGHTER', label: 'Daughter' },
-  { value: 'SPOUSE', label: 'Spouse' },
-  { value: 'PARENT', label: 'Parent' },
-  { value: 'SIBLING', label: 'Sibling' },
-  { value: 'FRIEND', label: 'Friend' },
-  { value: 'DOCTOR', label: 'Doctor' },
-  { value: 'OTHER', label: 'Other' },
-];
-
-const PERMISSION_PRESETS: Record<PermissionPreset, {
-  label: string;
-  description: string;
-  flags: Record<string, boolean>;
-}> = {
-  BASIC: {
-    label: 'Basic Support',
-    description: 'View schedule and receive missed dose alerts.',
-    flags: {
-      can_view_medications: true,
-      can_receive_escalations: true,
-      can_view_reports: false,
-      can_view_vault: false,
-      can_edit_medications: false,
-    },
-  },
-  FAMILY: {
-    label: 'Family Support',
-    description: 'View schedule, receive alerts, and check reports.',
-    flags: {
-      can_view_medications: true,
-      can_receive_escalations: true,
-      can_view_reports: true,
-      can_view_vault: false,
-      can_edit_medications: false,
-    },
-  },
-  FULL: {
-    label: 'Full Support',
-    description: 'Full access to schedules, reports, alerts, and shared documents.',
-    flags: {
-      can_view_medications: true,
-      can_receive_escalations: true,
-      can_view_reports: true,
-      can_view_vault: true,
-      can_edit_medications: false,
-    },
-  },
-  CUSTOM: {
-    label: 'Custom',
-    description: 'Manually choose what to share.',
-    flags: {
-      can_view_medications: true,
-      can_receive_escalations: true,
-      can_view_reports: false,
-      can_view_vault: false,
-      can_edit_medications: false,
-    },
-  },
-};
-
 // --- Component ---
 export default function CareCircleRequestsPage() {
   const supabase = createClient();
@@ -113,11 +48,6 @@ export default function CareCircleRequestsPage() {
   const [processing, setProcessing] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
-  // Per-request configuration state
-  const [selectedRelationship, setSelectedRelationship] = useState<Record<string, string>>({});
-  const [selectedPreset, setSelectedPreset] = useState<Record<string, PermissionPreset>>({});
-  const [customFlags, setCustomFlags] = useState<Record<string, Record<string, boolean>>>({});
 
   // Fetch pending requests (correct query direction: incoming = where I am the caregiver, outgoing = where I am the patient)
   const fetchRequests = useCallback(async () => {
@@ -220,48 +150,20 @@ export default function CareCircleRequestsPage() {
     setErrorMsg(null);
     setSuccessMsg(null);
 
-    const relationship = selectedRelationship[requestId] || 'OTHER';
-    const preset = selectedPreset[requestId] || 'BASIC';
-    const flags = preset === 'CUSTOM' 
-      ? (customFlags[requestId] || PERMISSION_PRESETS.BASIC.flags) 
-      : PERMISSION_PRESETS[preset].flags;
-
     try {
-      const requestObj = pendingRequests.find(r => r.id === requestId);
-      const patientId = requestObj ? requestObj.caregiver_profile_id : (currentUserId || '');
-
-      // Check if patient already has a primary caregiver
-      const { data: existingPrimary } = await supabase
-        .from('caregiver_connections')
-        .select('id')
-        .eq('patient_profile_id', patientId)
-        .eq('is_primary', true)
-        .eq('is_active', true)
-        .eq('connection_status', 'ACCEPTED')
-        .maybeSingle();
-
-      // First accepted caregiver becomes primary automatically
-      const isPrimary = !existingPrimary;
-
-
-      const { error } = await supabase
-        .from('caregiver_connections')
-        .update({
-          connection_status: 'ACCEPTED',
-          relationship_type: relationship,
-          is_primary: isPrimary,
-          ...flags,
-        })
-        .eq('id', requestId);
+      // Status-only accept via SECURITY DEFINER RPC. The connection's owner (the
+      // patient) controls relationship + permissions — a caregiver accepting cannot
+      // set them (the validation trigger forbids it). Primary is auto-assigned by trigger.
+      const { error } = await supabase.rpc('respond_to_caregiver_request', {
+        p_connection_id: requestId,
+        p_action: 'ACCEPT',
+      });
 
       if (error) throw error;
 
       // Ephemeral notification cleanup is handled by DB trigger
-      // trg_cleanup_resolved_notifications automatically deletes
-      // CARE_CIRCLE_ACCESS_REQUEST notifications when status leaves PENDING.
-
-      const roleLabel = isPrimary ? 'Primary Care Coordinator' : 'Care Supporter';
-      setSuccessMsg(`Connection accepted as ${roleLabel}! They can now view your shared health information.`);
+      // trg_cleanup_resolved_notifications when status leaves PENDING.
+      setSuccessMsg('Connection accepted! You can now support their medication routine.');
       setPendingRequests(prev => prev.filter(r => r.id !== requestId));
     } catch (err) {
       console.error('[Requests] Accept error:', err);
@@ -279,18 +181,12 @@ export default function CareCircleRequestsPage() {
     setSuccessMsg(null);
 
     try {
-      const { error } = await supabase
-        .from('caregiver_connections')
-        .update({ 
-          connection_status: 'REJECTED',
-          is_active: false,
-        })
-        .eq('id', requestId);
+      const { error } = await supabase.rpc('respond_to_caregiver_request', {
+        p_connection_id: requestId,
+        p_action: 'REJECT',
+      });
 
       if (error) throw error;
-
-      // Ephemeral notification cleanup is handled by DB trigger
-      // trg_cleanup_resolved_notifications auto-deletes on PENDING → REJECTED
 
       setSuccessMsg('Request declined.');
       setPendingRequests(prev => prev.filter(r => r.id !== requestId));
@@ -310,10 +206,10 @@ export default function CareCircleRequestsPage() {
     setSuccessMsg(null);
 
     try {
-      const { error } = await supabase
-        .from('caregiver_connections')
-        .update({ connection_status: 'WITHDRAWN' })
-        .eq('id', requestId);
+      const { error } = await supabase.rpc('respond_to_caregiver_request', {
+        p_connection_id: requestId,
+        p_action: 'WITHDRAW',
+      });
 
       if (error) throw error;
 
@@ -328,23 +224,6 @@ export default function CareCircleRequestsPage() {
   };
 
   // --- Helpers ---
-  const getPresetFlags = (preset: PermissionPreset, requestId: string) => {
-    if (preset === 'CUSTOM') {
-      return customFlags[requestId] || PERMISSION_PRESETS.BASIC.flags;
-    }
-    return PERMISSION_PRESETS[preset].flags;
-  };
-
-  const toggleCustomFlag = (requestId: string, flag: string) => {
-    setCustomFlags(prev => ({
-      ...prev,
-      [requestId]: {
-        ...(prev[requestId] || PERMISSION_PRESETS.BASIC.flags),
-        [flag]: !(prev[requestId]?.[flag] ?? PERMISSION_PRESETS.BASIC.flags[flag as keyof typeof PERMISSION_PRESETS.BASIC.flags]),
-      },
-    }));
-  };
-
   const getDaysRemaining = (expiresAt: string | null) => {
     if (!expiresAt) return null;
     const diff = new Date(expiresAt).getTime() - Date.now();
@@ -423,7 +302,6 @@ export default function CareCircleRequestsPage() {
           <div className="space-y-4">
             {pendingRequests.map(request => {
               const daysLeft = getDaysRemaining(request.expires_at);
-              const currentPreset = selectedPreset[request.id] || 'BASIC';
               const isProcessing = processing === request.id;
 
               return (
@@ -461,81 +339,12 @@ export default function CareCircleRequestsPage() {
 
                   {/* Configuration Panel */}
                   <div className="p-4 space-y-4">
-                    {/* Relationship Selector */}
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-foreground block">
-                        Who is {request.caregiver_name} to you?
-                      </label>
-                      <div className="relative">
-                        <select
-                          value={selectedRelationship[request.id] || 'OTHER'}
-                          onChange={(e) => setSelectedRelationship(prev => ({
-                            ...prev, [request.id]: e.target.value,
-                          }))}
-                          className="w-full h-10 px-3 pr-8 bg-white border border-border rounded-xl text-sm font-semibold text-foreground appearance-none cursor-pointer focus:outline-none focus:border-primary"
-                        >
-                          {RELATIONSHIP_OPTIONS.map(opt => (
-                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                          ))}
-                        </select>
-                        <ChevronDown className="w-4 h-4 text-muted-foreground absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                      </div>
-                    </div>
-
-                    {/* Permission Preset Selector */}
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-foreground block">
-                        What would you like to share?
-                      </label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {(Object.keys(PERMISSION_PRESETS) as PermissionPreset[]).map(preset => (
-                          <button
-                            key={preset}
-                            onClick={() => setSelectedPreset(prev => ({ ...prev, [request.id]: preset }))}
-                            className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                              currentPreset === preset
-                                ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
-                                : 'border-border bg-white hover:border-primary/30'
-                            }`}
-                          >
-                            <span className="text-xs font-bold text-foreground block">
-                              {PERMISSION_PRESETS[preset].label}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground leading-tight block mt-0.5">
-                              {PERMISSION_PRESETS[preset].description}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Custom Toggles (only shown if Custom preset selected) */}
-                    {currentPreset === 'CUSTOM' && (
-                      <div className="bg-muted/30 border border-border rounded-xl p-3 space-y-2">
-                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Custom Permissions</p>
-                        {[
-                          { key: 'can_view_medications', label: 'View medication schedules' },
-                          { key: 'can_receive_escalations', label: 'Receive missed dose alerts' },
-                          { key: 'can_view_reports', label: 'View compliance reports' },
-                          { key: 'can_view_vault', label: 'Access shared health documents' },
-                          { key: 'can_edit_medications', label: 'Modify medication schedules' },
-                        ].map(perm => {
-                          const flags = customFlags[request.id] || PERMISSION_PRESETS.BASIC.flags;
-                          const isChecked = flags[perm.key] ?? false;
-                          return (
-                            <label key={perm.key} className="flex items-center gap-2 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={() => toggleCustomFlag(request.id, perm.key)}
-                                className="w-4 h-4 rounded border-border text-primary focus:ring-primary cursor-pointer"
-                              />
-                              <span className="text-xs text-foreground font-medium">{perm.label}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    )}
+                    {/* Note: the patient controls what is shared (in their Care Circle settings).
+                        The caregiver simply accepts or declines here. */}
+                    <p className="text-[11px] text-muted-foreground bg-muted/30 border border-border rounded-xl p-3">
+                      Accepting lets you support this person&apos;s medication routine. They choose
+                      what to share with you and can adjust it anytime from their Care Circle settings.
+                    </p>
 
                     {/* Action Buttons */}
                     <div className="flex gap-3 pt-2">
