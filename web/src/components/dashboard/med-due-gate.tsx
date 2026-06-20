@@ -1,14 +1,15 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { resolveReminderEvent } from '@/lib/reminder-events';
 import { useUiMode } from '@/context/ui-mode-context';
 import { getUnitIcon } from '@/components/ui/custom-icons';
-import { Check, X, AlertTriangle } from 'lucide-react';
+import { Check, X, Clock, Siren, AlertTriangle } from 'lucide-react';
 import BrainMascot from './brain-mascot';
 
-interface GateEvent {
+export interface GateEvent {
   id: number;
   medication_id: number;
   scheduled_for: string;
@@ -22,10 +23,13 @@ interface GateEvent {
 }
 
 interface MedDueGateProps {
-  dueEvents: GateEvent[];
+  /** The current due dose to ask about (earliest unhandled). Driven live by the parent. */
+  event: GateEvent;
+  /** How many due doses remain (including this one). */
+  remaining: number;
   userRole: 'PATIENT' | 'CAREGIVER';
   onResolved: (eventId: number, newStatus: string) => void;
-  onComplete: () => void;
+  onSnooze: (eventId: number) => void;
 }
 
 function overdueLabel(scheduledFor: string): string {
@@ -37,21 +41,15 @@ function overdueLabel(scheduledFor: string): string {
   return m ? `${h}h ${m}m overdue` : `${h}h overdue`;
 }
 
-export default function MedDueGate({ dueEvents, userRole, onResolved, onComplete }: MedDueGateProps) {
+export default function MedDueGate({ event, remaining, userRole, onResolved, onSnooze }: MedDueGateProps) {
   const supabase = createClient();
+  const router = useRouter();
   const { isElderly } = useUiMode();
-  // Snapshot the queue once so it doesn't shift as the parent's data updates.
-  const [queue] = useState<GateEvent[]>(dueEvents);
-  const [index, setIndex] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const current = queue[index];
-  if (!current) return null;
-
-  const total = queue.length;
-  const med = current.medications;
-  const timeStr = new Date(current.scheduled_for).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const med = event.medications;
+  const timeStr = new Date(event.scheduled_for).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   const answer = async (action: 'TAKEN' | 'SKIP') => {
     if (busy) return;
@@ -60,18 +58,13 @@ export default function MedDueGate({ dueEvents, userRole, onResolved, onComplete
     try {
       const res = await resolveReminderEvent({
         supabase,
-        eventId: current.id,
-        medicationId: current.medication_id,
-        scheduledFor: current.scheduled_for,
+        eventId: event.id,
+        medicationId: event.medication_id,
+        scheduledFor: event.scheduled_for,
         action,
         actorRole: userRole,
       });
-      onResolved(current.id, res.reminder_status);
-      if (index + 1 >= total) {
-        onComplete();
-      } else {
-        setIndex((i) => i + 1);
-      }
+      onResolved(event.id, res.reminder_status);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       console.error('[MedDueGate] resolve failed:', message);
@@ -87,21 +80,18 @@ export default function MedDueGate({ dueEvents, userRole, onResolved, onComplete
       aria-modal="true"
       aria-label="Medication check"
       className="fixed inset-0 z-[120] flex flex-col items-center justify-center px-6 py-10 text-center overflow-y-auto"
-      style={{
-        background:
-          'radial-gradient(120% 90% at 50% 0%, #FDEEF2 0%, #F8F9FB 55%, #EAF3FF 100%)',
-      }}
+      style={{ background: 'radial-gradient(120% 90% at 50% 0%, #FDEEF2 0%, #F8F9FB 55%, #EAF3FF 100%)' }}
     >
-      {total > 1 && (
+      {remaining > 1 && (
         <span className="absolute top-6 text-xs font-mono font-bold text-muted-foreground tracking-widest">
-          {index + 1} of {total}
+          {remaining} doses to confirm
         </span>
       )}
 
       <BrainMascot size={isElderly ? 200 : 168} mood="asking" />
 
       <p className={`mt-6 font-semibold text-muted-foreground ${isElderly ? 'text-lg' : 'text-sm'}`}>
-        {overdueLabel(current.scheduled_for)} · scheduled {timeStr}
+        {overdueLabel(event.scheduled_for)} · scheduled {timeStr}
       </p>
 
       <h1 className={`mt-2 font-black text-foreground tracking-tight ${isElderly ? 'text-3xl' : 'text-2xl'}`}>
@@ -148,7 +138,24 @@ export default function MedDueGate({ dueEvents, userRole, onResolved, onComplete
         >
           <X className={isElderly ? 'w-7 h-7' : 'w-5 h-5'} /> No, skip this dose
         </button>
+        <button
+          onClick={() => !busy && onSnooze(event.id)}
+          disabled={busy}
+          className={`w-full flex items-center justify-center gap-2 rounded-2xl text-muted-foreground hover:text-foreground font-semibold transition-all disabled:opacity-50 cursor-pointer ${
+            isElderly ? 'py-3 text-lg' : 'py-2.5 text-sm'
+          }`}
+        >
+          <Clock className="w-4 h-4" /> Not yet — remind me later
+        </button>
       </div>
+
+      {/* Safety carve-out: the emergency card is always reachable, even mid-gate. */}
+      <button
+        onClick={() => router.push('/emergency')}
+        className="mt-6 inline-flex items-center gap-1.5 text-xs font-bold text-danger/80 hover:text-danger transition-colors cursor-pointer"
+      >
+        <Siren className="w-3.5 h-3.5" /> Emergency card
+      </button>
     </div>
   );
 }

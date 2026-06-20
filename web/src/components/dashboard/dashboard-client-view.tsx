@@ -314,7 +314,9 @@ export default function DashboardClientView({
   const { isElderly, toggleMode, viewMode } = useUiMode();
 
   const [events, setEvents] = useState<ReminderEvent[]>([]);
-  const [gateDone, setGateDone] = useState(false);
+  // Doses the user chose "remind me later" on → suppressed until this epoch ms.
+  // (The 60s `currentTime` clock below re-renders, so the gate re-evaluates live.)
+  const [snoozedUntil, setSnoozedUntil] = useState<Record<number, number>>({});
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [hoveredEvent, setHoveredEvent] = useState<ReminderEvent | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -330,6 +332,19 @@ export default function DashboardClientView({
       setCurrentTime(new Date());
     }, 60000);
     return () => clearInterval(timer);
+  }, []);
+
+  // Restore active "remind me later" snoozes so a reload doesn't bypass them.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('medGateSnoozes');
+      if (raw) {
+        const parsed = JSON.parse(raw) as Record<number, number>;
+        const now = Date.now();
+        const live = Object.fromEntries(Object.entries(parsed).filter(([, until]) => Number(until) > now));
+        if (Object.keys(live).length) setSnoozedUntil(live as Record<number, number>);
+      }
+    } catch { /* ignore */ }
   }, []);
 
   useEffect(() => {
@@ -582,18 +597,33 @@ export default function DashboardClientView({
   // Only for the patient on their own dashboard (never when a caregiver is monitoring).
   const dueQueue = (userRole === 'PATIENT' && viewMode !== 'PATIENT_MONITOR')
     ? [...events]
-        .filter(e => isPendingState(e.reminder_status) && new Date(e.scheduled_for).getTime() <= nowMs)
+        .filter(e =>
+          isPendingState(e.reminder_status) &&
+          new Date(e.scheduled_for).getTime() <= nowMs &&
+          !(snoozedUntil[e.id] && nowMs < snoozedUntil[e.id])
+        )
         .sort((a, b) => new Date(a.scheduled_for).getTime() - new Date(b.scheduled_for).getTime())
     : [];
-  const showGate = mounted && !gateDone && dueQueue.length > 0;
-  const dueGate = showGate ? (
+  // "Remind me later" — suppress this dose for 30 min (persisted), then it returns.
+  const handleGateSnooze = (eventId: number) => {
+    const until = Date.now() + 30 * 60 * 1000;
+    setSnoozedUntil(prev => {
+      const next = { ...prev, [eventId]: until };
+      try { localStorage.setItem('medGateSnoozes', JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  };
+  // Reactive gate: always asks about the earliest unhandled due dose. As doses are
+  // answered/snoozed (or new ones come due via the 60s clock), the queue updates live.
+  const dueGate = (mounted && dueQueue.length > 0) ? (
     <MedDueGate
-      dueEvents={dueQueue as any}
+      event={dueQueue[0] as any}
+      remaining={dueQueue.length}
       userRole={userRole}
       onResolved={(eventId, newStatus) =>
         setEvents(prev => prev.map(e => (e.id === eventId ? { ...e, reminder_status: newStatus } : e)))
       }
-      onComplete={() => { setGateDone(true); router.refresh(); }}
+      onSnooze={handleGateSnooze}
     />
   ) : null;
 
