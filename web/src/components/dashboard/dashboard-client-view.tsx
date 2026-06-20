@@ -1179,7 +1179,17 @@ export default function DashboardClientView({
         
         {/* Right side: brain mascot accent + Synced tag */}
         <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end shrink-0">
-          <BrainMascot size={52} mood={todayMissed > 0 || activeEscalations > 0 ? 'asking' : 'happy'} className="hidden sm:block -my-1" />
+          <BrainMascot
+            size={52}
+            mood={
+              activeEscalations > 0 || todayMissed > 0
+                ? 'concerned'
+                : nextPendingEvent
+                  ? 'happy'
+                  : 'proud'
+            }
+            className="hidden sm:block -my-1"
+          />
           <div className="text-[10px] font-bold text-muted-foreground bg-muted border border-border px-3 py-1.5 rounded-full flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" aria-label="Active Connection Dot" />
             Synced

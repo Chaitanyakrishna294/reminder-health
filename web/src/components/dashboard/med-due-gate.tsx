@@ -88,7 +88,10 @@ export default function MedDueGate({ event, remaining, userRole, onResolved, onS
         </span>
       )}
 
-      <BrainMascot size={isElderly ? 200 : 168} mood="asking" />
+      <BrainMascot
+        size={isElderly ? 200 : 168}
+        mood={Math.floor((Date.now() - new Date(event.scheduled_for).getTime()) / 60000) >= 30 ? 'concerned' : 'reminder'}
+      />
 
       <p className={`mt-6 font-semibold text-muted-foreground ${isElderly ? 'text-lg' : 'text-sm'}`}>
         {overdueLabel(event.scheduled_for)} · scheduled {timeStr}
