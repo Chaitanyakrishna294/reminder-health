@@ -13,6 +13,7 @@ import { resolveReminderEvent } from '@/lib/reminder-events';
 import { PremiumToast } from '@/components/ui/premium-toast';
 import MedDueGate from '@/components/dashboard/med-due-gate';
 import BrainMascot from '@/components/dashboard/brain-mascot';
+import GuideButton from '@/components/guide/guide-button';
 import moment from 'moment-timezone';
 
 const AdherenceChart = dynamic(() => import('@/components/dashboard/adherence-chart'), {
@@ -1190,6 +1191,7 @@ export default function DashboardClientView({
             }
             className="hidden sm:block -my-1"
           />
+          <GuideButton tour="dashboard" />
           <div className="text-[10px] font-bold text-muted-foreground bg-muted border border-border px-3 py-1.5 rounded-full flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" aria-label="Active Connection Dot" />
             Synced
@@ -1268,7 +1270,7 @@ export default function DashboardClientView({
       {/* First Viewport: Top Row split layout (Left: Next Medication card, Right: Compliance Ring) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left: Next/Missed Medication summary card */}
-        <div className={`lg:col-span-7 rounded-3xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden min-h-[300px] border transition-colors ${
+        <div data-tour="dash-next-med" className={`lg:col-span-7 rounded-3xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden min-h-[300px] border transition-colors ${
           isMissed
             ? 'border-danger/50 shadow-danger/5 shadow-md bg-danger/[0.02]'
             : nextPendingEvent
@@ -1396,7 +1398,7 @@ export default function DashboardClientView({
         </div>
 
         {/* Right: Medication Compliance Ring */}
-        <div className="lg:col-span-5 bg-card border border-border rounded-3xl p-6 shadow-sm flex flex-col items-center justify-between text-center relative min-h-[300px]">
+        <div data-tour="dash-compliance" className="lg:col-span-5 bg-card border border-border rounded-3xl p-6 shadow-sm flex flex-col items-center justify-between text-center relative min-h-[300px]">
           <div className="w-full text-left mb-2">
             <h3 className="font-black text-foreground text-sm flex items-center gap-1.5">
               <Activity className="w-4 h-4 text-primary" /> Daily Compliance
@@ -1641,7 +1643,7 @@ export default function DashboardClientView({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
         {/* Layer 2: Today's Medication Timeline (Main Content Zone) */}
-        <div className="lg:col-span-8 space-y-6">
+        <div data-tour="dash-today" className="lg:col-span-8 space-y-6">
           <div className="flex justify-between items-center px-1">
             <div>
               <h2 className="text-xl font-black text-foreground tracking-tight">Today's Schedule</h2>

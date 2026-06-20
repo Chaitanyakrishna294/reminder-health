@@ -4,6 +4,8 @@ import Navbar from '@/components/layout/navbar';
 import DashboardMainLayout from '@/components/layout/dashboard-main-layout';
 import { resolveUserData, getMedicalProfile } from '@/lib/supabase/cached-queries';
 import { createClient } from '@/lib/supabase/server';
+import { GuideProvider } from '@/components/guide/guide-context';
+import GuideTour from '@/components/guide/guide-tour';
 
 export default async function DashboardLayout({
   children,
@@ -34,28 +36,31 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      {/* Navbar passing user profile details */}
-      <Navbar 
-        user={{
-          id: user.id,
-          email: user.email!,
-          fullName: profile.full_name || 'User',
-          role: profile.role,
-          telegramChatId: profile.telegram_chat_id,
-          patientChatId: targetChatId,
-          patientName,
-          avatarUrl
-        }}
-      />
+    <GuideProvider>
+      <div className="min-h-screen flex flex-col bg-background">
+        {/* Navbar passing user profile details */}
+        <Navbar
+          user={{
+            id: user.id,
+            email: user.email!,
+            fullName: profile.full_name || 'User',
+            role: profile.role,
+            telegramChatId: profile.telegram_chat_id,
+            patientChatId: targetChatId,
+            patientName,
+            avatarUrl
+          }}
+        />
 
-      <DashboardMainLayout 
-        patientName={patientName}
-        patientPhone={patientPhone}
-        patientChatId={targetChatId}
-      >
-        {children}
-      </DashboardMainLayout>
-    </div>
+        <DashboardMainLayout
+          patientName={patientName}
+          patientPhone={patientPhone}
+          patientChatId={targetChatId}
+        >
+          {children}
+        </DashboardMainLayout>
+      </div>
+      <GuideTour />
+    </GuideProvider>
   );
 }

@@ -234,7 +234,8 @@ export default function DashboardMainLayout({
       </aside>
 
       {/* BOTTOM FLOATING PILL DOCK (Mobile) */}
-      <nav 
+      <nav
+        data-tour="dash-nav"
         className={`md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-40 rounded-[32px] bg-white border border-border shadow-lg flex items-center justify-around px-4 transition-all duration-300 ${
           isElderly 
             ? 'w-[92%] h-24 border-2 border-primary/50' 
