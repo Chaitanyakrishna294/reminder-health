@@ -1181,7 +1181,7 @@ export default function DashboardClientView({
         {/* Right side: brain mascot accent + Synced tag */}
         <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end shrink-0">
           <BrainMascot
-            size={52}
+            size={56}
             mood={
               activeEscalations > 0 || todayMissed > 0
                 ? 'concerned'
@@ -1189,7 +1189,7 @@ export default function DashboardClientView({
                   ? 'happy'
                   : 'proud'
             }
-            className="hidden sm:block -my-1"
+            className="-my-1 order-first sm:order-none"
           />
           <GuideButton tour="dashboard" />
           <div className="text-[10px] font-bold text-muted-foreground bg-muted border border-border px-3 py-1.5 rounded-full flex items-center gap-1.5">
