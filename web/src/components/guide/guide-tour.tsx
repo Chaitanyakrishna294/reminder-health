@@ -8,13 +8,13 @@ import { TOURS } from './guide-content';
 
 const CARD_W = 320;
 
-function PointingMascot({ dir, size }: { dir: 'left' | 'right'; size: number }) {
+function GuiderMascot({ size }: { size: number }) {
   const [ok, setOk] = useState(true);
   if (!ok) return <BrainMascot size={size} mood="curious" />;
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={`/mascot/point-${dir}.png`}
+      src="/mascot/guider.png"
       alt=""
       width={size}
       height={size}
@@ -86,14 +86,11 @@ export default function GuideTour() {
 
   let cardTop: number;
   let cardLeft: number;
-  let dir: 'left' | 'right' = 'right';
 
   if (hasTarget && rect) {
     const below = rect.bottom + estCardH + 24 < vh;
     cardTop = below ? rect.bottom + 16 : Math.max(12, rect.top - estCardH - 16);
     cardLeft = Math.min(Math.max(12, rect.left + rect.width / 2 - cardW / 2), vw - 12 - cardW);
-    const targetCx = rect.left + rect.width / 2;
-    dir = targetCx < cardLeft + cardW / 2 ? 'left' : 'right';
   } else {
     cardTop = vh - estCardH - 24;
     cardLeft = (vw - cardW) / 2;
@@ -124,26 +121,23 @@ export default function GuideTour() {
         />
       )}
 
-      {/* Pointing mascot, just outside the card toward the target. */}
-      <div
-        className="absolute transition-all duration-300 pointer-events-none"
-        style={{ top: cardTop - 58, left: dir === 'left' ? cardLeft + 6 : cardLeft + cardW - 70 }}
-      >
-        <PointingMascot dir={dir} size={64} />
-      </div>
-
-      {/* Step bubble. */}
+      {/* Step bubble — the guider mascot lives inside it. */}
       <div
         className="absolute bg-card border border-border rounded-3xl shadow-2xl p-5 transition-all duration-300 animate-fade-in"
         style={{ top: cardTop, left: cardLeft, width: cardW }}
       >
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="font-black text-foreground text-base tracking-tight">{step.title}</h3>
-          <button onClick={stopTour} aria-label="Skip guide" className="text-muted-foreground hover:text-foreground p-0.5 rounded-full cursor-pointer shrink-0">
-            <X className="w-4 h-4" />
-          </button>
+        <div className="flex items-start gap-3">
+          <GuiderMascot size={52} />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <h3 className="font-black text-foreground text-base tracking-tight">{step.title}</h3>
+              <button onClick={stopTour} aria-label="Skip guide" className="text-muted-foreground hover:text-foreground p-0.5 rounded-full cursor-pointer shrink-0">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed mt-1">{step.message}</p>
+          </div>
         </div>
-        <p className="text-sm text-muted-foreground leading-relaxed mt-2">{step.message}</p>
 
         <div className="flex items-center justify-between mt-4">
           <div className="flex items-center gap-1.5">

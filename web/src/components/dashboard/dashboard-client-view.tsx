@@ -1142,11 +1142,6 @@ export default function DashboardClientView({
         </div>
       )}
 
-      {/* Mobile: prominent centered brain above the greeting */}
-      <div className="sm:hidden flex justify-center pt-1">
-        <BrainMascot size={108} mood={heroMood} />
-      </div>
-
       {/* Welcome Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-transparent border-none shadow-none p-0">
         <div className="flex items-center gap-4 w-full sm:w-auto">
