@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { resolveReminderEvent } from '@/lib/reminder-events';
@@ -47,6 +47,14 @@ export default function MedDueGate({ event, remaining, userRole, onResolved, onS
   const { isElderly } = useUiMode();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [small, setSmall] = useState(false);
+
+  useEffect(() => {
+    const f = () => setSmall(window.innerWidth < 420);
+    f();
+    window.addEventListener('resize', f);
+    return () => window.removeEventListener('resize', f);
+  }, []);
 
   const med = event.medications;
   const timeStr = new Date(event.scheduled_for).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -89,7 +97,7 @@ export default function MedDueGate({ event, remaining, userRole, onResolved, onS
       )}
 
       <BrainMascot
-        size={isElderly ? 200 : 168}
+        size={isElderly ? (small ? 156 : 200) : (small ? 116 : 168)}
         mood={Math.floor((Date.now() - new Date(event.scheduled_for).getTime()) / 60000) >= 30 ? 'concerned' : 'reminder'}
       />
 

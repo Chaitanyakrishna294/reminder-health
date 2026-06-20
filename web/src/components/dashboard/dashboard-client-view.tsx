@@ -594,6 +594,8 @@ export default function DashboardClientView({
       return new Date(a.scheduled_for).getTime() - new Date(b.scheduled_for).getTime();
     })[0];
 
+  const heroMood = activeEscalations > 0 || todayMissed > 0 ? 'concerned' : nextPendingEvent ? 'happy' : 'proud';
+
   // "Did you take it?" gate: due/overdue, unresolved doses, shown before the dashboard.
   // Only for the patient on their own dashboard (never when a caregiver is monitoring).
   const dueQueue = (userRole === 'PATIENT' && viewMode !== 'PATIENT_MONITOR')
@@ -1140,6 +1142,11 @@ export default function DashboardClientView({
         </div>
       )}
 
+      {/* Mobile: prominent centered brain above the greeting */}
+      <div className="sm:hidden flex justify-center pt-1">
+        <BrainMascot size={108} mood={heroMood} />
+      </div>
+
       {/* Welcome Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-transparent border-none shadow-none p-0">
         <div className="flex items-center gap-4 w-full sm:w-auto">
@@ -1180,17 +1187,7 @@ export default function DashboardClientView({
         
         {/* Right side: brain mascot accent + Synced tag */}
         <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end shrink-0">
-          <BrainMascot
-            size={56}
-            mood={
-              activeEscalations > 0 || todayMissed > 0
-                ? 'concerned'
-                : nextPendingEvent
-                  ? 'happy'
-                  : 'proud'
-            }
-            className="-my-1 order-first sm:order-none"
-          />
+          <BrainMascot size={52} mood={heroMood} className="hidden sm:block -my-1" />
           <GuideButton tour="dashboard" />
           <div className="text-[10px] font-bold text-muted-foreground bg-muted border border-border px-3 py-1.5 rounded-full flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" aria-label="Active Connection Dot" />
