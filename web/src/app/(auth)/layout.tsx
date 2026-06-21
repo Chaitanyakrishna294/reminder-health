@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pill, ShieldCheck } from 'lucide-react';
+import BrainMascot from '@/components/dashboard/brain-mascot';
 
 export default function AuthLayout({
   children,
@@ -7,25 +7,18 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#f8fafc] px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
-      <div className="w-full max-w-md space-y-6 sm:space-y-8 bg-white border border-border/80 shadow-md rounded-3xl p-6 sm:p-8">
-        <div className="flex flex-col items-center justify-center text-center">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary ring-1 ring-primary/20 mb-4">
-            <ShieldCheck className="w-3.5 h-3.5 shrink-0" /> Safe &amp; Secure Care
-          </span>
-          <span className="flex items-center justify-center gap-1.5 sm:gap-2 font-black tracking-tight text-foreground font-mono text-2xl sm:text-3xl">
-            <Pill className="w-6 h-6 sm:w-7 sm:h-7 text-primary shrink-0" />
-            <span>Re-</span>
-            <img
-              src="/logo2.png"
-              alt="MIND"
-              className="rounded-lg object-contain shrink-0 bg-white w-12 h-12 sm:w-[60px] sm:h-[60px]"
-            />
-            <span>-eЯ</span>
-          </span>
-          <p className="mt-2 text-xs sm:text-sm text-muted-foreground">
-            Apple Health-Inspired Medication Companion
-          </p>
+    <div
+      className="flex min-h-screen flex-col items-center justify-center px-6 py-10"
+      style={{ background: 'radial-gradient(120% 80% at 50% 0%, #FDEEF2 0%, #F8F9FB 62%, #EAF3FF 100%)' }}
+    >
+      <div className="w-full max-w-sm">
+        {/* Brand hero */}
+        <div className="flex flex-col items-center text-center mb-8">
+          <div className="w-24 h-24 rounded-full bg-white shadow-lg ring-4 ring-primary/10 flex items-center justify-center overflow-hidden">
+            <BrainMascot mood="happy" size={76} />
+          </div>
+          <h1 className="mt-4 font-mono font-black text-2xl text-foreground tracking-tight">Re-MIND-eЯ</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Your personal medication companion</p>
         </div>
         {children}
       </div>
