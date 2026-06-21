@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useUiMode } from '@/context/ui-mode-context';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, User, Mail, Lock } from 'lucide-react';
 import Turnstile, { captchaEnabled } from '@/components/turnstile';
 
 export default function RegisterPage() {
@@ -84,36 +84,33 @@ export default function RegisterPage() {
     );
   }
 
-  const labelClass = `block font-medium text-foreground ${isElderly ? 'text-lg mb-2 font-bold' : 'text-sm'}`;
-  const inputClass = `mt-1 block w-full px-4 border border-input rounded-2xl bg-background text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all ${isElderly ? 'py-4 text-lg border-2' : 'py-3 text-sm'}`;
+  const inputClass = `w-full pl-11 pr-4 rounded-2xl bg-white border border-border text-foreground shadow-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all ${isElderly ? 'py-4 text-lg' : 'py-3.5 text-sm'}`;
+  const iconClass = 'absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none w-4 h-4';
 
   return (
-    <div className={`space-y-6 transition-all duration-300 ${isElderly ? 'max-w-2xl space-y-8' : ''}`}>
-      <div className="text-center">
-        <h2 className={`font-bold text-foreground ${isElderly ? 'text-2xl' : 'text-xl'}`}>Create Your Account</h2>
-      </div>
-
+    <div className="space-y-5">
       {error && (
         <div className="bg-danger/10 text-danger text-sm p-3 rounded-2xl border border-danger/20">
           ⚠️ {error}
         </div>
       )}
 
-      <form onSubmit={handleRegister} className="space-y-4">
-        <div>
-          <label className={labelClass}>Full Name</label>
+      <form onSubmit={handleRegister} className="space-y-3">
+        <div className="relative">
+          <User className={iconClass} />
           <input
             type="text"
             required
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
             className={inputClass}
-            placeholder="John Doe"
+            placeholder="Full name"
+            aria-label="Full name"
           />
         </div>
 
-        <div>
-          <label className={labelClass}>Email address</label>
+        <div className="relative">
+          <Mail className={iconClass} />
           <input
             type="email"
             required
@@ -121,35 +118,32 @@ export default function RegisterPage() {
             onChange={(e) => setEmail(e.target.value)}
             className={inputClass}
             placeholder="you@example.com"
+            aria-label="Email address"
           />
         </div>
 
-        <div>
-          <label className={labelClass}>Password</label>
-          <div className="relative flex items-center">
-            <input
-              type={showPassword ? 'text' : 'password'}
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className={`${inputClass} pr-12`}
-              placeholder="••••••••"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className={`absolute right-4 text-muted-foreground hover:text-primary transition-colors focus:outline-none flex items-center justify-center ${isElderly ? 'w-10 h-10' : 'w-6 h-6'}`}
-            >
-              {showPassword ? (
-                <EyeOff className={isElderly ? 'w-6 h-6' : 'w-4 h-4'} />
-              ) : (
-                <Eye className={isElderly ? 'w-6 h-6' : 'w-4 h-4'} />
-              )}
-            </button>
-          </div>
+        <div className="relative flex items-center">
+          <Lock className={iconClass} />
+          <input
+            type={showPassword ? 'text' : 'password'}
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className={`${inputClass} pr-12`}
+            placeholder="Password"
+            aria-label="Password"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            aria-label={showPassword ? 'Hide password' : 'Show password'}
+            className="absolute right-4 text-muted-foreground hover:text-primary transition-colors focus:outline-none flex items-center justify-center"
+          >
+            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </button>
         </div>
 
-        <label className="flex items-start gap-2 text-xs text-muted-foreground cursor-pointer">
+        <label className="flex items-start gap-2 text-xs text-muted-foreground cursor-pointer pt-1">
           <input
             type="checkbox"
             checked={agreed}
@@ -169,9 +163,10 @@ export default function RegisterPage() {
         <button
           type="submit"
           disabled={loading}
-          className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-2xl shadow-sm font-semibold text-primary-foreground bg-primary hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 transition-all active:scale-[0.98] cursor-pointer ${isElderly ? 'py-4 text-xl' : 'text-sm'}`}
+          style={{ background: 'linear-gradient(180deg, #F8839E 0%, #F26B8A 100%)' }}
+          className={`w-full flex justify-center rounded-2xl shadow-md font-black text-white hover:brightness-[0.97] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 transition-all active:scale-[0.98] cursor-pointer ${isElderly ? 'py-4 text-xl' : 'py-3.5 text-base'}`}
         >
-          {loading ? 'Registering...' : 'Register'}
+          {loading ? 'Creating account…' : 'Create account'}
         </button>
       </form>
 
