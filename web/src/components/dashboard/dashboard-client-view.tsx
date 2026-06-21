@@ -998,6 +998,8 @@ export default function DashboardClientView({
 
   const isMissed = nextPendingEvent && (new Date(nextPendingEvent.scheduled_for).getTime() <= new Date().getTime());
   const nextSeverity = getSeverityTheme(nextPendingEvent?.medications?.priority_level);
+  // Reference design: the upcoming (not-missed) next-dose card is a bold pink gradient with white text.
+  const onGradient = !!nextPendingEvent && !isMissed;
 
   // ==========================================
   // NORMAL MODE VIEW (Premium Apple Health Theme)
@@ -1266,14 +1268,14 @@ export default function DashboardClientView({
           isMissed
             ? 'border-danger/50 shadow-danger/5 shadow-md bg-danger/[0.02]'
             : nextPendingEvent
-              ? `${nextSeverity.bg} ${nextSeverity.border}`
+              ? 'border-transparent shadow-md shadow-primary/20 bg-gradient-to-br from-[#F8839E] to-[#F26B8A] text-white'
               : 'bg-card border-border'
         }`}>
           <div>
             <div className="flex justify-between items-start gap-4">
               <div className="min-w-0 flex-1">
                 <p className={`text-[10px] font-bold uppercase tracking-widest ${
-                  isMissed ? 'text-danger' : 'text-muted-foreground'
+                  isMissed ? 'text-danger' : onGradient ? 'text-white/90' : 'text-muted-foreground'
                 }`}>
                   {isMissed ? 'Missed Medication' : 'Next Medication'}
                 </p>
@@ -1282,17 +1284,19 @@ export default function DashboardClientView({
                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-colors ${
                       isMissed
                         ? 'bg-danger/10 text-danger border border-danger/20'
-                        : nextSeverity.tile
+                        : onGradient
+                          ? 'bg-white/20 text-white border border-white/30'
+                          : nextSeverity.tile
                     }`}>
                       {getUnitIcon(nextPendingEvent.medications.unit_type, "w-6 h-6")}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <h3 className="text-2xl font-black text-foreground tracking-tight leading-tight truncate">
+                      <h3 className={`text-2xl font-black tracking-tight leading-tight truncate ${onGradient ? 'text-white' : 'text-foreground'}`}>
                         {nextPendingEvent.medications.drug_name}
                       </h3>
-                      <div className="text-xs text-muted-foreground mt-1 space-y-1 font-sans">
+                      <div className={`text-xs mt-1 space-y-1 font-sans ${onGradient ? 'text-white/85' : 'text-muted-foreground'}`}>
                         <p>
-                          Dosage: <b className="text-foreground font-mono">
+                          Dosage: <b className={`font-mono ${onGradient ? 'text-white' : 'text-foreground'}`}>
                             {nextPendingEvent.medications.dosage_amount 
                               ? `${nextPendingEvent.medications.dosage_amount} ${nextPendingEvent.medications.unit_type?.toLowerCase() || 'unit'}(s)`
                               : ''}
@@ -1302,7 +1306,7 @@ export default function DashboardClientView({
                         </p>
                         {nextPendingEvent.medications.medication_reason && (
                           <p className="italic leading-snug">
-                            Reason: <span className="text-foreground font-semibold">{nextPendingEvent.medications.medication_reason}</span>
+                            Reason: <span className={`font-semibold ${onGradient ? 'text-white' : 'text-foreground'}`}>{nextPendingEvent.medications.medication_reason}</span>
                           </p>
                         )}
                       </div>
@@ -1322,14 +1326,16 @@ export default function DashboardClientView({
               {nextPendingEvent && (
                 <div className="flex flex-col items-end gap-1 shrink-0 font-mono text-right">
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black border transition-colors ${
-                    isMissed 
-                      ? 'bg-danger/15 text-danger border-danger/25' 
-                      : 'bg-primary/15 text-primary border-primary/25'
+                    isMissed
+                      ? 'bg-danger/15 text-danger border-danger/25'
+                      : onGradient
+                        ? 'bg-white/20 text-white border-white/30'
+                        : 'bg-primary/15 text-primary border-primary/25'
                   }`}>
                     {mounted ? getCountdownText(nextPendingEvent.scheduled_for) : 'UPCOMING'}
                   </span>
                   <span className={`text-lg font-black mt-1 transition-colors ${
-                    isMissed ? 'text-danger' : 'text-primary'
+                    isMissed ? 'text-danger' : onGradient ? 'text-white' : 'text-primary'
                   }`} suppressHydrationWarning>
                     {mounted ? new Date(nextPendingEvent.scheduled_for).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
                   </span>
@@ -1340,8 +1346,8 @@ export default function DashboardClientView({
  
           {nextPendingEvent && (
             viewMode === 'PATIENT_MONITOR' ? (
-              <div className="mt-6 p-3 bg-muted border border-border rounded-2xl text-[11px] font-bold text-muted-foreground w-fit flex items-center gap-1.5">
-                <Lock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+              <div className={`mt-6 p-3 rounded-2xl text-[11px] font-bold w-fit flex items-center gap-1.5 ${onGradient ? 'bg-white/15 border border-white/25 text-white' : 'bg-muted border border-border text-muted-foreground'}`}>
+                <Lock className="w-3.5 h-3.5 shrink-0" />
                 <span>Read-Only Monitoring Mode</span>
               </div>
             ) : (new Date(nextPendingEvent.scheduled_for).getTime() <= new Date().getTime()) ? (
@@ -1381,8 +1387,8 @@ export default function DashboardClientView({
                 </div>
               )
             ) : (
-              <div className="mt-6 p-4 bg-muted/50 border border-border/80 rounded-2xl text-xs font-semibold text-muted-foreground w-fit flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0 animate-pulse" />
+              <div className={`mt-6 p-4 rounded-2xl text-xs font-semibold w-fit flex items-center gap-1.5 ${onGradient ? 'bg-white/15 border border-white/25 text-white' : 'bg-muted/50 border border-border/80 text-muted-foreground'}`}>
+                <Clock className="w-3.5 h-3.5 shrink-0 animate-pulse" />
                 <span>Options will become available at {mounted ? new Date(nextPendingEvent.scheduled_for).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}</span>
               </div>
             )
