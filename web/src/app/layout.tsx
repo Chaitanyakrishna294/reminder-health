@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { UiModeProvider } from "@/context/ui-mode-context";
+import { ThemeProvider } from "@/context/theme-context";
 import CookieConsent from "@/components/cookie-consent";
 import InstallPrompt from "@/components/install-prompt";
 
@@ -39,11 +40,13 @@ export default function RootLayout({
       className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <UiModeProvider>
-          {children}
-          <InstallPrompt />
-          <CookieConsent />
-        </UiModeProvider>
+        <ThemeProvider>
+          <UiModeProvider>
+            {children}
+            <InstallPrompt />
+            <CookieConsent />
+          </UiModeProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

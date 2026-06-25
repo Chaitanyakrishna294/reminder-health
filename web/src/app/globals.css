@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
 :root {
-  --background: #F8F9FB;
+  --background: #F6F2F5;
   --foreground: #0F1C5A;
-  
+
   --card: #ffffff;
   --card-foreground: #0F1C5A;
   
@@ -36,33 +36,33 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #F8F9FB;
-    --foreground: #0F1C5A;
-    
-    --card: #ffffff;
-    --card-foreground: #0F1C5A;
-    
+    --background: #0F1C5A;
+    --foreground: #F8F9FB;
+
+    --card: #1a2d6e;
+    --card-foreground: #F8F9FB;
+
     --primary: #F26B8A;
     --primary-foreground: #ffffff;
-    
+
     --success: #34C759;
     --success-foreground: #ffffff;
-    
+
     --warning: #FF9500;
     --warning-foreground: #ffffff;
-    
+
     --danger: #FF3B30;
     --danger-foreground: #ffffff;
-    
-    --border: rgba(15, 23, 42, 0.04);
-    --input: rgba(15, 23, 42, 0.04);
+
+    --border: rgba(242, 107, 138, 0.15);
+    --input: rgba(242, 107, 138, 0.10);
     --ring: #F26B8A;
-    
-    --muted: #EEF4FB;
-    --muted-foreground: #64748b;
-    
-    --accent-surface: #EAF3FF;
-    --accent-surface-foreground: #0F1C5A;
+
+    --muted: #1f3a7f;
+    --muted-foreground: #94a3b8;
+
+    --accent-surface: #1f3a7f;
+    --accent-surface-foreground: #F8F9FB;
   }
 }
 
@@ -130,6 +130,33 @@
   }
   100% {
     transform: rotate(0deg);
+  }
+}
+
+/* Timeline card flip-in for stacked same-time dose groups */
+@keyframes card-flip-in {
+  0%   { transform: rotateY(-72deg) scale(0.9); opacity: 0; }
+  55%  { transform: rotateY(5deg)   scale(1.01); opacity: 1; }
+  100% { transform: rotateY(0deg)   scale(1);    opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-flip-in { animation: none !important; opacity: 1 !important; transform: none !important; }
+}
+
+/* Dose markers revolving around the compliance ring center */
+@keyframes dose-orbit {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [style*="dose-orbit"] {
+    animation: none !important;
   }
 }
 
@@ -217,7 +244,10 @@ h1, h2, h3, h4, h5, h6, .font-mono, .badge, .metric, .time-tag, .navigation-labe
 
 @media (prefers-color-scheme: dark) {
   body {
-    background-color: #F8F9FB;
+    background-color: #0F1C5A;
+    background-image:
+      radial-gradient(60rem 60rem at 100% -10%, rgba(242, 107, 138, 0.08), transparent 60%),
+      radial-gradient(50rem 50rem at -10% 0%, rgba(91, 141, 239, 0.08), transparent 55%);
     color: var(--foreground);
     background-attachment: fixed;
   }

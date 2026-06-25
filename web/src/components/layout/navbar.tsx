@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useUiMode } from '@/context/ui-mode-context';
-import { Pill, ChevronDown, LogOut, Glasses, HeartPulse, Siren } from 'lucide-react';
+import { useTheme } from '@/context/theme-context';
+import { Pill, ChevronDown, LogOut, Glasses, HeartPulse, Siren, Moon, Sun } from 'lucide-react';
 import NotificationCenter from '@/components/shared/notification-center';
 
 interface NavbarProps {
@@ -25,6 +26,7 @@ export default function Navbar({ user }: NavbarProps) {
   const router = useRouter();
   const supabase = createClient();
   const { isElderly, toggleMode, viewMode } = useUiMode();
+  const { theme, toggleTheme } = useTheme();
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
 
   const handleLogout = async () => {
@@ -34,14 +36,14 @@ export default function Navbar({ user }: NavbarProps) {
   };
 
   return (
-    <nav className="bg-white border-b border-border/80 shadow-sm sticky top-0 z-40 transition-all duration-300">
+    <nav className="bg-card border-b border-border/80 shadow-sm sticky top-0 z-40 transition-all duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className={`flex justify-between items-center transition-all duration-300 ${isElderly ? 'h-20' : 'h-16'
           }`}>
           {/* Logo and Brand */}
           <div className="flex items-center">
             <Link href="/dashboard" className="flex items-center space-x-2">
-              <Pill className="text-primary w-6 h-6 shrink-0" />
+              
               <span className={`font-black text-foreground tracking-tight transition-all duration-300 font-mono flex items-center gap-0.5 ${isElderly ? 'text-2xl' : 'text-lg'
                 }`}>
                 <span>Re</span>
@@ -64,6 +66,19 @@ export default function Navbar({ user }: NavbarProps) {
 
             {/* Realtime Bell */}
             <NotificationCenter userId={user.id} />
+
+            {/* Theme Toggle (Dark/Light Mode) */}
+            <button
+              onClick={toggleTheme}
+              aria-label={theme === 'light' ? 'Switch to Dark mode' : 'Switch to Light mode'}
+              title={theme === 'light' ? 'Dark mode' : 'Light mode'}
+              className={`flex items-center justify-center rounded-full transition-all duration-200 border cursor-pointer hover:scale-[1.05] active:scale-[0.95] ${theme === 'dark'
+                ? 'bg-primary/20 hover:bg-primary/35 border-primary/50 text-primary w-9 h-9'
+                : 'bg-muted hover:bg-muted/80 border-border text-foreground/80 hover:text-foreground w-9 h-9'
+                }`}
+            >
+              {theme === 'dark' ? <Sun className="w-[18px] h-[18px]" /> : <Moon className="w-[18px] h-[18px]" />}
+            </button>
 
             {/* Mode Switcher Toggle (icon-only: glasses = large/accessible "Elderly" view) */}
             <button

@@ -16,15 +16,23 @@ import BrainMascot from '@/components/dashboard/brain-mascot';
 import GuideButton from '@/components/guide/guide-button';
 import moment from 'moment-timezone';
 
-const AdherenceChart = dynamic(() => import('@/components/dashboard/adherence-chart'), {
-  ssr: false,
-  loading: () => <div className="h-[160px] w-full bg-muted/20 animate-pulse rounded-2xl flex items-center justify-center text-xs text-muted-foreground font-semibold">Loading charts...</div>
-});
-
 const CaregiverConsole = dynamic(() => import('@/components/dashboard/caregiver-console'), {
   ssr: false,
   loading: () => <div className="p-8 text-center text-xs text-muted-foreground bg-white border border-border/80 rounded-3xl animate-pulse">Loading Caregiver Command Center...</div>
 });
+
+// Subtle translucent bubbles for the pink cards — present but faint, mixed sizes, scattered.
+// Deterministic positions (no Math.random) to avoid hydration mismatches.
+const PinkBubbles = () => (
+  <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden !m-0">
+    <span className="absolute rounded-full bg-white/10" style={{ width: 150, height: 150, top: -45, left: -35 }} />
+    <span className="absolute rounded-full bg-white/[0.06]" style={{ width: 96, height: 96, bottom: -28, right: 28 }} />
+    <span className="absolute rounded-full bg-white/[0.07]" style={{ width: 56, height: 56, top: 28, right: -16 }} />
+    <span className="absolute rounded-full bg-white/[0.08]" style={{ width: 38, height: 38, bottom: 26, left: 40 }} />
+    <span className="absolute rounded-full bg-white/[0.05]" style={{ width: 22, height: 22, top: 64, left: '44%' }} />
+    <span className="absolute rounded-full bg-white/[0.09]" style={{ width: 30, height: 30, top: 14, right: '36%' }} />
+  </div>
+);
 
 import { createClient } from '@/lib/supabase/client';
 import { SpoonIcon, CreamBottleIcon, TabletIcon } from '@/components/ui/custom-icons';
@@ -32,7 +40,6 @@ import { getSeverityTheme } from '@/lib/severity-theme';
 import { 
   Activity, 
   Clock, 
-  Flame, 
   Package, 
   AlertCircle, 
   Phone, 
@@ -66,7 +73,7 @@ import {
   Bandage
 } from 'lucide-react';
 
-const FEATURE_FLAG_ENABLE_PILL_SLIDER = true;
+const FEATURE_FLAG_ENABLE_PILL_SLIDER = false;
 
 const getUnitIcon = (unitType?: string, className: string = "w-6 h-6") => {
   const type = unitType?.toUpperCase() || 'TABLET';
@@ -320,6 +327,7 @@ export default function DashboardClientView({
   const [snoozedUntil, setSnoozedUntil] = useState<Record<number, number>>({});
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [hoveredEvent, setHoveredEvent] = useState<ReminderEvent | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<ReminderEvent | null>(null);
   const [mounted, setMounted] = useState(false);
   const [toasts, setToasts] = useState<{ id: string; title: string; message: string; type: 'success' | 'error' }[]>([]);
   const [showPushBanner, setShowPushBanner] = useState(false);
@@ -595,6 +603,8 @@ export default function DashboardClientView({
     })[0];
 
   const heroMood = activeEscalations > 0 || todayMissed > 0 ? 'concerned' : nextPendingEvent ? 'happy' : 'proud';
+  const upcomingCount = events.filter(e => isPendingState(e.reminder_status)).length;
+  const activeEvent = hoveredEvent || selectedEvent;
 
   // "Did you take it?" gate: due/overdue, unresolved doses, shown before the dashboard.
   // Only for the patient on their own dashboard (never when a caregiver is monitoring).
@@ -1160,6 +1170,7 @@ export default function DashboardClientView({
             <h1 className="text-xl font-black text-foreground tracking-tight flex items-center gap-2">
               {getGreetingIcon()}
               <span>{getGreeting()}, {userName}</span>
+              <GuideButton tour="dashboard" />
             </h1>
             <p className="text-xs text-muted-foreground font-semibold mt-1 flex items-center gap-1.5">
               {activeEscalations > 0 ? (
@@ -1182,26 +1193,6 @@ export default function DashboardClientView({
           </div>
         </div>
         
-        {/* Right side: brain mascot accent + Synced tag */}
-        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end shrink-0">
-          <BrainMascot size={52} mood={heroMood} className="hidden sm:block -my-1" />
-          <GuideButton tour="dashboard" />
-          <div className="text-[10px] font-bold text-muted-foreground bg-muted border border-border px-3 py-1.5 rounded-full flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" aria-label="Active Connection Dot" />
-            Synced
-          </div>
-          
-          <button 
-            onClick={() => showToast('Reminders Synced', 'All your medication events are up to date.', 'success')}
-            className="w-10 h-10 rounded-full bg-muted hover:bg-muted/80 border border-border flex items-center justify-center text-foreground hover:text-primary transition-all relative cursor-pointer"
-            aria-label="Notifications"
-          >
-            <Clock className="w-4 h-4" />
-            {isGravityState && (
-              <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-danger border border-white animate-pulse" />
-            )}
-          </button>
-        </div>
       </div>
 
       {/* Patient Monitor Summary Card */}
@@ -1264,13 +1255,20 @@ export default function DashboardClientView({
       {/* First Viewport: Top Row split layout (Left: Next Medication card, Right: Compliance Ring) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left: Next/Missed Medication summary card */}
-        <div data-tour="dash-next-med" className={`lg:col-span-7 rounded-3xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden min-h-[300px] border transition-colors ${
+        <div data-tour="dash-next-med" className={`lg:col-span-7 rounded-3xl p-6 shadow-sm flex flex-col justify-start gap-4 relative overflow-hidden isolate border transition-colors ${
           isMissed
             ? 'border-danger/50 shadow-danger/5 shadow-md bg-danger/[0.02]'
             : nextPendingEvent
               ? 'border-transparent shadow-md shadow-primary/20 bg-gradient-to-br from-[#F8839E] to-[#F26B8A] text-white'
               : 'bg-card border-border'
         }`}>
+          {nextPendingEvent && !isMissed && <PinkBubbles />}
+          {/* Mascot accent filling the card's empty space */}
+          <BrainMascot
+            size={96}
+            mood={heroMood}
+            className="absolute right-3 sm:right-6 top-[42%] -translate-y-1/2 opacity-90 pointer-events-none select-none"
+          />
           <div>
             <div className="flex justify-between items-start gap-4">
               <div className="min-w-0 flex-1">
@@ -1396,15 +1394,17 @@ export default function DashboardClientView({
         </div>
 
         {/* Right: Medication Compliance Ring */}
-        <div data-tour="dash-compliance" className="lg:col-span-5 bg-card border border-border rounded-3xl p-6 shadow-sm flex flex-col items-center justify-between text-center relative min-h-[300px]">
+        <div data-tour="dash-compliance" className="lg:col-span-5 bg-card border border-border rounded-3xl p-6 shadow-sm flex flex-col justify-between text-center relative min-h-[300px]">
           <div className="w-full text-left mb-2">
             <h3 className="font-black text-foreground text-sm flex items-center gap-1.5">
               <Activity className="w-4 h-4 text-primary" /> Daily Compliance
             </h3>
             <p className="text-[11px] text-muted-foreground">Daily dose cycle progress</p>
           </div>
-          
-          <div className="relative w-full max-w-[200px] aspect-square flex items-center justify-center">
+
+          <div className="flex flex-col sm:flex-row items-center gap-6 w-full">
+          {/* Left: orbiting compliance ring */}
+          <div className="relative w-full max-w-[200px] aspect-square flex items-center justify-center shrink-0">
             {events.length === 0 ? (
               <div className="text-center space-y-2">
                 <CheckCircle className="w-8 h-8 text-success mx-auto" />
@@ -1442,7 +1442,7 @@ export default function DashboardClientView({
                   cy="150" 
                   r="45" 
                   fill="var(--card)" 
-                  stroke={hoveredEvent ? getStatusColor(hoveredEvent.reminder_status) : "var(--primary)"} 
+                  stroke={activeEvent ? getStatusColor(activeEvent.reminder_status) : "var(--primary)"}
                   strokeWidth="2.5"
                   style={{ transition: 'all 0.3s ease' }}
                 />
@@ -1456,16 +1456,19 @@ export default function DashboardClientView({
                   className="pointer-events-none select-none"
                 >
                   <div className="w-full h-full flex flex-col justify-center items-center text-center p-1">
-                    {hoveredEvent ? (
-                      <div className="space-y-0.5 leading-tight">
+                    {activeEvent ? (
+                      <div className="space-y-0.5 leading-tight flex flex-col items-center">
+                        <span className="text-foreground" style={{ color: getStatusColor(activeEvent.reminder_status) }}>
+                          {getUnitIcon(activeEvent.medications.unit_type, 'w-5 h-5')}
+                        </span>
                         <p className="text-[9px] font-black text-foreground truncate max-w-[70px]">
-                          {hoveredEvent.medications.drug_name}
+                          {activeEvent.medications.drug_name}
                         </p>
                         <p className="text-[8px] font-black text-primary" suppressHydrationWarning>
-                          {mounted ? new Date(hoveredEvent.scheduled_for).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                          {mounted ? new Date(activeEvent.scheduled_for).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
                         </p>
                         <p className="text-[7px] font-black text-muted-foreground uppercase tracking-wider">
-                          {hoveredEvent.reminder_status.replace('_', ' ')}
+                          {activeEvent.reminder_status.replace('_', ' ')}
                         </p>
                       </div>
                     ) : (
@@ -1481,21 +1484,30 @@ export default function DashboardClientView({
                   </div>
                 </foreignObject>
  
-                {/* Compliance Ring Markers */}
-                <g className="origin-center">
+                {/* Compliance Ring Markers — orbit the center, pause while inspecting one */}
+                <g
+                  className="origin-center"
+                  style={{
+                    transformOrigin: '150px 150px',
+                    animation: 'dose-orbit 40s linear infinite',
+                    animationPlayState: activeEvent ? 'paused' : 'running',
+                  }}
+                >
                   {events.map((event, idx) => {
                     const angle = (idx * 2 * Math.PI) / events.length - Math.PI / 2;
                     const cx = 150 + 85 * Math.cos(angle);
                     const cy = 150 + 85 * Math.sin(angle);
                     const statusColor = getStatusColor(event.reminder_status);
                     const isEscalated = event.reminder_status === 'ESCALATED_TO_CG';
- 
+                    const isActive = activeEvent?.id === event.id;
+
                     return (
-                      <g 
+                      <g
                         key={event.id}
                         className="cursor-pointer group/node"
                         onMouseEnter={() => setHoveredEvent(event)}
                         onMouseLeave={() => setHoveredEvent(null)}
+                        onClick={() => setSelectedEvent(prev => prev?.id === event.id ? null : event)}
                       >
                         {/* Ping ring for alarms */}
                         {isEscalated && (
@@ -1511,13 +1523,13 @@ export default function DashboardClientView({
                         )}
  
                         {/* Node Circle - White ringed solid status badge */}
-                        <circle 
-                          cx={cx} 
-                          cy={cy} 
-                          r="9" 
+                        <circle
+                          cx={cx}
+                          cy={cy}
+                          r={isActive ? 12 : 9}
                           fill={statusColor}
                           stroke="#ffffff"
-                          strokeWidth="2.5"
+                          strokeWidth={isActive ? 3 : 2.5}
                           className="transition-all duration-300 group-hover/node:r-[11px]"
                         />
                       </g>
@@ -1527,114 +1539,65 @@ export default function DashboardClientView({
               </svg>
             )}
           </div>
-          
-          <div className="text-xs font-bold text-muted-foreground mt-2">
-            Status: <span className="text-foreground">{todayTaken} of {todayTotal} Taken Today</span>
-          </div>
-        </div>
-      </div>
 
-      {/* Layer 1B: Quick Summary Cards Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Today's Progress */}
-        <div className="bg-white border border-border rounded-3xl p-4 shadow-sm flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-accent-surface text-[#4F8EF7] flex items-center justify-center shrink-0">
-            <TrendingUp className="w-5 h-5" />
+          {/* Right: compliance stat cards */}
+          <div className="w-full flex-1 flex flex-col justify-center gap-2">
+            <div className="flex items-center justify-between rounded-2xl bg-success/10 px-4 py-2.5">
+              <span className="text-xs font-bold text-success flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-success" /> Taken
+              </span>
+              <span className="text-sm font-black text-success">{todayTaken}</span>
+            </div>
+            <div className="flex items-center justify-between rounded-2xl bg-muted px-4 py-2.5">
+              <span className="text-xs font-bold text-muted-foreground flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50" /> Upcoming
+              </span>
+              <span className="text-sm font-black text-foreground">{upcomingCount}</span>
+            </div>
           </div>
-          <div className="min-w-0">
-            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Progress</p>
-            <p className="text-sm font-extrabold text-foreground mt-0.5">
-              {todayTotal > 0 ? Math.round((todayTaken / todayTotal) * 100) : 100}% Completed
-            </p>
-          </div>
-        </div>
-
-        {/* Card 2: Streak */}
-        <div className="bg-white border border-border rounded-3xl p-4 shadow-sm flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-amber-50 text-amber-500 flex items-center justify-center shrink-0">
-            <Flame className="w-5 h-5" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Streak</p>
-            <p className="text-sm font-extrabold text-foreground mt-0.5">7 Days Active</p>
-          </div>
-        </div>
-
-        {/* Card 3: Remaining Inventory */}
-        <div className="bg-white border border-border rounded-3xl p-4 shadow-sm flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
-            lowStockCount > 0 ? 'bg-danger/10 text-danger' : 'bg-success/10 text-success'
-          }`}>
-            <Package className="w-5 h-5" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Inventory</p>
-            <p className="text-sm font-extrabold text-foreground mt-0.5 leading-tight">
-              {lowStockCount > 0 ? `${lowStockCount} Low Item${lowStockCount > 1 ? 's' : ''}` : 'Stock Balanced'}
-            </p>
-          </div>
-        </div>
-
-        {/* Card 4: Caregiver Status */}
-        <div className="bg-white border border-border rounded-3xl p-4 shadow-sm flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-success/10 text-success flex items-center justify-center shrink-0">
-            <User className="w-5 h-5" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Caregiver</p>
-            <p className="text-sm font-extrabold text-foreground mt-0.5 leading-tight">
-              {userRole === 'CAREGIVER' ? 'Active Monitor' : 'Secure Sync'}
-            </p>
           </div>
         </div>
       </div>
 
       {/* Daily Compliance Timeline Card */}
-      <div className="bg-card border border-border rounded-3xl p-5 shadow-sm space-y-4">
-        <div>
-          <h3 className="font-black text-foreground text-sm flex items-center gap-1.5">
-            <Clock className="w-4 h-4 text-primary" /> Daily Compliance Timeline
-          </h3>
-          <p className="text-[11px] text-muted-foreground font-semibold">Your compliance routine tracking status by time-of-day period</p>
-        </div>
-        
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center">
+      <div className="relative overflow-hidden isolate bg-gradient-to-br from-[#F8839E] to-[#F26B8A] text-white border border-transparent rounded-3xl p-5 shadow-sm shadow-primary/20 space-y-4">
+        <h3 className="font-black text-white text-sm flex items-center gap-1.5">
+          <Clock className="w-4 h-4 text-white" /> Daily Compliance Timeline
+        </h3>
+
+        <div className="grid grid-cols-4 gap-2 text-center">
           {[
             { label: 'Morning', icon: <Sun className="w-3.5 h-3.5 shrink-0" />, period: getPeriodStatus(5, 12) },
             { label: 'Afternoon', icon: <CloudSun className="w-3.5 h-3.5 shrink-0" />, period: getPeriodStatus(12, 17) },
             { label: 'Evening', icon: <Moon className="w-3.5 h-3.5 shrink-0" />, period: getPeriodStatus(17, 21) },
             { label: 'Night', icon: <Moon className="w-3.5 h-3.5 opacity-75 shrink-0" />, period: getPeriodStatus(21, 5) },
           ].map((item, idx) => {
-            let bgClass = 'bg-muted text-muted-foreground border-border';
-            let statusIcon = <Circle className="w-4 h-4 opacity-40 shrink-0" />;
-            let statusText = 'No Dose';
-            
+            let bgClass = 'bg-white/10 backdrop-blur-md text-white/70 border-white/20';
+            let statusIcon = <Circle className="w-5 h-5 opacity-50 shrink-0" />;
+
             if (item.period === 'taken') {
-              bgClass = 'bg-success/15 text-success border-success/30';
-              statusIcon = <Check className="w-4 h-4 shrink-0" />;
-              statusText = 'Taken';
+              bgClass = 'bg-white/20 backdrop-blur-md text-white border-white/35';
+              statusIcon = <Check className="w-5 h-5 shrink-0" />;
             } else if (item.period === 'pending') {
-              bgClass = 'bg-primary/10 text-primary border-primary/20';
-              statusIcon = <Clock className="w-4 h-4 animate-pulse shrink-0" />;
-              statusText = 'Pending';
+              bgClass = 'bg-white/20 backdrop-blur-md text-white border-white/35';
+              statusIcon = <Clock className="w-5 h-5 animate-pulse shrink-0" />;
             } else if (item.period === 'missed') {
-              bgClass = 'bg-danger/15 text-danger border-danger/30';
-              statusIcon = <X className="w-4 h-4 shrink-0" />;
-              statusText = 'Missed';
+              bgClass = 'bg-white/20 backdrop-blur-md text-white border-white/35';
+              statusIcon = <X className="w-5 h-5 shrink-0" />;
             }
-            
+
             return (
-              <div key={idx} className={`p-3 rounded-2xl border flex flex-col items-center justify-between min-h-[95px] ${bgClass}`}>
-                <span className="text-[10px] font-black font-mono tracking-tight flex items-center gap-1.5 justify-center w-full">
+              <div key={idx} className={`p-2 rounded-2xl border flex flex-col items-center justify-center gap-2 min-h-[78px] ${bgClass}`}>
+                <span className="text-[9px] font-black font-mono tracking-tight flex flex-col items-center gap-1 w-full">
                   {item.icon}
-                  <span>{item.label}</span>
+                  <span className="truncate max-w-full">{item.label}</span>
                 </span>
-                <span className="my-1.5">{statusIcon}</span>
-                <span className="text-[8px] font-bold uppercase tracking-wider">{statusText}</span>
+                <span>{statusIcon}</span>
               </div>
             );
           })}
         </div>
+        <PinkBubbles />
       </div>
 
       {/* Main Workspace Layout Grid */}
@@ -1676,27 +1639,57 @@ export default function DashboardClientView({
           <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4">
             <div>
               <h3 className="font-black text-foreground text-sm">Health Insights</h3>
-              <p className="text-[11px] text-muted-foreground">Historical progress tracker</p>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-muted p-4 rounded-2xl border border-border">
-                <span className="text-[10px] font-black text-muted-foreground uppercase">30d Adherence</span>
-                <p className="text-2xl font-black text-primary mt-1">{monthlyAdherence}%</p>
-              </div>
-              <div className="bg-muted p-4 rounded-2xl border border-border">
-                <span className="text-[10px] font-black text-muted-foreground uppercase font-bold flex items-center gap-1">
-                  Streak
-                </span>
-                <p className="text-xl font-black text-warning mt-1 flex items-center gap-1">
-                  <Flame className="w-4 h-4 text-warning fill-warning shrink-0" /> 7 Days
-                </p>
-              </div>
+              <p className="text-[11px] text-muted-foreground">Your last 7 days at a glance</p>
             </div>
 
-            <div className="min-h-[160px] flex items-center justify-center bg-muted/30 p-2 rounded-2xl border border-border">
-              <AdherenceChart data={chartData} />
-            </div>
+            {/* Weekly rings — center number = doses taken; teal = taken, amber = skipped, uncoloured = missed.
+                Laid out like the Olympic rings: 4 on top, 3 nestled below. */}
+            {(() => {
+              const days = chartData.slice(-7);
+              const renderRing = (d: { date: string; Taken: number; Skipped: number; Missed: number }, idx: number) => {
+                const taken = d.Taken || 0;
+                const skipped = d.Skipped || 0;
+                const total = taken + skipped + (d.Missed || 0);
+                const dayNum = String(d.date).split(' ')[0];
+                const C = 2 * Math.PI * 15.5;
+                const takenLen = total > 0 ? C * (taken / total) : 0;
+                const skippedLen = total > 0 ? C * (skipped / total) : 0;
+                return (
+                  <div key={idx} className="flex flex-col items-center gap-1" title={`${d.date}: ${taken} taken, ${skipped} skipped, ${d.Missed || 0} missed`}>
+                    <div className="relative w-14 h-14">
+                      <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+                        {/* Track = missed / no data (uncoloured) */}
+                        <circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--muted)" strokeWidth="3" />
+                        {/* Taken (green) */}
+                        {takenLen > 0 && (
+                          <circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--success)" strokeWidth="3"
+                            strokeDasharray={`${takenLen} ${C - takenLen}`} strokeDashoffset={0} />
+                        )}
+                        {/* Skipped (amber), placed right after the taken arc */}
+                        {skippedLen > 0 && (
+                          <circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--warning)" strokeWidth="3"
+                            strokeDasharray={`${skippedLen} ${C - skippedLen}`} strokeDashoffset={-takenLen} />
+                        )}
+                      </svg>
+                      <span className="absolute inset-0 flex items-center justify-center text-sm font-black text-foreground tabular-nums">
+                        {taken}
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-bold text-muted-foreground tabular-nums">{dayNum}</span>
+                  </div>
+                );
+              };
+              return (
+                <div className="flex flex-col items-center gap-2 py-1">
+                  <div className="flex justify-center gap-3">
+                    {days.slice(0, 4).map((d, i) => renderRing(d, i))}
+                  </div>
+                  <div className="flex justify-center gap-3">
+                    {days.slice(4).map((d, i) => renderRing(d, i + 4))}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Layer 4: Medication Inventory */}
@@ -1734,15 +1727,15 @@ export default function DashboardClientView({
           </div>
 
           {/* Layer 5: Care Circle */}
-          <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-5">
+          <div className="relative overflow-hidden isolate bg-gradient-to-br from-[#F8839E] to-[#F26B8A] text-white border border-transparent rounded-3xl p-6 shadow-sm shadow-primary/20 space-y-5">
             <div className="flex justify-between items-center">
               <div>
-                <h3 className="font-black text-foreground text-sm">Care Circle</h3>
-                <p className="text-[11px] text-muted-foreground">Manage sharing & family relationships</p>
+                <h3 className="font-black text-white text-sm">Care Circle</h3>
+                <p className="text-[11px] text-white/80">Manage sharing & family relationships</p>
               </div>
-              <Link 
+              <Link
                 href="/care-circle"
-                className="px-3 py-1.5 rounded-full bg-muted border border-border hover:bg-muted/70 text-foreground transition-all text-[10px] font-bold"
+                className="px-3 py-1.5 rounded-full bg-[#5EEAD4] border border-transparent hover:bg-[#2DD4BF] text-[#0F766E] transition-all text-[10px] font-bold shadow-sm"
               >
                 Open Hub
               </Link>
@@ -1751,25 +1744,25 @@ export default function DashboardClientView({
             <div className="space-y-4">
               {/* Sub-List 1: People I Care For */}
               <div className="space-y-2">
-                <p className="text-[10px] uppercase font-bold text-muted-foreground">People I Care For ({peopleICareFor.length})</p>
+                <p className="text-[10px] uppercase font-bold text-white/80">People I Care For ({peopleICareFor.length})</p>
                 {peopleICareFor.length > 0 ? (
                   <div className="space-y-2">
                     {peopleICareFor.slice(0, 3).map((conn) => {
                       const initials = conn.resolved_name?.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() || 'P';
                       return (
-                        <div key={conn.connection_id} className="flex items-center justify-between p-3 rounded-2xl bg-muted border border-border">
+                        <div key={conn.connection_id} className="flex items-center justify-between p-3 rounded-2xl bg-white/15 backdrop-blur-md border border-white/25">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-black">
+                            <div className="w-8 h-8 rounded-full bg-[#CCFBF1] text-[#0D9488] flex items-center justify-center text-xs font-black">
                               {initials}
                             </div>
                             <div>
-                              <p className="text-xs font-black text-foreground">{conn.resolved_name}</p>
-                              <p className="text-[9px] font-bold text-muted-foreground uppercase">{conn.relationship_type}</p>
+                              <p className="text-xs font-black text-white">{conn.resolved_name}</p>
+                              <p className="text-[9px] font-bold text-white/70 uppercase">{conn.relationship_type}</p>
                             </div>
                           </div>
-                          <Link 
+                          <Link
                             href={`/care-circle/${conn.patient_telegram_id}`}
-                            className="px-2.5 py-1 rounded-full bg-muted hover:bg-muted/70 text-[10px] font-bold text-foreground border border-border transition-all"
+                            className="px-2.5 py-1 rounded-full bg-white/20 hover:bg-white/30 text-[10px] font-bold text-white border border-white/30 transition-all"
                           >
                             Overview
                           </Link>
@@ -1777,13 +1770,13 @@ export default function DashboardClientView({
                       );
                     })}
                     {peopleICareFor.length > 3 && (
-                      <p className="text-[10px] text-center text-muted-foreground">
-                        + {peopleICareFor.length - 3} more. <Link href="/care-circle" className="text-primary font-bold">View all</Link>
+                      <p className="text-[10px] text-center text-white/70">
+                        + {peopleICareFor.length - 3} more. <Link href="/care-circle" className="text-white font-bold underline">View all</Link>
                       </p>
                     )}
                   </div>
                 ) : (
-                  <p className="text-[10px] text-muted-foreground border border-dashed border-border/80 rounded-xl p-3 text-center">
+                  <p className="text-[10px] text-white/70 border border-dashed border-white/40 rounded-xl p-3 text-center">
                     No active patients linked yet.
                   </p>
                 )}
@@ -1791,23 +1784,23 @@ export default function DashboardClientView({
 
               {/* Sub-List 2: People Caring For Me */}
               <div className="space-y-2">
-                <p className="text-[10px] uppercase font-bold text-muted-foreground">People Caring For Me ({peopleCaringForMe.length})</p>
+                <p className="text-[10px] uppercase font-bold text-white/80">People Caring For Me ({peopleCaringForMe.length})</p>
                 {peopleCaringForMe.length > 0 ? (
                   <div className="space-y-2">
                     {peopleCaringForMe.slice(0, 3).map((conn) => {
                       const initials = conn.resolved_name?.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() || 'C';
                       return (
-                        <div key={conn.connection_id} className="flex items-center justify-between p-3 rounded-2xl bg-muted border border-border">
+                        <div key={conn.connection_id} className="flex items-center justify-between p-3 rounded-2xl bg-white/15 backdrop-blur-md border border-white/25">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-black">
+                            <div className="w-8 h-8 rounded-full bg-[#CCFBF1] text-[#0D9488] flex items-center justify-center text-xs font-black">
                               {initials}
                             </div>
                             <div>
-                              <p className="text-xs font-black text-foreground">{conn.resolved_name}</p>
-                              <p className="text-[9px] font-bold text-muted-foreground uppercase">{conn.relationship_type}</p>
+                              <p className="text-xs font-black text-white">{conn.resolved_name}</p>
+                              <p className="text-[9px] font-bold text-white/70 uppercase">{conn.relationship_type}</p>
                             </div>
                           </div>
-                          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-success/10 text-success uppercase">
+                          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-white/20 text-white border border-white/30 uppercase">
                             {conn.connection_status}
                           </span>
                         </div>
@@ -1815,12 +1808,13 @@ export default function DashboardClientView({
                     })}
                   </div>
                 ) : (
-                  <p className="text-[10px] text-muted-foreground border border-dashed border-border/80 rounded-xl p-3 text-center">
+                  <p className="text-[10px] text-white/70 border border-dashed border-white/40 rounded-xl p-3 text-center">
                     No active caregivers linked yet.
                   </p>
                 )}
               </div>
             </div>
+            <PinkBubbles />
           </div>
 
         </div>
