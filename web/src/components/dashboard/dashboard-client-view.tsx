@@ -1689,11 +1689,13 @@ export default function DashboardClientView({
                 Laid out like the Olympic rings: 4 on top, 3 nestled below. */}
             {(() => {
               const days = chartData.slice(-7);
-              const renderRing = (d: { date: string; Taken: number; Skipped: number; Missed: number }, idx: number) => {
+              const renderRing = (d: { date: string; day?: number; Taken: number; Skipped: number; Missed: number }, idx: number) => {
                 const taken = d.Taken || 0;
                 const skipped = d.Skipped || 0;
                 const total = taken + skipped + (d.Missed || 0);
-                const dayNum = String(d.date).split(' ')[0];
+                // Prefer the explicit numeric day; otherwise pull the first number out of
+                // the localized label so month-first formats (e.g. "Jun 25") still work.
+                const dayNum = d.day != null ? String(d.day) : (String(d.date).match(/\d+/)?.[0] ?? String(d.date));
                 const C = 2 * Math.PI * 15.5;
                 const takenLen = total > 0 ? C * (taken / total) : 0;
                 const skippedLen = total > 0 ? C * (skipped / total) : 0;

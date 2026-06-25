@@ -107,16 +107,17 @@ export default async function DashboardPage() {
   const lowStockCount = lowStockMedicines.length;
 
   // Group 7-day chart data points
-  const chartDataMap: { [key: string]: { Taken: number; Skipped: number; Missed: number } } = {};
+  const chartDataMap: { [key: string]: { Taken: number; Skipped: number; Missed: number; day: number } } = {};
   for (let i = 6; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
-    const dateStr = d.toLocaleDateString([], { month: 'short', day: 'numeric' });
-    chartDataMap[dateStr] = { Taken: 0, Skipped: 0, Missed: 0 };
+    // Pin locale so the label format is deterministic across server/clients.
+    const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    chartDataMap[dateStr] = { Taken: 0, Skipped: 0, Missed: 0, day: d.getDate() };
   }
 
   logs?.forEach(log => {
-    const dateStr = new Date(log.scheduled_time).toLocaleDateString([], { month: 'short', day: 'numeric' });
+    const dateStr = new Date(log.scheduled_time).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     if (chartDataMap[dateStr]) {
       if (log.response === 'TAKEN') chartDataMap[dateStr].Taken += 1;
       else if (log.response === 'SKIP') chartDataMap[dateStr].Skipped += 1;
