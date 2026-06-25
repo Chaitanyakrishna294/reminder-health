@@ -408,63 +408,63 @@ export default function TodaysSchedule({
           ? isPending 
           : isEscalated;
 
-    // Severity-tinted capsule; escalated overrides everything with danger emphasis.
-    const theme = getSeverityTheme(event.medications.priority_level);
+    // Severity colour: red = critical, amber = important, green = normal.
+    const priority = event.medications.priority_level;
+    const sevColor = priority === 'critical' ? 'text-danger bg-danger/15' : priority === 'important' ? 'text-warning bg-warning/15' : 'text-success bg-success/15';
+    const status = event.reminder_status;
+    const statusIcon =
+      status === 'TAKEN' || status === 'RESOLVED_BY_CG' ? <Check className="w-5 h-5" />
+      : status === 'SKIPPED' ? <SkipForward className="w-5 h-5" />
+      : status === 'MISSED' || status === 'ESCALATED_TO_CG' ? <AlertCircle className="w-5 h-5" />
+      : <Clock className="w-5 h-5" />;
+    const theme = getSeverityTheme(priority);
     const borderClass = isEscalated
-      ? 'border-danger/30 bg-danger/5 shadow-sm shadow-danger/10'
+      ? 'border-danger/30 bg-danger/5'
       : isPending
-        ? `${theme.bg} ${theme.border} hover:border-primary/40`
+        ? `${theme.bg} ${theme.border}`
         : `${theme.bg} border-border/40 opacity-90`;
 
     return (
       <div
         key={event.id}
-        className={`rounded-3xl min-h-[120px] border p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm hover:shadow-md transition-all duration-300 ${borderClass}`}
+        className={`rounded-2xl border px-4 py-3 flex items-center justify-between gap-3 shadow-sm hover:shadow-md transition-all duration-200 ${borderClass}`}
       >
-        <div className="flex items-center gap-5">
-          {/* Visual Status Circle Indicator surrounded by Severity Arc */}
-          <SeverityArcBadge priority={event.medications.priority_level} status={event.reminder_status} />
-          
-          <div className="space-y-1">
-            <h4 className="text-xl font-bold text-[#0F172A] tracking-tight">
-              {event.medications.drug_name}
-              {event.medications.dosage && (
-                <span className="font-semibold text-[#475569] text-sm ml-2">
-                  ({event.medications.dosage})
-                </span>
-              )}
-            </h4>
-            <div className="flex flex-wrap items-center gap-2 mt-1">
-              <span className="text-xs text-primary font-bold bg-primary/10 px-2 py-0.5 rounded-lg border border-primary/20 flex items-center gap-1" suppressHydrationWarning>
-                <Clock className="w-3.5 h-3.5" /> {timeStr}
-              </span>
-              <span className="text-[10px] uppercase font-extrabold px-2 py-0.5 bg-muted rounded-md text-muted-foreground border border-border">
-                {event.medications.priority_level} Priority
-              </span>
-            </div>
-          </div>
+        {/* Severity dot + name + time */}
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <span
+            className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${sevColor}`}
+            title={`${priority} priority — ${status.replace(/_/g, ' ').toLowerCase()}`}
+            aria-label={`${priority} priority, ${status.replace(/_/g, ' ').toLowerCase()}`}
+          >
+            {statusIcon}
+          </span>
+          <span className="font-bold text-foreground text-sm truncate">{event.medications.drug_name}</span>
+          <span className="text-xs text-muted-foreground font-semibold shrink-0 tabular-nums" suppressHydrationWarning>
+            {timeStr}
+          </span>
         </div>
 
-        <div className="flex items-center gap-3 self-end md:self-center shrink-0">
+        {/* Resolve toggle — small icon + word */}
+        <div className="shrink-0">
           {canResolve ? (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <button
                 onClick={() => handleResolve(event, 'TAKEN')}
                 disabled={isUpdating}
-                className="inline-flex items-center gap-1.5 px-5 py-3 text-sm font-black rounded-full bg-success/20 backdrop-blur-md border border-success/40 text-success hover:bg-success/30 active:scale-[0.96] transition-all cursor-pointer shadow-sm disabled:opacity-50"
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-full bg-success/15 text-success border border-success/30 hover:bg-success/25 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
               >
-                {isUpdating ? '...' : (<><Check className="w-4 h-4" /> <span>{userRole === 'CAREGIVER' ? 'Confirm Taken' : 'Take Now'}</span></>)}
+                {isUpdating ? '…' : (<><Check className="w-3.5 h-3.5" /> Take</>)}
               </button>
               <button
                 onClick={() => handleResolve(event, 'SKIP')}
                 disabled={isUpdating}
-                className="inline-flex items-center gap-1.5 px-4 py-3 text-sm font-bold rounded-full bg-white/55 backdrop-blur-md border border-white/70 text-muted-foreground hover:bg-white/80 active:scale-[0.96] transition-all cursor-pointer shadow-sm disabled:opacity-50"
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-full bg-muted text-muted-foreground border border-border hover:bg-muted/70 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
               >
-                {isUpdating ? '...' : (<><X className="w-4 h-4" /> <span>Skip</span></>)}
+                {isUpdating ? '…' : (<><SkipForward className="w-3.5 h-3.5" /> Skip</>)}
               </button>
             </div>
           ) : (
-            <div className="flex flex-col items-end gap-1">
+            <div className="flex flex-col items-end gap-0.5">
               {getStatusBadge(event.reminder_status)}
               {renderChangeLink(event)}
             </div>

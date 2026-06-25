@@ -35,6 +35,7 @@ import {
   ClipboardList,
   Sparkles,
   ChevronRight,
+  ChevronDown,
   Minus,
   Plus,
   Utensils,
@@ -72,10 +73,14 @@ const stepMeta = [
   { label: 'Review', icon: <ClipboardList className="w-4 h-4" /> },
 ];
 
+// Soft diffuse card shadow shared across the Apple-Health-styled pages.
+const CARD_SHADOW = '0 1px 3px rgba(16, 28, 90, 0.04), 0 10px 30px rgba(16, 28, 90, 0.06)';
+
 export default function NewMedicationPage() {
   const [step, setStep] = useState(1);
   const [drugName, setDrugName] = useState('');
   const [unitType, setUnitType] = useState<UnitType>('TABLET');
+  const [unitOpen, setUnitOpen] = useState(false);
   const [frequency, setFrequency] = useState<'once_daily' | 'twice_daily' | 'thrice_daily'>('once_daily');
   const [times, setTimes] = useState<string[]>(['08:00']);
   
@@ -218,6 +223,13 @@ export default function NewMedicationPage() {
     }
   };
 
+  // Jump directly to any step via the stepper.
+  const goToStep = (target: number) => {
+    if (target === step) return;
+    setError(null);
+    animateStep(target, target > step ? 'forward' : 'backward');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!targetTelegramChatId) {
@@ -277,8 +289,8 @@ export default function NewMedicationPage() {
   ];
 
   const labelClass = `block font-semibold text-foreground ${isElderly ? 'text-xl mb-2' : 'text-sm mb-1.5'}`;
-  const inputClass = `mt-1 block w-full px-4 py-3 border border-input rounded-2xl bg-background text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 text-sm transition-all duration-200 font-[var(--font-sans)] ${
-    isElderly ? 'py-4 text-xl rounded-2xl border-2' : ''
+  const inputClass = `mt-1 block w-full px-4 py-3 rounded-2xl bg-[#F2F2F7] text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm transition-all duration-200 font-[var(--font-sans)] ${
+    isElderly ? 'py-4 text-xl' : ''
   }`;
 
   const stepContentClass = `transition-all duration-300 ease-out ${
@@ -292,24 +304,24 @@ export default function NewMedicationPage() {
       
       {/* Page Header */}
       <div>
-        <h1 className={`font-black tracking-tight text-foreground ${isElderly ? 'text-4xl' : 'text-2xl'}`}>
+        <h1 className={`font-bold tracking-tight text-foreground ${isElderly ? 'text-4xl' : 'text-[26px]'}`}>
           Add Medication
         </h1>
-        <p className={`text-muted-foreground mt-1 ${isElderly ? 'text-lg' : 'text-sm'}`}>
+        <p className={`text-muted-foreground mt-1 font-medium ${isElderly ? 'text-lg' : 'text-[13px]'}`}>
           Set up a new medication in 6 guided steps.
         </p>
       </div>
 
       {/* Error Banner */}
       {error && (
-        <div className="flex items-start gap-3 bg-danger/8 text-danger text-sm p-4 rounded-2xl border border-danger/15">
+        <div className="flex items-start gap-3 text-[#FF3B30] text-sm p-4 rounded-2xl" style={{ background: '#FFECEA' }}>
           <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-          <span>{error}</span>
+          <span className="font-medium">{error}</span>
         </div>
       )}
 
       {targetTelegramChatId ? (
-        <div className={`bg-card rounded-3xl border border-border shadow-md overflow-hidden ${isElderly ? 'border-2' : ''}`}>
+        <div className="bg-white rounded-[22px] overflow-hidden" style={{ boxShadow: CARD_SHADOW }}>
           
           {/* ── Premium Stepper ── */}
           <div className="px-6 pt-6 pb-4 md:px-8 md:pt-8">
@@ -320,27 +332,34 @@ export default function NewMedicationPage() {
                 const isCurrent = step === stepNum;
                 return (
                   <React.Fragment key={stepNum}>
-                    <div className="flex flex-col items-center gap-1.5 min-w-0">
+                    <button
+                      type="button"
+                      onClick={() => goToStep(stepNum)}
+                      className="flex flex-col items-center gap-1.5 min-w-0 cursor-pointer group/step"
+                      aria-label={`Go to step ${stepNum}: ${s.label}`}
+                      aria-current={isCurrent ? 'step' : undefined}
+                    >
                       <div
-                        className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${
+                        className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 group-hover/step:scale-105 ${
                           isCompleted
-                            ? 'bg-success text-white'
+                            ? 'bg-primary text-white'
                             : isCurrent
-                              ? 'bg-primary text-white shadow-[0_0_0_4px_rgba(242,107,138,0.15)]'
-                              : 'bg-muted text-muted-foreground'
+                              ? 'bg-gradient-to-b from-[#F8839E] to-[#F26B8A] text-white'
+                              : 'bg-[#F2F2F7] text-muted-foreground group-hover/step:bg-[#E5E5EA]'
                         }`}
+                        style={isCurrent ? { boxShadow: '0 6px 16px rgba(242,107,138,0.40)' } : undefined}
                       >
-                        {isCompleted ? <Check className="w-4 h-4" /> : stepNum}
+                        {isCompleted ? <Check className="w-4 h-4" strokeWidth={2.5} /> : stepNum}
                       </div>
                       <span className={`text-[10px] font-semibold text-center leading-tight hidden sm:block ${
-                        isCurrent ? 'text-primary' : isCompleted ? 'text-success' : 'text-muted-foreground'
+                        isCurrent || isCompleted ? 'text-primary' : 'text-muted-foreground'
                       }`}>
                         {s.label}
                       </span>
-                    </div>
+                    </button>
                     {i < stepMeta.length - 1 && (
                       <div className={`flex-1 h-[2px] rounded-full mx-1 mt-[-18px] sm:mt-0 transition-all duration-300 ${
-                        step > stepNum ? 'bg-success' : 'bg-muted'
+                        step > stepNum ? 'bg-primary' : 'bg-[#EAEAEF]'
                       }`} />
                     )}
                   </React.Fragment>
@@ -354,13 +373,13 @@ export default function NewMedicationPage() {
             <form onSubmit={handleSubmit}>
 
               {/* Current step label */}
-              <div className="flex items-center gap-2 mb-5 pb-4 border-b border-border/60">
-                <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+              <div className="flex items-center gap-2 mb-5 pb-4 border-b border-[#0F1C5A]/[0.06]">
+                <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
                   {stepMeta[step - 1].icon}
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Step {step} of 6</span>
-                  <h2 className="text-base font-bold text-foreground leading-tight">{stepMeta[step - 1].label}</h2>
+                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Step {step} of 6</span>
+                  <h2 className="text-base font-bold tracking-tight text-foreground leading-tight">{stepMeta[step - 1].label}</h2>
                 </div>
               </div>
               
@@ -385,24 +404,43 @@ export default function NewMedicationPage() {
                   <div>
                     <label className={labelClass}>Medication Form</label>
                     <p className="text-xs text-muted-foreground mb-3">Select the type of medication unit.</p>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                      {unitOptions.map((opt) => (
-                        <button
-                          key={opt.id}
-                          type="button"
-                          onClick={() => setUnitType(opt.id)}
-                          className={`p-3.5 rounded-2xl border text-center transition-all duration-200 flex flex-col items-center justify-center cursor-pointer gap-2 ${
-                            unitType === opt.id 
-                              ? 'border-primary bg-primary/6 ring-2 ring-primary/15 text-primary' 
-                              : 'border-border hover:border-primary/30 hover:bg-muted/40 text-muted-foreground'
-                          }`}
-                        >
-                          <div className={`transition-colors duration-200 ${unitType === opt.id ? 'text-primary' : 'text-muted-foreground'}`}>
-                            {opt.icon}
-                          </div>
-                          <span className={`text-xs font-semibold ${unitType === opt.id ? 'text-primary font-bold' : ''}`}>{opt.label}</span>
-                        </button>
-                      ))}
+                    <div className="flex flex-col gap-2">
+                      {(unitOpen ? unitOptions : unitOptions.filter((o) => o.id === unitType)).map((opt) => {
+                        const isSel = unitType === opt.id;
+                        return (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => {
+                              if (!unitOpen) { setUnitOpen(true); return; }
+                              setUnitType(opt.id);
+                              setUnitOpen(false);
+                            }}
+                            className={`px-3.5 py-3 rounded-2xl text-left transition-all duration-200 flex items-center justify-between gap-3 cursor-pointer ${
+                              isSel
+                                ? 'bg-primary/8 ring-2 ring-primary/25'
+                                : 'bg-[#F6F6F9] hover:bg-[#EFEFF3]'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors duration-200 ${
+                                isSel ? 'bg-primary/15 text-primary' : 'bg-white text-muted-foreground'
+                              }`}>
+                                {opt.icon}
+                              </div>
+                              <span className={`text-sm font-semibold truncate ${isSel ? 'text-primary' : 'text-foreground'}`}>{opt.label}</span>
+                            </div>
+                            {/* Right indicator: chevron to open when collapsed, check on the selected row when open */}
+                            {!unitOpen ? (
+                              <ChevronDown className="w-5 h-5 text-muted-foreground shrink-0" strokeWidth={2.5} />
+                            ) : isSel ? (
+                              <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center shrink-0">
+                                <Check className="w-3.5 h-3.5 text-white" strokeWidth={2.5} />
+                              </div>
+                            ) : null}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -419,15 +457,15 @@ export default function NewMedicationPage() {
                           key={freq.id}
                           type="button"
                           onClick={() => setFrequency(freq.id as any)}
-                          className={`p-4 rounded-2xl border text-left transition-all duration-200 flex items-center justify-between cursor-pointer ${
-                            frequency === freq.id 
-                              ? 'border-primary bg-primary/6 ring-2 ring-primary/15' 
-                              : 'border-border hover:border-primary/30 hover:bg-muted/40'
+                          className={`p-4 rounded-2xl text-left transition-all duration-200 flex items-center justify-between cursor-pointer ${
+                            frequency === freq.id
+                              ? 'bg-primary/8 ring-2 ring-primary/25'
+                              : 'bg-[#F6F6F9] hover:bg-[#EFEFF3]'
                           }`}
                         >
                           <div className="flex items-center gap-3.5">
                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors duration-200 ${
-                              frequency === freq.id ? 'bg-primary/12 text-primary' : 'bg-muted text-muted-foreground'
+                              frequency === freq.id ? 'bg-primary/15 text-primary' : 'bg-white text-muted-foreground'
                             }`}>
                               {freq.icon}
                             </div>
@@ -446,14 +484,14 @@ export default function NewMedicationPage() {
                     </div>
                   </div>
 
-                  <div className="pt-4 border-t border-border/40">
+                  <div className="pt-4 border-t border-[#0F1C5A]/[0.06]">
                     <label className={labelClass}>Reminder Times</label>
                     <p className="text-xs text-muted-foreground mb-3">Set the time for each dose in 24-hour format.</p>
                     <div className="grid grid-cols-1 gap-2.5">
                       {times.map((time, idx) => (
-                        <div key={idx} className="bg-muted/30 p-4 rounded-2xl border border-border flex items-center justify-between gap-4">
+                        <div key={idx} className="bg-[#F6F6F9] p-4 rounded-2xl flex items-center justify-between gap-4">
                           <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                            <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
                               <Clock className="w-4 h-4 text-primary" />
                             </div>
                             <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Dose {idx + 1}</span>
@@ -463,7 +501,7 @@ export default function NewMedicationPage() {
                             required
                             value={time}
                             onChange={(e) => handleTimeChange(idx, e.target.value)}
-                            className={`px-4 py-2.5 border border-input rounded-xl bg-background text-foreground font-[var(--font-mono)] text-sm font-bold focus:ring-2 focus:ring-primary/30 focus:border-primary/40 transition-all ${
+                            className={`px-4 py-2.5 rounded-xl bg-white text-foreground font-[var(--font-mono)] text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all ${
                               isElderly ? 'py-3 text-lg' : ''
                             }`}
                           />
@@ -492,10 +530,10 @@ export default function NewMedicationPage() {
                           key={s}
                           type="button"
                           onClick={() => setStrength(s)}
-                          className={`px-3.5 py-1.5 text-xs font-semibold rounded-full border transition-all cursor-pointer ${
+                          className={`px-3.5 py-1.5 text-xs font-semibold rounded-full transition-all cursor-pointer ${
                             strength === s
-                              ? 'border-primary bg-primary/8 text-primary font-bold'
-                              : 'border-border hover:bg-muted bg-background text-muted-foreground'
+                              ? 'bg-primary/10 text-primary font-bold ring-1 ring-primary/30'
+                              : 'bg-[#F2F2F7] hover:bg-[#E9E9EE] text-muted-foreground'
                           }`}
                         >
                           {s}
@@ -504,18 +542,18 @@ export default function NewMedicationPage() {
                     </div>
                   </div>
 
-                  <div className="pt-4 border-t border-border/40">
+                  <div className="pt-4 border-t border-[#0F1C5A]/[0.06]">
                     <label className={labelClass}>Dosage Amount</label>
                     <p className="text-xs text-muted-foreground mb-3">Units taken per reminder.</p>
                     <div className="flex items-center gap-3 mt-2">
                       <button
                         type="button"
                         onClick={() => setDosageAmount(prev => Math.max(0.5, prev - 0.5))}
-                        className="w-11 h-11 border border-border rounded-xl bg-muted flex items-center justify-center hover:bg-muted/80 transition-all cursor-pointer"
+                        className="w-11 h-11 rounded-full bg-[#F2F2F7] flex items-center justify-center hover:bg-[#E5E5EA] transition-all cursor-pointer"
                       >
-                        <Minus className="w-4 h-4 text-foreground" />
+                        <Minus className="w-4 h-4 text-foreground" strokeWidth={2.5} />
                       </button>
-                      <div className="flex items-center gap-2 bg-muted/30 border border-border rounded-xl px-4 py-2.5">
+                      <div className="flex items-center gap-2 bg-[#F2F2F7] rounded-2xl px-4 py-2.5">
                         <input
                           type="number"
                           step="0.5"
@@ -532,9 +570,9 @@ export default function NewMedicationPage() {
                       <button
                         type="button"
                         onClick={() => setDosageAmount(prev => prev + 0.5)}
-                        className="w-11 h-11 border border-border rounded-xl bg-muted flex items-center justify-center hover:bg-muted/80 transition-all cursor-pointer"
+                        className="w-11 h-11 rounded-full bg-[#F2F2F7] flex items-center justify-center hover:bg-[#E5E5EA] transition-all cursor-pointer"
                       >
-                        <Plus className="w-4 h-4 text-foreground" />
+                        <Plus className="w-4 h-4 text-foreground" strokeWidth={2.5} />
                       </button>
                     </div>
                   </div>
@@ -544,7 +582,7 @@ export default function NewMedicationPage() {
               {/* STEP 4: Inventory Tracking */}
               {step === 4 && (
                 <div className="space-y-5">
-                  <div className="flex items-center justify-between p-4 bg-muted/30 rounded-2xl border border-border">
+                  <div className="flex items-center justify-between p-4 bg-[#F6F6F9] rounded-2xl">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                         <Layers className="w-5 h-5 text-primary" />
@@ -620,7 +658,7 @@ export default function NewMedicationPage() {
                     />
                   </div>
 
-                  <div className="pt-4 border-t border-border/40">
+                  <div className="pt-4 border-t border-[#0F1C5A]/[0.06]">
                     <label className={labelClass}>Priority Level</label>
                     <p className="text-xs text-muted-foreground mb-3">Determines escalation behavior on missed doses.</p>
                     <div className="grid grid-cols-1 gap-2.5">
@@ -628,24 +666,21 @@ export default function NewMedicationPage() {
                         const isSelected = priority === p.id;
                         const colorMap = {
                           success: {
-                            border: isSelected ? 'border-success' : 'border-border',
-                            bg: isSelected ? 'bg-success/6' : '',
-                            ring: isSelected ? 'ring-2 ring-success/15' : '',
-                            iconBg: isSelected ? 'bg-success/12 text-success' : 'bg-muted text-muted-foreground',
+                            bg: isSelected ? 'bg-success/8' : 'bg-[#F6F6F9] hover:bg-[#EFEFF3]',
+                            ring: isSelected ? 'ring-2 ring-success/30' : '',
+                            iconBg: isSelected ? 'bg-success/15 text-success' : 'bg-white text-muted-foreground',
                             title: isSelected ? 'text-success' : 'text-foreground',
                           },
                           warning: {
-                            border: isSelected ? 'border-warning' : 'border-border',
-                            bg: isSelected ? 'bg-warning/6' : '',
-                            ring: isSelected ? 'ring-2 ring-warning/15' : '',
-                            iconBg: isSelected ? 'bg-warning/12 text-warning' : 'bg-muted text-muted-foreground',
+                            bg: isSelected ? 'bg-warning/8' : 'bg-[#F6F6F9] hover:bg-[#EFEFF3]',
+                            ring: isSelected ? 'ring-2 ring-warning/30' : '',
+                            iconBg: isSelected ? 'bg-warning/15 text-warning' : 'bg-white text-muted-foreground',
                             title: isSelected ? 'text-warning' : 'text-foreground',
                           },
                           danger: {
-                            border: isSelected ? 'border-danger' : 'border-border',
-                            bg: isSelected ? 'bg-danger/6' : '',
-                            ring: isSelected ? 'ring-2 ring-danger/15' : '',
-                            iconBg: isSelected ? 'bg-danger/12 text-danger' : 'bg-muted text-muted-foreground',
+                            bg: isSelected ? 'bg-danger/8' : 'bg-[#F6F6F9] hover:bg-[#EFEFF3]',
+                            ring: isSelected ? 'ring-2 ring-danger/30' : '',
+                            iconBg: isSelected ? 'bg-danger/15 text-danger' : 'bg-white text-muted-foreground',
                             title: isSelected ? 'text-danger' : 'text-foreground',
                           },
                         };
@@ -655,7 +690,7 @@ export default function NewMedicationPage() {
                             key={p.id}
                             type="button"
                             onClick={() => setPriority(p.id as any)}
-                            className={`p-4 rounded-2xl border text-left transition-all duration-200 flex items-center justify-between cursor-pointer hover:bg-muted/40 ${c.border} ${c.bg} ${c.ring}`}
+                            className={`p-4 rounded-2xl text-left transition-all duration-200 flex items-center justify-between cursor-pointer ${c.bg} ${c.ring}`}
                           >
                             <div className="flex items-center gap-3">
                               <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors duration-200 ${c.iconBg}`}>
@@ -685,11 +720,11 @@ export default function NewMedicationPage() {
               {step === 6 && (
                 <div className="space-y-5">
                   {/* Summary Card */}
-                  <div className="rounded-2xl border border-border overflow-hidden">
+                  <div className="rounded-2xl bg-[#F6F6F9] overflow-hidden">
                     {/* Drug name header */}
-                    <div className="bg-primary/6 px-5 py-4 border-b border-border/40">
+                    <div className="bg-primary/8 px-5 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-primary/12 flex items-center justify-center text-primary">
+                        <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center text-primary">
                           <Pill className="w-5 h-5" />
                         </div>
                         <div>
@@ -702,7 +737,7 @@ export default function NewMedicationPage() {
                     </div>
 
                     {/* Detail rows */}
-                    <div className="divide-y divide-border/40">
+                    <div className="divide-y divide-[#0F1C5A]/[0.06]">
                       <div className="flex items-center justify-between px-5 py-3.5">
                         <div className="flex items-center gap-2.5">
                           <Clock className="w-4 h-4 text-muted-foreground" />
@@ -760,7 +795,7 @@ export default function NewMedicationPage() {
                   </div>
 
                   {/* Info Note */}
-                  <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 flex items-start gap-3">
+                  <div className="p-4 bg-primary/5 rounded-2xl flex items-start gap-3">
                     <ShieldAlert className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                     <p className="text-xs text-muted-foreground leading-relaxed">
                       Saving will activate automated reminders. You can pause or edit this medication at any time from the Medications page.
@@ -772,22 +807,22 @@ export default function NewMedicationPage() {
               </div>
 
               {/* ── Wizard Navigation ── */}
-              <div className="flex items-center justify-between pt-5 mt-6 border-t border-border/40 gap-3">
+              <div className="flex items-center justify-between pt-5 mt-6 border-t border-[#0F1C5A]/[0.06] gap-3">
                 {step > 1 ? (
                   <button
                     type="button"
                     onClick={handlePrevStep}
-                    className={`px-5 py-2.5 font-semibold rounded-2xl border border-border text-foreground bg-muted hover:bg-muted/70 transition-all duration-200 flex items-center gap-2 cursor-pointer ${
+                    className={`px-5 py-2.5 font-semibold rounded-full text-foreground bg-[#F2F2F7] hover:bg-[#E5E5EA] transition-all duration-200 flex items-center gap-2 cursor-pointer ${
                       isElderly ? 'h-[72px] text-lg' : 'text-sm'
                     }`}
                   >
-                    <ArrowLeft className="w-4 h-4" />
+                    <ArrowLeft className="w-4 h-4" strokeWidth={2.5} />
                     Back
                   </button>
                 ) : (
                   <Link
                     href="/medications"
-                    className={`px-5 py-2.5 font-semibold rounded-2xl border border-border text-foreground bg-muted hover:bg-muted/70 transition-all duration-200 flex items-center justify-center gap-2 ${
+                    className={`px-5 py-2.5 font-semibold rounded-full text-foreground bg-[#F2F2F7] hover:bg-[#E5E5EA] transition-all duration-200 flex items-center justify-center gap-2 ${
                       isElderly ? 'h-[72px] text-lg' : 'text-sm'
                     }`}
                   >
@@ -799,23 +834,25 @@ export default function NewMedicationPage() {
                   <button
                     type="button"
                     onClick={handleNextStep}
-                    className={`px-6 py-2.5 font-semibold rounded-2xl bg-primary text-primary-foreground hover:bg-primary-hover transition-all duration-200 flex items-center gap-2 cursor-pointer shadow-sm ${
+                    className={`px-6 py-2.5 font-semibold rounded-full bg-primary text-white hover:bg-primary-hover transition-all duration-200 flex items-center gap-2 cursor-pointer ${
                       isElderly ? 'h-[72px] text-lg' : 'text-sm'
                     }`}
+                    style={{ boxShadow: '0 4px 12px rgba(242, 107, 138, 0.35)' }}
                   >
                     Continue
-                    <ArrowRight className="w-4 h-4" />
+                    <ArrowRight className="w-4 h-4" strokeWidth={2.5} />
                   </button>
                 ) : (
                   <button
                     type="submit"
                     disabled={loading}
-                    className={`px-6 py-2.5 font-semibold rounded-2xl bg-success text-success-foreground hover:bg-success/90 transition-all duration-200 flex items-center gap-2 cursor-pointer disabled:opacity-50 shadow-sm ${
+                    className={`px-6 py-2.5 font-semibold rounded-full bg-primary text-white hover:bg-primary-hover transition-all duration-200 flex items-center gap-2 cursor-pointer disabled:opacity-50 ${
                       isElderly ? 'h-[72px] text-lg' : 'text-sm'
                     }`}
+                    style={{ boxShadow: '0 4px 12px rgba(242, 107, 138, 0.35)' }}
                   >
                     {loading ? 'Saving...' : 'Add Medication'}
-                    <Check className="w-4 h-4" />
+                    <Check className="w-4 h-4" strokeWidth={2.5} />
                   </button>
                 )}
               </div>
@@ -824,8 +861,8 @@ export default function NewMedicationPage() {
           </div>
         </div>
       ) : (
-        <div className="bg-card p-12 text-center text-sm text-muted-foreground border border-border rounded-3xl shadow-sm">
-          <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
+        <div className="bg-white p-12 text-center text-sm text-muted-foreground rounded-[22px]" style={{ boxShadow: CARD_SHADOW }}>
+          <div className="w-10 h-10 rounded-full bg-[#F2F2F7] flex items-center justify-center mx-auto mb-3">
             <Activity className="w-5 h-5 text-muted-foreground" />
           </div>
           Loading patient configuration...

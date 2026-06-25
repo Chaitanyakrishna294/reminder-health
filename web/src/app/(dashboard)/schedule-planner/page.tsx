@@ -1,8 +1,22 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Calendar as CalendarIcon, Clock, Edit2, AlertCircle, Plus, ChevronLeft, ChevronRight, CheckCircle, HelpCircle } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import {
+  Clock,
+  Edit2,
+  Plus,
+  ChevronLeft,
+  ChevronRight,
+  Sunrise,
+  Sun,
+  Sunset,
+  Moon,
+  RotateCcw,
+  X,
+  Grid3x3,
+  Minus,
+  GripVertical,
+} from 'lucide-react';
 import { useUiMode } from '@/context/ui-mode-context';
 import { createClient } from '@/lib/supabase/client';
 
@@ -25,12 +39,149 @@ interface OverrideEntry {
   isSkipped?: boolean;
 }
 
+const HOUR_HEIGHT = 64; // px per hour on the timeline rail
+
+const DAY_BANDS = [
+  { from: 0, to: 5, label: 'Night', icon: Moon, color: 'rgba(15,28,90,0.05)', text: '#5b6aa8' },
+  { from: 5, to: 12, label: 'Morning', icon: Sunrise, color: 'rgba(255,149,0,0.07)', text: '#c47600' },
+  { from: 12, to: 17, label: 'Afternoon', icon: Sun, color: 'rgba(52,199,89,0.07)', text: '#1f9d4d' },
+  { from: 17, to: 21, label: 'Evening', icon: Sunset, color: 'rgba(242,107,138,0.08)', text: '#d23e64' },
+  { from: 21, to: 24, label: 'Night', icon: Moon, color: 'rgba(15,28,90,0.05)', text: '#5b6aa8' },
+];
+
+function parseTimeToMinutes(t: string): number | null {
+  if (!t) return null;
+  const m = t.trim().match(/^(\d{1,2}):(\d{2})\s*(am|pm)?$/i);
+  if (!m) return null;
+  let h = parseInt(m[1], 10);
+  const min = parseInt(m[2], 10);
+  const ap = m[3]?.toLowerCase();
+  if (ap === 'pm' && h < 12) h += 12;
+  if (ap === 'am' && h === 12) h = 0;
+  if (h > 23 || min > 59) return null;
+  return h * 60 + min;
+}
+
+function formatTimeLabel(t: string): string {
+  const mins = parseTimeToMinutes(t);
+  if (mins === null) return t;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  const ap = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return h12 + ':' + m.toString().padStart(2, '0') + ' ' + ap;
+}
+
+function hourLabel(h: number): string {
+  if (h === 0) return '12a';
+  if (h < 12) return h + 'a';
+  if (h === 12) return '12p';
+  return (h - 12) + 'p';
+}
+
+const priorityColor = (p: string) =>
+  p === 'critical' ? 'var(--danger)' : p === 'important' ? 'var(--warning)' : 'var(--primary)';
+
+// Soft diffuse card shadow shared with the Medications page.
+const CARD_SHADOW = '0 1px 3px rgba(16, 28, 90, 0.04), 0 10px 30px rgba(16, 28, 90, 0.06)';
+
+interface DoseCardProps {
+  med: ScheduledMed;
+  groupMinutes: number;
+  canEdit: boolean;
+  dragging: { medId: number; originalMinutes: number; currentMinutes: number; startY: number } | null;
+  openOverride: (med: ScheduledMed) => void;
+  handleRemoveOverride: (id: number) => void;
+  startDrag: (e: React.PointerEvent, medId: number, minutes: number) => void;
+  onDragMove: (e: React.PointerEvent, medId: number) => void;
+  endDrag: (medId: number) => void;
+  setDragging: (v: null) => void;
+}
+
+function DoseCard({
+  med, groupMinutes, canEdit, dragging,
+  openOverride, handleRemoveOverride,
+  startDrag, onDragMove, endDrag, setDragging,
+}: DoseCardProps) {
+  const isDraggingThis = dragging?.medId === med.id;
+  const accent = med.isSkipped ? '#C7C7CC' : priorityColor(med.priority_level);
+  const cardBg = med.isSkipped
+    ? '#F2F2F7'
+    : med.isOverridden
+      ? '#FFF3E0'
+      : isDraggingThis
+        ? '#FFEDF2'
+        : '#FFFFFF';
+  const displayTime = isDraggingThis && dragging
+    ? formatTimeLabel(
+        Math.floor(dragging.currentMinutes / 60).toString().padStart(2, '0') + ':' +
+        (dragging.currentMinutes % 60).toString().padStart(2, '0')
+      )
+    : formatTimeLabel(med.time);
+
+  return (
+    <div
+      className={'group/card flex items-center gap-2 rounded-2xl px-2.5 py-2 select-none w-full ' + (med.isSkipped ? 'opacity-60' : '')}
+      style={{ background: cardBg, boxShadow: CARD_SHADOW }}
+    >
+      {canEdit && (
+        <div
+          className="shrink-0 cursor-grab active:cursor-grabbing touch-none"
+          onPointerDown={(e) => startDrag(e, med.id, groupMinutes)}
+          onPointerMove={(e) => onDragMove(e, med.id)}
+          onPointerUp={() => endDrag(med.id)}
+          onPointerCancel={() => setDragging(null)}
+        >
+          <GripVertical className="w-3.5 h-3.5 text-muted-foreground/40 group-hover/card:text-muted-foreground/70 transition-colors" />
+        </div>
+      )}
+      <span className="shrink-0 w-2 h-2 rounded-full" style={{ background: accent }} />
+      <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
+        <p className={'text-[12px] font-bold truncate ' + (med.isSkipped ? 'text-muted-foreground line-through' : 'text-foreground')}>
+          {med.drug_name}
+        </p>
+        <span className="shrink-0 text-[9px] font-medium text-muted-foreground">{med.dosage}</span>
+      </div>
+      {med.isSkipped && (
+        <span className="shrink-0 text-[8px] font-bold uppercase tracking-wide rounded-full px-1.5 py-0.5" style={{ color: '#FF3B30', background: '#FFECEA' }}>skip</span>
+      )}
+      {med.isOverridden && !med.isSkipped && (
+        <span className="shrink-0 text-[8px] font-bold uppercase tracking-wide rounded-full px-1.5 py-0.5" style={{ color: '#FF9500', background: '#FFF3E0' }}>adj</span>
+      )}
+      <span className={'shrink-0 inline-flex items-center gap-0.5 text-[10px] font-bold font-mono px-2 py-0.5 rounded-full ' + (isDraggingThis ? 'text-primary bg-primary/15' : 'text-primary bg-primary/10')}>
+        <Clock className="w-2.5 h-2.5" strokeWidth={2.5} />{displayTime}
+      </span>
+      {canEdit && (
+        <div className="shrink-0 opacity-0 group-hover/card:opacity-100 transition-opacity">
+          {med.isOverridden || med.isSkipped ? (
+            <button
+              onClick={() => handleRemoveOverride(med.id)}
+              className="inline-flex items-center justify-center w-6 h-6 rounded-full cursor-pointer transition-all"
+              style={{ color: '#FF3B30', background: '#FFECEA' }}
+              title="Restore"
+            >
+              <RotateCcw className="w-3 h-3" strokeWidth={2.5} />
+            </button>
+          ) : (
+            <button
+              onClick={() => openOverride(med)}
+              className="inline-flex items-center justify-center w-6 h-6 rounded-full text-foreground/60 bg-[#F2F2F7] hover:bg-[#E5E5EA] cursor-pointer transition-all"
+              title="Adjust"
+            >
+              <Edit2 className="w-3 h-3" strokeWidth={2.5} />
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function SchedulePlannerPage() {
-  const router = useRouter();
   const { isElderly, viewMode: activeViewMode } = useUiMode();
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [viewMode, setViewMode] = useState<'month' | 'week' | 'day'>('month');
+  const [showMonth, setShowMonth] = useState(false);
   const [medications, setMedications] = useState<any[]>([]);
   const [overrides, setOverrides] = useState<OverrideEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,15 +190,25 @@ export default function SchedulePlannerPage() {
   const [newOverrideTime, setNewOverrideTime] = useState('');
   const [skipForToday, setSkipForToday] = useState(false);
   const [patientName, setPatientName] = useState<string | null>(null);
+  const [now, setNow] = useState<Date>(new Date());
+  const railRef = useRef<HTMLDivElement>(null);
+  const [zoom, setZoom] = useState(1.0);
+  const [dragging, setDragging] = useState<{
+    medId: number;
+    originalMinutes: number;
+    currentMinutes: number;
+    startY: number;
+  } | null>(null);
+
   const activeRole = activeViewMode === 'PATIENT_MONITOR' ? 'CAREGIVER' : 'PATIENT';
-  
+  const isReadOnly = activeViewMode === 'PATIENT_MONITOR';
+  const canEdit = !isReadOnly && activeRole !== 'CAREGIVER';
+  const hourHeight = HOUR_HEIGHT * zoom;
   const supabase = createClient();
 
   useEffect(() => {
-    // Detect mobile viewport and default to 'day' view
-    if (typeof window !== 'undefined' && window.innerWidth < 768) {
-      setViewMode('day');
-    }
+    const id = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(id);
   }, []);
 
   useEffect(() => {
@@ -63,7 +224,7 @@ export default function SchedulePlannerPage() {
           .single();
 
         if (!profile) return;
-        
+
         let targetChatId = profile.telegram_chat_id;
 
         if (activeViewMode === 'PATIENT_MONITOR') {
@@ -76,8 +237,7 @@ export default function SchedulePlannerPage() {
 
           if (caregiverLink && caregiverLink.patient_telegram_id && caregiverLink.connection_status === 'ACCEPTED') {
             targetChatId = caregiverLink.patient_telegram_id;
-            
-            // Fetch patient name and medications concurrently
+
             const [patientProfileResult, medsResult] = await Promise.all([
               supabase
                 .from('profiles')
@@ -88,7 +248,7 @@ export default function SchedulePlannerPage() {
                 .from('medications')
                 .select('id, drug_name, dosage, frequency, reminder_times, priority_level, created_at')
                 .eq('telegram_id', targetChatId)
-                .eq('active', true)
+                .eq('active', true),
             ]);
 
             if (patientProfileResult.data) {
@@ -100,7 +260,6 @@ export default function SchedulePlannerPage() {
             setMedications([]);
           }
         } else {
-          // Patient: fetch medications directly (hide patient name header as they view their own)
           setPatientName(null);
           const { data: meds } = await supabase
             .from('medications')
@@ -110,8 +269,7 @@ export default function SchedulePlannerPage() {
           setMedications(meds || []);
         }
 
-        // Load overrides from localStorage
-        const storageKey = `schedule-overrides-${user.id}`;
+        const storageKey = 'schedule-overrides-' + user.id;
         const savedOverrides = localStorage.getItem(storageKey);
         if (savedOverrides) {
           setOverrides(JSON.parse(savedOverrides));
@@ -125,114 +283,105 @@ export default function SchedulePlannerPage() {
     loadData();
   }, [supabase, activeViewMode]);
 
-  // Save overrides to localStorage
   const saveOverrides = (newOverrides: OverrideEntry[]) => {
     setOverrides(newOverrides);
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
-        localStorage.setItem(`schedule-overrides-${user.id}`, JSON.stringify(newOverrides));
+        localStorage.setItem('schedule-overrides-' + user.id, JSON.stringify(newOverrides));
       }
     });
   };
 
-  // Helper: Get list of meds scheduled for selected date
   const getMedicationsForDate = (date: Date): ScheduledMed[] => {
     const dateStr = date.toISOString().split('T')[0];
-    const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday...
-    
-    return medications.flatMap(med => {
-      // Determine if med runs on this day based on frequency
-      let scheduled = false;
-      if (med.frequency === 'once_daily' || med.frequency === 'twice_daily' || med.frequency === 'thrice_daily') {
-        scheduled = true;
-      } else if (med.frequency === 'every_other_day') {
-        // Simple modulo logic based on timestamp
-        const createdTime = new Date(med.created_at || Date.now()).getTime();
-        const diffDays = Math.floor((date.getTime() - createdTime) / (1000 * 60 * 60 * 24));
-        scheduled = diffDays % 2 === 0;
-      } else if (med.frequency === 'weekly') {
-        // Runs on same day of week as creation day
-        const createdDay = new Date(med.created_at || Date.now()).getDay();
-        scheduled = dayOfWeek === createdDay;
-      }
+    const dayOfWeek = date.getDay();
 
-      if (!scheduled) return [];
+    return medications
+      .flatMap((med) => {
+        let scheduled = false;
+        if (med.frequency === 'once_daily' || med.frequency === 'twice_daily' || med.frequency === 'thrice_daily') {
+          scheduled = true;
+        } else if (med.frequency === 'every_other_day') {
+          const createdTime = new Date(med.created_at || Date.now()).getTime();
+          const diffDays = Math.floor((date.getTime() - createdTime) / (1000 * 60 * 60 * 24));
+          scheduled = diffDays % 2 === 0;
+        } else if (med.frequency === 'weekly') {
+          const createdDay = new Date(med.created_at || Date.now()).getDay();
+          scheduled = dayOfWeek === createdDay;
+        }
 
-      // Generate items for each reminder time
-      return (med.reminder_times || []).map((timeStr: string) => {
-        // Check for overrides
-        const medOverride = overrides.find(
-          o => o.medicationId === med.id && o.dateStr === dateStr
-        );
+        if (!scheduled) return [];
 
-        return {
-          id: med.id,
-          drug_name: med.drug_name,
-          dosage: med.dosage,
-          frequency: med.frequency,
-          time: medOverride?.overriddenTime || timeStr,
-          priority_level: med.priority_level,
-          isOverridden: !!medOverride?.overriddenTime,
-          overriddenTime: medOverride?.overriddenTime,
-          isSkipped: medOverride?.isSkipped || false,
-        };
-      });
-    }).sort((a, b) => a.time.localeCompare(b.time));
+        return (med.reminder_times || []).map((timeStr: string) => {
+          const medOverride = overrides.find(
+            (o) => o.medicationId === med.id && o.dateStr === dateStr
+          );
+          const result: ScheduledMed = {
+            id: med.id,
+            drug_name: med.drug_name,
+            dosage: med.dosage,
+            frequency: med.frequency,
+            time: medOverride?.overriddenTime || timeStr,
+            priority_level: med.priority_level,
+            isOverridden: !!medOverride?.overriddenTime,
+            overriddenTime: medOverride?.overriddenTime,
+            isSkipped: medOverride?.isSkipped || false,
+          };
+          return result;
+        });
+      })
+      .sort((a, b) => (parseTimeToMinutes(a.time) ?? 0) - (parseTimeToMinutes(b.time) ?? 0))
+      .filter((med, idx, arr) => arr.findIndex(m => m.id === med.id && m.time === med.time) === idx);
   };
 
-  // Calendar logic
-  const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-  const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-  
-  const daysInMonth: Date[] = [];
-  // Pad beginning of month
-  const startDayOfWeek = startOfMonth.getDay();
-  for (let i = startDayOfWeek; i > 0; i--) {
-    daysInMonth.push(new Date(currentDate.getFullYear(), currentDate.getMonth(), 1 - i));
-  }
-  // Month days
-  for (let i = 1; i <= endOfMonth.getDate(); i++) {
-    daysInMonth.push(new Date(currentDate.getFullYear(), currentDate.getMonth(), i));
-  }
-  // Pad end of month to full weeks
-  const totalSlots = Math.ceil(daysInMonth.length / 7) * 7;
-  const remainingSlots = totalSlots - daysInMonth.length;
-  for (let i = 1; i <= remainingSlots; i++) {
-    daysInMonth.push(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, i));
-  }
+  const weekDays = useMemo(() => {
+    const start = new Date(selectedDate);
+    start.setDate(selectedDate.getDate() - selectedDate.getDay());
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      return d;
+    });
+  }, [selectedDate]);
 
-  const prevMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+  const shiftWeek = (dir: number) => {
+    const d = new Date(selectedDate);
+    d.setDate(selectedDate.getDate() + dir * 7);
+    setSelectedDate(d);
+    setCurrentDate(d);
   };
 
-  const nextMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
-  };
+  const daysInMonth = useMemo(() => {
+    const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+    const days: Date[] = [];
+    const startDayOfWeek = startOfMonth.getDay();
+    for (let i = startDayOfWeek; i > 0; i--) {
+      days.push(new Date(currentDate.getFullYear(), currentDate.getMonth(), 1 - i));
+    }
+    for (let i = 1; i <= endOfMonth.getDate(); i++) {
+      days.push(new Date(currentDate.getFullYear(), currentDate.getMonth(), i));
+    }
+    const totalSlots = Math.ceil(days.length / 7) * 7;
+    for (let i = 1; i <= totalSlots - days.length; i++) {
+      days.push(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, i));
+    }
+    return days;
+  }, [currentDate]);
 
   const handleApplyOverride = () => {
     if (!selectedMedForOverride) return;
-
     const dateStr = selectedDate.toISOString().split('T')[0];
-    const filteredOverrides = overrides.filter(
-      o => !(o.medicationId === selectedMedForOverride.id && o.dateStr === dateStr)
+    const filtered = overrides.filter(
+      (o) => !(o.medicationId === selectedMedForOverride.id && o.dateStr === dateStr)
     );
-
-    const newOverrides = [...filteredOverrides];
+    const next = [...filtered];
     if (skipForToday) {
-      newOverrides.push({
-        medicationId: selectedMedForOverride.id,
-        dateStr,
-        isSkipped: true,
-      });
+      next.push({ medicationId: selectedMedForOverride.id, dateStr, isSkipped: true });
     } else if (newOverrideTime) {
-      newOverrides.push({
-        medicationId: selectedMedForOverride.id,
-        dateStr,
-        overriddenTime: newOverrideTime,
-      });
+      next.push({ medicationId: selectedMedForOverride.id, dateStr, overriddenTime: newOverrideTime });
     }
-
-    saveOverrides(newOverrides);
+    saveOverrides(next);
     setShowOverrideModal(false);
     setSelectedMedForOverride(null);
     setNewOverrideTime('');
@@ -241,11 +390,110 @@ export default function SchedulePlannerPage() {
 
   const handleRemoveOverride = (medId: number) => {
     const dateStr = selectedDate.toISOString().split('T')[0];
-    const filtered = overrides.filter(
-      o => !(o.medicationId === medId && o.dateStr === dateStr)
-    );
-    saveOverrides(filtered);
+    saveOverrides(overrides.filter((o) => !(o.medicationId === medId && o.dateStr === dateStr)));
   };
+
+  const openOverride = (med: ScheduledMed) => {
+    const mins = parseTimeToMinutes(med.time);
+    const hhmm =
+      mins !== null
+        ? Math.floor(mins / 60).toString().padStart(2, '0') + ':' + (mins % 60).toString().padStart(2, '0')
+        : '08:00';
+    setSelectedMedForOverride(med);
+    setNewOverrideTime(hhmm);
+    setSkipForToday(false);
+    setShowOverrideModal(true);
+  };
+
+  const closeModal = () => {
+    setShowOverrideModal(false);
+    setSelectedMedForOverride(null);
+    setNewOverrideTime('');
+    setSkipForToday(false);
+  };
+
+  const startDrag = (e: React.PointerEvent, medId: number, minutes: number) => {
+    if (!canEdit) return;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    setDragging({ medId, originalMinutes: minutes, currentMinutes: minutes, startY: e.clientY });
+  };
+
+  const onDragMove = (e: React.PointerEvent, medId: number) => {
+    if (!dragging || dragging.medId !== medId) return;
+    const deltaY = e.clientY - dragging.startY;
+    const raw = Math.round((deltaY / hourHeight) * 60);
+    const newMins = Math.max(0, Math.min(23 * 60 + 55, dragging.originalMinutes + raw));
+    setDragging(prev => prev ? { ...prev, currentMinutes: newMins } : null);
+  };
+
+  const endDrag = (medId: number) => {
+    if (!dragging || dragging.medId !== medId) return;
+    if (dragging.currentMinutes !== dragging.originalMinutes) {
+      const h = Math.floor(dragging.currentMinutes / 60);
+      const m = dragging.currentMinutes % 60;
+      const newTime = h.toString().padStart(2, '0') + ':' + m.toString().padStart(2, '0');
+      const dateStr = selectedDate.toISOString().split('T')[0];
+      const filtered = overrides.filter(o => !(o.medicationId === medId && o.dateStr === dateStr));
+      filtered.push({ medicationId: medId, dateStr, overriddenTime: newTime });
+      saveOverrides(filtered);
+    }
+    setDragging(null);
+  };
+
+  const selectedMeds = getMedicationsForDate(selectedDate);
+  const isToday = selectedDate.toDateString() === new Date().toDateString();
+
+  const groupedByTime = useMemo(() => {
+    const map = new Map<string, ScheduledMed[]>();
+    for (const m of selectedMeds) {
+      if (!map.has(m.time)) map.set(m.time, []);
+      map.get(m.time)!.push(m);
+    }
+    const out: { time: string; minutes: number; meds: ScheduledMed[] }[] = [];
+    map.forEach((meds, time) => {
+      const minutes = parseTimeToMinutes(time);
+      if (minutes !== null) out.push({ time, minutes, meds });
+    });
+    return out.sort((a, b) => a.minutes - b.minutes);
+  }, [selectedMeds]);
+
+  const activeDoses = selectedMeds.filter((m) => !m.isSkipped);
+  const skippedCount = selectedMeds.length - activeDoses.length;
+
+  // Compute non-overlapping card tops: each card sits at its natural time position
+  // or just below the previous card if they would overlap (36px per card).
+  const cardTops = useMemo(() => {
+    const CARD_H = 36;
+    const tops: number[] = [];
+    let minY = 0;
+    for (const med of selectedMeds) {
+      const mins = parseTimeToMinutes(med.time) ?? 0;
+      const natural = (mins / 60) * hourHeight + 2;
+      const top = Math.max(natural, minY);
+      tops.push(top);
+      minY = top + CARD_H;
+    }
+    return tops;
+  }, [selectedMeds, hourHeight]);
+  const criticalCount = activeDoses.filter((m) => m.priority_level === 'critical').length;
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const nextDose = isToday
+    ? activeDoses.find((m) => (parseTimeToMinutes(m.time) ?? -1) >= nowMinutes) || null
+    : activeDoses[0] || null;
+
+  useEffect(() => {
+    if (loading || !railRef.current) return;
+    const anchorMin = isToday ? nowMinutes : (groupedByTime[0]?.minutes ?? 8 * 60);
+    const top = Math.max(0, (anchorMin / 60) * hourHeight - 80);
+    railRef.current.scrollTo({ top, behavior: 'smooth' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, selectedDate, groupedByTime.length, hourHeight]);
+
+  const selectedDateLong = selectedDate.toLocaleDateString([], {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  });
 
   if (loading) {
     return (
@@ -255,332 +503,440 @@ export default function SchedulePlannerPage() {
     );
   }
 
-  const selectedMeds = getMedicationsForDate(selectedDate);
-  const selectedDateStr = selectedDate.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
-
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-card p-6 rounded-[24px] border border-border shadow-sm gap-4">
-        <div>
-          <h1 className="text-xl md:text-2xl font-black text-foreground flex items-center gap-2">
-            <CalendarIcon className="w-6 h-6 text-primary" />
-            Schedule Planner
-            {activeViewMode === 'PATIENT_MONITOR' && (
-              <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black bg-danger/10 text-danger border border-danger/25 uppercase tracking-wider shrink-0 animate-pulse">
+    <div className={'max-w-6xl mx-auto space-y-5 ' + (isElderly ? 'text-[1.05rem]' : '')}>
+      {/* Header — plain Apple large title */}
+      <div className="flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-[26px] font-bold tracking-tight text-foreground flex items-center gap-2">
+            <span className="whitespace-nowrap">Schedule</span>
+            {isReadOnly && (
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-[#F2F2F7] text-muted-foreground uppercase tracking-wide shrink-0">
                 Read Only
               </span>
             )}
           </h1>
-          <p className="text-xs text-muted-foreground font-semibold mt-1">
-            {patientName 
-              ? `Plan medications, view calendar schedules, and set overrides for: ${patientName}.`
-              : 'Plan your medications, view calendar schedules, and set custom overrides.'}
+          <p className="text-[13px] text-muted-foreground font-medium mt-0.5 sm:truncate sm:max-w-xs">
+            {patientName
+              ? `Dose timeline for ${patientName} — tap a day to plan ahead.`
+              : 'Your day, on a timeline — tap a day to plan ahead.'}
           </p>
         </div>
-        <div className="flex bg-[#EEF4FB] rounded-full p-1 border border-border/60">
-          {(['month', 'week', 'day'] as const).map(mode => (
-            <button
-              key={mode}
-              onClick={() => setViewMode(mode)}
-              className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer capitalize ${
-                viewMode === mode
-                  ? 'bg-primary text-white shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {mode}
-            </button>
-          ))}
+
+        <div
+          className="shrink-0 w-fit flex items-center gap-2.5 rounded-[22px] bg-white px-3.5 py-2"
+          style={{ boxShadow: CARD_SHADOW }}
+        >
+          <Clock className="w-4 h-4 shrink-0 text-primary" strokeWidth={2.5} />
+          <div className="leading-tight">
+            <p className="text-[8px] uppercase tracking-widest font-semibold text-muted-foreground">
+              {isToday ? 'Next dose' : 'First dose'}
+            </p>
+            {nextDose ? (
+              <p className="text-xs font-bold text-foreground whitespace-nowrap">
+                {nextDose.drug_name} · {formatTimeLabel(nextDose.time)}
+              </p>
+            ) : (
+              <p className="text-xs font-semibold text-muted-foreground">None today</p>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Grid: Calendar Left, Day Schedule Right */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left Column: Calendar (8 cols) */}
-        <div className="lg:col-span-8 bg-card border border-border rounded-[24px] p-6 shadow-sm space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-base font-black text-foreground">
-              {currentDate.toLocaleDateString([], { month: 'long', year: 'numeric' })}
+      {/* Week navigator */}
+      <div className="bg-white rounded-[22px] p-4" style={{ boxShadow: CARD_SHADOW }}>
+        <div className="flex items-center justify-between mb-3">
+          <button
+            onClick={() => shiftWeek(-1)}
+            className="w-9 h-9 rounded-full flex items-center justify-center bg-[#F2F2F7] hover:bg-[#E5E5EA] text-foreground transition-all cursor-pointer"
+            aria-label="Previous week"
+          >
+            <ChevronLeft className="w-4 h-4" strokeWidth={2.5} />
+          </button>
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-bold tracking-tight text-foreground">
+              {weekDays[0].toLocaleDateString([], { month: 'short', day: 'numeric' })}
+              {' – '}
+              {weekDays[6].toLocaleDateString([], { month: 'short', day: 'numeric' })}
             </h2>
-            <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowMonth((s) => !s)}
+              className={
+                'inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-semibold cursor-pointer transition-all ' +
+                (showMonth
+                  ? 'bg-primary text-white'
+                  : 'bg-[#F2F2F7] text-muted-foreground hover:text-foreground')
+              }
+            >
+              <Grid3x3 className="w-3 h-3" strokeWidth={2.5} /> Month
+            </button>
+          </div>
+          <button
+            onClick={() => shiftWeek(1)}
+            className="w-9 h-9 rounded-full flex items-center justify-center bg-[#F2F2F7] hover:bg-[#E5E5EA] text-foreground transition-all cursor-pointer"
+            aria-label="Next week"
+          >
+            <ChevronRight className="w-4 h-4" strokeWidth={2.5} />
+          </button>
+        </div>
+
+        <div className="flex gap-1 sm:gap-1.5 items-stretch px-1">
+          {weekDays.map((date, idx) => {
+            const meds = getMedicationsForDate(date);
+            const load = meds.filter((m) => !m.isSkipped).length;
+            const isSel = date.toDateString() === selectedDate.toDateString();
+            const isTod = date.toDateString() === new Date().toDateString();
+
+            return (
               <button
-                onClick={prevMonth}
-                className="p-2 border border-border rounded-xl hover:bg-muted text-foreground cursor-pointer"
+                key={idx}
+                onClick={() => { setSelectedDate(date); setCurrentDate(date); }}
+                className={
+                  'group relative cursor-pointer rounded-[7px] ' +
+                  (isSel
+                    ? 'bg-gradient-to-b from-[#F8839E] to-[#F26B8A] text-white z-10'
+                    : isTod
+                      ? 'bg-primary-soft text-foreground'
+                      : 'bg-[#F2F2F5] text-foreground hover:bg-[#EAEAEF]')
+                }
+                style={{
+                  flexGrow: isSel ? 2.1 : 1,
+                  flexBasis: 0,
+                  minWidth: 0,
+                  transform: `skewX(-9deg)${isSel ? ' translateY(-5px)' : ''}`,
+                  boxShadow: isSel ? '0 14px 26px rgba(242, 107, 138, 0.45)' : '0 0 0 rgba(242, 107, 138, 0)',
+                  willChange: 'flex-grow, transform',
+                  transitionProperty: 'flex-grow, transform, background-color, box-shadow',
+                  transitionDuration: '650ms',
+                  transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
+                }}
               >
-                <ChevronLeft className="w-4 h-4" />
+                {/* counter-skew so content stays upright */}
+                <span
+                  className={'flex flex-col items-center justify-center ' + (isSel ? 'gap-1 py-3.5' : 'gap-1.5 py-3')}
+                  style={{
+                    transform: 'skewX(9deg)',
+                    transitionProperty: 'gap, padding',
+                    transitionDuration: '650ms',
+                    transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
+                  }}
+                >
+                  <span
+                    className={'uppercase font-bold tracking-wide whitespace-nowrap ' + (isSel ? 'text-[11px] text-white/80' : isTod ? 'text-[9px] sm:text-[10px] text-primary' : 'text-[9px] sm:text-[10px] text-muted-foreground')}
+                    style={{ transition: 'color 650ms cubic-bezier(0.16, 1, 0.3, 1)' }}
+                  >
+                    {date.toLocaleDateString([], { weekday: 'short' })}
+                  </span>
+                  <span className={'font-extrabold leading-none tabular-nums transition-[font-size] duration-[650ms] ease-[cubic-bezier(0.16,1,0.3,1)] ' + (isSel ? 'text-2xl sm:text-3xl' : 'text-base sm:text-lg')}>
+                    {date.getDate()}
+                  </span>
+                  {/* Dose count along the bottom edge of the expanded tab */}
+                  {isSel && (
+                    <span className="mt-0.5 text-[9px] font-bold leading-none text-white/85 whitespace-nowrap animate-fade-in">
+                      {load > 0 ? `${load} dose${load > 1 ? 's' : ''}` : 'clear'}
+                    </span>
+                  )}
+                </span>
               </button>
+            );
+          })}
+        </div>
+
+        {showMonth && (
+          <div className="mt-4 pt-4 border-t border-[#0F1C5A]/[0.06] animate-fade-in">
+            <div className="flex items-center justify-between mb-3">
               <button
-                onClick={nextMonth}
-                className="p-2 border border-border rounded-xl hover:bg-muted text-foreground cursor-pointer"
+                onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))}
+                className="w-8 h-8 rounded-full flex items-center justify-center bg-[#F2F2F7] hover:bg-[#E5E5EA] text-foreground cursor-pointer transition-all"
               >
-                <ChevronRight className="w-4 h-4" />
+                <ChevronLeft className="w-3.5 h-3.5" strokeWidth={2.5} />
+              </button>
+              <span className="text-xs font-bold text-foreground">
+                {currentDate.toLocaleDateString([], { month: 'long', year: 'numeric' })}
+              </span>
+              <button
+                onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))}
+                className="w-8 h-8 rounded-full flex items-center justify-center bg-[#F2F2F7] hover:bg-[#E5E5EA] text-foreground cursor-pointer transition-all"
+              >
+                <ChevronRight className="w-3.5 h-3.5" strokeWidth={2.5} />
               </button>
             </div>
+            <div className="grid grid-cols-7 gap-1 text-center text-[9px] font-semibold text-muted-foreground mb-1">
+              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+                <div key={i}>{d}</div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {daysInMonth.map((date, idx) => {
+                const isSel = date.toDateString() === selectedDate.toDateString();
+                const isCur = date.getMonth() === currentDate.getMonth();
+                const isTod = date.toDateString() === new Date().toDateString();
+                const load = getMedicationsForDate(date).filter((m) => !m.isSkipped).length;
+                const cellClass = isSel
+                  ? 'bg-primary text-white'
+                  : isTod
+                    ? 'bg-primary-soft text-foreground'
+                    : 'hover:bg-[#F2F2F7] text-foreground';
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      setSelectedDate(date);
+                      setCurrentDate(date);
+                      setShowMonth(false);
+                    }}
+                    className={'h-9 rounded-xl flex flex-col items-center justify-center text-[11px] font-semibold cursor-pointer transition-all ' + cellClass + (isCur ? '' : ' opacity-35')}
+                  >
+                    {date.getDate()}
+                    {load > 0 && (
+                      <span className="w-1 h-1 rounded-full mt-0.5" style={{ background: isSel ? '#fff' : 'var(--primary)' }} />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
+        )}
+      </div>
 
-          {/* Month Calendar Grid */}
-          {viewMode === 'month' && (
-            <div className="space-y-2">
-              <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold text-muted-foreground pb-2 border-b border-border/60">
-                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-                  <div key={d} className="py-1">{d}</div>
-                ))}
+      {/* Main: timeline + summary */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        <div className="lg:col-span-8 bg-white rounded-[22px] overflow-hidden" style={{ boxShadow: CARD_SHADOW }}>
+          <div className="flex items-center justify-between px-6 py-4">
+            <div>
+              <h3 className="text-sm font-bold tracking-tight text-foreground">{selectedDateLong}</h3>
+              <p className="text-[11px] font-medium text-muted-foreground mt-0.5">
+                {activeDoses.length} {activeDoses.length === 1 ? 'dose' : 'doses'} planned
+                {skippedCount > 0 ? ' · ' + skippedCount + ' skipped' : ''}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-0.5 bg-[#F2F2F7] rounded-full px-1 py-1">
+                <button
+                  onClick={() => setZoom(z => Math.max(0.5, +(z - 0.25).toFixed(2)))}
+                  className="w-6 h-6 rounded-full flex items-center justify-center hover:bg-white text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+                  aria-label="Zoom out"
+                >
+                  <Minus className="w-3 h-3" strokeWidth={2.5} />
+                </button>
+                <span className="text-[10px] font-bold text-foreground w-8 text-center tabular-nums">{Math.round(zoom * 100)}%</span>
+                <button
+                  onClick={() => setZoom(z => Math.min(3, +(z + 0.25).toFixed(2)))}
+                  className="w-6 h-6 rounded-full flex items-center justify-center hover:bg-white text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+                  aria-label="Zoom in"
+                >
+                  <Plus className="w-3 h-3" strokeWidth={2.5} />
+                </button>
               </div>
-              <div className="grid grid-cols-7 gap-2">
-                {daysInMonth.map((date, idx) => {
-                  const isSelected = date.toDateString() === selectedDate.toDateString();
-                  const isCurrentMonth = date.getMonth() === currentDate.getMonth();
-                  const dateMeds = getMedicationsForDate(date);
-                  const hasMeds = dateMeds.length > 0;
-                  const isToday = date.toDateString() === new Date().toDateString();
+              {canEdit && overrides.some(o => o.dateStr === selectedDate.toISOString().split('T')[0]) && (
+                <button
+                  onClick={() => {
+                    const dateStr = selectedDate.toISOString().split('T')[0];
+                    saveOverrides(overrides.filter(o => o.dateStr !== dateStr));
+                  }}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[10px] font-semibold transition-all cursor-pointer"
+                  style={{ color: '#FF3B30', background: '#FFECEA' }}
+                  title="Reset all adjustments for this day"
+                >
+                  <RotateCcw className="w-3 h-3" strokeWidth={2.5} /> Reset
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="h-px bg-[#0F1C5A]/[0.06] mx-6" />
 
+          {groupedByTime.length === 0 ? (
+            <div className="flex flex-col items-center justify-center text-center py-16 px-6">
+              <div className="w-16 h-16 rounded-full bg-[#F2F2F7] flex items-center justify-center mb-3">
+                <Sun className="w-8 h-8 text-muted-foreground/50" strokeWidth={2} />
+              </div>
+              <p className="text-sm font-bold text-foreground">A clear day</p>
+              <p className="text-xs font-medium text-muted-foreground mt-1">No medications scheduled for {selectedDateLong}.</p>
+            </div>
+          ) : (
+            <div ref={railRef} className="relative max-h-[560px] overflow-y-auto px-4 py-3">
+              <div className="relative" style={{ height: 24 * hourHeight }}>
+                {/* Day bands */}
+                {DAY_BANDS.map((band, i) => {
+                  const BandIcon = band.icon;
                   return (
-                    <button
-                      key={idx}
-                      onClick={() => {
-                        setSelectedDate(date);
-                        setCurrentDate(date);
-                      }}
-                      className={`h-12 w-full rounded-2xl flex flex-col items-center justify-center relative cursor-pointer border transition-all text-xs font-bold ${
-                        isSelected
-                          ? 'bg-primary text-white border-primary shadow-sm shadow-primary/20 hover:bg-primary-hover'
-                          : isToday
-                            ? 'bg-primary/10 border-primary text-primary hover:bg-primary/15'
-                            : 'bg-white border-border hover:bg-muted text-foreground'
-                      } ${!isCurrentMonth ? 'opacity-40' : ''}`}
+                    <div
+                      key={i}
+                      className="absolute left-0 right-0 flex items-start"
+                      style={{ top: band.from * hourHeight, height: (band.to - band.from) * hourHeight, background: band.color }}
                     >
-                      <span>{date.getDate()}</span>
-                      {hasMeds && (
-                        <div className="flex gap-0.5 mt-1 justify-center">
-                          {dateMeds.slice(0, 3).map((m, mIdx) => (
-                            <span 
-                              key={mIdx} 
-                              className={`w-1.5 h-1.5 rounded-full ${
-                                m.isSkipped 
-                                  ? 'bg-muted-foreground' 
-                                  : m.priority_level === 'critical' 
-                                    ? 'bg-danger' 
-                                    : m.priority_level === 'important' 
-                                      ? 'bg-warning' 
-                                      : 'bg-primary'
-                              }`} 
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </button>
+                      <span className="ml-14 mt-1 inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider" style={{ color: band.text }}>
+                        <BandIcon className="w-3 h-3" /> {band.label}
+                      </span>
+                    </div>
+                  );
+                })}
+
+                {/* Hour lines */}
+                {Array.from({ length: 24 }).map((_, h) => (
+                  <div key={h} className="absolute left-0 right-0 border-t border-border/50" style={{ top: h * hourHeight }}>
+                    <span className="absolute -top-2 left-0 w-12 text-right pr-2 text-[9px] font-bold text-muted-foreground tabular-nums">
+                      {hourLabel(h)}
+                    </span>
+                  </div>
+                ))}
+
+                {/* Now line */}
+                {isToday && (
+                  <div className="absolute left-12 right-2 z-20 pointer-events-none" style={{ top: (nowMinutes / 60) * hourHeight }}>
+                    <div className="relative flex items-center">
+                      <span className="absolute -left-1 w-2.5 h-2.5 rounded-full bg-danger ring-2 ring-white" />
+                      <div className="w-full border-t-2 border-danger/70 border-dashed" />
+                      <span className="absolute right-0 -top-4 text-[8px] font-black text-danger bg-danger/10 px-1.5 py-0.5 rounded-full">NOW</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Drag ghost line */}
+                {dragging && (
+                  <div className="absolute left-12 right-2 z-30 pointer-events-none" style={{ top: (dragging.currentMinutes / 60) * hourHeight }}>
+                    <div className="relative flex items-center">
+                      <span className="absolute -left-1 w-2 h-2 rounded-full bg-primary ring-2 ring-white" />
+                      <div className="w-full border-t-2 border-primary border-dashed" />
+                      <span className="absolute right-0 -top-4 text-[8px] font-black text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">
+                        {formatTimeLabel(
+                          Math.floor(dragging.currentMinutes / 60).toString().padStart(2, '0') + ':' +
+                          (dragging.currentMinutes % 60).toString().padStart(2, '0')
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Dose cards — each positioned individually, no overlap */}
+                {selectedMeds.map((med, idx) => {
+                  const medMins = parseTimeToMinutes(med.time) ?? 0;
+                  const isDraggingThis = dragging?.medId === med.id;
+                  const topPos = isDraggingThis && dragging
+                    ? (dragging.currentMinutes / 60) * hourHeight + 2
+                    : cardTops[idx];
+                  return (
+                    <div key={`${med.id}-${idx}`} className="absolute left-12 right-2 z-10" style={{ top: topPos }}>
+                      <DoseCard
+                        med={med}
+                        groupMinutes={medMins}
+                        canEdit={canEdit}
+                        dragging={dragging}
+                        openOverride={openOverride}
+                        handleRemoveOverride={handleRemoveOverride}
+                        startDrag={startDrag}
+                        onDragMove={onDragMove}
+                        endDrag={endDrag}
+                        setDragging={setDragging}
+                      />
+                    </div>
                   );
                 })}
               </div>
             </div>
           )}
-
-          {/* Week Calendar View */}
-          {viewMode === 'week' && (
-            <div className="grid grid-cols-7 gap-3">
-              {Array.from({ length: 7 }).map((_, idx) => {
-                const date = new Date(selectedDate);
-                date.setDate(selectedDate.getDate() - selectedDate.getDay() + idx);
-                const isSelected = date.toDateString() === selectedDate.toDateString();
-                const isToday = date.toDateString() === new Date().toDateString();
-                const dateMeds = getMedicationsForDate(date);
-
-                return (
-                  <button
-                    key={idx}
-                    onClick={() => setSelectedDate(date)}
-                    className={`p-4 rounded-3xl flex flex-col items-center justify-between min-h-[100px] border cursor-pointer transition-all ${
-                      isSelected
-                        ? 'bg-primary text-primary-foreground border-primary shadow-sm shadow-primary/20'
-                        : isToday
-                          ? 'bg-primary/10 border-primary text-primary'
-                          : 'bg-white border-border text-foreground hover:bg-muted'
-                    }`}
-                  >
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground">
-                      {date.toLocaleDateString([], { weekday: 'short' })}
-                    </span>
-                    <span className="text-lg font-black">{date.getDate()}</span>
-                    <span className="text-[9px] font-bold mt-1">
-                      {dateMeds.length} Doses
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Day Calendar View */}
-          {viewMode === 'day' && (
-            <div className="bg-muted/10 p-4 rounded-3xl border border-border/80">
-              <p className="text-xs text-center font-bold text-muted-foreground">Hourly Day View for {selectedDateStr}</p>
-              <div className="mt-4 space-y-4 max-h-[300px] overflow-y-auto pr-1">
-                {selectedMeds.length === 0 ? (
-                  <p className="text-xs text-center text-muted-foreground py-6">No doses scheduled for today</p>
-                ) : (
-                  selectedMeds.map((med, idx) => (
-                    <div key={idx} className="flex gap-4 items-center p-3 bg-white border border-border rounded-2xl shadow-sm">
-                      <Clock className="w-4 h-4 text-primary shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-black text-foreground truncate">{med.drug_name}</p>
-                        <p className="text-[10px] text-muted-foreground font-semibold">Dosage: {med.dosage}</p>
-                      </div>
-                      <span className="text-xs font-mono font-black text-primary bg-primary/10 px-2 py-0.5 rounded-lg border border-primary/20">
-                        {med.time}
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* Right Column: Medications for Date (4 cols) */}
-        <div className="lg:col-span-4 bg-white border border-border rounded-[24px] p-6 shadow-sm flex flex-col justify-between min-h-[450px]">
-          <div>
-            <h3 className="font-black text-foreground text-sm flex items-center gap-1.5 border-b border-border/60 pb-3">
-              <Clock className="w-4 h-4 text-primary" /> Daily Schedule
-            </h3>
-            <p className="text-xs font-bold text-primary mt-2">{selectedDateStr}</p>
-
-            <div className="mt-4 space-y-3 overflow-y-auto max-h-[300px] pr-1">
-              {selectedMeds.length === 0 ? (
-                <div className="text-center py-10 space-y-2">
-                  <CheckCircle className="w-8 h-8 text-success mx-auto" />
-                  <p className="text-xs font-bold text-success">All clear!</p>
-                  <p className="text-[10px] text-muted-foreground font-semibold">No medications scheduled for this day.</p>
-                </div>
-              ) : (
-                selectedMeds.map((med, idx) => (
-                  <div 
-                    key={idx} 
-                    className={`p-3 rounded-2xl border flex flex-col justify-between gap-3 shadow-sm ${
-                      med.isSkipped
-                        ? 'bg-muted/40 border-border/60 opacity-60'
-                        : med.isOverridden
-                          ? 'border-warning/40 bg-warning/5'
-                          : 'border-border bg-card'
-                    }`}
-                  >
-                    <div className="flex justify-between items-start gap-2">
-                      <div className="min-w-0">
-                        <p className="text-xs font-black text-foreground truncate">{med.drug_name}</p>
-                        <p className="text-[10px] text-muted-foreground font-semibold mt-0.5">Dose: {med.dosage}</p>
-                      </div>
-                      <div className="flex flex-col items-end gap-1">
-                        <span className={`text-[9px] font-black font-mono px-2 py-0.5 rounded-lg border ${
-                          med.isSkipped 
-                            ? 'bg-muted text-muted-foreground border-border'
-                            : 'bg-primary/10 text-primary border-primary/20'
-                        }`}>
-                          {med.time}
-                        </span>
-                        {med.isSkipped && (
-                          <span className="text-[8px] font-black text-danger uppercase tracking-wider">
-                            SKIPPED FOR TODAY
-                          </span>
-                        )}
-                        {med.isOverridden && !med.isSkipped && (
-                          <span className="text-[8px] font-black text-warning uppercase tracking-wider">
-                            OVERRIDDEN
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {activeRole !== 'CAREGIVER' && (
-                      <div className="flex gap-2 justify-end border-t border-border/40 pt-2">
-                        {med.isOverridden || med.isSkipped ? (
-                          <button
-                            onClick={() => handleRemoveOverride(med.id)}
-                            className="px-2.5 py-1 text-[9px] font-bold bg-danger/10 text-danger hover:bg-danger/20 rounded-lg cursor-pointer transition-all"
-                          >
-                            Restore Default
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => {
-                              setSelectedMedForOverride(med);
-                              setNewOverrideTime(med.time);
-                              setShowOverrideModal(true);
-                            }}
-                            className="px-2.5 py-1 text-[9px] font-bold bg-muted hover:bg-muted/80 text-foreground border border-border/80 rounded-lg flex items-center gap-1 cursor-pointer transition-all"
-                          >
-                            <Edit2 className="w-2.5 h-2.5" /> Adjust
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))
-              )}
+        {/* Summary rail */}
+        <div className="lg:col-span-4 space-y-5">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-white rounded-[22px] p-4" style={{ boxShadow: CARD_SHADOW }}>
+              <p className="text-2xl font-bold text-foreground leading-none">{activeDoses.length}</p>
+              <p className="text-[10px] font-semibold text-muted-foreground mt-1 uppercase tracking-wide">Doses today</p>
+            </div>
+            <div className="bg-white rounded-[22px] p-4" style={{ boxShadow: CARD_SHADOW }}>
+              <p className="text-2xl font-bold leading-none" style={{ color: criticalCount > 0 ? '#FF3B30' : 'var(--foreground)' }}>{criticalCount}</p>
+              <p className="text-[10px] font-semibold text-muted-foreground mt-1 uppercase tracking-wide">Critical</p>
             </div>
           </div>
 
-          <div className="bg-primary/5 p-3 rounded-2xl border border-primary/10 text-[10px] text-muted-foreground font-semibold mt-4">
-            * Adjusting times here overrides the schedule only for the selected date. The base recurring medication routine will remain unchanged.
+          <div className="bg-white rounded-[22px] p-5 space-y-3" style={{ boxShadow: CARD_SHADOW }}>
+            <h4 className="text-xs font-bold tracking-tight text-foreground">Priority key</h4>
+            {[
+              { c: '#FF3B30', l: 'Critical — never miss' },
+              { c: '#FF9500', l: 'Important' },
+              { c: '#F26B8A', l: 'Routine' },
+            ].map((row, i) => (
+              <div key={i} className="flex items-center gap-2.5">
+                <span className="w-3 h-3 rounded-full" style={{ background: row.c }} />
+                <span className="text-[11px] font-medium text-muted-foreground">{row.l}</span>
+              </div>
+            ))}
+          </div>
+
+          {canEdit && (
+            <a
+              href="/medications"
+              className="flex items-center justify-center gap-2 w-full py-3 rounded-full bg-primary text-white font-semibold text-sm hover:bg-primary-hover transition-all cursor-pointer"
+              style={{ boxShadow: '0 4px 12px rgba(242, 107, 138, 0.35)' }}
+            >
+              <Plus className="w-4 h-4" strokeWidth={2.5} /> Add medication
+            </a>
+          )}
+
+          <div className="bg-[#F2F2F7] rounded-[22px] p-4">
+            <p className="text-[10px] font-medium text-muted-foreground leading-relaxed">
+              Adjusting a time or skipping a dose here only affects <b className="text-foreground font-semibold">{selectedDateLong}</b>. Your recurring routine stays exactly as it is.
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Override Modification Modal */}
+      {/* Override modal */}
       {showOverrideModal && selectedMedForOverride && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="bg-white rounded-3xl border border-border max-w-md w-full p-6 shadow-xl space-y-4">
-            <h3 className="text-sm font-black text-foreground flex items-center gap-1.5">
-              Adjust timing for: <span className="text-primary">{selectedMedForOverride.drug_name}</span>
-            </h3>
-            
-            <p className="text-xs text-muted-foreground font-semibold">
-              Select a customized time or choose to skip this dose for the date: <b className="text-foreground">{selectedDateStr}</b>
-            </p>
-
-            <div className="space-y-3">
-              <label className="block">
-                <span className="text-[10px] uppercase font-black text-muted-foreground">Skip this dosage</span>
-                <div className="flex items-center gap-2 mt-1.5">
-                  <input
-                    type="checkbox"
-                    checked={skipForToday}
-                    onChange={(e) => setSkipForToday(e.target.checked)}
-                    className="w-4 h-4 rounded border-border text-primary focus:ring-primary/60 cursor-pointer"
-                  />
-                  <span className="text-xs font-semibold text-foreground">Skip for today</span>
-                </div>
-              </label>
-
-              {!skipForToday && (
-                <label className="block">
-                  <span className="text-[10px] uppercase font-black text-muted-foreground">Adjust Timing</span>
-                  <input
-                    type="time"
-                    value={newOverrideTime}
-                    onChange={(e) => setNewOverrideTime(e.target.value)}
-                    className="mt-1.5 w-full px-3 py-2 bg-muted border border-border/80 rounded-xl text-xs font-semibold focus:outline-none"
-                  />
-                </label>
-              )}
+        <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-[22px] max-w-md w-full p-6 space-y-5" style={{ boxShadow: '0 8px 40px rgba(16, 28, 90, 0.18)' }}>
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-[10px] uppercase tracking-widest font-semibold text-muted-foreground">Adjust dose</p>
+                <h3 className="text-base font-bold tracking-tight text-foreground mt-0.5">{selectedMedForOverride.drug_name}</h3>
+                <p className="text-[11px] font-semibold text-primary mt-0.5">{selectedDateLong}</p>
+              </div>
+              <button onClick={closeModal} className="w-8 h-8 rounded-full flex items-center justify-center bg-[#F2F2F7] hover:bg-[#E5E5EA] text-muted-foreground cursor-pointer transition-all">
+                <X className="w-4 h-4" strokeWidth={2.5} />
+              </button>
             </div>
 
-            <div className="flex gap-2 justify-end pt-3">
+            <button
+              onClick={() => setSkipForToday((s) => !s)}
+              className={
+                'w-full flex items-center justify-between px-4 py-3 rounded-2xl border cursor-pointer transition-all ' +
+                (skipForToday ? 'bg-danger/10 border-danger/40' : 'bg-muted border-border hover:bg-muted/70')
+              }
+            >
+              <span className={'text-sm font-bold ' + (skipForToday ? 'text-danger' : 'text-foreground')}>
+                Skip this dose for the day
+              </span>
+              <span className={'relative w-10 h-5 rounded-full transition-all ' + (skipForToday ? 'bg-danger' : 'bg-border')}>
+                <span className={'absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ' + (skipForToday ? 'left-[22px]' : 'left-0.5')} />
+              </span>
+            </button>
+
+            {!skipForToday && (
+              <label className="block">
+                <span className="text-[10px] uppercase font-black text-muted-foreground">New time</span>
+                <input
+                  type="time"
+                  value={newOverrideTime}
+                  onChange={(e) => setNewOverrideTime(e.target.value)}
+                  className="mt-1.5 w-full px-4 py-3 bg-muted border border-border rounded-2xl text-sm font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                />
+              </label>
+            )}
+
+            <div className="flex gap-2">
               <button
-                onClick={() => {
-                  setShowOverrideModal(false);
-                  setSelectedMedForOverride(null);
-                  setNewOverrideTime('');
-                  setSkipForToday(false);
-                }}
-                className="px-4 py-2 bg-muted text-muted-foreground hover:bg-muted/80 text-xs font-bold rounded-xl cursor-pointer"
+                onClick={closeModal}
+                className="flex-1 py-3 bg-[#F2F2F7] text-muted-foreground hover:bg-[#E5E5EA] text-sm font-semibold rounded-full cursor-pointer transition-all"
               >
                 Cancel
               </button>
               <button
                 onClick={handleApplyOverride}
-                className="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary-hover text-xs font-black rounded-xl cursor-pointer shadow-sm"
+                className="flex-1 py-3 bg-primary text-white hover:bg-primary-hover text-sm font-semibold rounded-full cursor-pointer transition-all"
+                style={{ boxShadow: '0 4px 12px rgba(242, 107, 138, 0.35)' }}
               >
-                Apply Override
+                Save change
               </button>
             </div>
           </div>

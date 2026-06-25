@@ -23,24 +23,12 @@ export default async function MedicationsPage() {
     : { data: [] };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-extrabold text-foreground tracking-tight">
-          {userRole === 'CAREGIVER' ? `${patientName}'s Medications` : 'My Medications'}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {userRole === 'CAREGIVER'
-            ? 'Manage and schedule reminder routines for your linked patient.'
-            : 'Configure your dosage intervals, timings, and tablet inventory logs.'}
-        </p>
-      </div>
-
-      <MedicationList
-        initialMeds={(medications || []) as Medication[]}
-        targetTelegramChatId={targetChatId || ''}
-        myTelegramChatId={myTelegramChatId || ''}
-        userRole={userRole}
-      />
-    </div>
+    <MedicationList
+      initialMeds={(medications || []) as Medication[]}
+      targetTelegramChatId={targetChatId || ''}
+      myTelegramChatId={myTelegramChatId || ''}
+      userRole={userRole}
+      patientName={userRole === 'CAREGIVER' ? patientName ?? undefined : undefined}
+    />
   );
 }
