@@ -199,6 +199,14 @@ export default function SchedulePlannerPage() {
     currentMinutes: number;
     startY: number;
   } | null>(null);
+  // Mirror of the live drag so pointer handlers always read the current position
+  // (state closures can be stale, which previously dropped the dragged time).
+  const dragRef = useRef<{
+    medId: number;
+    originalMinutes: number;
+    currentMinutes: number;
+    startY: number;
+  } | null>(null);
 
   const activeRole = activeViewMode === 'PATIENT_MONITOR' ? 'CAREGIVER' : 'PATIENT';
   const isReadOnly = activeViewMode === 'PATIENT_MONITOR';
@@ -415,29 +423,39 @@ export default function SchedulePlannerPage() {
   const startDrag = (e: React.PointerEvent, medId: number, minutes: number) => {
     if (!canEdit) return;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    setDragging({ medId, originalMinutes: minutes, currentMinutes: minutes, startY: e.clientY });
+    const init = { medId, originalMinutes: minutes, currentMinutes: minutes, startY: e.clientY };
+    dragRef.current = init;
+    setDragging(init);
   };
 
   const onDragMove = (e: React.PointerEvent, medId: number) => {
-    if (!dragging || dragging.medId !== medId) return;
-    const deltaY = e.clientY - dragging.startY;
+    const d = dragRef.current;
+    if (!d || d.medId !== medId) return;
+    const deltaY = e.clientY - d.startY;
     const raw = Math.round((deltaY / hourHeight) * 60);
-    const newMins = Math.max(0, Math.min(23 * 60 + 55, dragging.originalMinutes + raw));
+    const newMins = Math.max(0, Math.min(23 * 60 + 55, d.originalMinutes + raw));
+    dragRef.current = { ...d, currentMinutes: newMins };
     setDragging(prev => prev ? { ...prev, currentMinutes: newMins } : null);
   };
 
   const endDrag = (medId: number) => {
-    if (!dragging || dragging.medId !== medId) return;
-    if (dragging.currentMinutes !== dragging.originalMinutes) {
-      const h = Math.floor(dragging.currentMinutes / 60);
-      const m = dragging.currentMinutes % 60;
-      const newTime = h.toString().padStart(2, '0') + ':' + m.toString().padStart(2, '0');
-      const dateStr = selectedDate.toISOString().split('T')[0];
-      const filtered = overrides.filter(o => !(o.medicationId === medId && o.dateStr === dateStr));
-      filtered.push({ medicationId: medId, dateStr, overriddenTime: newTime });
-      saveOverrides(filtered);
-    }
+    const d = dragRef.current;
+    dragRef.current = null;
     setDragging(null);
+    if (!d || d.medId !== medId) return;
+    // No meaningful move → treat as a tap, nothing to confirm.
+    if (d.currentMinutes === d.originalMinutes) return;
+    const h = Math.floor(d.currentMinutes / 60);
+    const m = d.currentMinutes % 60;
+    const hhmm = h.toString().padStart(2, '0') + ':' + m.toString().padStart(2, '0');
+    // Open the confirmation popup pre-filled with the dragged time. Saving goes
+    // through the same path as the Edit button, so it lands in the timeline.
+    const med = getMedicationsForDate(selectedDate).find((x) => x.id === medId);
+    if (!med) return;
+    setSelectedMedForOverride(med);
+    setNewOverrideTime(hhmm);
+    setSkipForToday(false);
+    setShowOverrideModal(true);
   };
 
   const selectedMeds = getMedicationsForDate(selectedDate);
