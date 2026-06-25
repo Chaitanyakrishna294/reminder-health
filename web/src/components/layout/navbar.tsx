@@ -36,7 +36,7 @@ export default function Navbar({ user }: NavbarProps) {
   };
 
   return (
-    <nav className="bg-card border-b border-border/80 shadow-sm sticky top-0 z-40 transition-all duration-300">
+    <nav className="bg-white border-b border-border/80 shadow-sm sticky top-0 z-40 transition-all duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className={`flex justify-between items-center transition-all duration-300 ${isElderly ? 'h-20' : 'h-16'
           }`}>
@@ -67,17 +67,17 @@ export default function Navbar({ user }: NavbarProps) {
             {/* Realtime Bell */}
             <NotificationCenter userId={user.id} />
 
-            {/* Theme Toggle (Dark/Light Mode) */}
+            {/* Theme Toggle (Light/Dark mode) */}
             <button
               onClick={toggleTheme}
-              aria-label={theme === 'light' ? 'Switch to Dark mode' : 'Switch to Light mode'}
-              title={theme === 'light' ? 'Dark mode' : 'Light mode'}
-              className={`flex items-center justify-center rounded-full transition-all duration-200 border cursor-pointer hover:scale-[1.05] active:scale-[0.95] ${theme === 'dark'
-                ? 'bg-primary/20 hover:bg-primary/35 border-primary/50 text-primary w-9 h-9'
-                : 'bg-muted hover:bg-muted/80 border-border text-foreground/80 hover:text-foreground w-9 h-9'
+              aria-label={theme === 'dark' ? 'Switch to Light mode' : 'Switch to Dark mode'}
+              title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+              className={`flex items-center justify-center rounded-full transition-all duration-200 border cursor-pointer hover:scale-[1.05] active:scale-[0.95] bg-muted hover:bg-muted/80 border-border text-foreground/80 hover:text-foreground ${isElderly ? 'w-12 h-12' : 'w-9 h-9'
                 }`}
             >
-              {theme === 'dark' ? <Sun className="w-[18px] h-[18px]" /> : <Moon className="w-[18px] h-[18px]" />}
+              {theme === 'dark'
+                ? <Sun className={isElderly ? 'w-6 h-6' : 'w-[18px] h-[18px]'} />
+                : <Moon className={isElderly ? 'w-6 h-6' : 'w-[18px] h-[18px]'} />}
             </button>
 
             {/* Mode Switcher Toggle (icon-only: glasses = large/accessible "Elderly" view) */}

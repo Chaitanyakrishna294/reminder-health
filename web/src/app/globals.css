@@ -34,37 +34,62 @@
   --radius: 1.75rem; /* 28px rounded corners */
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0F1C5A;
-    --foreground: #F8F9FB;
+/* ── Dark theme (toggle-driven via .dark class on <html>) ── */
+:root.dark {
+  --background: #0F1C5A;
+  --foreground: #EAF0FF;
 
-    --card: #1a2d6e;
-    --card-foreground: #F8F9FB;
+  --card: #1A2A66;
+  --card-foreground: #EAF0FF;
 
-    --primary: #F26B8A;
-    --primary-foreground: #ffffff;
+  --primary: #F26B8A;
+  --primary-foreground: #ffffff;
+  --primary-hover: #F583A0;
+  --primary-soft: rgba(242, 107, 138, 0.16);
 
-    --success: #34C759;
-    --success-foreground: #ffffff;
+  --success: #34C759;
+  --success-foreground: #ffffff;
 
-    --warning: #FF9500;
-    --warning-foreground: #ffffff;
+  --warning: #FF9500;
+  --warning-foreground: #ffffff;
 
-    --danger: #FF3B30;
-    --danger-foreground: #ffffff;
+  --danger: #FF453A;
+  --danger-foreground: #ffffff;
 
-    --border: rgba(242, 107, 138, 0.15);
-    --input: rgba(242, 107, 138, 0.10);
-    --ring: #F26B8A;
+  --border: rgba(234, 240, 255, 0.12);
+  --input: rgba(234, 240, 255, 0.10);
+  --ring: #F26B8A;
 
-    --muted: #1f3a7f;
-    --muted-foreground: #94a3b8;
+  --muted: #233473;
+  --muted-foreground: #A6B6DD;
 
-    --accent-surface: #1f3a7f;
-    --accent-surface-foreground: #F8F9FB;
-  }
+  --accent-surface: #2A3B7E;
+  --accent-surface-foreground: #EAF0FF;
 }
+
+/* Compatibility layer: flip hardcoded light surfaces/text used across the app
+   so dark mode reads cleanly without editing every component. */
+:root.dark .bg-white { background-color: var(--card) !important; }
+
+:root.dark .bg-\[\#F2F2F7\],
+:root.dark .bg-\[\#F6F6F9\],
+:root.dark .bg-\[\#EFEFF3\],
+:root.dark .bg-\[\#E9E9EE\],
+:root.dark .bg-\[\#EAEAEF\],
+:root.dark .bg-\[\#F2F2F5\] { background-color: var(--muted) !important; }
+
+:root.dark .bg-\[\#EAF3FF\] { background-color: var(--accent-surface) !important; }
+:root.dark .bg-\[\#f8fafc\] { background-color: var(--background) !important; }
+
+:root.dark .hover\:bg-\[\#E5E5EA\]:hover,
+:root.dark .hover\:bg-\[\#EFEFF3\]:hover,
+:root.dark .hover\:bg-\[\#E9E9EE\]:hover { background-color: var(--accent-surface) !important; }
+
+:root.dark [class*="text-[#0F1C5A]"],
+:root.dark [class*="text-[#0F172A]"] { color: var(--foreground) !important; }
+:root.dark [class*="text-[#475569]"] { color: var(--muted-foreground) !important; }
+
+:root.dark [class*="border-[#0F1C5A]"] { border-color: var(--border) !important; }
 
 @theme inline {
   --font-sans: var(--font-sans), sans-serif;
@@ -242,15 +267,13 @@ h1, h2, h3, h4, h5, h6, .font-mono, .badge, .metric, .time-tag, .navigation-labe
   outline: none;
 }
 
-@media (prefers-color-scheme: dark) {
-  body {
-    background-color: #0F1C5A;
-    background-image:
-      radial-gradient(60rem 60rem at 100% -10%, rgba(242, 107, 138, 0.08), transparent 60%),
-      radial-gradient(50rem 50rem at -10% 0%, rgba(91, 141, 239, 0.08), transparent 55%);
-    color: var(--foreground);
-    background-attachment: fixed;
-  }
+:root.dark body {
+  background-color: var(--background);
+  background-image:
+    radial-gradient(60rem 60rem at 100% -10%, rgba(242, 107, 138, 0.10), transparent 60%),
+    radial-gradient(50rem 50rem at -10% 0%, rgba(91, 141, 239, 0.12), transparent 55%);
+  color: var(--foreground);
+  background-attachment: fixed;
 }
 
 .gravity-active * {
