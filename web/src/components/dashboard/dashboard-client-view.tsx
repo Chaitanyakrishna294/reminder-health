@@ -322,6 +322,11 @@ export default function DashboardClientView({
   const { isElderly, toggleMode, viewMode } = useUiMode();
 
   const [events, setEvents] = useState<ReminderEvent[]>([]);
+  // Per-day schedule overrides saved by the Schedule Planner (localStorage). Applied
+  // to today's generated doses so the "Next Dose" card reflects planner changes/skips.
+  const [scheduleOverrides, setScheduleOverrides] = useState<
+    { medicationId: number; dateStr: string; overriddenTime?: string; isSkipped?: boolean }[]
+  >([]);
   // Doses the user chose "remind me later" on → suppressed until this epoch ms.
   // (The 60s `currentTime` clock below re-renders, so the gate re-evaluates live.)
   const [snoozedUntil, setSnoozedUntil] = useState<Record<number, number>>({});
@@ -441,6 +446,23 @@ export default function DashboardClientView({
   const supabase = createClient();
   const router = useRouter();
 
+  // Load the Schedule Planner's per-day overrides (same localStorage key the planner
+  // writes: `schedule-overrides-<authUserId>`). Re-read on mount so returning from the
+  // planner picks up the latest time changes / skips for the "Next Dose" card.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || cancelled) return;
+        const raw = localStorage.getItem('schedule-overrides-' + user.id);
+        if (raw) setScheduleOverrides(JSON.parse(raw));
+      } catch { /* ignore malformed/absent overrides */ }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Generate virtual events and filter database events to the day client-side.
   // Timezone-aware: virtual events are built in each medication's own timezone (e.g.
   // Asia/Kolkata) rather than the browser's local timezone. This keeps the generated
@@ -449,6 +471,9 @@ export default function DashboardClientView({
   // throws INVALID_SCHEDULED_TIME when the browser is in a different zone (e.g. UTC).
   useEffect(() => {
     const now = new Date();
+    // Planner stores overrides keyed by the date's UTC string (toISOString), so match
+    // today the same way to line up with what the Schedule Planner saved.
+    const todayDateStr = now.toISOString().split('T')[0];
 
     // Reference timezone for the "today" window: first medication's tz, else browser guess.
     const refTz =
@@ -473,7 +498,23 @@ export default function DashboardClientView({
         const localToday = moment().tz(medTz);
         const times = (med.reminder_times || []) as string[];
         times.forEach((timeStr) => {
-          const [hours, minutes] = timeStr.split(':').map(Number);
+          const [baseH, baseM] = timeStr.split(':').map(Number);
+
+          // Apply the Schedule Planner's override for this med today, if any:
+          // skip the dose entirely, or shift it to the new wall-clock time.
+          const ov = scheduleOverrides.find(
+            (o) => o.medicationId === med.id && o.dateStr === todayDateStr
+          );
+          if (ov?.isSkipped) return;
+          let hours = baseH;
+          let minutes = baseM;
+          if (ov?.overriddenTime) {
+            const [oh, om] = ov.overriddenTime.split(':').map(Number);
+            if (!Number.isNaN(oh) && !Number.isNaN(om)) {
+              hours = oh;
+              minutes = om;
+            }
+          }
 
           // Build the dose moment at this wall-clock time in the medication's timezone
           const reminderMoment = moment.tz(
@@ -501,7 +542,9 @@ export default function DashboardClientView({
           });
 
           if (!eventExists) {
-            const virtualId = -(med.id * 1000 + hours * 60 + minutes);
+            // Keyed by the original slot (baseH/baseM) so each reminder time keeps a
+            // stable, collision-free id even when shifted by an override.
+            const virtualId = -(med.id * 10000 + baseH * 60 + baseM);
             // 10-minute grace period for virtual events to become MISSED
             const isPast = reminderMoment.valueOf() < now.getTime() - 10 * 60 * 1000;
 
@@ -530,7 +573,7 @@ export default function DashboardClientView({
     }
 
     setEvents(generatedEvents);
-  }, [todayEvents, medications, targetTelegramChatId, myTelegramChatId]);
+  }, [todayEvents, medications, targetTelegramChatId, myTelegramChatId, scheduleOverrides]);
 
   // Toast Helper
   const showToast = (title: string, message: string, type: 'success' | 'error' = 'success') => {
