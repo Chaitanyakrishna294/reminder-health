@@ -3,6 +3,7 @@ const express = require('express');
 const { bot } = require('./src/bot');
 const { initCommands } = require('./src/commands');
 const { initScheduler } = require('./src/scheduler');
+const { initVoiceScheduler } = require('./src/voice-scheduler');
 
 // Health-check express server (UptimeRobot, Render)
 const app = express();
@@ -24,6 +25,8 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_BOT_TOKEN !== 'your_t
   console.log('🚀 Starting Re-MIND-eЯ Bot...');
   initCommands();
   initScheduler();
+  // Additive, isolated voice-call scheduler. No-ops unless VOICE_CALLS_ENABLED=true.
+  initVoiceScheduler();
 
   // Graceful shutdown handling
   process.once('SIGINT', () => bot.stopPolling());
