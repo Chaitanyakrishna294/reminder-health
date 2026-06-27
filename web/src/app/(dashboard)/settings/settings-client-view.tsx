@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useUiMode } from '@/context/ui-mode-context';
 import { createClient } from '@/lib/supabase/client';
+import CallSchedule from '@/components/settings/call-schedule';
 import { 
   Settings, 
   User, 
@@ -579,6 +580,11 @@ export default function SettingsClientView({
           </button>
         </div>
       </div>
+
+      {/* SECTION 2.5: VOICE CALL SCHEDULE (P0 — preference capture; calls land in P1) */}
+      {viewMode !== 'PATIENT_MONITOR' && (
+        <CallSchedule telegramId={user.telegramChatId} isElderly={isElderly} />
+      )}
 
       {/* SECTION 3: UNIFIED CAREGIVER & CLIENT MANAGEMENT */}
       <div 
