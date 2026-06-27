@@ -40,6 +40,12 @@ export default function CallSchedule({ telegramId, isElderly }: { telegramId: st
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+  // Phone verification (OTP)
+  const [verified, setVerified] = useState(false);
+  const [otpStage, setOtpStage] = useState<'idle' | 'sent'>('idle');
+  const [code, setCode] = useState('');
+  const [otpBusy, setOtpBusy] = useState(false);
+  const [otpMsg, setOtpMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -62,6 +68,7 @@ export default function CallSchedule({ telegramId, isElderly }: { telegramId: st
             nightly_confirm: data.nightly_confirm || DEFAULTS.nightly_confirm,
             consent: !!data.consent_at,
           });
+          setVerified(!!data.phone_verified);
         }
       } catch (err) {
         console.error('[CallSchedule] load failed:', err);
@@ -74,6 +81,52 @@ export default function CallSchedule({ telegramId, isElderly }: { telegramId: st
 
   const setWindow = (key: 'morning' | 'afternoon' | 'night' | 'nightly_confirm', patch: Partial<Window>) =>
     setPrefs((p) => ({ ...p, [key]: { ...p[key], ...patch } }));
+
+  const handleSendCode = async () => {
+    setOtpMsg(null);
+    if (!isValidPhone(prefs.phone_e164)) {
+      setOtpMsg({ type: 'err', text: 'Enter a valid number first (e.g. +9198XXXXXXXX).' });
+      return;
+    }
+    setOtpBusy(true);
+    try {
+      const res = await fetch('/api/voice/verify/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: prefs.phone_e164.trim() }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || 'Could not send the code.');
+      setOtpStage('sent');
+      setOtpMsg({ type: 'ok', text: 'Code sent — check your SMS.' });
+    } catch (e) {
+      setOtpMsg({ type: 'err', text: e instanceof Error ? e.message : 'Failed to send code.' });
+    } finally {
+      setOtpBusy(false);
+    }
+  };
+
+  const handleCheckCode = async () => {
+    setOtpMsg(null);
+    setOtpBusy(true);
+    try {
+      const res = await fetch('/api/voice/verify/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: prefs.phone_e164.trim(), code }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || 'Could not verify the code.');
+      setVerified(true);
+      setOtpStage('idle');
+      setCode('');
+      setOtpMsg({ type: 'ok', text: 'Phone verified.' });
+    } catch (e) {
+      setOtpMsg({ type: 'err', text: e instanceof Error ? e.message : 'Verification failed.' });
+    } finally {
+      setOtpBusy(false);
+    }
+  };
 
   const handleSave = async () => {
     setMsg(null);
@@ -195,21 +248,80 @@ export default function CallSchedule({ telegramId, isElderly }: { telegramId: st
 
           {prefs.enabled && (
             <div className="space-y-5 animate-fade-in">
-              {/* Phone */}
+              {/* Phone + verification */}
               <div>
-                <label className={`block font-bold text-foreground mb-1.5 ${label}`}>Phone number to call</label>
-                <input
-                  type="tel"
-                  inputMode="tel"
-                  placeholder="+9198XXXXXXXX"
-                  value={prefs.phone_e164}
-                  onChange={(e) => setPrefs((p) => ({ ...p, phone_e164: e.target.value }))}
-                  className={`w-full bg-white border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/40 font-mono ${
-                    isElderly ? 'h-14 px-4 text-lg' : 'h-10 px-3 text-sm'
-                  }`}
-                />
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className={`block font-bold text-foreground ${label}`}>Phone number to call</label>
+                  {verified && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-success/15 text-success border border-success/30">
+                      <ShieldCheck className="w-3 h-3" /> Verified
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="tel"
+                    inputMode="tel"
+                    placeholder="+9198XXXXXXXX"
+                    value={prefs.phone_e164}
+                    onChange={(e) => {
+                      setPrefs((p) => ({ ...p, phone_e164: e.target.value }));
+                      setVerified(false);
+                      setOtpStage('idle');
+                      setOtpMsg(null);
+                    }}
+                    className={`flex-1 bg-white border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/40 font-mono ${
+                      isElderly ? 'h-14 px-4 text-lg' : 'h-10 px-3 text-sm'
+                    }`}
+                  />
+                  {!verified && (
+                    <button
+                      type="button"
+                      onClick={handleSendCode}
+                      disabled={otpBusy}
+                      className={`shrink-0 font-bold rounded-xl border border-primary text-primary hover:bg-primary/5 transition-all cursor-pointer disabled:opacity-50 ${
+                        isElderly ? 'h-14 px-5 text-base' : 'h-10 px-4 text-xs'
+                      }`}
+                    >
+                      {otpBusy && otpStage === 'idle' ? 'Sending…' : otpStage === 'sent' ? 'Resend' : 'Verify'}
+                    </button>
+                  )}
+                </div>
+
+                {!verified && otpStage === 'sent' && (
+                  <div className="flex gap-2 mt-2">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={6}
+                      placeholder="6-digit code"
+                      value={code}
+                      onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      className={`flex-1 bg-white border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/40 font-mono tracking-widest text-center ${
+                        isElderly ? 'h-14 px-4 text-lg' : 'h-10 px-3 text-sm'
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleCheckCode}
+                      disabled={otpBusy || code.length !== 6}
+                      className={`shrink-0 font-bold rounded-xl bg-primary text-primary-foreground hover:bg-primary-hover transition-all cursor-pointer disabled:opacity-50 ${
+                        isElderly ? 'h-14 px-5 text-base' : 'h-10 px-4 text-xs'
+                      }`}
+                    >
+                      {otpBusy ? 'Checking…' : 'Confirm'}
+                    </button>
+                  </div>
+                )}
+
+                {otpMsg && (
+                  <p className={`text-[11px] font-bold mt-1.5 ${otpMsg.type === 'ok' ? 'text-success' : 'text-danger'}`}>
+                    {otpMsg.text}
+                  </p>
+                )}
+
                 <p className="text-[11px] text-muted-foreground mt-1.5 font-semibold">
-                  Use international format with country code (India: <span className="font-mono">+91…</span>).
+                  Use international format with country code (India: <span className="font-mono">+91…</span>). We&apos;ll text a code to confirm it&apos;s yours.
                 </p>
               </div>
 
