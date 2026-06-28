@@ -155,7 +155,24 @@ Statuses on `reminder_events.reminder_status`:
 ### 4.7 Other
 - **Chat** (`chat_messages`) between connected profiles. **Audit logs** (`audit_logs`) for compliance.
 - **Elderly Mode** UI toggle (giant fonts/buttons) across the app.
+- **Light/Dark theme toggle** (navbar Sun/Moon; `.dark` class on `<html>`, localStorage-persisted).
 - **Admin diagnostics** + **schedule planner** dashboard pages.
+
+### 4.8 Voice calls + Care+ subscription (SCAFFOLDED, feature-flagged OFF)
+- An automated **voice-call reminder** channel (India-first, **Exotel** IVR) + **Care+** subscription
+  (**Razorpay**) to cover call costs. **All dormant behind `VOICE_CALLS_ENABLED`** + Razorpay/Exotel
+  keys — zero impact on the live reminder pipeline until enabled. Full design in
+  `docs/VOICE_CALLS_DESIGN.md`; activation steps in `docs/VOICE_LAUNCH_CHECKLIST.md`.
+- **v1 MVP scope:** (1) patient daily confirmation call, (2) caregiver call only on an
+  unconfirmed/missed critical dose (after the confirmation runs, to avoid false alarms).
+- **Worker:** `src/voice-scheduler.js` — its OWN cron + OWN `voice_minute_tick` lock (isolated from
+  the medication tick); `src/voice/exotel.js` — Exotel adapter (connect-to-flow).
+- **Web routes:** `/api/voice/{twiml,response,status}` (IVR webhooks, 404 until flag on),
+  `/api/voice/verify/{send,check}` (phone OTP), `/api/billing/{subscribe,webhook,start-trial}`.
+  Call responses resolve through the same `resolve_reminder_event` RPC (one adherence ledger).
+- **Care+ UI:** `components/billing/care-plus-card.tsx` (Free-vs-Care+ comparison + 7-day **free
+  trial, no card**), gated via `lib/plan.ts`; voice setup lives in `components/settings/call-schedule.tsx`.
+- **Blocked on external:** Exotel DLT + call flow, SMS-OTP provider, Razorpay keys, pricing validation.
 
 ---
 
@@ -193,6 +210,16 @@ Statuses on `reminder_events.reminder_status`:
   `deleted_at` soft delete).
 
 **Other**: **`chat_messages`**, **`audit_logs`**.
+
+**Voice calls & billing (added for the voice feature — all RLS-enabled, mostly service-role-only):**
+- **`voice_call_preferences`** — per-patient voice config: `phone_e164`, `phone_verified`, `enabled`,
+  `mode`, per-window times (morning/afternoon/night), `nightly_confirm`, `consent_at`, `dnd_optout`.
+- **`voice_calls`** — per-call state machine (`provider_call_sid`, `status`, `attempts`, `responses`,
+  `billed_seconds`, `cost_inr`); idempotent per (telegram_id, call_type, window_key, scheduled_for).
+- **`voice_call_usage`** — monthly metering for quota/billing.
+- **`subscriptions`** — Care+ plan state (`plan`, `status` incl. `trialing`, `current_period_end`,
+  `razorpay_*`).
+- **`phone_verifications`** — short-lived hashed OTP codes (service-role only; RLS, no policies).
 
 **Compatibility view**: `active_caregiver_links` (unions `caregiver_connections` + `caregiver_info`,
 `security_invoker=on`).
@@ -249,6 +276,9 @@ Statuses on `reminder_events.reminder_status`:
 - The **Telegram bot uses the service-role key** (bypasses RLS) — it is a trusted backend and enforces
   ownership in code.
 - Recursion-safe RLS via helper functions (`get_my_telegram_chat_id`, `are_profiles_connected`).
+- **RLS is enabled on every table**, including `scheduler_locks` and `rate_limits` (closed an advisor
+  finding — both are reached only via SECURITY DEFINER RPCs / the service role, so RLS-on with no
+  policies blocks anon while legitimate callers keep working).
 
 ---
 
@@ -258,7 +288,11 @@ Statuses on `reminder_events.reminder_status`:
   `directory: web`). Deploy from the **repo root**: `npx vercel deploy --prod --yes`.
   ⚠️ Do **not** deploy from `web/` (its `.vercel` points to a different/wrong project `reminder-health-web`).
   No GitHub→Vercel auto-deploy; push to `main` for history, then deploy explicitly.
-- **Bot/scheduler** → separate Node host (runs `node index.js`); deploys with that host (not Vercel).
+- **Bot/scheduler** → **Render** service `reminder-health` (`reminder-health.onrender.com`, runs
+  `node index.js`; kept awake by an UptimeRobot ping). ⚠️ On Render **Free** it uses ~all 750
+  monthly instance-hours, so it can **pause near month-end and auto-resume on the 1st**. Deferred ₹0
+  fix (see `memory`/discussion): move the minute-tick to a Vercel function triggered by Supabase
+  pg_cron / external cron — reuses the existing lock, no double-send.
 - **Database** → Supabase project `jaflclnakwtikqbfhfdk`. Apply SQL from `db/migrations/` (live changes
   go through Supabase; keep the `.sql` files as source of truth).
 - Secrets: web uses Supabase URL + anon/publishable key (+ server env); bot uses `SUPABASE_URL` +

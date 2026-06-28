@@ -12,9 +12,12 @@
 **Re-MIND-eЯ** is a **medication reminder + caregiver coordination** app for patients (including
 elderly users) and the family/caregivers who support them.
 
-- **Two surfaces that share one database:**
+- **Surfaces that share one database:**
   - **Telegram bot** — sends dose reminders, escalations, and lets users respond (TAKEN/SKIP/SNOOZE).
   - **Web app (PWA)** — Next.js dashboard for patients and caregivers; installable on phones.
+  - **Voice calls (scaffolded, not yet live)** — an automated reminder/confirmation call channel
+    (Exotel IVR), monetized via a **Care+** subscription. Built behind `VOICE_CALLS_ENABLED`;
+    see `docs/VOICE_CALLS_DESIGN.md`. v1 = patient daily confirmation call + caregiver miss-alert.
 - **Backend:** Supabase (Postgres + Auth + Storage + RLS). Hosting: Vercel (web), separate host (bot).
 - **Core jobs:** never miss a dose; let trusted caregivers help; keep an accurate medication record;
   hold emergency + medical info; track adherence.
@@ -60,8 +63,10 @@ elderly users) and the family/caregivers who support them.
 
 - **Body background** has a whisper-subtle radial tint: pink (`rgba(242,107,138,0.05)`) top-right +
   blue (`rgba(91,141,239,0.05)`) top-left over `#F8F9FB`.
-- **Dark mode:** defined but currently mapped to the **same light values** — the app is effectively
-  **light-only** today. (If you design a true dark theme, that's a net-new effort.)
+- **Dark mode:** a working **light/dark toggle** (Sun/Moon button in the navbar) is **live**. It's
+  driven by a `.dark` class on `<html>` with a navy dark palette (`:root.dark`) plus a centralized
+  compatibility layer that flips hardcoded light surfaces. The choice persists (localStorage) with a
+  no-flash boot script; it defaults to the OS preference. **Light is still the primary design target.**
 
 ### 3.2 Typography
 
@@ -127,7 +132,7 @@ tour's message bubble).
 | `/medical-profile` | Medical identity card: photo, DOB/age, gender, blood group, height/weight/BMI, allergies, conditions, emergency contact, language/timezone; "share photo with caregivers" toggle |
 | `/emergency` | One-tap high-contrast emergency card: name, blood group, allergies, emergency contact (tap-to-call), current meds. Red card. |
 | `/care-circle`, `/care-circle/[patientId]`, `/care-circle/manage`, `/care-circle/requests` | Connect/manage caregivers & patients, per-patient view (gated medical card + meds + adherence), permission presets, accept/decline requests |
-| `/settings` | Profile, **Connect Code** (universal sharable code), elderly-mode, linked caregivers, legal links, **Delete Account** danger zone |
+| `/settings` | Profile, **Connect Code** (universal sharable code), elderly-mode, **Care+ plan card** (Free-vs-Care+ + free trial), **Call Schedule** (voice reminder setup, gated behind Care+), linked caregivers, legal links, **Delete Account** danger zone |
 | `/login`, `/register`, `/forgot-password`, `/update-password`, `/link-account` | Auth (Supabase) + Telegram linking; register has an 18+ & Terms/Privacy consent checkbox + optional Turnstile CAPTCHA |
 | `/privacy`, `/terms` | Public legal pages |
 
@@ -162,7 +167,10 @@ tour's message bubble).
   Secondary = white/muted with border. Destructive = danger fill or danger-soft.
 - **Badges/pills:** small uppercase mono, tinted by status (success/warning/danger/primary).
 - **Status badges:** Taken (green/check), Skipped (orange/skip), Missed (red), Snoozed (primary).
-- **Slide-to-confirm** control for taking a dose (drag knob left=skip / right=take).
+- **Take / Skip buttons** for resolving a dose. *(The older slide-to-confirm knob was removed — it's
+  now standard buttons. In the Scheduler, dragging a dose opens a confirmation popup to reschedule it.)*
+- **Theme toggle** (Sun/Moon) and **Elderly-mode toggle** (glasses) in the navbar.
+- **Care+ card** — Free-vs-Care+ comparison + "Start 7-day free trial" (the voice-feature paywall).
 - **Compliance ring** (circular progress).
 - **Toasts** (premium slide-up), **notification center** (bell dropdown with per-item delete).
 - **Avatars:** profile photo (signed URL) or initials circle; brain mascot accents.
@@ -181,7 +189,7 @@ tour's message bubble).
 ## 9. Constraints & notes for design
 
 - **Mobile-first, 5-icon nav, elderly mode** are hard constraints (see §2, §5).
-- **Light theme only** today (dark mode tokens exist but mirror light).
+- **Light + dark themes** both ship (navbar Sun/Moon toggle); design for both, light is the default.
 - **Health data is sensitive** — emergency info must always be reachable; don't design flows that
   fully trap the user.
 - **Tailwind v4** with CSS variables; use the tokens in §3 rather than arbitrary hex.
