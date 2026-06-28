@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useUiMode } from '@/context/ui-mode-context';
 import { createClient } from '@/lib/supabase/client';
 import CallSchedule from '@/components/settings/call-schedule';
+import CarePlusCard from '@/components/billing/care-plus-card';
 import { 
   Settings, 
   User, 
@@ -580,6 +581,15 @@ export default function SettingsClientView({
           </button>
         </div>
       </div>
+
+      {/* SECTION 2.4: CARE+ PLAN (Free vs Care+ comparison + 7-day free trial) */}
+      {viewMode !== 'PATIENT_MONITOR' && (
+        <CarePlusCard
+          telegramId={user.telegramChatId}
+          isElderly={isElderly}
+          onActivated={() => window.location.reload()}
+        />
+      )}
 
       {/* SECTION 2.5: VOICE CALL SCHEDULE (P0 — preference capture; calls land in P1) */}
       {viewMode !== 'PATIENT_MONITOR' && (

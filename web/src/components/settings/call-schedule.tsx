@@ -6,6 +6,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { getActivePlan } from '@/lib/plan';
+import CarePlusCard from '@/components/billing/care-plus-card';
 import { PhoneCall, Sun, CloudSun, Moon, MoonStar, Check, ShieldCheck } from 'lucide-react';
 
 type Window = { enabled: boolean; time: string };
@@ -46,11 +48,17 @@ export default function CallSchedule({ telegramId, isElderly }: { telegramId: st
   const [code, setCode] = useState('');
   const [otpBusy, setOtpBusy] = useState(false);
   const [otpMsg, setOtpMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+  // Care+ gate: voice calls are a paid (or trial) feature.
+  const [access, setAccess] = useState<boolean | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
+        const plan = await getActivePlan(supabase, telegramId);
+        if (cancelled) return;
+        setAccess(plan === 'care_plus');
+
         const { data } = await supabase
           .from('voice_call_preferences')
           .select('*')
@@ -209,6 +217,18 @@ export default function CallSchedule({ telegramId, isElderly }: { telegramId: st
     );
   };
 
+  // Care+ gate: free users see the compact upgrade card at the point of value.
+  if (access === false) {
+    return (
+      <CarePlusCard
+        telegramId={telegramId}
+        isElderly={isElderly}
+        compact
+        onActivated={() => window.location.reload()}
+      />
+    );
+  }
+
   return (
     <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-5">
       <div className="flex items-start justify-between gap-3">
@@ -221,12 +241,12 @@ export default function CallSchedule({ telegramId, isElderly }: { telegramId: st
             Get medication reminders by phone call — ideal for those who don&apos;t use the app daily.
           </p>
         </div>
-        <span className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-primary/10 text-primary border border-primary/20">
-          Care+ · soon
+        <span className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-success/15 text-success border border-success/30">
+          Care+
         </span>
       </div>
 
-      {loading ? (
+      {(loading || access === null) ? (
         <div className="h-24 rounded-2xl bg-muted/30 animate-pulse" />
       ) : (
         <>

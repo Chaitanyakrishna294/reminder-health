@@ -12,10 +12,10 @@ export async function getActivePlan(supabase: SupabaseClient, telegramId: string
     .maybeSingle();
 
   if (!data) return 'free';
-  const active =
-    data.plan === 'care_plus' &&
-    data.status === 'active' &&
-    (!data.current_period_end || new Date(data.current_period_end) > new Date());
+  if (data.plan !== 'care_plus') return 'free';
+  // Paid (active) counts; a trial counts until it expires.
+  const future = !data.current_period_end || new Date(data.current_period_end) > new Date();
+  const active = data.status === 'active' || (data.status === 'trialing' && future);
   return active ? 'care_plus' : 'free';
 }
 
