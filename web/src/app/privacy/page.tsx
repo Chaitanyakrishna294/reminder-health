@@ -7,9 +7,8 @@ export const metadata: Metadata = {
 };
 
 const UPDATED = 'June 29, 2026';
-// TODO(owner): fill these in before launch.
-const CONTACT_EMAIL = '[add your contact email]';
-const OPERATOR = '[your name or registered entity]';
+const CONTACT_EMAIL = 'hello.remindre@gmail.com';
+const OPERATOR = 'Chaitanya Krishna';
 
 export default function PrivacyPolicyPage() {
   return (
