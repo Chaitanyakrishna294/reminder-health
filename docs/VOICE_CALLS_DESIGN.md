@@ -20,6 +20,42 @@ The agent calls the patient, reads their due medications, and the patient respon
 
 ---
 
+## 1a. MVP scope (v1 — begin stage). Ship ONLY this first.
+
+Start tiny to keep call costs near-zero and prove people pay before expanding.
+**Exactly two calls; everything else stays dormant until there's revenue.**
+
+1. **Patient — 1 daily confirmation call** (the existing `nightly_confirmation`):
+   "Did you take all your medicines today? Press 1 = yes, 2 = no." Free per-dose
+   push/Telegram reminders keep running, so the patient loses nothing.
+2. **Caregiver — call only on an unconfirmed/missed dose:**
+   "We couldn't confirm <patient> took <medicine> today." This single, high-emotion,
+   low-volume call is the thing that justifies paying.
+
+Deferred until revenue grows (built but kept OFF): grouped morning/afternoon/night
+calls, per-medication calls, AI voice agent.
+
+**Cost shape (why this works):** ~1 patient call/day + caregiver call only on miss days
+≈ ~1–1.5 calls/patient/day ≈ **₹30–60/patient/month** — comfortable margin even at ₹199–399.
+
+### False-alarm guardrails (critical — a wrong "they missed it!" call kills trust)
+- Only call the caregiver **after** the patient confirmation call has run (give the
+  patient the chance to confirm first).
+- v1: caregiver alerts for **critical/important meds only** — never about a missed vitamin.
+- Soft framing: "We couldn't confirm…", not an accusation.
+
+### Trial & conversion (begin stage)
+- **7-day free trial**, **no card required to start** (maximize trial starts; the trial
+  is itself the demand test — if people won't even start it, that's the signal).
+- **Convert at peak value** (e.g., right after a missed-dose caregiver alert), not at an
+  arbitrary day count: "Keep these calls going — ₹399/mo, cancel anytime."
+- **Cap trial usage** so non-converters can't bleed COGS.
+- **India autopay reality:** recurring charges need a proper UPI-AutoPay / card e-mandate
+  with a **pre-debit notification (~24h before each charge)** + one-tap cancel (RBI rules).
+  No silent auto-charging — be transparent or face chargebacks + bad reviews.
+
+---
+
 ## 2. Business model (corrected)
 
 **One axis: free = safety + retention; paid = the expensive, high-emotion convenience (voice).**
@@ -38,7 +74,10 @@ Safety is NEVER gated. We gate the *channel* (voice), never the *number of medic
 - **Payer = the adult-child caregiver**, not the elderly patient. All upgrade copy,
   billing, and prompts target the caregiver ("peace of mind that mum took her pills").
 - **Price target: ₹299–₹499/month** (confirm via validation, §8). Annual discount to cut churn.
+- **7-day free trial, no card to start** → convert at peak value (see §1a). The trial
+  doubles as the demand test.
 - **Beyond quota → UPI pay-as-you-go top-ups.** Protects margin from heavy users.
+- v1 ships the lean 2-call MVP in §1a; the grouped-mode math below is why we DON'T start there.
 
 ### Why these choices (the brutal math)
 - Grouped mode = up to 4 calls/day (morning/afternoon/night + nightly). With no-answer
