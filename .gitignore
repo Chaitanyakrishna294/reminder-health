@@ -26,6 +26,7 @@ next-env.d.ts
 
 # AI Agents / Scratch files / Local logs
 .agents/
+.claude/
 scratch/
 logs/
 *.log
