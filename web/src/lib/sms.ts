@@ -6,10 +6,12 @@ type SmsResult = { ok: boolean; reason?: string; detail?: unknown };
 
 const PROVIDER = (process.env.SMS_PROVIDER || 'msg91').toLowerCase();
 
+const EXOTEL_ACCOUNT_SID = process.env.EXOTEL_ACCOUNT_SID || process.env.EXOTEL_SID;
+
 export function smsConfigured(): boolean {
   if (PROVIDER === 'exotel') {
     return Boolean(
-      process.env.EXOTEL_SID &&
+      EXOTEL_ACCOUNT_SID &&
         process.env.EXOTEL_API_KEY &&
         process.env.EXOTEL_API_TOKEN &&
         process.env.EXOTEL_SMS_SENDER
@@ -26,7 +28,7 @@ export async function sendSms({ to, text }: { to: string; text: string }): Promi
     if (PROVIDER === 'exotel') {
       const endpoint =
         `https://${encodeURIComponent(process.env.EXOTEL_API_KEY!)}:${encodeURIComponent(process.env.EXOTEL_API_TOKEN!)}` +
-        `@${process.env.EXOTEL_SUBDOMAIN || 'api.exotel.com'}/v1/Accounts/${process.env.EXOTEL_SID}/Sms/send.json`;
+        `@${process.env.EXOTEL_SUBDOMAIN || 'api.exotel.com'}/v1/Accounts/${EXOTEL_ACCOUNT_SID}/Sms/send.json`;
       const body = new URLSearchParams();
       body.set('From', process.env.EXOTEL_SMS_SENDER!);
       body.set('To', to);

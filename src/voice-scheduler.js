@@ -68,9 +68,8 @@ async function processPreference(pref) {
       continue;
     }
 
-    const answerUrl = `${WEBHOOK_BASE}/api/voice/twiml?callId=${inserted.id}`;
     const statusUrl = `${WEBHOOK_BASE}/api/voice/status?callId=${inserted.id}`;
-    const r = await exotel.placeCall({ to: pref.phone_e164, answerUrl, statusUrl });
+    const r = await exotel.placeCall({ to: pref.phone_e164, callId: inserted.id, statusUrl });
 
     await supabase
       .from('voice_calls')
