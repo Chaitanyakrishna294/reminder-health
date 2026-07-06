@@ -4,71 +4,24 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { SpoonIcon, CreamBottleIcon, TabletIcon } from '@/components/ui/custom-icons';
 import { calculateNextReminder } from '@/lib/medication-utils';
 import { useUiMode } from '@/context/ui-mode-context';
-import { 
-  Pill, 
-  Clock, 
-  Layers, 
-  ShieldAlert, 
-  Check, 
-  ArrowLeft, 
-  ArrowRight, 
+import { type UnitType, unitOptions, stepMeta, frequencies, priorities } from '@/components/medications/medication-form-options';
+import { validateMedicationStep, buildSharedMedicationFields } from '@/lib/medications/form-logic';
+import {
+  Pill,
+  Clock,
+  Layers,
+  ShieldAlert,
+  Check,
+  ArrowLeft,
+  ArrowRight,
   FileText,
-  Activity,
-  Sun,
-  CloudSun,
-  Moon,
-  Droplets,
-  Syringe,
-  Wind,
-  Package,
   Beaker,
-  CircleDot,
-  Crosshair,
-  Scale,
   AlertTriangle,
-  ShieldCheck,
-  CircleAlert,
-  ClipboardList,
   Minus,
   Plus,
-  Utensils,
-  Bandage,
-  Sparkles
 } from 'lucide-react';
-
-type UnitType = 'TABLET' | 'CAPSULE' | 'ML' | 'DROP' | 'APPLICATION' | 'TEASPOON' | 'UNIT' | 'PATCH' | 'INHALATION' | 'OTHER';
-
-interface UnitOption {
-  id: UnitType;
-  label: string;
-  icon: React.ReactNode;
-}
-
-const unitOptions: UnitOption[] = [
-  { id: 'TABLET', label: 'Tablet', icon: <TabletIcon className="w-5 h-5" /> },
-  { id: 'CAPSULE', label: 'Capsule', icon: <Pill className="w-5 h-5" /> },
-  { id: 'ML', label: 'Milliliter (ml)', icon: <Beaker className="w-5 h-5" /> },
-  { id: 'DROP', label: 'Drop', icon: <Droplets className="w-5 h-5" /> },
-  { id: 'APPLICATION', label: 'Application', icon: <CreamBottleIcon className="w-5 h-5" /> },
-  { id: 'TEASPOON', label: 'Teaspoon', icon: <SpoonIcon className="w-5 h-5" /> },
-  { id: 'UNIT', label: 'Unit', icon: <Syringe className="w-5 h-5" /> },
-  { id: 'PATCH', label: 'Patch', icon: <Bandage className="w-5 h-5" /> },
-  { id: 'INHALATION', label: 'Inhalation', icon: <Wind className="w-5 h-5" /> },
-  { id: 'OTHER', label: 'Other', icon: <Package className="w-5 h-5" /> },
-];
-
-// Step metadata for the premium stepper
-const stepMeta = [
-  { label: 'Details', icon: <Pill className="w-4 h-4" /> },
-  { label: 'Schedule', icon: <Clock className="w-4 h-4" /> },
-  { label: 'Dosage', icon: <Beaker className="w-4 h-4" /> },
-  { label: 'Inventory', icon: <Layers className="w-4 h-4" /> },
-  { label: 'Priority', icon: <ShieldAlert className="w-4 h-4" /> },
-  { label: 'Review', icon: <ClipboardList className="w-4 h-4" /> },
-];
 
 interface EditMedicationFormProps {
   medication: {
@@ -164,45 +117,16 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
   const handleNextStep = (e: React.MouseEvent) => {
     e.preventDefault();
     setError(null);
-    
-    if (step === 1) {
-      if (!drugName.trim()) {
-        setError('Please enter a medication name.');
-        return;
-      }
-      animateStep(2, 'forward');
-    } else if (step === 2) {
-      const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
-      for (const t of times) {
-        if (!timeRegex.test(t)) {
-          setError('Invalid time format. Please enter valid hours and minutes.');
-          return;
-        }
-      }
-      animateStep(3, 'forward');
-    } else if (step === 3) {
-      if (dosageAmount <= 0) {
-        setError('Dosage amount must be greater than zero.');
-        return;
-      }
-      animateStep(4, 'forward');
-    } else if (step === 4) {
-      if (enableInventory) {
-        const stockNum = Number(currentStock);
-        const thresholdNum = Number(stockThreshold);
-        if (isNaN(stockNum) || stockNum < 0) {
-          setError('Current stock must be a non-negative number.');
-          return;
-        }
-        if (isNaN(thresholdNum) || thresholdNum < 0) {
-          setError('Low stock threshold must be a non-negative number.');
-          return;
-        }
-      }
-      animateStep(5, 'forward');
-    } else if (step === 5) {
-      animateStep(6, 'forward');
+    if (step >= 6) return;
+
+    const validationError = validateMedicationStep(step, {
+      drugName, times, dosageAmount, enableInventory, currentStock, stockThreshold,
+    });
+    if (validationError) {
+      setError(validationError);
+      return;
     }
+    animateStep(step + 1, 'forward');
   };
 
   const handlePrevStep = (e: React.MouseEvent) => {
@@ -229,17 +153,10 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
       const { error: updateErr } = await supabase
         .from('medications')
         .update({
-          drug_name: drugName.trim(),
-          dosage: strength.trim() || 'N/A',
-          frequency,
-          reminder_times: sortedTimes,
-          unit_type: unitType,
-          dosage_amount: Number(dosageAmount),
-          current_stock: enableInventory && currentStock !== '' ? Number(currentStock) : null,
-          stock_threshold: enableInventory && stockThreshold !== '' ? Number(stockThreshold) : null,
-          medication_reason: medicationReason.trim() || null,
-          priority_level: priority,
-          low_stock_alert_enabled: enableInventory,
+          ...buildSharedMedicationFields(
+            { drugName, frequency, times, dosageAmount, strength, enableInventory, currentStock, stockThreshold, medicationReason, priority, unitType },
+            sortedTimes,
+          ),
           ...(nextReminder ? { next_reminder_at: nextReminder.toISOString() } : {}),
         })
         .eq('id', medication.id);
@@ -254,18 +171,6 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
       setLoading(false);
     }
   };
-
-  const frequencies = [
-    { id: 'once_daily', title: 'Once Daily', desc: 'One dose per day', icon: <Sun className="w-5 h-5" /> },
-    { id: 'twice_daily', title: 'Twice Daily', desc: 'Morning and night', icon: <CloudSun className="w-5 h-5" /> },
-    { id: 'thrice_daily', title: 'Thrice Daily', desc: 'Morning, noon, and night', icon: <Moon className="w-5 h-5" /> }
-  ];
-
-  const priorities = [
-    { id: 'normal', title: 'Normal', desc: 'General vitamins and supplements', icon: <ShieldCheck className="w-5 h-5" />, color: 'success' as const },
-    { id: 'important', title: 'Important', desc: 'Core medication, low delay tolerated', icon: <AlertTriangle className="w-5 h-5" />, color: 'warning' as const },
-    { id: 'critical', title: 'Critical', desc: 'Life-critical doses, alarms caregiver on miss', icon: <CircleAlert className="w-5 h-5" />, color: 'danger' as const }
-  ];
 
   const labelClass = `block font-semibold text-foreground ${isElderly ? 'text-xl mb-2' : 'text-sm mb-1.5'}`;
   const inputClass = `mt-1 block w-full px-4 py-3 border border-input rounded-2xl bg-background text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 text-sm transition-all duration-200 font-[var(--font-sans)] ${
