@@ -40,3 +40,29 @@ This document lists confirmed bugs, technical limitations, and security issues i
 - **Status**: ACTIVE LIMITATION
 - **Details**: Direct PostgreSQL TCP traffic (ports 5432 and 6543) is blocked from within the agent's sandbox by firewall rules. Programmatic migrations using `pg` node client fail.
 - **Workaround**: SQL migrations must be run manually by the developer in the Supabase SQL editor dashboard.
+
+---
+
+## 3. Open Architecture Gaps (need a decision or infra)
+
+These are documented deliberately because they cannot be resolved as a pure, behavior-preserving code change — each needs a product decision or a deploy/infra environment.
+
+### Frequency Recurrence Is Not Honored by the Reminder Engine
+- **Status**: RESOLVED (planner made truthful) — engine-level recurrence remains a future feature
+- **Problem**: The bot scheduler's `calculateNextReminder` (`src/utils.js`) expands `reminder_times` **every day** and ignores `frequency`. So `every_other_day`/`weekly` medications actually fire **daily**. The web dashboard (daily) matched this; the Schedule Planner was the only surface that gated by frequency, so it displayed a recurrence the engine never follows.
+- **Blast radius (small)**: The web "new/edit" forms only offer `once/twice/thrice_daily` (see `medication-form-options.tsx`), so `every_other_day`/`weekly` can only originate from the Telegram bot or legacy rows.
+- **Fix applied**: `getMedicationsForDate` in `web/.../schedule-planner/page.tsx` no longer gates by frequency — it shows a dose on every day, matching what the engine actually fires. The now-single-use `isDoseScheduledOnDate` helper was removed from `dose-engine.ts`. The planner is now consistent with both the dashboard and the engine.
+- **Future feature (not a bug)**: if real `every_other_day`/`weekly` behavior is wanted, teach `calculateNextReminder` to skip off-days; that changes *when doses fire* and needs its own tests across the bot.
+
+### Minute-Tick Scheduler Single Point of Failure
+- **Status**: PARTIALLY MITIGATED (failover route shipped; full send-failover pending infra)
+- **Problem**: The every-minute reminder tick runs only inside the bot process on Render Free (`src/scheduler.js`). Render Free's ~750 instance-hours can exhaust near month-end and the service pauses → the loop stops until the 1st.
+- **Shipped**: `web/src/app/api/cron/tick/route.ts` — an authenticated (`CRON_SECRET` Bearer) endpoint that runs the *idempotent DB-side* maintenance RPCs the bot already calls (`scan_and_escalate_overdue_reminders`, `close_daily_medications`). Inert until `CRON_SECRET` is set. Keeps escalation state and day-end closure (and therefore the web dashboard / review queue) advancing even while the bot host is paused. Introduces no new writer semantics — it calls the same SECURITY DEFINER RPCs.
+- **Activation**: set `CRON_SECRET` in the web env, then add a Vercel Cron (or external cron) on `GET /api/cron/tick` every minute (Vercel Cron sends the Bearer header automatically).
+- **Remaining (needs deploy verification)**: this route does **not** re-send the initial Telegram/browser-push reminder — that delivery still requires the bot process. Full send-failover means porting the message-send path (Telegram + web-push) into a shared module the route can call, then retiring the Render tick. Deferred because it can't be validated without a real Vercel deploy.
+
+### Cross-Package Duplication of `calculateNextReminder`
+- **Status**: OPEN (packaging change; needs deploy verification)
+- **Problem**: `calculateNextReminder` exists in both `src/utils.js` (CJS, bot) and `web/src/lib/medication-utils.ts` (ESM, web). They are now algorithmically identical and tz-aware, but remain two physical copies that can drift again.
+- **Constraint**: A true single source requires a shared workspace package or a source dir imported by both runtimes. The web app deploys from `web/` on Vercel (monorepo `directory: web`), so importing a module from outside `web/` risks breaking Vercel's file tracing/build. This must be validated against an actual Vercel build before adoption.
+- **Mitigation in place**: both copies carry a comment requiring lockstep edits; the bot copy is covered by `test/utils.test.js`.

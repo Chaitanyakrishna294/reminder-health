@@ -20,14 +20,6 @@ export const getCachedProfile = cache(async (userId: string) => {
     .single();
 
   if (error) {
-    if (error.message?.includes('phone_number') || error.code === '42703') {
-      const { data: fallbackProfile } = await supabase
-        .from('profiles')
-        .select('id,role,full_name,telegram_chat_id')
-        .eq('id', userId)
-        .single();
-      return fallbackProfile ? { ...fallbackProfile, phone_number: null } as any : null;
-    }
     if (error.code !== 'PGRST116') {
       console.error('getCachedProfile error:', error);
     }
@@ -72,14 +64,6 @@ export const getCachedPatientProfile = cache(async (patientTelegramId: string) =
     .single();
 
   if (error) {
-    if (error.message?.includes('phone_number') || error.code === '42703') {
-      const { data: fallbackProfile } = await supabase
-        .from('profiles')
-        .select('id,full_name')
-        .eq('telegram_chat_id', patientTelegramId)
-        .single();
-      return fallbackProfile ? { ...fallbackProfile, phone_number: null } as any : null;
-    }
     if (error.code !== 'PGRST116') {
       console.error('getCachedPatientProfile error:', error);
     }

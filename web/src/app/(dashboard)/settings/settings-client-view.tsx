@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useUiMode } from '@/context/ui-mode-context';
 import { createClient } from '@/lib/supabase/client';
-import CallSchedule from '@/components/settings/call-schedule';
 import CarePlusCard from '@/components/billing/care-plus-card';
 import { 
   Settings, 
@@ -591,10 +590,8 @@ export default function SettingsClientView({
         />
       )}
 
-      {/* SECTION 2.5: VOICE CALL SCHEDULE (P0 — preference capture; calls land in P1) */}
-      {viewMode !== 'PATIENT_MONITOR' && (
-        <CallSchedule telegramId={user.telegramChatId} isElderly={isElderly} />
-      )}
+      {/* Voice-call reminders moved to its own members-only page (/care-plus/voice),
+          reached from the Care+ hub. */}
 
       {/* SECTION 3: UNIFIED CAREGIVER & CLIENT MANAGEMENT */}
       <div 
