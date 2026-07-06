@@ -15,27 +15,17 @@ import MedDueGate from '@/components/dashboard/med-due-gate';
 import BrainMascot from '@/components/dashboard/brain-mascot';
 import GuideButton from '@/components/guide/guide-button';
 import moment from 'moment-timezone';
+import { type OverrideEntry, findOverride, toOverrideDateStr } from '@/lib/schedule/dose-engine';
+import MedicationSlider from '@/components/dashboard/medication-slider';
+import { getUnitIcon, getCountdownText, PinkBubbles } from '@/components/dashboard/dashboard-helpers';
+import CarePlusLink from '@/components/billing/care-plus-link';
 
 const CaregiverConsole = dynamic(() => import('@/components/dashboard/caregiver-console'), {
   ssr: false,
   loading: () => <div className="p-8 text-center text-xs text-muted-foreground bg-white border border-border/80 rounded-3xl animate-pulse">Loading Caregiver Command Center...</div>
 });
 
-// Subtle translucent bubbles for the pink cards — present but faint, mixed sizes, scattered.
-// Deterministic positions (no Math.random) to avoid hydration mismatches.
-const PinkBubbles = () => (
-  <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden !m-0">
-    <span className="absolute rounded-full bg-white/10" style={{ width: 150, height: 150, top: -45, left: -35 }} />
-    <span className="absolute rounded-full bg-white/[0.06]" style={{ width: 96, height: 96, bottom: -28, right: 28 }} />
-    <span className="absolute rounded-full bg-white/[0.07]" style={{ width: 56, height: 56, top: 28, right: -16 }} />
-    <span className="absolute rounded-full bg-white/[0.08]" style={{ width: 38, height: 38, bottom: 26, left: 40 }} />
-    <span className="absolute rounded-full bg-white/[0.05]" style={{ width: 22, height: 22, top: 64, left: '44%' }} />
-    <span className="absolute rounded-full bg-white/[0.09]" style={{ width: 30, height: 30, top: 14, right: '36%' }} />
-  </div>
-);
-
 import { createClient } from '@/lib/supabase/client';
-import { SpoonIcon, CreamBottleIcon, TabletIcon } from '@/components/ui/custom-icons';
 import { getSeverityTheme } from '@/lib/severity-theme';
 import { 
   Activity, 
@@ -58,10 +48,6 @@ import {
   Check,
   Pill,
   X,
-  CircleDot,
-  Beaker,
-  Droplets,
-  Wind,
   Sparkles,
   Sun,
   CloudSun,
@@ -70,205 +56,9 @@ import {
   Lock,
   ChevronDown,
   Utensils,
-  Bandage
 } from 'lucide-react';
 
 const FEATURE_FLAG_ENABLE_PILL_SLIDER = false;
-
-const getUnitIcon = (unitType?: string, className: string = "w-6 h-6") => {
-  const type = unitType?.toUpperCase() || 'TABLET';
-  switch (type) {
-    case 'TABLET':
-      return <TabletIcon className={className} />;
-    case 'CAPSULE':
-      return <Pill className={className} />;
-    case 'ML':
-    case 'LIQUID':
-      return <Beaker className={className} />;
-    case 'DROP':
-    case 'DROPS':
-      return <Droplets className={className} />;
-    case 'SPRAY':
-      return <Wind className={className} />;
-    case 'APPLICATION':
-      return <CreamBottleIcon className={className} />;
-    case 'TEASPOON':
-      return <SpoonIcon className={className} />;
-    case 'PATCH':
-      return <Bandage className={className} />;
-    case 'POWDER':
-      return <Sparkles className={className} />;
-    case 'INHALER':
-    case 'INHALATION':
-      return <Wind className={className} />;
-    case 'OTHER':
-      return <Package className={className} />;
-    default:
-      return <CircleDot className={className} />;
-  }
-};
-
-const getCountdownText = (scheduledForStr: string) => {
-  const scheduledTime = new Date(scheduledForStr).getTime();
-  const now = new Date().getTime();
-  const diffMs = scheduledTime - now;
-  const diffMins = Math.round(diffMs / 60000);
-
-  if (diffMins < 0) {
-    const overdueMins = Math.abs(diffMins);
-    if (overdueMins < 60) {
-      return `Missed ${overdueMins} min ago`;
-    } else {
-      const overdueHours = Math.floor(overdueMins / 60);
-      const remainingMins = overdueMins % 60;
-      if (remainingMins === 0) {
-        return `Missed ${overdueHours} hour${overdueHours > 1 ? 's' : ''} ago`;
-      }
-      return `Missed ${overdueHours}h ${remainingMins}m ago`;
-    }
-  } else {
-    if (diffMins < 60) {
-      return `Due in ${diffMins} min`;
-    } else {
-      const dueHours = Math.floor(diffMins / 60);
-      const remainingMins = diffMins % 60;
-      return `Due in ${dueHours}h ${remainingMins}m`;
-    }
-  }
-};
-
-interface MedicationSliderProps {
-  event: any;
-  onResolve: (action: 'TAKEN' | 'SKIP') => void;
-}
-
-const MedicationSlider = ({ event, onResolve }: MedicationSliderProps) => {
-  const [position, setPosition] = useState(0); // in pixels
-  const [progress, setProgress] = useState(0); // -100 (skip) .. 100 (take)
-  const [isDragging, setIsDragging] = useState(false);
-  const trackRef = React.useRef<HTMLDivElement>(null);
-  // Refs mirror the live drag state so window-listener handlers read current
-  // values without the effect re-subscribing on every pixel (the prior cause of jank).
-  const positionRef = React.useRef(0);
-  const draggingRef = React.useRef(false);
-
-  const handleStart = () => {
-    draggingRef.current = true;
-    setIsDragging(true);
-  };
-
-  const handleMove = (clientX: number) => {
-    if (!draggingRef.current || !trackRef.current) return;
-    const rect = trackRef.current.getBoundingClientRect();
-    const width = rect.width;
-    const center = rect.left + width / 2;
-    const offset = clientX - center;
-    const maxOffset = width / 2 - 28; // ~knob radius
-    const percentage = Math.max(-100, Math.min(100, (offset / maxOffset) * 100));
-    const px = (percentage / 100) * maxOffset;
-    positionRef.current = px;
-    setPosition(px);
-    setProgress(percentage);
-  };
-
-  const handleEnd = () => {
-    if (!draggingRef.current || !trackRef.current) return;
-    draggingRef.current = false;
-    setIsDragging(false);
-    const rect = trackRef.current.getBoundingClientRect();
-    const maxOffset = rect.width / 2 - 28;
-    const threshold = maxOffset * 0.7;
-    const pos = positionRef.current;
-
-    if (pos >= threshold) {
-      onResolve('TAKEN');
-    } else if (pos <= -threshold) {
-      onResolve('SKIP');
-    }
-    positionRef.current = 0;
-    setPosition(0);
-    setProgress(0);
-  };
-
-  useEffect(() => {
-    if (!isDragging) return;
-    const onMouseMove = (e: MouseEvent) => handleMove(e.clientX);
-    const onMouseUp = () => handleEnd();
-    const onTouchMove = (e: TouchEvent) => {
-      if (e.touches.length > 0) handleMove(e.touches[0].clientX);
-    };
-    const onTouchEnd = () => handleEnd();
-
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
-    window.addEventListener('touchmove', onTouchMove, { passive: true });
-    window.addEventListener('touchend', onTouchEnd);
-
-    return () => {
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
-      window.removeEventListener('touchmove', onTouchMove);
-      window.removeEventListener('touchend', onTouchEnd);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDragging]);
-
-  const takeIntensity = Math.max(0, progress) / 100; // 0..1 dragging right (take)
-  const skipIntensity = Math.max(0, -progress) / 100; // 0..1 dragging left (skip)
-  const armedTake = progress > 45;
-  const armedSkip = progress < -45;
-
-  return (
-    <div
-      ref={trackRef}
-      role="slider"
-      aria-label="Slide left to skip, right to take this medication"
-      aria-valuemin={-100}
-      aria-valuemax={100}
-      aria-valuenow={Math.round(progress)}
-      className="relative w-full h-14 rounded-full overflow-hidden border border-border flex items-center justify-between px-5 select-none bg-muted shadow-inner"
-    >
-      {/* Directional fills that intensify as the knob travels */}
-      <div
-        className="absolute inset-y-0 left-0 w-1/2 bg-danger/35 pointer-events-none transition-opacity duration-75"
-        style={{ opacity: skipIntensity }}
-      />
-      <div
-        className="absolute inset-y-0 right-0 w-1/2 bg-success/35 pointer-events-none transition-opacity duration-75"
-        style={{ opacity: takeIntensity }}
-      />
-
-      <span className={`relative z-10 flex items-center gap-1 text-[11px] font-black transition-colors ${armedSkip ? 'text-danger' : 'text-danger/70'}`}>
-        <X className="w-3.5 h-3.5 shrink-0" /> Skip
-      </span>
-      <span
-        className="relative z-10 text-[10px] font-black uppercase tracking-wider text-muted-foreground transition-opacity"
-        style={{ opacity: 1 - Math.min(1, Math.abs(progress) / 60) }}
-      >
-        Slide to confirm
-      </span>
-      <span className={`relative z-10 flex items-center gap-1 text-[11px] font-black transition-colors ${armedTake ? 'text-success' : 'text-success/70'}`}>
-        Take <Check className="w-3.5 h-3.5 shrink-0" />
-      </span>
-
-      <div
-        onMouseDown={handleStart}
-        onTouchStart={handleStart}
-        style={{
-          transform: `translateX(calc(-50% + ${position}px))`,
-          left: '50%',
-          willChange: 'transform',
-          transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
-        }}
-        className={`absolute top-1 z-20 w-12 h-12 rounded-full bg-white shadow-lg border-2 cursor-grab active:cursor-grabbing flex items-center justify-center touch-none transition-colors ${
-          armedTake ? 'border-success/60 text-success' : armedSkip ? 'border-danger/60 text-danger' : 'border-border text-primary'
-        }`}
-      >
-        {armedTake ? <Check className="w-5 h-5" /> : armedSkip ? <X className="w-5 h-5" /> : getUnitIcon(event.medications?.unit_type, 'w-5 h-5')}
-      </div>
-    </div>
-  );
-};
 
 interface DashboardClientViewProps {
   userRole: 'PATIENT' | 'CAREGIVER';
@@ -324,9 +114,7 @@ export default function DashboardClientView({
   const [events, setEvents] = useState<ReminderEvent[]>([]);
   // Per-day schedule overrides saved by the Schedule Planner (localStorage). Applied
   // to today's generated doses so the "Next Dose" card reflects planner changes/skips.
-  const [scheduleOverrides, setScheduleOverrides] = useState<
-    { medicationId: number; dateStr: string; overriddenTime?: string; isSkipped?: boolean }[]
-  >([]);
+  const [scheduleOverrides, setScheduleOverrides] = useState<OverrideEntry[]>([]);
   // Doses the user chose "remind me later" on → suppressed until this epoch ms.
   // (The 60s `currentTime` clock below re-renders, so the gate re-evaluates live.)
   const [snoozedUntil, setSnoozedUntil] = useState<Record<number, number>>({});
@@ -473,7 +261,7 @@ export default function DashboardClientView({
     const now = new Date();
     // Planner stores overrides keyed by the date's UTC string (toISOString), so match
     // today the same way to line up with what the Schedule Planner saved.
-    const todayDateStr = now.toISOString().split('T')[0];
+    const todayDateStr = toOverrideDateStr(now);
 
     // Reference timezone for the "today" window: first medication's tz, else browser guess.
     const refTz =
@@ -502,9 +290,7 @@ export default function DashboardClientView({
 
           // Apply the Schedule Planner's override for this med today, if any:
           // skip the dose entirely, or shift it to the new wall-clock time.
-          const ov = scheduleOverrides.find(
-            (o) => o.medicationId === med.id && o.dateStr === todayDateStr
-          );
+          const ov = findOverride(scheduleOverrides, med.id, todayDateStr);
           if (ov?.isSkipped) return;
           let hours = baseH;
           let minutes = baseM;
@@ -841,6 +627,11 @@ export default function DashboardClientView({
       <>
         {dueGate}
         <div className={`space-y-8 w-full max-w-4xl mx-auto transition-colors duration-500 ${isGravityState ? 'pb-24' : ''}`}>
+          {/* Care+ premium spotlight — own account only, hidden while monitoring a patient */}
+          {viewMode !== 'PATIENT_MONITOR' && myTelegramChatId && (
+            <CarePlusLink isElderly={isElderly} />
+          )}
+
           {/* Gravity State Dimmer Backdrop (Disabled) */}
 
           {/* Push Banner */}
@@ -1061,6 +852,11 @@ export default function DashboardClientView({
     <>
       {dueGate}
       <div className={`space-y-8 w-full transition-all duration-500 relative ${isGravityState ? 'gravity-active' : ''}`}>
+
+      {/* Care+ premium spotlight — own account only, hidden while monitoring a patient */}
+      {viewMode !== 'PATIENT_MONITOR' && myTelegramChatId && (
+        <CarePlusLink isElderly={isElderly} />
+      )}
 
       {/* Push Banner */}
       {showPushBanner && (

@@ -19,6 +19,12 @@ import {
 } from 'lucide-react';
 import { useUiMode } from '@/context/ui-mode-context';
 import { createClient } from '@/lib/supabase/client';
+import {
+  type OverrideEntry,
+  findOverride,
+  parseTimeToMinutes,
+  toOverrideDateStr,
+} from '@/lib/schedule/dose-engine';
 
 interface ScheduledMed {
   id: number;
@@ -32,13 +38,6 @@ interface ScheduledMed {
   isSkipped?: boolean;
 }
 
-interface OverrideEntry {
-  medicationId: number;
-  dateStr: string; // YYYY-MM-DD
-  overriddenTime?: string;
-  isSkipped?: boolean;
-}
-
 const HOUR_HEIGHT = 64; // px per hour on the timeline rail
 
 const DAY_BANDS = [
@@ -48,19 +47,6 @@ const DAY_BANDS = [
   { from: 17, to: 21, label: 'Evening', icon: Sunset, color: 'rgba(242,107,138,0.08)', text: '#d23e64' },
   { from: 21, to: 24, label: 'Night', icon: Moon, color: 'rgba(15,28,90,0.05)', text: '#5b6aa8' },
 ];
-
-function parseTimeToMinutes(t: string): number | null {
-  if (!t) return null;
-  const m = t.trim().match(/^(\d{1,2}):(\d{2})\s*(am|pm)?$/i);
-  if (!m) return null;
-  let h = parseInt(m[1], 10);
-  const min = parseInt(m[2], 10);
-  const ap = m[3]?.toLowerCase();
-  if (ap === 'pm' && h < 12) h += 12;
-  if (ap === 'am' && h === 12) h = 0;
-  if (h > 23 || min > 59) return null;
-  return h * 60 + min;
-}
 
 function formatTimeLabel(t: string): string {
   const mins = parseTimeToMinutes(t);
@@ -301,29 +287,18 @@ export default function SchedulePlannerPage() {
   };
 
   const getMedicationsForDate = (date: Date): ScheduledMed[] => {
-    const dateStr = date.toISOString().split('T')[0];
-    const dayOfWeek = date.getDay();
+    const dateStr = toOverrideDateStr(date);
 
+    // Every active medication has a dose on every day: the reminder engine
+    // (src/utils.js calculateNextReminder) expands `reminder_times` daily and does
+    // NOT honor every_other_day/weekly, so those frequencies actually fire daily.
+    // The planner shows what truly happens rather than a recurrence the engine
+    // never follows. (Real recurrence support is a separate engine feature — see
+    // docs/KNOWN_ISSUES.md §3.)
     return medications
       .flatMap((med) => {
-        let scheduled = false;
-        if (med.frequency === 'once_daily' || med.frequency === 'twice_daily' || med.frequency === 'thrice_daily') {
-          scheduled = true;
-        } else if (med.frequency === 'every_other_day') {
-          const createdTime = new Date(med.created_at || Date.now()).getTime();
-          const diffDays = Math.floor((date.getTime() - createdTime) / (1000 * 60 * 60 * 24));
-          scheduled = diffDays % 2 === 0;
-        } else if (med.frequency === 'weekly') {
-          const createdDay = new Date(med.created_at || Date.now()).getDay();
-          scheduled = dayOfWeek === createdDay;
-        }
-
-        if (!scheduled) return [];
-
         return (med.reminder_times || []).map((timeStr: string) => {
-          const medOverride = overrides.find(
-            (o) => o.medicationId === med.id && o.dateStr === dateStr
-          );
+          const medOverride = findOverride(overrides, med.id, dateStr);
           const result: ScheduledMed = {
             id: med.id,
             drug_name: med.drug_name,
