@@ -5,7 +5,8 @@ const webpush = require('web-push');
 const { bot } = require('./bot');
 const { supabase } = require('./db');
 const { delay, calculateNextReminder, escapeHTML, activeSnoozes } = require('./utils');
-const { CALLBACK_ACTIONS, MAX_SNOOZES } = require('./constants');
+const { CALLBACK_ACTIONS } = require('./constants');
+const { dosesPerDay, buildDoseKeyboard, buildTakePromptMessage } = require('./reminders');
 
 // Unique id for this process, used to claim the cross-instance minute-tick lease
 // so two overlapping instances (deploy/restart) can't double-escalate reminders.
@@ -217,20 +218,8 @@ const initScheduler = () => {
           }
 
           const currentSnoozes = activeSnoozes[med.id] || 0;
-          const buttons = [
-            { text: '✅ TAKEN', callback_data: `${CALLBACK_ACTIONS.TAKEN}:${med.id}:${scheduledTimeMs}` },
-            { text: '⏭ SKIP', callback_data: `${CALLBACK_ACTIONS.SKIP}:${med.id}:${scheduledTimeMs}` }
-          ];
-
-          if (currentSnoozes < MAX_SNOOZES) {
-            buttons.splice(1, 0, { text: '⏰ Snooze 10m', callback_data: `${CALLBACK_ACTIONS.SNOOZE}:${med.id}:${scheduledTimeMs}` });
-          }
-
-          const inlineKeyboard = {
-            inline_keyboard: [ buttons ]
-          };
-
-          const message = `💊 Time to take <b>${escapeHTML(med.drug_name)}</b>${med.dosage ? ` (${escapeHTML(med.dosage)})` : ''}`;
+          const inlineKeyboard = buildDoseKeyboard(med.id, scheduledTimeMs, currentSnoozes);
+          const message = buildTakePromptMessage(med.drug_name, med.dosage);
 
           try {
             console.log(`[Scheduler] IMMEDIATELY locking medication record for Med ID: ${med.id}`);
@@ -384,18 +373,7 @@ const initScheduler = () => {
               .single();
             const currentSnoozes = eventRow ? eventRow.snooze_count : 0;
 
-            const buttons = [
-              { text: '✅ TAKEN', callback_data: `${CALLBACK_ACTIONS.TAKEN}:${transition.medication_id}:${scheduledTimeMs}` },
-              { text: '⏭ SKIP', callback_data: `${CALLBACK_ACTIONS.SKIP}:${transition.medication_id}:${scheduledTimeMs}` }
-            ];
-
-            if (currentSnoozes < MAX_SNOOZES) {
-              buttons.splice(1, 0, { text: '⏰ Snooze 10m', callback_data: `${CALLBACK_ACTIONS.SNOOZE}:${transition.medication_id}:${scheduledTimeMs}` });
-            }
-
-            const inlineKeyboard = {
-              inline_keyboard: [ buttons ]
-            };
+            const inlineKeyboard = buildDoseKeyboard(transition.medication_id, scheduledTimeMs, currentSnoozes);
 
             const message = `⏰ <b>Gentle Reminder:</b> Please take your <b>${escapeHTML(transition.drug_name)}</b>${transition.dosage ? ` (${escapeHTML(transition.dosage)})` : ''}.`;
             try {
@@ -513,21 +491,8 @@ const initScheduler = () => {
 
             console.log(`[Workflow State Change] Snooze expired for Event ID ${event.id}. Transitioned status from SNOOZED to SENT`);
             const scheduledTimeMs = new Date(event.scheduled_for).getTime();
-            const currentSnoozes = event.snooze_count;
-            const buttons = [
-              { text: '✅ TAKEN', callback_data: `${CALLBACK_ACTIONS.TAKEN}:${med.id}:${scheduledTimeMs}` },
-              { text: '⏭ SKIP', callback_data: `${CALLBACK_ACTIONS.SKIP}:${med.id}:${scheduledTimeMs}` }
-            ];
-
-            if (currentSnoozes < MAX_SNOOZES) {
-              buttons.splice(1, 0, { text: '⏰ Snooze 10m', callback_data: `${CALLBACK_ACTIONS.SNOOZE}:${med.id}:${scheduledTimeMs}` });
-            }
-
-            const inlineKeyboard = {
-              inline_keyboard: [ buttons ]
-            };
-
-            const message = `💊 Time to take <b>${escapeHTML(med.drug_name)}</b>${med.dosage ? ` (${escapeHTML(med.dosage)})` : ''}`;
+            const inlineKeyboard = buildDoseKeyboard(med.id, scheduledTimeMs, event.snooze_count);
+            const message = buildTakePromptMessage(med.drug_name, med.dosage);
             try {
               await bot.sendMessage(med.telegram_id, message, { parse_mode: 'HTML', reply_markup: inlineKeyboard });
             } catch (tgErr) {
@@ -667,7 +632,7 @@ const initScheduler = () => {
 
       for (const med of activeMeds) {
         if (med.tablet_count === null || med.tablet_count === undefined) continue;
-        const tabletsPerDay = med.frequency === 'once_daily' ? 1 : med.frequency === 'twice_daily' ? 2 : med.frequency === 'thrice_daily' ? 3 : 1;
+        const tabletsPerDay = dosesPerDay(med.frequency);
         const daysRemaining = Math.floor(med.tablet_count / tabletsPerDay);
 
         if (daysRemaining <= 3) {
@@ -808,67 +773,82 @@ const initScheduler = () => {
 
       if (!links || links.length === 0) return;
 
-      // 3. For each link, compile adherence stats and low stock alerts
+      // 3. Compile adherence stats and low-stock alerts for every patient up front.
+      //    Previously this issued a reminder_logs query, a medications query, and a
+      //    getChat round-trip *per caregiver link* (N+1, and repeated for patients with
+      //    multiple caregivers). We now fetch logs and meds once for all patients via
+      //    batched IN-queries and group them in memory, and dedupe getChat by patient.
+      //    The per-caregiver message output is byte-for-byte identical.
       const startOfToday = moment().tz('Asia/Kolkata').startOf('day').toISOString();
+      const patientIds = [...new Set(links.map(l => l.patient_telegram_id))];
+
+      // Batch 1: today's adherence logs for all monitored patients.
+      const { data: allLogs, error: allLogsErr } = await supabase
+        .from('reminder_logs')
+        .select('telegram_id, response')
+        .in('telegram_id', patientIds)
+        .gte('scheduled_time', startOfToday);
+
+      if (allLogsErr) {
+        console.error('[Scheduler] Error fetching logs for caregiver summary:', allLogsErr);
+        return;
+      }
+
+      const statsByPatient = new Map();
+      patientIds.forEach(id => statsByPatient.set(id, { taken: 0, skipped: 0, missed: 0 }));
+      (allLogs || []).forEach(log => {
+        const s = statsByPatient.get(log.telegram_id);
+        if (!s) return;
+        if (log.response === 'TAKEN') s.taken++;
+        else if (log.response === 'SKIP') s.skipped++;
+        else if (log.response === 'MISSED') s.missed++;
+      });
+
+      // Batch 2: active medications for all monitored patients (low-stock check).
+      const { data: allMeds, error: allMedsErr } = await supabase
+        .from('medications')
+        .select('*')
+        .in('telegram_id', patientIds)
+        .eq('active', true);
+
+      if (allMedsErr) {
+        console.error('[Scheduler] Error fetching medications for caregiver summary:', allMedsErr);
+        return;
+      }
+
+      const lowStockByPatient = new Map();
+      patientIds.forEach(id => lowStockByPatient.set(id, []));
+      (allMeds || []).forEach(med => {
+        if (med.tablet_count === null || med.tablet_count === undefined) return;
+        const tabletsPerDay = dosesPerDay(med.frequency);
+        const daysRemaining = Math.floor(med.tablet_count / tabletsPerDay);
+        if (daysRemaining <= 3) {
+          const arr = lowStockByPatient.get(med.telegram_id);
+          if (arr) arr.push({ drug_name: med.drug_name, daysRemaining });
+        }
+      });
+
+      // Resolve each patient's display name at most once.
+      const patientNameCache = new Map();
+      const getPatientName = async (telegramId) => {
+        if (patientNameCache.has(telegramId)) return patientNameCache.get(telegramId);
+        let name = 'Patient';
+        try {
+          const chatInfo = await bot.getChat(telegramId);
+          name = `${chatInfo.first_name || ''} ${chatInfo.last_name || ''}`.trim() || 'Patient';
+        } catch (chatErr) {}
+        patientNameCache.set(telegramId, name);
+        return name;
+      };
 
       for (const link of links) {
-        // Fetch logs for this patient today
-        const { data: todayLogs, error: logsErr } = await supabase
-          .from('reminder_logs')
-          .select('response')
-          .eq('telegram_id', link.patient_telegram_id)
-          .gte('scheduled_time', startOfToday);
+        const stats = statsByPatient.get(link.patient_telegram_id) || { taken: 0, skipped: 0, missed: 0 };
+        const takenCount = stats.taken;
+        const skippedCount = stats.skipped;
+        const missedCount = stats.missed;
+        const lowStockMeds = lowStockByPatient.get(link.patient_telegram_id) || [];
 
-        if (logsErr) {
-          console.error(`[Scheduler] Error fetching logs for patient ${link.patient_telegram_id}:`, logsErr);
-          continue;
-        }
-
-        let takenCount = 0;
-        let skippedCount = 0;
-        let missedCount = 0;
-
-        if (todayLogs) {
-          todayLogs.forEach(log => {
-            if (log.response === 'TAKEN') takenCount++;
-            else if (log.response === 'SKIP') skippedCount++;
-            else if (log.response === 'MISSED') missedCount++;
-          });
-        }
-
-        // Fetch patient meds to check for low stock
-        const { data: patientMeds, error: patMedsErr } = await supabase
-          .from('medications')
-          .select('*')
-          .eq('telegram_id', link.patient_telegram_id)
-          .eq('active', true);
-
-        if (patMedsErr) {
-          console.error(`[Scheduler] Error fetching medications for patient ${link.patient_telegram_id}:`, patMedsErr);
-          continue;
-        }
-
-        const lowStockMeds = [];
-        if (patientMeds) {
-          patientMeds.forEach(med => {
-            if (med.tablet_count === null || med.tablet_count === undefined) return;
-            const tabletsPerDay = med.frequency === 'once_daily' ? 1 : med.frequency === 'twice_daily' ? 2 : med.frequency === 'thrice_daily' ? 3 : 1;
-            const daysRemaining = Math.floor(med.tablet_count / tabletsPerDay);
-            if (daysRemaining <= 3) {
-              lowStockMeds.push({
-                drug_name: med.drug_name,
-                daysRemaining
-              });
-            }
-          });
-        }
-
-        // Get patient name
-        let patientName = 'Patient';
-        try {
-          const chatInfo = await bot.getChat(link.patient_telegram_id);
-          patientName = `${chatInfo.first_name || ''} ${chatInfo.last_name || ''}`.trim() || 'Patient';
-        } catch (chatErr) {}
+        const patientName = await getPatientName(link.patient_telegram_id);
 
         // Format message
         let summaryMessage = `📊 <b>Daily Adherence Summary</b>\n`;
