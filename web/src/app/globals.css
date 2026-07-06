@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+/* Nico Moji — self-hosted (OFL) for the Care+ wordmark. Single weight (400). */
+@font-face {
+  font-family: 'Nico Moji';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/nico-moji.ttf') format('truetype');
+}
+
 :root {
   --background: #F6F2F5;
   --foreground: #0F1C5A;
@@ -30,8 +39,11 @@
   
   --accent-surface: #EAF3FF; /* Accent Surface */
   --accent-surface-foreground: #0F1C5A;
-  
+
   --radius: 1.75rem; /* 28px rounded corners */
+
+  /* Auth pages' decorative page background (theme-aware). */
+  --auth-radial: radial-gradient(120% 80% at 50% 0%, #FDEEF2 0%, #F8F9FB 62%, #EAF3FF 100%);
 }
 
 /* ── Dark theme (toggle-driven via .dark class on <html>) ── */
@@ -65,6 +77,9 @@
 
   --accent-surface: #2A3B7E;
   --accent-surface-foreground: #EAF0FF;
+
+  /* Deep navy radial so light text + dark cards read coherently in dark mode. */
+  --auth-radial: radial-gradient(120% 80% at 50% 0%, #1E2E6E 0%, #0F1C5A 60%, #0A1340 100%);
 }
 
 /* Compatibility layer: flip hardcoded light surfaces/text used across the app
@@ -235,6 +250,17 @@
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(4px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Luxe (Care+ premium) — a slow gold light-sweep across dark gold surfaces. */
+@keyframes luxeSheen {
+  0%        { transform: translateX(-140%) skewX(-18deg); }
+  55%, 100% { transform: translateX(360%) skewX(-18deg); }
+}
+/* Gentle gold-glow pulse for premium accents. */
+@keyframes luxeGlow {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 1; }
 }
 
 body {
