@@ -36,6 +36,11 @@ const DEFAULTS: Prefs = {
 // E.164 India-friendly check: +<country><number>, 8–15 digits total.
 const isValidPhone = (p: string) => /^\+\d{8,15}$/.test(p.trim());
 
+// Per-window reminder scheduling (the "How should we call?" mode + the
+// Morning/Afternoon/Night call windows) is hidden for now — at launch we offer a
+// single nightly confirmation call only (budget). Flip to true to bring it back.
+const SHOW_REMINDER_WINDOWS = false;
+
 export default function CallSchedule({ telegramId, isElderly }: { telegramId: string; isElderly: boolean }) {
   const supabase = createClient();
   const [prefs, setPrefs] = useState<Prefs>(DEFAULTS);
@@ -181,37 +186,46 @@ export default function CallSchedule({ telegramId, isElderly }: { telegramId: st
   const label = isElderly ? 'text-lg' : 'text-xs';
   const heading = isElderly ? 'text-2xl' : 'text-sm';
   const timeInput = `bg-white border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/40 font-mono font-bold ${
-    isElderly ? 'h-12 px-3 text-lg' : 'h-9 px-2.5 text-sm'
+    isElderly ? 'h-12 px-3 text-lg' : 'h-9 px-2 text-sm'
   }`;
 
   const WindowRow = ({
-    icon, title, k,
-  }: { icon: React.ReactNode; title: string; k: 'morning' | 'afternoon' | 'night' | 'nightly_confirm' }) => {
+    icon, title, k, soon = false,
+  }: { icon: React.ReactNode; title: string; k: 'morning' | 'afternoon' | 'night' | 'nightly_confirm'; soon?: boolean }) => {
     const w = prefs[k];
     return (
-      <div className="flex items-center justify-between gap-3 bg-muted/30 border border-border/80 rounded-2xl px-4 py-3">
+      <div className={`flex items-center justify-between gap-2 bg-muted/30 border border-border/80 rounded-2xl px-4 py-3 ${soon ? 'opacity-60' : ''}`}>
         <div className="flex items-center gap-2.5 min-w-0">
           <span className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">{icon}</span>
-          <span className={`font-bold text-foreground truncate ${label}`}>{title}</span>
+          <span className={`font-bold text-foreground leading-tight ${label}`}>{title}</span>
         </div>
-        <div className="flex items-center gap-3 shrink-0">
-          {w.enabled && (
-            <input
-              type="time"
-              value={w.time}
-              onChange={(e) => setWindow(k, { time: e.target.value })}
-              className={timeInput}
-              aria-label={`${title} time`}
-            />
+        <div className="flex items-center gap-2 shrink-0">
+          {soon ? (
+            // Additional call timers roll out later (kept to one call/day for now).
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black bg-muted text-muted-foreground border border-border/80 uppercase tracking-wide">
+              Soon
+            </span>
+          ) : (
+            <>
+              {w.enabled && (
+                <input
+                  type="time"
+                  value={w.time}
+                  onChange={(e) => setWindow(k, { time: e.target.value })}
+                  className={timeInput}
+                  aria-label={`${title} time`}
+                />
+              )}
+              <button
+                type="button"
+                onClick={() => setWindow(k, { enabled: !w.enabled })}
+                aria-pressed={w.enabled}
+                className={`relative w-11 h-6 rounded-full transition-all cursor-pointer shrink-0 ${w.enabled ? 'bg-primary' : 'bg-border'}`}
+              >
+                <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${w.enabled ? 'left-[22px]' : 'left-0.5'}`} />
+              </button>
+            </>
           )}
-          <button
-            type="button"
-            onClick={() => setWindow(k, { enabled: !w.enabled })}
-            aria-pressed={w.enabled}
-            className={`relative w-11 h-6 rounded-full transition-all cursor-pointer shrink-0 ${w.enabled ? 'bg-primary' : 'bg-border'}`}
-          >
-            <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${w.enabled ? 'left-[22px]' : 'left-0.5'}`} />
-          </button>
         </div>
       </div>
     );
@@ -290,7 +304,7 @@ export default function CallSchedule({ telegramId, isElderly }: { telegramId: st
                       setOtpStage('idle');
                       setOtpMsg(null);
                     }}
-                    className={`flex-1 bg-white border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/40 font-mono ${
+                    className={`flex-1 min-w-0 bg-white border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/40 font-mono ${
                       isElderly ? 'h-14 px-4 text-lg' : 'h-10 px-3 text-sm'
                     }`}
                   />
@@ -317,7 +331,7 @@ export default function CallSchedule({ telegramId, isElderly }: { telegramId: st
                       placeholder="6-digit code"
                       value={code}
                       onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                      className={`flex-1 bg-white border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/40 font-mono tracking-widest text-center ${
+                      className={`flex-1 min-w-0 bg-white border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/40 font-mono tracking-widest text-center ${
                         isElderly ? 'h-14 px-4 text-lg' : 'h-10 px-3 text-sm'
                       }`}
                     />
@@ -345,25 +359,40 @@ export default function CallSchedule({ telegramId, isElderly }: { telegramId: st
                 </p>
               </div>
 
+              {SHOW_REMINDER_WINDOWS && (<>
               {/* Mode */}
               <div>
                 <span className={`block font-bold text-foreground mb-2 ${label}`}>How should we call?</span>
                 <div className="grid grid-cols-2 gap-2">
                   {([
-                    { id: 'grouped', t: 'By time of day', d: 'One call per window' },
-                    { id: 'per_medication', t: 'Per medication', d: 'A call for each medicine' },
+                    { id: 'grouped', t: 'By time of day', d: 'One call per window', soon: false },
+                    { id: 'per_medication', t: 'Per medication', d: 'A call for each medicine', soon: true },
                   ] as const).map((opt) => {
-                    const sel = prefs.mode === opt.id;
+                    const sel = prefs.mode === opt.id && !opt.soon;
                     return (
                       <button
                         key={opt.id}
                         type="button"
-                        onClick={() => setPrefs((p) => ({ ...p, mode: opt.id }))}
-                        className={`text-left rounded-2xl border p-3 transition-all cursor-pointer ${
-                          sel ? 'bg-primary/8 border-primary/40 ring-2 ring-primary/20' : 'bg-muted/30 border-border/80 hover:bg-muted/50'
+                        disabled={opt.soon}
+                        aria-disabled={opt.soon}
+                        title={opt.soon ? 'Coming soon' : undefined}
+                        onClick={() => { if (!opt.soon) setPrefs((p) => ({ ...p, mode: opt.id })); }}
+                        className={`relative text-left rounded-2xl border p-3 transition-all ${
+                          opt.soon
+                            ? 'bg-muted/20 border-border/60 opacity-60 cursor-not-allowed'
+                            : sel
+                              ? 'bg-primary/8 border-primary/40 ring-2 ring-primary/20 cursor-pointer'
+                              : 'bg-muted/30 border-border/80 hover:bg-muted/50 cursor-pointer'
                         }`}
                       >
-                        <span className={`block font-bold ${sel ? 'text-primary' : 'text-foreground'} ${isElderly ? 'text-lg' : 'text-sm'}`}>{opt.t}</span>
+                        <span className="flex items-center gap-1.5 flex-wrap">
+                          <span className={`font-bold ${sel ? 'text-primary' : 'text-foreground'} ${isElderly ? 'text-lg' : 'text-sm'}`}>{opt.t}</span>
+                          {opt.soon && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-black bg-muted text-muted-foreground border border-border/80 uppercase tracking-wide">
+                              Soon
+                            </span>
+                          )}
+                        </span>
                         <span className="block text-[11px] text-muted-foreground font-semibold mt-0.5">{opt.d}</span>
                       </button>
                     );
@@ -376,19 +405,20 @@ export default function CallSchedule({ telegramId, isElderly }: { telegramId: st
                 <div className="space-y-2">
                   <span className={`block font-bold text-foreground ${label}`}>Reminder call windows</span>
                   <WindowRow icon={<Sun className="w-4 h-4" />} title="Morning" k="morning" />
-                  <WindowRow icon={<CloudSun className="w-4 h-4" />} title="Afternoon" k="afternoon" />
-                  <WindowRow icon={<Moon className="w-4 h-4" />} title="Night" k="night" />
+                  <WindowRow icon={<CloudSun className="w-4 h-4" />} title="Afternoon" k="afternoon" soon />
+                  <WindowRow icon={<Moon className="w-4 h-4" />} title="Night" k="night" soon />
                 </div>
               ) : (
                 <p className="text-[12px] text-muted-foreground font-semibold bg-muted/30 border border-border/80 rounded-2xl p-3">
                   We&apos;ll call at each medicine&apos;s scheduled time. (Per-medication calling rolls out after the grouped mode.)
                 </p>
               )}
+              </>)}
 
               {/* Nightly confirmation */}
               <div className="space-y-2">
                 <span className={`block font-bold text-foreground ${label}`}>End-of-day check-in</span>
-                <WindowRow icon={<MoonStar className="w-4 h-4" />} title="Nightly confirmation call" k="nightly_confirm" />
+                <WindowRow icon={<MoonStar className="w-4 h-4" />} title="Nightly call" k="nightly_confirm" />
               </div>
 
               {/* Consent */}

@@ -18,6 +18,25 @@ Current state:
    *This approval is the bottleneck — days to weeks. Start before anything else.*
 4. Note: `EXOTEL_SID`, `EXOTEL_API_KEY`, `EXOTEL_API_TOKEN`, `EXOTEL_CALLER_ID`.
 
+## Step 1b — Build the Exotel Call Flow (recommended: STATIC prompt)
+Reading drug names per call needs dynamic ExoML (fragile, plan-dependent). For v1 use a
+generic static prompt — the flow is trivial and reliable, and `/api/voice/response`
+still resolves the exact dose from the call's window.
+
+In Exotel → **App Bazaar / Flow Builder** → new **Voice** flow:
+1. **Get Input (Gather) applet** — max digits **1**, TTS prompt:
+   *"This is your Re-MIND-eR medication reminder. Press 1 if you have taken your medicines
+   for this time. Press 2 if you missed any."*
+2. **Passthru applet** → URL (GET):
+   `https://<PUBLIC_WEBHOOK_BASE_URL>/api/voice/response?callId={{CustomField}}&digits={{digits}}`
+   *(Use your Exotel account's macro names — the pressed digit + the CustomField we send.
+   `/api/voice/response` accepts `digits`/`Digits` and posts the outcome to the one ledger.)*
+3. Publish → copy the flow's **App URL** → set `EXOTEL_FLOW_URL`.
+
+`src/voice/exotel.js` already sends `CustomField=<voice_calls.id>` and
+`StatusCallback=/api/voice/status?callId=<id>` on `connect.json`, so status/usage is wired.
+With the static flow, `/api/voice/twiml` (dynamic drug-name TwiML) is unused for v1.
+
 ## Step 2 — Validate before spending on billing (parallel, ~1–2 weeks)
 1. Waitlist page/message: "Voice reminders for your parents — ₹399/mo." Target **caregivers**.
 2. Manual 5–10 call pilot → record **answer rate, retries, billed minutes/call**.

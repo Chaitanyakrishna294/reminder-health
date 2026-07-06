@@ -9,11 +9,14 @@ const crypto = require('crypto');
 const moment = require('moment-timezone');
 const { supabase } = require('./db');
 const exotel = require('./voice/exotel');
+const { getActivePlan } = require('./plan');
 
 const VOICE_INSTANCE_ID = crypto.randomUUID();
 const ENABLED = process.env.VOICE_CALLS_ENABLED === 'true';
 const WEBHOOK_BASE = (process.env.PUBLIC_WEBHOOK_BASE_URL || '').replace(/\/$/, '');
 const DAILY_CALL_CAP = Number(process.env.VOICE_DAILY_CALL_CAP || 6);
+// Per-account monthly ceiling — the primary cost cap for the paid voice feature.
+const MONTHLY_CALL_QUOTA = Number(process.env.VOICE_MONTHLY_CALL_QUOTA || 90);
 
 // Which call(s) are due for a preference at the current wall-clock minute (in its tz).
 function callsDue(pref, hhmm) {
@@ -37,7 +40,21 @@ async function processPreference(pref) {
   // Per-medication fan-out is a later phase; skeleton handles grouped + nightly only.
   if (pref.mode === 'per_medication') return;
 
-  // Daily cap (cost guard).
+  // Plan gate — voice calls are a Care+ (paid/trial) feature. Re-checked here at call
+  // time so a lapsed subscriber (who set preferences while subscribed) is not called.
+  const plan = await getActivePlan(pref.telegram_id);
+  if (plan !== 'care_plus') return;
+
+  // Monthly quota (primary cost cap) — count this account's calls in the current month.
+  const startOfMonth = nowTz.clone().startOf('month').toISOString();
+  const { count: monthCount } = await supabase
+    .from('voice_calls')
+    .select('id', { count: 'exact', head: true })
+    .eq('telegram_id', pref.telegram_id)
+    .gte('created_at', startOfMonth);
+  if ((monthCount || 0) >= MONTHLY_CALL_QUOTA) return;
+
+  // Daily cap (secondary cost guard).
   const startOfDay = nowTz.clone().startOf('day').toISOString();
   const { count: todayCount } = await supabase
     .from('voice_calls')
