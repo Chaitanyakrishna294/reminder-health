@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { Bot, Check, AlertTriangle } from 'lucide-react';
 
 export default function LinkAccountPage() {
   const [code, setCode] = useState('');
@@ -127,8 +128,8 @@ export default function LinkAccountPage() {
         
         {/* Header Branding */}
         <div className="text-center space-y-2">
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-black bg-primary/10 text-primary border border-primary/20">
-            🤖 Telegram Syncing
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-primary/10 text-primary border border-primary/20">
+            <Bot className="w-3.5 h-3.5" /> Telegram Syncing
           </span>
           <h2 className="text-3xl font-black text-foreground tracking-tight">
             Connect Your Account
@@ -140,8 +141,8 @@ export default function LinkAccountPage() {
 
         {success ? (
           <div className="space-y-4 text-center py-6">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-success/15 text-success rounded-full text-3xl shadow-lg border border-success/30 animate-pulse">
-              ✓
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-success/15 text-success rounded-full shadow-lg border border-success/30 animate-pulse">
+              <Check className="w-8 h-8" />
             </div>
             <h3 className="text-xl font-black text-foreground">Verification Confirmed!</h3>
             <p className="text-sm text-muted-foreground font-semibold">
@@ -152,8 +153,8 @@ export default function LinkAccountPage() {
           <div className="space-y-6">
             
             {error && (
-              <div className="bg-danger/10 text-danger text-xs p-4 rounded-2xl border border-danger/20 font-bold">
-                ⚠️ {error}
+              <div className="bg-danger/10 text-danger text-xs p-4 rounded-2xl border border-danger/20 font-bold flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0" /> <span>{error}</span>
               </div>
             )}
 

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useUiMode } from '@/context/ui-mode-context';
-import { Eye, EyeOff, User, Mail, Lock } from 'lucide-react';
+import { Eye, EyeOff, User, Mail, Lock, AlertTriangle } from 'lucide-react';
 import Turnstile, { captchaEnabled } from '@/components/turnstile';
 
 export default function RegisterPage() {
@@ -67,8 +67,8 @@ export default function RegisterPage() {
   if (success) {
     return (
       <div className={`space-y-6 text-center transition-all duration-300 ${isElderly ? 'max-w-2xl space-y-8' : ''}`}>
-        <div className="inline-flex items-center justify-center w-12 h-12 bg-success/10 text-success rounded-full text-2xl">
-          ✉️
+        <div className="inline-flex items-center justify-center w-12 h-12 bg-success/10 text-success rounded-full">
+          <Mail className="w-6 h-6" />
         </div>
         <h2 className={`font-bold text-foreground ${isElderly ? 'text-2xl' : 'text-xl'}`}>Verify Your Email</h2>
         <p className={`text-muted-foreground ${isElderly ? 'text-lg mt-2' : 'text-sm'}`}>
@@ -90,48 +90,56 @@ export default function RegisterPage() {
   return (
     <div className="space-y-5">
       {error && (
-        <div className="bg-danger/10 text-danger text-sm p-3 rounded-2xl border border-danger/20">
-          ⚠️ {error}
+        <div className="bg-danger/10 text-danger text-sm p-3 rounded-2xl border border-danger/20 flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /> <span>{error}</span>
         </div>
       )}
 
       <form onSubmit={handleRegister} className="space-y-3">
-        <div className="relative">
-          <User className={iconClass} />
-          <input
-            type="text"
-            required
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            className={inputClass}
-            placeholder="Full name"
-            aria-label="Full name"
-          />
+        <div>
+          <label htmlFor="reg-name" className={`block font-bold text-foreground mb-1.5 ${isElderly ? 'text-base' : 'text-xs'}`}>Full name</label>
+          <div className="relative">
+            <User className={iconClass} />
+            <input
+              id="reg-name"
+              type="text"
+              required
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              className={inputClass}
+              placeholder="Full name"
+            />
+          </div>
         </div>
 
-        <div className="relative">
-          <Mail className={iconClass} />
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className={inputClass}
-            placeholder="you@example.com"
-            aria-label="Email address"
-          />
+        <div>
+          <label htmlFor="reg-email" className={`block font-bold text-foreground mb-1.5 ${isElderly ? 'text-base' : 'text-xs'}`}>Email</label>
+          <div className="relative">
+            <Mail className={iconClass} />
+            <input
+              id="reg-email"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className={inputClass}
+              placeholder="you@example.com"
+            />
+          </div>
         </div>
 
-        <div className="relative flex items-center">
+        <div>
+          <label htmlFor="reg-password" className={`block font-bold text-foreground mb-1.5 ${isElderly ? 'text-base' : 'text-xs'}`}>Password</label>
+          <div className="relative flex items-center">
           <Lock className={iconClass} />
           <input
+            id="reg-password"
             type={showPassword ? 'text' : 'password'}
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className={`${inputClass} pr-12`}
-            placeholder="Password"
-            aria-label="Password"
+            placeholder="Choose a password"
           />
           <button
             type="button"
@@ -141,6 +149,7 @@ export default function RegisterPage() {
           >
             {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
+          </div>
         </div>
 
         <label className="flex items-start gap-2 text-xs text-muted-foreground cursor-pointer pt-1">

@@ -135,42 +135,14 @@
   --radius-md: calc(var(--radius) - 4px);
   --radius-sm: calc(var(--radius) - 8px);
   
-  /* Layered, soft-but-visible elevation (navy-tinted to match foreground) */
-  --shadow-sm: 0 1px 2px rgba(15, 28, 90, 0.04), 0 2px 8px rgba(15, 28, 90, 0.04);
-  --shadow-md: 0 2px 4px rgba(15, 28, 90, 0.04), 0 8px 20px rgba(15, 28, 90, 0.07);
-  --shadow-lg: 0 4px 8px rgba(15, 28, 90, 0.05), 0 18px 40px rgba(15, 28, 90, 0.10);
+  /* Apple-Health elevation: a tight contact shadow + a wide, very soft ambient
+     halo (navy-tinted to match foreground). Multi-layered so cards read as
+     gently floating rather than outlined. */
+  --shadow-sm: 0 1px 2px rgba(15, 28, 90, 0.05), 0 3px 8px rgba(15, 28, 90, 0.04);
+  --shadow-md: 0 1px 2px rgba(15, 28, 90, 0.04), 0 6px 16px rgba(15, 28, 90, 0.06), 0 14px 34px rgba(15, 28, 90, 0.06);
+  --shadow-lg: 0 2px 6px rgba(15, 28, 90, 0.05), 0 14px 30px rgba(15, 28, 90, 0.09), 0 34px 64px rgba(15, 28, 90, 0.11);
 
-  --animate-float: float 8s ease-in-out infinite;
-  --animate-breath: breath 12s ease-in-out infinite;
-  --animate-orbit-rotate: orbit-rotate 20s linear infinite;
   --animate-fade-in: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(0px);
-  }
-}
-
-@keyframes breath {
-  0%, 100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1);
-  }
-}
-
-@keyframes orbit-rotate {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(0deg);
-  }
 }
 
 /* Timeline card flip-in for stacked same-time dose groups */
@@ -264,23 +236,36 @@
 }
 
 body {
-  /* Whisper-subtle brand tint over the base so large surfaces feel less flat */
-  background-color: #F8F9FB;
+  /* Soft brand-tinted "aurora" over a warm off-white base: three whisper-faint
+     radials give large surfaces gentle depth without ever reading as gradient slop. */
+  background-color: #F7F5FA;
   background-image:
-    radial-gradient(60rem 60rem at 100% -10%, rgba(242, 107, 138, 0.05), transparent 60%),
-    radial-gradient(50rem 50rem at -10% 0%, rgba(91, 141, 239, 0.05), transparent 55%);
+    radial-gradient(58rem 46rem at 100% -12%, rgba(242, 107, 138, 0.07), transparent 60%),
+    radial-gradient(52rem 44rem at -12% 2%, rgba(91, 141, 239, 0.06), transparent 58%),
+    radial-gradient(70rem 50rem at 50% 118%, rgba(242, 107, 138, 0.045), transparent 60%);
   color: var(--foreground);
   min-height: 100vh;
   margin: 0;
-  background-attachment: fixed;
   font-family: var(--font-sans), sans-serif;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
 }
 
 h1, h2, h3, h4, h5, h6, .font-mono, .badge, .metric, .time-tag, .navigation-label {
   font-family: var(--font-mono), monospace !important;
   letter-spacing: -0.01em;
+}
+
+/* Tighter rhythm on real display headings so large titles read as composed,
+   not just big. (Scoped to h1/h2 to avoid disturbing dense label text.) */
+h1, h2 {
+  line-height: 1.12;
+}
+
+/* Tabular figures for metrics/times so numbers don't wobble as they change. */
+.font-mono, .metric, .time-tag {
+  font-variant-numeric: tabular-nums;
 }
 
 /* Consistent, on-brand keyboard focus ring across the app */
@@ -318,5 +303,44 @@ h1, h2, h3, h4, h5, h6, .font-mono, .badge, .metric, .time-tag, .navigation-labe
     scroll-behavior: auto !important;
     transform: none !important;
   }
+}
+
+/* ── Premium finishing touches (systemic, theme-aware) ── */
+
+/* On-brand text selection instead of the OS default blue. */
+::selection {
+  background-color: rgba(242, 107, 138, 0.22);
+  color: var(--foreground);
+}
+
+/* Slim, unobtrusive branded scrollbars (Firefox + WebKit). */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(15, 28, 90, 0.18) transparent;
+}
+:root.dark * {
+  scrollbar-color: rgba(234, 240, 255, 0.22) transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: rgba(15, 28, 90, 0.16);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(15, 28, 90, 0.28);
+}
+:root.dark ::-webkit-scrollbar-thumb {
+  background-color: rgba(234, 240, 255, 0.20);
+}
+:root.dark ::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(234, 240, 255, 0.32);
 }
 

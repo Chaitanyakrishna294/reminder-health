@@ -511,8 +511,8 @@ export default function SchedulePlannerPage() {
           </h1>
           <p className="text-[13px] text-muted-foreground font-medium mt-0.5 sm:truncate sm:max-w-xs">
             {patientName
-              ? `Dose timeline for ${patientName} — tap a day to plan ahead.`
-              : 'Your day, on a timeline — tap a day to plan ahead.'}
+              ? `Dose timeline for ${patientName}. Tap a day to plan ahead.`
+              : 'Your day, on a timeline. Tap a day to plan ahead.'}
           </p>
         </div>
 
@@ -846,7 +846,7 @@ export default function SchedulePlannerPage() {
           <div className="bg-white rounded-[22px] p-5 space-y-3" style={{ boxShadow: CARD_SHADOW }}>
             <h4 className="text-xs font-bold tracking-tight text-foreground">Priority key</h4>
             {[
-              { c: '#FF3B30', l: 'Critical — never miss' },
+              { c: '#FF3B30', l: 'Critical: never miss' },
               { c: '#FF9500', l: 'Important' },
               { c: '#F26B8A', l: 'Routine' },
             ].map((row, i) => (

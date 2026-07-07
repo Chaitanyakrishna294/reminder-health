@@ -23,14 +23,14 @@ export const TOURS: Record<string, GuideStep[]> = {
       target: 'dash-compliance',
       title: 'How you’re doing',
       message:
-        'Your adherence at a glance — the percentage of doses you’ve taken on time. Keeping this high is the goal!',
+        'Your adherence at a glance: the percentage of doses you’ve taken on time. Keeping this high is the goal!',
       mood: 'encouraging',
     },
     {
       target: 'dash-today',
       title: 'Today’s schedule',
       message:
-        'Every dose for today lives here. Mark each one Taken or Skip — and if you logged one wrong, tap “Change” to fix it.',
+        'Every dose for today lives here. Mark each one Taken or Skip. If you logged one wrong, tap “Change” to fix it.',
       mood: 'reminder',
     },
     {
@@ -53,7 +53,7 @@ export const TOURS: Record<string, GuideStep[]> = {
       target: 'med-card-first',
       title: 'One card per medication',
       message:
-        'The coloured left stripe shows priority — red is critical, orange is important, pink is routine. A PAUSED chip means reminders are currently off.',
+        'The coloured left stripe shows priority: red is critical, orange is important, pink is routine. A PAUSED chip means reminders are currently off.',
       mood: 'encouraging',
     },
     {
@@ -67,7 +67,7 @@ export const TOURS: Record<string, GuideStep[]> = {
       target: 'med-stock',
       title: 'Inventory tracking',
       message:
-        'Stock counts down with each dose. When it reaches your threshold it pulses red — that\'s your cue to restock.',
+        'Stock counts down with each dose. When it reaches your threshold it pulses red: that\'s your cue to restock.',
       mood: 'curious',
     },
     {

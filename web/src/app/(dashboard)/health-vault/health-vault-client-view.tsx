@@ -799,7 +799,7 @@ export default function HealthVaultClientView({
                     className={`bg-card rounded-3xl border border-border flex flex-col justify-between transition-all duration-300 shadow-sm cursor-pointer ${
                       isElderly 
                         ? 'p-8 border-4 border-primary/30 space-y-6' 
-                        : 'p-5 hover:scale-[1.01] hover:shadow-md hover:border-primary/40 animate-breath space-y-4'
+                        : 'p-5 hover:scale-[1.01] hover:shadow-md hover:border-primary/40 space-y-4'
                     }`}
                   >
                     <div className="flex items-start justify-between">
@@ -827,7 +827,7 @@ export default function HealthVaultClientView({
                         }`}
                       >
                         <Upload className="w-3.5 h-3.5 mr-1.5 shrink-0" />
-                        <span>Upload Record</span>
+                        <span>Add to this folder</span>
                       </button>
                     )}
                   </div>
@@ -886,7 +886,7 @@ export default function HealthVaultClientView({
             <div className="flex items-start gap-3.5 bg-primary/5 text-primary border border-primary/20 rounded-3xl p-5 text-xs">
               <ShieldCheck className="w-5 h-5 shrink-0 text-primary mt-0.5" />
               <div className="space-y-1">
-                <h4 className="font-extrabold text-sm text-foreground">📖 Documents Shared by {patientName}</h4>
+                <h4 className="font-extrabold text-sm text-foreground">Documents Shared by {patientName}</h4>
                 <p className="font-bold text-primary opacity-90">Shared through Care Circle. You currently have read-only access.</p>
                 <p className="text-muted-foreground mt-1.5 leading-relaxed font-semibold">
                   {patientName} has chosen to share their health documents with you. You may review prescriptions, lab reports, and medical records. All documents remain read-only.

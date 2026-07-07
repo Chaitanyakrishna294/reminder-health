@@ -58,8 +58,8 @@ async function PatientStatusCard({ id, name, relationship, isPrimary, telegramId
 
   const statusLabel = metrics 
     ? metrics.complianceStatus === 'missed' 
-      ? '⚠️ Action Needed' 
-      : '✓ On Track' 
+      ? 'Action Needed'
+      : 'On Track'
     : 'Pending';
 
   const statusColor = metrics

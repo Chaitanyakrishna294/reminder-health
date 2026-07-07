@@ -2,9 +2,9 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { resolveUserData, getMedicalProfile } from '@/lib/supabase/cached-queries';
 import { createClient } from '@/lib/supabase/server';
-import { Phone, Pencil } from 'lucide-react';
+import { Phone, Pencil, Siren } from 'lucide-react';
 
-export const metadata = { title: 'Emergency Card — Re-MIND-eЯ' };
+export const metadata = { title: 'Emergency Card | Re-MIND-eЯ' };
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -44,7 +44,7 @@ export default async function EmergencyPage() {
       <div className="rounded-3xl bg-red-600 text-white shadow-2xl p-6 sm:p-8">
         <div className="flex items-center justify-between">
           <span className="inline-flex items-center gap-2 text-sm font-black uppercase tracking-widest bg-white/15 px-3 py-1 rounded-full">
-            🚨 Emergency Card
+            <Siren className="w-4 h-4" /> Emergency Card
           </span>
           <Link href="/medical-profile" className="text-white/80 hover:text-white" aria-label="Edit medical profile">
             <Pencil className="w-5 h-5" />
@@ -105,7 +105,7 @@ export default async function EmergencyPage() {
             <ul className="space-y-1">
               {meds.map((m, i) => (
                 <li key={i} className="text-base font-bold">
-                  • {m.drug_name}{m.dosage ? ` — ${m.dosage}` : ''}
+                  • {m.drug_name}{m.dosage ? ` (${m.dosage})` : ''}
                 </li>
               ))}
             </ul>

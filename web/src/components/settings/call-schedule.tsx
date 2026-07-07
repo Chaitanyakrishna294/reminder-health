@@ -111,7 +111,7 @@ export default function CallSchedule({ telegramId, isElderly }: { telegramId: st
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(j.error || 'Could not send the code.');
       setOtpStage('sent');
-      setOtpMsg({ type: 'ok', text: 'Code sent — check your SMS.' });
+      setOtpMsg({ type: 'ok', text: 'Code sent. Check your SMS.' });
     } catch (e) {
       setOtpMsg({ type: 'err', text: e instanceof Error ? e.message : 'Failed to send code.' });
     } finally {
@@ -252,7 +252,7 @@ export default function CallSchedule({ telegramId, isElderly }: { telegramId: st
             Call Schedule
           </h3>
           <p className={`text-muted-foreground ${label}`}>
-            Get medication reminders by phone call — ideal for those who don&apos;t use the app daily.
+            Get medication reminders by phone call, ideal for those who don&apos;t use the app daily.
           </p>
         </div>
         <span className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-success/15 text-success border border-success/30">

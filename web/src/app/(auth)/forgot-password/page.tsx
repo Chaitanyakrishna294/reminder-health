@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import { Mail, AlertTriangle } from 'lucide-react';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -32,8 +33,8 @@ export default function ForgotPasswordPage() {
   if (success) {
     return (
       <div className="space-y-6 text-center">
-        <div className="inline-flex items-center justify-center w-12 h-12 bg-success/10 text-success rounded-full text-2xl">
-          ✉️
+        <div className="inline-flex items-center justify-center w-12 h-12 bg-success/10 text-success rounded-full">
+          <Mail className="w-6 h-6" />
         </div>
         <h2 className="text-xl font-bold text-foreground">Email Sent</h2>
         <p className="text-sm text-muted-foreground">
@@ -59,8 +60,8 @@ export default function ForgotPasswordPage() {
       </div>
 
       {error && (
-        <div className="bg-danger/10 text-danger text-sm p-3 rounded-2xl border border-danger/20">
-          ⚠️ {error}
+        <div className="bg-danger/10 text-danger text-sm p-3 rounded-2xl border border-danger/20 flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /> <span>{error}</span>
         </div>
       )}
 

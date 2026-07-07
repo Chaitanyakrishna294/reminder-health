@@ -8,7 +8,6 @@ import { useUiMode } from '@/context/ui-mode-context';
 import TodaysSchedule, { ReminderEvent } from '@/components/dashboard/todays-schedule';
 import MedicationReviewQueue from '@/components/dashboard/medication-review-queue';
 import { registerPush } from '@/lib/push/register-push';
-import dynamic from 'next/dynamic';
 import { resolveReminderEvent } from '@/lib/reminder-events';
 import { PremiumToast } from '@/components/ui/premium-toast';
 import MedDueGate from '@/components/dashboard/med-due-gate';
@@ -19,11 +18,6 @@ import { type OverrideEntry, findOverride, toOverrideDateStr } from '@/lib/sched
 import MedicationSlider from '@/components/dashboard/medication-slider';
 import { getUnitIcon, getCountdownText, PinkBubbles } from '@/components/dashboard/dashboard-helpers';
 import CarePlusLink from '@/components/billing/care-plus-link';
-
-const CaregiverConsole = dynamic(() => import('@/components/dashboard/caregiver-console'), {
-  ssr: false,
-  loading: () => <div className="p-8 text-center text-xs text-muted-foreground bg-white border border-border/80 rounded-3xl animate-pulse">Loading Caregiver Command Center...</div>
-});
 
 import { createClient } from '@/lib/supabase/client';
 import { getSeverityTheme } from '@/lib/severity-theme';
@@ -56,6 +50,7 @@ import {
   Lock,
   ChevronDown,
   Utensils,
+  SkipForward,
 } from 'lucide-react';
 
 const FEATURE_FLAG_ENABLE_PILL_SLIDER = false;
@@ -469,6 +464,27 @@ export default function DashboardClientView({
     />
   ) : null;
 
+  // "Request Caregiver Contact" (elderly mode): notifies every linked caregiver
+  // via the in-app notification bell. Honest feedback either way.
+  const [contactRequestSending, setContactRequestSending] = useState(false);
+  const handleContactRequest = async () => {
+    if (contactRequestSending) return;
+    setContactRequestSending(true);
+    try {
+      const res = await fetch('/api/care/contact-request', { method: 'POST' });
+      const body = await res.json().catch(() => ({}));
+      if (res.ok) {
+        showToast('Contact Request Sent', 'Your caregiver has been notified to assist you.', 'success');
+      } else {
+        showToast('Could Not Send Request', body?.error || 'Please try again, or call your caregiver directly.', 'error');
+      }
+    } catch {
+      showToast('Could Not Send Request', 'Please check your connection and try again.', 'error');
+    } finally {
+      setContactRequestSending(false);
+    }
+  };
+
   // Resolve medication for Elderly Mode giant button
   const handleElderlyTakeNow = async (event: ReminderEvent, action: 'TAKEN' | 'SKIP') => {
     // 1. Double-click prevention
@@ -661,9 +677,9 @@ export default function DashboardClientView({
 
           {/* iOS PWA Installation Banner */}
           {showIosPwaBanner && (
-            <div className="bg-gradient-to-r from-indigo-500/10 to-purple-500/10 dark:from-indigo-500/20 dark:to-purple-500/20 border-4 border-indigo-500/30 p-5 rounded-2xl flex flex-col sm:flex-row items-center justify-between text-foreground gap-4">
+            <div className="bg-primary/10 border-4 border-primary/30 p-5 rounded-2xl flex flex-col sm:flex-row items-center justify-between text-foreground gap-4">
               <span className="text-xl font-black text-center sm:text-left flex items-start gap-2">
-                <Plus className="w-8 h-8 text-indigo-500 shrink-0" />
+                <Plus className="w-8 h-8 text-primary shrink-0" />
                 <span>To receive push reminders on iOS, install Re-MIND-eЯ: tap the Share button and select 'Add to Home Screen'.</span>
               </span>
               <button
@@ -671,7 +687,7 @@ export default function DashboardClientView({
                   localStorage.setItem('dismissedIosPwaBanner', 'true');
                   setShowIosPwaBanner(false);
                 }}
-                className="bg-indigo-500 text-white font-black px-8 py-3 rounded-xl text-xl cursor-pointer hover:bg-indigo-600 transition-all shadow-md shrink-0"
+                className="bg-primary text-primary-foreground font-black px-8 py-3 rounded-xl text-xl cursor-pointer hover:bg-primary-hover transition-all shadow-md shrink-0"
               >
                 Dismiss
               </button>
@@ -777,12 +793,11 @@ export default function DashboardClientView({
                 Tap the button below if you want your caregiver to call or assist you.
               </p>
               <button
-                onClick={() => {
-                  alert("Contact Request Sent. Your caregiver has been notified to assist you.");
-                }}
-                className="w-full h-[88px] flex items-center justify-center text-2xl font-black rounded-2xl bg-warning text-warning-foreground hover:bg-warning/95 active:scale-[0.98] transition-all cursor-pointer shadow-md gap-2"
+                onClick={handleContactRequest}
+                disabled={contactRequestSending}
+                className="w-full h-[88px] flex items-center justify-center text-2xl font-black rounded-2xl bg-warning text-warning-foreground hover:bg-warning/95 active:scale-[0.98] transition-all cursor-pointer shadow-md gap-2 disabled:opacity-60"
               >
-                <Phone className="w-8 h-8" /> Request Caregiver Contact
+                <Phone className="w-8 h-8" /> {contactRequestSending ? 'Sending…' : 'Request Caregiver Contact'}
               </button>
             </div>
           )}
@@ -892,15 +907,15 @@ export default function DashboardClientView({
 
       {/* iOS PWA Installation Banner */}
       {showIosPwaBanner && (
-        <div className="bg-gradient-to-r from-indigo-500/10 to-purple-500/10 dark:from-indigo-500/20 dark:to-purple-500/20 border border-indigo-500/20 dark:border-indigo-500/30 rounded-3xl p-5 shadow-lg relative overflow-hidden flex flex-col sm:flex-row items-center justify-between gap-4 animate-fade-in z-45">
+        <div className="bg-primary/5 dark:bg-primary/10 border border-primary/20 rounded-3xl p-5 shadow-lg relative overflow-hidden flex flex-col sm:flex-row items-center justify-between gap-4 animate-fade-in z-45">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
               <Plus className="w-5 h-5" />
             </div>
             <div>
               <h4 className="text-sm font-black text-foreground">Add to Home Screen (iOS)</h4>
               <p className="text-xs text-muted-foreground font-semibold mt-0.5">
-                To receive push reminders on iOS, install Re-MIND-eЯ: tap the <span className="font-bold text-indigo-600 dark:text-indigo-400">Share</span> button (box with an up arrow) and select <span className="font-bold text-indigo-600 dark:text-indigo-400">"Add to Home Screen"</span>.
+                To receive push reminders on iOS, install Re-MIND-eЯ: tap the <span className="font-bold text-primary">Share</span> button (box with an up arrow) and select <span className="font-bold text-primary">"Add to Home Screen"</span>.
               </p>
             </div>
           </div>
@@ -955,7 +970,7 @@ export default function DashboardClientView({
               href="/medications"
               className="flex flex-col items-center text-center p-5 border border-border hover:border-primary/40 bg-card hover:bg-primary/[0.02] rounded-2xl cursor-pointer transition-all hover:scale-[1.02] group"
             >
-              <span className="text-2xl mb-2 group-hover:scale-110 transition-transform">💊</span>
+              <Pill className="w-7 h-7 mb-2 text-primary group-hover:scale-110 transition-transform" />
               <span className="text-xs font-black text-foreground">Manage my medications</span>
               <span className="text-[10px] text-muted-foreground mt-1 font-semibold leading-relaxed">Add drug inventory, schedule recurring reminder times, and log intake.</span>
             </Link>
@@ -964,7 +979,7 @@ export default function DashboardClientView({
               href="/settings"
               className="flex flex-col items-center text-center p-5 border border-border hover:border-primary/40 bg-card hover:bg-primary/[0.02] rounded-2xl cursor-pointer transition-all hover:scale-[1.02] group"
             >
-              <span className="text-2xl mb-2 group-hover:scale-110 transition-transform">🤝</span>
+              <Users className="w-7 h-7 mb-2 text-primary group-hover:scale-110 transition-transform" />
               <span className="text-xs font-black text-foreground">Invite someone to support me</span>
               <span className="text-[10px] text-muted-foreground mt-1 font-semibold leading-relaxed">Share your profile access code so family members can monitor adherence.</span>
             </Link>
@@ -973,7 +988,7 @@ export default function DashboardClientView({
               href="/settings"
               className="flex flex-col items-center text-center p-5 border border-border hover:border-primary/40 bg-card hover:bg-primary/[0.02] rounded-2xl cursor-pointer transition-all hover:scale-[1.02] group"
             >
-              <span className="text-2xl mb-2 group-hover:scale-110 transition-transform">👨‍⚕️</span>
+              <Stethoscope className="w-7 h-7 mb-2 text-primary group-hover:scale-110 transition-transform" />
               <span className="text-xs font-black text-foreground">Help care for someone else</span>
               <span className="text-[10px] text-muted-foreground mt-1 font-semibold leading-relaxed">Register your caregiver ID and link connected patient profiles.</span>
             </Link>
@@ -985,7 +1000,7 @@ export default function DashboardClientView({
               }}
               className="flex flex-col items-center text-center p-5 border border-border hover:border-primary/40 bg-card hover:bg-primary/[0.02] rounded-2xl cursor-pointer transition-all hover:scale-[1.02] group"
             >
-              <span className="text-2xl mb-2 group-hover:scale-110 transition-transform">⏭️</span>
+              <SkipForward className="w-7 h-7 mb-2 text-muted-foreground group-hover:scale-110 transition-transform" />
               <span className="text-xs font-black text-foreground">Skip for now</span>
               <span className="text-[10px] text-muted-foreground mt-1 font-semibold leading-relaxed">Close this guide and explore the workspace dashboard at your own pace.</span>
             </button>

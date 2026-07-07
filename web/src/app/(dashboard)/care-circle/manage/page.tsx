@@ -12,6 +12,7 @@ import {
   CheckCircle, 
   Clock, 
   Heart,
+  HeartOff,
   Calendar,
   FileText,
   UserCheck,
@@ -370,7 +371,7 @@ export default function SharedTrustCenter() {
     if (log.action_type === 'GRANTED') {
       return (
         <div className="space-y-0.5">
-          <p className="text-xs text-foreground font-bold">❤️ Shared Trust Granted</p>
+          <p className="text-xs text-foreground font-bold flex items-center gap-1.5"><Heart className="w-3.5 h-3.5 text-primary shrink-0" /> Shared Trust Granted</p>
           <p className="text-[11px] text-muted-foreground">You approved request and shared your Care Circle with <b>{log.caregiver_name}</b>.</p>
           <span className="text-[9px] text-muted-foreground block pt-0.5">{timeStr}</span>
         </div>
@@ -379,7 +380,7 @@ export default function SharedTrustCenter() {
     if (log.action_type === 'PRIMARY_PROMOTED') {
       return (
         <div className="space-y-0.5">
-          <p className="text-xs text-foreground font-bold">❤️ Care Circle Coordinator Updated</p>
+          <p className="text-xs text-foreground font-bold flex items-center gap-1.5"><Heart className="w-3.5 h-3.5 text-primary shrink-0" /> Care Circle Coordinator Updated</p>
           <p className="text-[11px] text-muted-foreground"><b>{log.caregiver_name}</b> was promoted to Primary Care Coordinator.</p>
           <span className="text-[9px] text-muted-foreground block pt-0.5">{timeStr}</span>
         </div>
@@ -388,7 +389,7 @@ export default function SharedTrustCenter() {
     if (log.action_type === 'REVOKED') {
       return (
         <div className="space-y-0.5">
-          <p className="text-xs text-danger font-bold">💔 Shared Trust Access Revoked</p>
+          <p className="text-xs text-danger font-bold flex items-center gap-1.5"><HeartOff className="w-3.5 h-3.5 shrink-0" /> Shared Trust Access Revoked</p>
           <p className="text-[11px] text-muted-foreground">Access revoked for caregiver <b>{log.caregiver_name}</b>.</p>
           <span className="text-[9px] text-muted-foreground block pt-0.5">{timeStr}</span>
         </div>
@@ -419,7 +420,7 @@ export default function SharedTrustCenter() {
       // user-controlled value — cannot inject HTML/script (stored XSS).
       return (
         <div className="space-y-0.5">
-          <p className="text-xs text-foreground font-bold">❤️ Shared Trust Updated</p>
+          <p className="text-xs text-foreground font-bold flex items-center gap-1.5"><Heart className="w-3.5 h-3.5 text-primary shrink-0" /> Shared Trust Updated</p>
           <p className="text-[11px] text-muted-foreground">
             You updated permissions for <b>{log.caregiver_name}</b>
             {changeDescriptions.length > 0 ? ` (${changeDescriptions.join(', ')}).` : '.'}

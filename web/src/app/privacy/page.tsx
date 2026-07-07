@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy — Re-MIND-eЯ',
+  title: 'Privacy Policy | Re-MIND-eЯ',
   description: 'How Re-MIND-eЯ collects, uses, stores, shares, and protects your data.',
 };
 
@@ -21,7 +21,7 @@ export default function PrivacyPolicyPage() {
           <p>
             This Privacy Policy explains how {OPERATOR} (&quot;we&quot;, &quot;us&quot;) collects, uses,
             shares, stores, and protects your information when you use Re-MIND-eЯ (the
-            &quot;Service&quot;) — a medication-reminder and caregiver-coordination app. By using the
+            &quot;Service&quot;), a medication-reminder and caregiver-coordination app. By using the
             Service you agree to this Policy. If you do not agree, please do not use the Service.
           </p>
         </div>
@@ -70,7 +70,7 @@ export default function PrivacyPolicyPage() {
           <h2 className="text-xl font-bold mb-2">4. Where your data is stored (international transfer)</h2>
           <p>Our database and file storage are hosted on Supabase infrastructure located in
             <strong> Singapore</strong>, and application hosting is provided by Vercel, which may process data in
-            other countries. This means your information — including health data — may be stored and processed
+            other countries. This means your information, including health data, may be stored and processed
             <strong> outside India</strong>. We rely on your consent and on contractual safeguards with these
             providers for such transfers.</p>
         </div>
@@ -92,8 +92,8 @@ export default function PrivacyPolicyPage() {
 
         <div>
           <h2 className="text-xl font-bold mb-2">7. Your rights</h2>
-          <p>Subject to applicable law — including India&apos;s <strong>Digital Personal Data Protection Act, 2023
-            (DPDP Act)</strong> and, where relevant, the GDPR and CCPA — you may have the right to access, correct,
+          <p>Subject to applicable law (including India&apos;s <strong>Digital Personal Data Protection Act, 2023
+            (DPDP Act)</strong> and, where relevant, the GDPR and CCPA), you may have the right to access, correct,
             update, or delete your data, to withdraw consent, to nominate another person to exercise your rights,
             and to lodge a grievance or complaint.</p>
           <p className="mt-2">You can permanently delete your account and all associated data at any time from

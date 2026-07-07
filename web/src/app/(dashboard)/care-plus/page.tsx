@@ -7,5 +7,5 @@ export default async function CarePlusPage() {
   const userData = await resolveUserData();
   if (!userData) return null;
 
-  return <CarePlusHub telegramId={userData.myTelegramChatId} />;
+  return <CarePlusHub telegramId={userData.myTelegramChatId} memberName={userData.profile.full_name} />;
 }

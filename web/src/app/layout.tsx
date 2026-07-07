@@ -6,22 +6,21 @@ import { ThemeProvider } from "@/context/theme-context";
 import CookieConsent from "@/components/cookie-consent";
 import InstallPrompt from "@/components/install-prompt";
 
+// Variable fonts: one file per family covers every weight (vs 12 static files).
 const inter = Inter({
   variable: "--font-sans",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800", "900"],
 });
 
 const jetbrainsMono = JetBrains_Mono({
   variable: "--font-mono",
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700", "800"],
 });
 
 export const metadata: Metadata = {
   title: "Re-MIND-eЯ | Healthcare Companion",
   description:
-    "Your calm, intelligent healthcare companion. Medication tracking, medication progress tracking, and caregiver coordination — secure and always present.",
+    "Your calm, intelligent healthcare companion. Medication tracking, medication progress tracking, and caregiver coordination. Secure and always present.",
   icons: {
     icon: "/favicon.ico",
     apple: "/apple-icon.png",

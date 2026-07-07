@@ -156,7 +156,7 @@ export default function MedDueGate({ event, remaining, userRole, onResolved, onS
             isElderly ? 'py-3 text-lg' : 'py-2.5 text-sm'
           }`}
         >
-          <Clock className="w-4 h-4" /> Not yet — remind me later
+          <Clock className="w-4 h-4" /> Not yet, remind me later
         </button>
       </div>
 

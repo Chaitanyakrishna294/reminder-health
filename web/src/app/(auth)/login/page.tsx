@@ -103,30 +103,34 @@ function LoginForm() {
       )}
 
       <form onSubmit={handlePasswordLogin} className="space-y-3">
-        <div className="relative">
-          <Mail className={`${iconClass} w-4 h-4`} />
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className={inputClass}
-            placeholder="you@example.com"
-            aria-label="Email address"
-          />
+        <div>
+          <label htmlFor="login-email" className={`block font-bold text-foreground mb-1.5 ${isElderly ? 'text-base' : 'text-xs'}`}>Email</label>
+          <div className="relative">
+            <Mail className={`${iconClass} w-4 h-4`} />
+            <input
+              id="login-email"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className={inputClass}
+              placeholder="you@example.com"
+            />
+          </div>
         </div>
 
         <div>
+          <label htmlFor="login-password" className={`block font-bold text-foreground mb-1.5 ${isElderly ? 'text-base' : 'text-xs'}`}>Password</label>
           <div className="relative flex items-center">
             <Lock className={`${iconClass} w-4 h-4`} />
             <input
+              id="login-password"
               type={showPassword ? 'text' : 'password'}
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className={`${inputClass} pr-12`}
-              placeholder="Password"
-              aria-label="Password"
+              placeholder="Your password"
             />
             <button
               type="button"

@@ -1,6 +1,6 @@
-// Care+ entry point — the "Care+" wordmark set in Nico Moji (self-hosted), with a
-// purple→magenta gradient on "Care" and a raised magenta "+". Centered; links to
-// the /care-plus page.
+// Care+ entry point — the "Care+" wordmark set in Nico Moji (self-hosted), with the
+// brand rose ramp on "Care" and a raised deep-rose "+". Centered; links to the
+// /care-plus page.
 import Link from 'next/link';
 
 export default function CarePlusLink({ isElderly }: { isElderly?: boolean }) {
@@ -18,7 +18,7 @@ export default function CarePlusLink({ isElderly }: { isElderly?: boolean }) {
         <span
           style={{
             fontSize: careSize,
-            background: 'linear-gradient(96deg, #A22FBE 0%, #C42BAE 44%, #E0299C 78%, #EC2E90 100%)',
+            backgroundImage: 'linear-gradient(96deg, #F8839E 0%, #F26B8A 55%, #ED5276 100%)',
             WebkitBackgroundClip: 'text',
             backgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
@@ -29,7 +29,7 @@ export default function CarePlusLink({ isElderly }: { isElderly?: boolean }) {
         <span
           style={{
             fontSize: plusSize,
-            color: '#EA2A8E',
+            color: '#ED5276',
             marginLeft: '0.04em',
             transform: 'translateY(-0.06em)',
             lineHeight: 1,

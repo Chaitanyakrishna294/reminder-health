@@ -527,7 +527,7 @@ export default function SettingsClientView({
                 Your Connect Code
               </span>
               <span className={`text-muted-foreground block ${isElderly ? 'text-base' : 'text-xs'}`}>
-                Share this so others can connect with you in Care Circle — works for any account.
+                Share this so others can connect with you in Care Circle. Works for any account.
               </span>
             </div>
             <div className="flex items-center gap-2 shrink-0">

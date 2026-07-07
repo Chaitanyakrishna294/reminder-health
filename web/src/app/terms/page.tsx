@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
-  title: 'Terms of Service — Re-MIND-eЯ',
+  title: 'Terms of Service | Re-MIND-eЯ',
   description: 'The terms that govern your use of Re-MIND-eЯ.',
 };
 
@@ -27,10 +27,10 @@ export default function TermsOfServicePage() {
         </div>
 
         <div>
-          <h2 className="text-xl font-bold mb-2">1. Not medical advice — important</h2>
+          <h2 className="text-xl font-bold mb-2">1. Not medical advice (important)</h2>
           <p>Re-MIND-eЯ is a reminder and organization tool only. It <strong>does not provide medical advice,
             diagnosis, or treatment</strong>, and is not a substitute for professional healthcare. Always follow
-            your doctor or pharmacist. <strong>Never rely on the Service for emergencies</strong> — in an
+            your doctor or pharmacist. <strong>Never rely on the Service for emergencies.</strong> In an
             emergency, contact your local emergency services. You are solely responsible for your medical
             decisions and for taking your medications.</p>
         </div>

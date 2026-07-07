@@ -198,9 +198,9 @@ export default function DashboardMainLayout({
     <div className="flex flex-1 min-h-[calc(100vh-4rem)] relative w-full">
       {/* LEFT VERTICAL RAIL (Desktop/Tablet) */}
       <aside 
-        className={`hidden md:flex flex-col items-center justify-center fixed left-6 top-1/2 -translate-y-1/2 z-40 rounded-[28px] bg-white border border-border shadow-md transition-all duration-300 ${
-          isElderly 
-            ? 'w-24 py-10 space-y-8 border-2 border-primary/50' 
+        className={`hidden md:flex flex-col items-center justify-center fixed left-6 top-1/2 -translate-y-1/2 z-40 rounded-[28px] bg-white/80 dark:bg-card/70 backdrop-blur-xl border border-border/70 shadow-lg transition-all duration-300 ${
+          isElderly
+            ? 'w-24 py-10 space-y-8 border-2 border-primary/50'
             : 'w-[72px] py-8 space-y-6'
         }`}
       >
@@ -236,9 +236,9 @@ export default function DashboardMainLayout({
       {/* BOTTOM FLOATING PILL DOCK (Mobile) */}
       <nav
         data-tour="dash-nav"
-        className={`md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-40 rounded-[32px] bg-white border border-border shadow-lg flex items-center justify-around px-4 transition-all duration-300 ${
-          isElderly 
-            ? 'w-[92%] h-24 border-2 border-primary/50' 
+        className={`md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-40 rounded-[32px] bg-white/85 dark:bg-card/80 backdrop-blur-xl border border-border/70 shadow-lg flex items-center justify-around px-4 transition-all duration-300 ${
+          isElderly
+            ? 'w-[92%] h-24 border-2 border-primary/50'
             : 'w-[90%] max-w-[480px] h-[72px]'
         }`}
       >

@@ -433,7 +433,7 @@ export default function TodaysSchedule({
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <span
             className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${sevColor}`}
-            title={`${priority} priority — ${status.replace(/_/g, ' ').toLowerCase()}`}
+            title={`${priority} priority, ${status.replace(/_/g, ' ').toLowerCase()}`}
             aria-label={`${priority} priority, ${status.replace(/_/g, ' ').toLowerCase()}`}
           >
             {statusIcon}

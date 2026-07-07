@@ -36,7 +36,7 @@ export default function Navbar({ user }: NavbarProps) {
   };
 
   return (
-    <nav className="bg-white border-b border-border/80 shadow-sm sticky top-0 z-40 transition-all duration-300">
+    <nav className="bg-white/80 dark:bg-card/70 backdrop-blur-xl border-b border-border/70 shadow-sm sticky top-0 z-40 transition-all duration-300 supports-[backdrop-filter]:bg-white/65">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className={`flex justify-between items-center transition-all duration-300 ${isElderly ? 'h-20' : 'h-16'
           }`}>

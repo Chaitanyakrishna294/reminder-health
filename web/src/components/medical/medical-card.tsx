@@ -62,7 +62,7 @@ export default function MedicalCard({ name, data }: { name: string; data: Medica
     <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-5">
       <div className="flex items-center gap-2">
         <HeartPulse className="w-5 h-5 text-primary" />
-        <h3 className="font-black text-foreground">Medical Profile — {name}</h3>
+        <h3 className="font-black text-foreground">Medical Profile: {name}</h3>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

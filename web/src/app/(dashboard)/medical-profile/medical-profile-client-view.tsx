@@ -193,7 +193,7 @@ export default function MedicalProfileClientView({ userId, fullName, email, init
         </div>
         <div>
           <h1 className={`font-black text-foreground ${isElderly ? 'text-3xl' : 'text-xl'}`}>Medical Profile</h1>
-          <p className="text-xs text-muted-foreground">Your medical identity card — used for reminders and emergencies.</p>
+          <p className="text-xs text-muted-foreground">Your medical identity card, used for reminders and emergencies.</p>
         </div>
       </div>
 
