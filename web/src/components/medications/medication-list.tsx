@@ -27,6 +27,7 @@ export interface Medication {
   current_stock?: number | null;
   stock_threshold?: number | null;
   medication_reason?: string | null;
+  timezone?: string | null;
 }
 
 interface MedicationListProps {
@@ -136,8 +137,9 @@ export default function MedicationList({
       let nextReminder: string | null = null;
 
       if (newActive && med.reminder_times.length > 0) {
-        // Recalculate next reminder when resuming
-        const nextDate = calculateNextReminder(med.reminder_times);
+        // Recalculate next reminder when resuming, in the med's OWN timezone
+        // (recomputing without it silently shifts non-IST medications to IST).
+        const nextDate = calculateNextReminder(med.reminder_times, med.timezone ?? undefined);
         nextReminder = nextDate.toISOString();
       }
 

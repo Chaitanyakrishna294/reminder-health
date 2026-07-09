@@ -45,8 +45,10 @@ async function handle(request: Request) {
     })
     .eq('id', call.id);
 
-  // Meter usage for quota/billing (period = current month).
-  if (billedSeconds) {
+  // Meter usage for quota/billing (period = current month). Only on the FIRST
+  // callback that carries a duration: providers retry webhooks, and re-metering
+  // the same call would double-count calls_made/billed_seconds.
+  if (billedSeconds && !call.billed_seconds) {
     const periodYm = new Date().toISOString().slice(0, 7); // YYYY-MM
     const { data: usage } = await supabase
       .from('voice_call_usage')

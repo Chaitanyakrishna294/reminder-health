@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { calculateNextReminder } from '@/lib/medication-utils';
+import moment from 'moment-timezone';
 import { useUiMode } from '@/context/ui-mode-context';
 import { type UnitType, unitOptions, stepMeta, frequencies, priorities } from '@/components/medications/medication-form-options';
 import { validateMedicationStep, buildSharedMedicationFields } from '@/lib/medications/form-logic';
@@ -164,12 +165,16 @@ export default function NewMedicationPage() {
     setError(null);
 
     const sortedTimes = [...times].sort((a, b) => a.localeCompare(b));
-    const nextReminder = calculateNextReminder(sortedTimes);
+    // Reminder times are wall-clock in the creator's timezone: store it so the
+    // scheduler fires at the user's local time (DB default is IST otherwise).
+    const timezone = moment.tz.guess();
+    const nextReminder = calculateNextReminder(sortedTimes, timezone);
 
     try {
       const { error: insertErr } = await supabase.from('medications').insert([
         {
           telegram_id: targetTelegramChatId,
+          timezone,
           ...buildSharedMedicationFields(
             { drugName, frequency, times, dosageAmount, strength, enableInventory, currentStock, stockThreshold, medicationReason, priority, unitType },
             sortedTimes,

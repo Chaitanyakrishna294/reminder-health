@@ -36,12 +36,21 @@ export async function POST(request: Request) {
     }
 
     // Record the pending subscription so the webhook can activate it by id.
+    // Never downgrade a live trial/active row to 'created': an abandoned checkout
+    // must not cost the user their remaining trial. Status only moves forward via
+    // the payment webhook.
     const admin = createServiceClient();
+    const { data: existing } = await admin
+      .from('subscriptions')
+      .select('status')
+      .eq('telegram_id', telegramId)
+      .maybeSingle();
+    const keepStatus = existing?.status === 'trialing' || existing?.status === 'active';
     await admin.from('subscriptions').upsert(
       {
         telegram_id: telegramId,
         plan: 'care_plus',
-        status: 'created',
+        ...(keepStatus ? {} : { status: 'created' }),
         razorpay_subscription_id: r.id,
         updated_at: new Date().toISOString(),
       },

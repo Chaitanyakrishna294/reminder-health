@@ -222,14 +222,25 @@ export default function SchedulePlannerPage() {
         let targetChatId = profile.telegram_chat_id;
 
         if (activeViewMode === 'PATIENT_MONITOR') {
-          const { data: caregiverLink } = await supabase
-            .from('caregiver_info')
+          // Same patient the rest of the app is monitoring (cookie set by the
+          // patient selector), verified against an accepted link. The previous
+          // `.single()` lookup broke for caregivers with 2+ patients and could
+          // show a different patient than the one selected.
+          const cookiePatient = document.cookie
+            .split('; ')
+            .find((c) => c.startsWith('monitored-patient-id='))
+            ?.split('=')[1];
+          let linkQuery = supabase
+            .from('active_caregiver_links')
             .select('patient_telegram_id, connection_status')
             .eq('caregiver_chat_id', profile.telegram_chat_id)
             .eq('is_active', true)
-            .single();
+            .eq('connection_status', 'ACCEPTED');
+          if (cookiePatient) linkQuery = linkQuery.eq('patient_telegram_id', cookiePatient);
+          const { data: caregiverLinks } = await linkQuery.limit(1);
+          const caregiverLink = caregiverLinks?.[0];
 
-          if (caregiverLink && caregiverLink.patient_telegram_id && caregiverLink.connection_status === 'ACCEPTED') {
+          if (caregiverLink && caregiverLink.patient_telegram_id) {
             targetChatId = caregiverLink.patient_telegram_id;
 
             const [patientProfileResult, medsResult] = await Promise.all([

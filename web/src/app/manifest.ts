@@ -14,8 +14,10 @@ export default function manifest(): MetadataRoute.Manifest {
     categories: ['health', 'medical', 'lifestyle'],
     display: 'standalone',
     orientation: 'portrait',
-    background_color: '#090d16',
-    theme_color: '#0d9488',
+    // Match the app's light chrome (page background) so the installed PWA's
+    // splash and title bar look like the app, not off-brand teal/black.
+    background_color: '#F8F9FB',
+    theme_color: '#F8F9FB',
     shortcuts: [
       {
         name: 'Medications',

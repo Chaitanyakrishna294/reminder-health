@@ -40,6 +40,7 @@ interface EditMedicationFormProps {
     current_stock?: number | null;
     stock_threshold?: number | null;
     medication_reason?: string | null;
+    timezone?: string | null;
   };
 }
 
@@ -146,7 +147,10 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
     
     let nextReminder: Date | null = null;
     if (medication.active) {
-      nextReminder = calculateNextReminder(sortedTimes);
+      // Recompute in the medication's OWN timezone: reminder_times are wall-clock
+      // in that zone, and the scheduler fires on next_reminder_at. Recalculating
+      // without it would silently shift non-IST medications to IST on every edit.
+      nextReminder = calculateNextReminder(sortedTimes, medication.timezone ?? undefined);
     }
 
     try {
