@@ -45,7 +45,7 @@ export default async function DashboardPage() {
   const [medsResult, eventsResult, logsResult, monthlyLogsResult] = await Promise.all([
     supabase
       .from('medications')
-      .select('id, drug_name, dosage, frequency, tablet_count, low_stock_alert_enabled, reminder_times, priority_level, unit_type, dosage_amount, medication_reason, timezone')
+      .select('id, drug_name, dosage, frequency, tablet_count, current_stock, low_stock_alert_enabled, reminder_times, priority_level, unit_type, dosage_amount, medication_reason, timezone')
       .eq('telegram_id', targetChatId)
       .eq('active', true),
     supabase
@@ -102,7 +102,7 @@ export default async function DashboardPage() {
       const daysRemaining = Math.floor(m.tablet_count / tabletsPerDay);
       return daysRemaining <= 3 && m.low_stock_alert_enabled;
     })
-    .map(m => ({ drug_name: m.drug_name, tablet_count: m.tablet_count }));
+    .map(m => ({ id: m.id, drug_name: m.drug_name, tablet_count: m.tablet_count, current_stock: m.current_stock }));
 
   const lowStockCount = lowStockMedicines.length;
 

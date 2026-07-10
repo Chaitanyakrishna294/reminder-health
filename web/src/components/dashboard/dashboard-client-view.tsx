@@ -71,7 +71,7 @@ interface DashboardClientViewProps {
   myTelegramChatId: string;
   targetTelegramChatId?: string;
   chartData: any[];
-  lowStockMedicines: { drug_name: string; tablet_count: number }[];
+  lowStockMedicines: { id: number; drug_name: string; tablet_count: number; current_stock?: number | null }[];
   hasPatientLinked: boolean;
   caregiverId?: string;
   lastTaken: { drug_name: string; time: string } | null;
@@ -482,6 +482,34 @@ export default function DashboardClientView({
       showToast('Could Not Send Request', 'Please check your connection and try again.', 'error');
     } finally {
       setContactRequestSending(false);
+    }
+  };
+
+  // Inline stock refill from the dashboard inventory card. Same write as the
+  // Medications page (current_stock += amount; a DB trigger syncs tablet_count).
+  const [refillOpenId, setRefillOpenId] = useState<number | null>(null);
+  const [refillAmount, setRefillAmount] = useState('');
+  const [refillBusyId, setRefillBusyId] = useState<number | null>(null);
+  const submitRefill = async (medId: number, currentStock: number | null | undefined) => {
+    const amount = Number(refillAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      showToast('Enter an amount', 'Type how many units you added.', 'error');
+      return;
+    }
+    setRefillBusyId(medId);
+    try {
+      const newStock = Number(currentStock || 0) + amount;
+      const { error } = await supabase.from('medications').update({ current_stock: newStock }).eq('id', medId);
+      if (error) throw error;
+      showToast('Stock updated', `Added ${amount} to your inventory.`, 'success');
+      setRefillOpenId(null);
+      setRefillAmount('');
+      router.refresh();
+    } catch (err) {
+      console.error('[Dashboard Refill] failed:', err);
+      showToast('Error', 'Could not update stock. Please try again.', 'error');
+    } finally {
+      setRefillBusyId(null);
     }
   };
 
@@ -1504,9 +1532,6 @@ export default function DashboardClientView({
                 const taken = d.Taken || 0;
                 const skipped = d.Skipped || 0;
                 const total = taken + skipped + (d.Missed || 0);
-                // Prefer the explicit numeric day; otherwise pull the first number out of
-                // the localized label so month-first formats (e.g. "Jun 25") still work.
-                const dayNum = d.day != null ? String(d.day) : (String(d.date).match(/\d+/)?.[0] ?? String(d.date));
                 const C = 2 * Math.PI * 15.5;
                 const takenLen = total > 0 ? C * (taken / total) : 0;
                 const skippedLen = total > 0 ? C * (skipped / total) : 0;
@@ -1527,11 +1552,11 @@ export default function DashboardClientView({
                             strokeDasharray={`${skippedLen} ${C - skippedLen}`} strokeDashoffset={-takenLen} />
                         )}
                       </svg>
-                      <span className="absolute inset-0 flex items-center justify-center text-sm font-black text-foreground tabular-nums">
-                        {taken}
+                      <span className="absolute inset-0 flex items-center justify-center text-[11px] font-black text-foreground tabular-nums">
+                        {taken}/{total}
                       </span>
                     </div>
-                    <span className="text-[10px] font-bold text-muted-foreground tabular-nums">{dayNum}</span>
+                    <span className="text-[10px] font-bold text-muted-foreground tabular-nums whitespace-nowrap">{d.date}</span>
                   </div>
                 );
               };
@@ -1550,9 +1575,16 @@ export default function DashboardClientView({
 
           {/* Layer 4: Medication Inventory */}
           <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4">
-            <div>
-              <h3 className="font-black text-foreground text-sm">Medication Inventory</h3>
-              <p className="text-[11px] text-muted-foreground">Current tablet counts and alerts</p>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="font-black text-foreground text-sm">Medication Inventory</h3>
+                <p className="text-[11px] text-muted-foreground">Current tablet counts and alerts</p>
+              </div>
+              {lowStockCount > 0 && (
+                <span className="shrink-0 inline-flex items-center gap-1 bg-warning/10 border border-warning/30 text-warning text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full">
+                  <AlertTriangle className="w-3 h-3 shrink-0" /> {lowStockCount} low
+                </span>
+              )}
             </div>
 
             {lowStockCount > 0 ? (
@@ -1561,17 +1593,56 @@ export default function DashboardClientView({
                   <AlertCircle className="w-4 h-4 shrink-0 text-warning" />
                   <span>Refill recommended for:</span>
                 </div>
-                {lowStockMedicines.map((m, idx) => (
-                  <div key={idx} className="bg-muted px-4 py-3 rounded-2xl border border-border flex justify-between items-center text-xs font-mono">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <AlertTriangle className="w-3.5 h-3.5 text-warning shrink-0" />
-                      <span className="font-black text-foreground truncate">{m.drug_name}</span>
+                {lowStockMedicines.map((m, idx) => {
+                  const canRefill = viewMode !== 'PATIENT_MONITOR';
+                  const isOpen = refillOpenId === m.id;
+                  return (
+                    <div key={idx} className="bg-muted px-4 py-3 rounded-2xl border border-border text-xs font-mono space-y-2">
+                      <div className="flex justify-between items-center gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <AlertTriangle className="w-3.5 h-3.5 text-warning shrink-0" />
+                          <span className="font-black text-foreground truncate">{m.drug_name}</span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="font-black text-danger bg-danger/10 px-2.5 py-1 rounded-lg border border-danger/20">
+                            {m.tablet_count} left
+                          </span>
+                          {canRefill && (
+                            <button
+                              onClick={() => { setRefillOpenId(isOpen ? null : m.id); setRefillAmount(''); }}
+                              className="inline-flex items-center gap-1 font-black text-primary bg-primary/10 hover:bg-primary/15 border border-primary/20 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                              aria-label={`Add stock for ${m.drug_name}`}
+                            >
+                              <Plus className="w-3 h-3" /> Refill
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      {canRefill && isOpen && (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min="1"
+                            inputMode="numeric"
+                            autoFocus
+                            value={refillAmount}
+                            onChange={(e) => setRefillAmount(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') submitRefill(m.id, m.current_stock); }}
+                            placeholder="Units to add"
+                            className="flex-1 min-w-0 bg-card border border-input rounded-lg px-3 py-1.5 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                          />
+                          <button
+                            onClick={() => submitRefill(m.id, m.current_stock)}
+                            disabled={refillBusyId === m.id}
+                            className="shrink-0 font-black text-primary-foreground bg-primary hover:bg-primary-hover px-3 py-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                          >
+                            {refillBusyId === m.id ? 'Adding…' : 'Add'}
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    <span className="font-black text-danger shrink-0 bg-danger/10 px-2.5 py-1 rounded-lg border border-danger/20">
-                      {m.tablet_count} left
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="bg-success/5 border border-success/20 p-4 rounded-2xl text-center text-xs space-y-1">
