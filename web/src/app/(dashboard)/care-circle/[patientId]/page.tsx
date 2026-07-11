@@ -447,6 +447,11 @@ export default async function PatientConsolePage({ params }: PageProps) {
                     <div>
                       <p className="font-extrabold text-foreground">{med.drug_name}</p>
                       <p className="text-[10px] text-muted-foreground font-semibold mt-0.5">{med.dosage} • {med.frequency.replace('_', ' ')}</p>
+                      {med.linked_brand_name && (
+                        <p className="text-[9px] text-muted-foreground/80 font-semibold mt-0.5">
+                          {med.linked_brand_name}{med.linked_composition ? ` — ${med.linked_composition}` : ''} · Patient-selected from catalog
+                        </p>
+                      )}
                     </div>
                     <div className="text-right">
                       <p className="text-foreground font-semibold">{med.tablet_count !== null ? `${med.tablet_count} Left` : 'Unlimited'}</p>
