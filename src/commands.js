@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const { bot } = require('./bot');
 const { supabase } = require('./db');
 const moment = require('moment-timezone');
@@ -619,7 +620,13 @@ const initCommands = () => {
   bot.onText(/\/linkweb/, async (msg) => {
     const chatId = msg.chat.id;
     try {
-      const randomCode = 'RMDR-' + Math.floor(100000 + Math.random() * 900000);
+      // crypto.randomInt is cryptographically secure (Math.random() is not) — this code
+      // grants full account access on redemption, so it must not be predictable.
+      const randomCode = 'RMDR-' + crypto.randomInt(100000, 1000000);
+      // Hash before storing (matches phone_verifications.code_hash): the plaintext code only
+      // ever exists in this Telegram message and the user's clipboard, never persisted.
+      // Normalize the same way the redeem_link_code RPC does (upper + trim) so they always match.
+      const codeHash = crypto.createHash('sha256').update(randomCode.toUpperCase().trim()).digest('hex');
       const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
       // Delete any existing codes for this chat ID
@@ -632,7 +639,7 @@ const initCommands = () => {
         .from('link_codes')
         .insert([{
           telegram_chat_id: chatId.toString(),
-          code: randomCode,
+          code_hash: codeHash,
           expires_at: expiresAt
         }]);
 
