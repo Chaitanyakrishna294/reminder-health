@@ -22,48 +22,18 @@ export default function LinkAccountPage() {
     const formattedCode = code.trim().toUpperCase();
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setError('You must be signed in to link your account.');
+      const res = await fetch('/api/link-account/redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: formattedCode }),
+      });
+      const body = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setError(body?.error || 'An unexpected error occurred. Please try again.');
         setLoading(false);
         return;
       }
-
-      const { data: linkData, error: fetchErr } = await supabase
-        .from('link_codes')
-        .select('*')
-        .eq('code', formattedCode)
-        .single();
-
-      if (fetchErr || !linkData) {
-        setError('Invalid verification code. Please check and try again.');
-        setLoading(false);
-        return;
-      }
-
-      const expiresAt = new Date(linkData.expires_at).getTime();
-      if (expiresAt < Date.now()) {
-        setError('This verification code has expired. Please request a new one by typing /linkweb in the bot.');
-        setLoading(false);
-        return;
-      }
-
-      const { error: updateErr } = await supabase
-        .from('profiles')
-        .update({ telegram_chat_id: linkData.telegram_chat_id })
-        .eq('id', user.id);
-
-      if (updateErr) {
-        console.error('[LinkAccount] Profile update error:', updateErr);
-        setError('Failed to update profile. Please try again.');
-        setLoading(false);
-        return;
-      }
-
-      await supabase
-        .from('link_codes')
-        .delete()
-        .eq('id', linkData.id);
 
       setSuccess(true);
       setLoading(false);
@@ -72,7 +42,6 @@ export default function LinkAccountPage() {
         router.refresh();
         router.push('/dashboard');
       }, 1500);
-
     } catch (err) {
       console.error('[LinkAccount] Unexpected error:', err);
       setError('An unexpected error occurred. Please try again.');
