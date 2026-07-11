@@ -6,30 +6,33 @@ This document lists confirmed bugs, technical limitations, and security issues i
 
 ## 1. Active Issues (P0/P1)
 
-### Care Circle Overwrite & Limit Bug
-- **Status**: Under Remediation (Sprint 5.7B Corrective)
-- **Problem**: Caregiver connection relationships are stored across both the legacy `caregiver_info` table and the new `caregiver_connections` table. Linking a second caregiver overwrites the patient's existing caregiver entry, restricting Care Circle connections.
-- **Remediation**: Shift relationship tracking to `caregiver_connections` as the single source of truth.
-
-### Request Notifications RLS Failure
-- **Status**: Under Remediation (Sprint 5.7B Corrective)
-- **Problem**: Patient browser tries to write notification rows directly to caregivers' inbox in the `notifications` table, which is blocked by Row-Level Security policies.
-- **Remediation**: Transition notification creation to database-level security definer triggers.
-
 ### Timezone Mismatches on Virtual Events
 - **Status**: Under Remediation (Sprint 5.7B Corrective)
 - **Problem**: Client browser generates virtual events using the client's local browser timezone (e.g. UTC). This mismatch with the medication's database timezone (e.g. Asia/Kolkata) causes incorrect `scheduled_for` parameters, resulting in `INVALID_SCHEDULED_TIME` RPC failures.
 - **Remediation**: Use `moment-timezone` to align client boundaries and scheduled times with the medication's timezone.
 
-### Care Circle Requests Not Appearing
-- **Status**: OPEN (Pending Verification)
-- **Problem**: Patient web client failed to create `PENDING` caregiver connection request rows because direct client-side inserts on `caregiver_connections` were blocked by Row-Level Security policies, causing requests to silently fail.
-- **Remediation**: Replaced direct client inserts with calls to the `invite_caregiver` SECURITY DEFINER RPC.
+---
 
-### Unknown User Display in Request Lists
-- **Status**: OPEN (Pending Verification)
-- **Problem**: Names of pending requests resolved to "Unknown" because the SELECT policy on `profiles` relied on deprecated `caregiver_info` relationships and failed to resolve names for pending connection requests.
-- **Remediation**: Updated `profiles` SELECT policy to allow users to read profiles of users with whom they have a connection (both `PENDING` and `ACCEPTED`) in `caregiver_connections`.
+## 1a. Resolved (verified 2026-07-11)
+
+The four Care Circle items formerly listed here as Active/P0-P1 were re-verified directly
+against the live schema, RLS policies, and current web code and are confirmed fixed by the
+`caregiver_connections` architecture superseding the legacy `caregiver_info` design:
+
+- **Care Circle Overwrite & Limit Bug** — `caregiver_connections` carries
+  `UNIQUE(caregiver_profile_id, patient_profile_id)` (a compound pair, not a
+  single-caregiver-per-patient constraint), and `invite_caregiver()` inserts an independent row
+  per pair. No overwrite path exists. `caregiver_info` remains in the web code only as a clearly
+  labeled legacy fallback for pre-migration rows, not a live write path for new links.
+- **Request Notifications RLS Failure** — `notifications` has zero direct client INSERT
+  policies (blocks direct writes entirely); `trg_audit_and_notify_caregiver_changes`
+  (SECURITY DEFINER, fires on `caregiver_connections` insert/update) creates the notification
+  rows instead.
+- **Care Circle Requests Not Appearing** — `settings-client-view.tsx` calls the
+  `invite_caregiver` RPC (not a direct insert) for all new connection requests.
+- **Unknown User Display in Request Lists** — the `profiles` SELECT policy covers any
+  `is_active=true` `caregiver_connections` row regardless of `connection_status`
+  (`PENDING` or `ACCEPTED`), so both states resolve a name.
 
 
 ---
@@ -55,11 +58,11 @@ These are documented deliberately because they cannot be resolved as a pure, beh
 - **Future feature (not a bug)**: if real `every_other_day`/`weekly` behavior is wanted, teach `calculateNextReminder` to skip off-days; that changes *when doses fire* and needs its own tests across the bot.
 
 ### Minute-Tick Scheduler Single Point of Failure
-- **Status**: PARTIALLY MITIGATED (failover route shipped; full send-failover pending infra)
+- **Status**: RESOLVED (2026-07-11) — push-only send-failover shipped and verified live
 - **Problem**: The every-minute reminder tick runs only inside the bot process on Render Free (`src/scheduler.js`). Render Free's ~750 instance-hours can exhaust near month-end and the service pauses → the loop stops until the 1st.
-- **Shipped**: `web/src/app/api/cron/tick/route.ts` — an authenticated (`CRON_SECRET` Bearer) endpoint that runs the *idempotent DB-side* maintenance RPCs the bot already calls (`scan_and_escalate_overdue_reminders`, `close_daily_medications`). Inert until `CRON_SECRET` is set. Keeps escalation state and day-end closure (and therefore the web dashboard / review queue) advancing even while the bot host is paused. Introduces no new writer semantics — it calls the same SECURITY DEFINER RPCs.
-- **Activation**: set `CRON_SECRET` in the web env, then add a Vercel Cron (or external cron) on `GET /api/cron/tick` every minute (Vercel Cron sends the Bearer header automatically).
-- **Remaining (needs deploy verification)**: this route does **not** re-send the initial Telegram/browser-push reminder — that delivery still requires the bot process. Full send-failover means porting the message-send path (Telegram + web-push) into a shared module the route can call, then retiring the Render tick. Deferred because it can't be validated without a real Vercel deploy.
+- **Design**: `docs/superpowers/specs/2026-07-11-reminder-send-failover-design.md`. Heartbeat takeover — the bot upserts `scheduler_heartbeat.last_beat` every tick; `web/src/app/api/cron/tick/route.ts` (pinged every minute by an external cron with a `CRON_SECRET` Bearer) is a total no-op while the beat is fresh, and takes over sending when it goes stale (>180s). Push-only by design: Telegram is unreachable when the bot is down anyway, since Telegram delivery and the Take/Skip callback handling both live in the same paused bot process.
+- **Exactly-once**: enforced by the shared `minute_tick` advisory lock plus the `reminder_events` `UNIQUE(medication_id, scheduled_for)` and `push_logs` `UNIQUE(event_id, 'SENT')` constraints — verified with a live acceptance test (bot suspended, one push delivered, zero duplicate `SENT` rows, dose resolved via the always-up push routes, bot resumed, route returned to dormant).
+- **Found + fixed during activation**: `SUPABASE_SERVICE_ROLE_KEY` was missing from the Vercel Production environment, silently 500ing every route that calls `createServiceClient()` (19 files, including account deletion and push-action tracking). Added and verified.
 
 ### Cross-Package Duplication of `calculateNextReminder`
 - **Status**: OPEN (packaging change; needs deploy verification)
