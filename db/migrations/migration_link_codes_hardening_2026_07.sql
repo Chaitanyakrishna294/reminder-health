@@ -46,20 +46,25 @@ BEGIN
     RAISE EXCEPTION 'Invalid code';
   END IF;
 
+  -- No DELETE here: an uncaught RAISE EXCEPTION rolls back everything this function did
+  -- earlier in the SAME call, including a DELETE issued just before it — so a delete-then-
+  -- raise here would silently never persist (confirmed empirically: a live acceptance test
+  -- showed the row surviving despite this exact pattern). Not a security gap either way —
+  -- the expires_at check below always blocks a stale code regardless of whether the row is
+  -- still present. cleanup_expired_link_codes() (existing maintenance function) reaps it.
   IF v_row.expires_at < now() THEN
-    DELETE FROM public.link_codes WHERE id = v_row.id;
     RAISE EXCEPTION 'Code expired';
   END IF;
 
   -- telegram_chat_id is UNIQUE on profiles: if this Telegram identity is already linked to
-  -- a DIFFERENT profile, the UPDATE raises unique_violation. Consume the code either way
-  -- (it revealed real information; leaving it valid would let the same conflict be probed
-  -- again) and surface a clean, matchable error instead of an opaque 500.
+  -- a DIFFERENT profile, the UPDATE raises unique_violation, caught below. No DELETE in the
+  -- handler for the same rollback-on-raise reason as above: resubmitting the same code just
+  -- hits this same unique_violation again until it naturally expires (safe, not reusable
+  -- for anything else) and cleanup_expired_link_codes() reaps it then.
   BEGIN
     UPDATE public.profiles SET telegram_chat_id = v_row.telegram_chat_id WHERE id = v_uid;
     DELETE FROM public.link_codes WHERE id = v_row.id;
   EXCEPTION WHEN unique_violation THEN
-    DELETE FROM public.link_codes WHERE id = v_row.id;
     RAISE EXCEPTION 'Already linked';
   END;
 END;
