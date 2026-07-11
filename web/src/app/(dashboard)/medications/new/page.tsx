@@ -8,6 +8,8 @@ import { calculateNextReminder } from '@/lib/medication-utils';
 import moment from 'moment-timezone';
 import { useUiMode } from '@/context/ui-mode-context';
 import { type UnitType, unitOptions, stepMeta, frequencies, priorities } from '@/components/medications/medication-form-options';
+import MedicationCatalogLink from '@/components/medications/medication-catalog-link';
+import type { CatalogLinkValue } from '@/lib/medications/catalog';
 import { validateMedicationStep, buildSharedMedicationFields } from '@/lib/medications/form-logic';
 import {
   Pill,
@@ -32,6 +34,7 @@ const CARD_SHADOW = '0 1px 3px rgba(16, 28, 90, 0.04), 0 10px 30px rgba(16, 28, 
 export default function NewMedicationPage() {
   const [step, setStep] = useState(1);
   const [drugName, setDrugName] = useState('');
+  const [catalogLink, setCatalogLink] = useState<CatalogLinkValue | null>(null);
   const [unitType, setUnitType] = useState<UnitType>('TABLET');
   const [unitOpen, setUnitOpen] = useState(false);
   const [frequency, setFrequency] = useState<'once_daily' | 'twice_daily' | 'thrice_daily'>('once_daily');
@@ -176,7 +179,7 @@ export default function NewMedicationPage() {
           telegram_id: targetTelegramChatId,
           timezone,
           ...buildSharedMedicationFields(
-            { drugName, frequency, times, dosageAmount, strength, enableInventory, currentStock, stockThreshold, medicationReason, priority, unitType },
+            { drugName, frequency, times, dosageAmount, strength, enableInventory, currentStock, stockThreshold, medicationReason, priority, unitType, catalogLink },
             sortedTimes,
           ),
           next_reminder_at: nextReminder.toISOString(),
@@ -308,8 +311,9 @@ export default function NewMedicationPage() {
                       placeholder="e.g., Paracetamol, Atorvastatin"
                       autoFocus
                     />
+                    <MedicationCatalogLink value={catalogLink} onChange={setCatalogLink} />
                   </div>
-                  
+
                   <div>
                     <label className={labelClass}>Medication Form</label>
                     <p className="text-xs text-muted-foreground mb-3">Select the type of medication unit.</p>
