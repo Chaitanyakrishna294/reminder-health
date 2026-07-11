@@ -8,6 +8,8 @@ import { calculateNextReminder } from '@/lib/medication-utils';
 import { useUiMode } from '@/context/ui-mode-context';
 import { type UnitType, unitOptions, stepMeta, frequencies, priorities } from '@/components/medications/medication-form-options';
 import { validateMedicationStep, buildSharedMedicationFields } from '@/lib/medications/form-logic';
+import MedicationCatalogLink from '@/components/medications/medication-catalog-link';
+import type { CatalogLinkValue } from '@/lib/medications/catalog';
 import {
   Pill,
   Clock,
@@ -41,12 +43,30 @@ interface EditMedicationFormProps {
     stock_threshold?: number | null;
     medication_reason?: string | null;
     timezone?: string | null;
+    catalog_id?: number | null;
+    linked_brand_name?: string | null;
+    linked_composition?: string | null;
+    linked_manufacturer?: string | null;
+    linked_snapshot_date?: string | null;
+    linked_is_discontinued?: boolean | null;
   };
 }
 
 export default function EditMedicationForm({ medication }: EditMedicationFormProps) {
   const [step, setStep] = useState(1);
   const [drugName, setDrugName] = useState(medication.drug_name);
+  const [catalogLink, setCatalogLink] = useState<CatalogLinkValue | null>(
+    medication.catalog_id
+      ? {
+          catalogId: medication.catalog_id,
+          brandName: medication.linked_brand_name || '',
+          composition: medication.linked_composition ?? null,
+          manufacturer: medication.linked_manufacturer ?? null,
+          isDiscontinued: medication.linked_is_discontinued ?? false,
+          snapshotDate: medication.linked_snapshot_date || '',
+        }
+      : null
+  );
   const [unitType, setUnitType] = useState<UnitType>((medication.unit_type as UnitType) || 'TABLET');
   const [frequency, setFrequency] = useState<'once_daily' | 'twice_daily' | 'thrice_daily'>(
     medication.frequency as any
@@ -158,7 +178,7 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
         .from('medications')
         .update({
           ...buildSharedMedicationFields(
-            { drugName, frequency, times, dosageAmount, strength, enableInventory, currentStock, stockThreshold, medicationReason, priority, unitType },
+            { drugName, frequency, times, dosageAmount, strength, enableInventory, currentStock, stockThreshold, medicationReason, priority, unitType, catalogLink },
             sortedTimes,
           ),
           ...(nextReminder ? { next_reminder_at: nextReminder.toISOString() } : {}),
@@ -279,8 +299,9 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
                     placeholder="e.g., Paracetamol"
                     autoFocus
                   />
+                  <MedicationCatalogLink value={catalogLink} onChange={setCatalogLink} />
                 </div>
-                
+
                 <div>
                   <label className={labelClass}>Medication Form</label>
                   <p className="text-xs text-muted-foreground mb-3">Select the type of medication unit.</p>
