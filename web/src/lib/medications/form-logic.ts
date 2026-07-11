@@ -3,6 +3,8 @@
 // per-step validation rules and the medication row fields they write are identical —
 // centralized here so the two can never silently drift apart.
 
+import type { CatalogLinkValue } from '@/lib/medications/catalog';
+
 export const TIME_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 /** The wizard fields that drive validation and the persisted medication row. */
@@ -18,6 +20,8 @@ export interface MedicationFormState {
   medicationReason: string;
   priority: string;
   unitType: string;
+  /** Optional, explicit human-selected catalog link. Never auto-populated. */
+  catalogLink: CatalogLinkValue | null;
 }
 
 /**
@@ -80,5 +84,13 @@ export function buildSharedMedicationFields(
     medication_reason: s.medicationReason.trim() || null,
     priority_level: s.priority,
     low_stock_alert_enabled: s.enableInventory,
+    // Copied at selection time from an explicit human pick (MedicationCatalogLink) —
+    // never auto-matched. null when nothing was linked.
+    catalog_id: s.catalogLink?.catalogId ?? null,
+    linked_brand_name: s.catalogLink?.brandName ?? null,
+    linked_composition: s.catalogLink?.composition ?? null,
+    linked_manufacturer: s.catalogLink?.manufacturer ?? null,
+    linked_snapshot_date: s.catalogLink?.snapshotDate ?? null,
+    linked_is_discontinued: s.catalogLink?.isDiscontinued ?? null,
   };
 }
