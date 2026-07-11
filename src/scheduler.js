@@ -175,6 +175,14 @@ const initScheduler = () => {
       }
       lockHeld = true;
 
+      // Heartbeat: mark the scheduler alive so the web failover cron stays dormant
+      // while this process is running. Written every tick we hold the lease.
+      const { error: beatErr } = await supabase.from('scheduler_heartbeat').upsert(
+        { id: 1, last_beat: new Date().toISOString(), instance_id: SCHEDULER_INSTANCE_ID },
+        { onConflict: 'id' }
+      );
+      if (beatErr) console.error('[Scheduler] Failed to write heartbeat:', beatErr);
+
       console.log(`[Scheduler] Checking for due reminders at ${now.toISOString()}...`);
 
       const sixtySecondsAgo = new Date(Date.now() - 60000).toISOString();
