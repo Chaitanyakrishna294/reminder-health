@@ -36,6 +36,12 @@ export async function POST(request: Request) {
       if (m.includes('invalid code')) {
         return NextResponse.json({ error: 'Invalid verification code. Please check and try again.' }, { status: 400 });
       }
+      if (m.includes('already linked')) {
+        return NextResponse.json(
+          { error: 'That Telegram account is already linked to a different account.' },
+          { status: 409 }
+        );
+      }
       console.error('[link-account/redeem] RPC error:', error);
       return NextResponse.json({ error: 'Failed to link account. Please try again.' }, { status: 500 });
     }
