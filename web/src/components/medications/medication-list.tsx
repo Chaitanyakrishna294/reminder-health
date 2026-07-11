@@ -28,6 +28,12 @@ export interface Medication {
   stock_threshold?: number | null;
   medication_reason?: string | null;
   timezone?: string | null;
+  catalog_id?: number | null;
+  linked_brand_name?: string | null;
+  linked_composition?: string | null;
+  linked_manufacturer?: string | null;
+  linked_snapshot_date?: string | null;
+  linked_is_discontinued?: boolean | null;
 }
 
 interface MedicationListProps {
@@ -115,7 +121,7 @@ export default function MedicationList({
 
         const { data, error } = await supabase
           .from('medications')
-          .select('id, telegram_id, drug_name, dosage, frequency, reminder_times, tablet_count, priority_level, next_reminder_at, active, unit_type, dosage_amount, current_stock, stock_threshold, medication_reason')
+          .select('id, telegram_id, drug_name, dosage, frequency, reminder_times, tablet_count, priority_level, next_reminder_at, active, unit_type, dosage_amount, current_stock, stock_threshold, medication_reason, catalog_id, linked_brand_name, linked_composition, linked_manufacturer, linked_snapshot_date, linked_is_discontinued')
           .eq('telegram_id', queryId);
 
         if (!error && data) {
@@ -292,6 +298,19 @@ export default function MedicationList({
                         {med.dosage_amount || 1} {med.unit_type?.toLowerCase() || 'tablet'}(s)
                         {med.dosage && med.dosage !== 'N/A' && <> · {med.dosage}</>}
                       </p>
+                      {med.linked_brand_name && (
+                        <p className="text-[11px] text-muted-foreground/80 font-medium mt-1 truncate">
+                          {med.linked_brand_name}{med.linked_composition ? ` — ${med.linked_composition}` : ''}
+                          {med.linked_is_discontinued && (
+                            <span className="ml-1.5 inline-flex items-center rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-semibold text-muted-foreground align-middle">
+                              Discontinued
+                            </span>
+                          )}
+                          <span className="block text-[9px] text-muted-foreground/70 mt-0.5">
+                            Patient-selected from catalog · as of {med.linked_snapshot_date}
+                          </span>
+                        </p>
+                      )}
                       {/* Category + frequency pills */}
                       <div className="flex items-center gap-1.5 mt-2 flex-wrap">
                         <span

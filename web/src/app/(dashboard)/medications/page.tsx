@@ -18,7 +18,7 @@ export default async function MedicationsPage() {
   const { data: medications } = targetChatId
     ? await supabase
         .from('medications')
-        .select('id, telegram_id, drug_name, dosage, frequency, reminder_times, tablet_count, priority_level, next_reminder_at, active, unit_type, dosage_amount, current_stock, stock_threshold, medication_reason, timezone')
+        .select('id, telegram_id, drug_name, dosage, frequency, reminder_times, tablet_count, priority_level, next_reminder_at, active, unit_type, dosage_amount, current_stock, stock_threshold, medication_reason, timezone, catalog_id, linked_brand_name, linked_composition, linked_manufacturer, linked_snapshot_date, linked_is_discontinued')
         .eq('telegram_id', targetChatId)
     : { data: [] };
 
