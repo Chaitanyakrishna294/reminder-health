@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import Link from 'next/link';
+import Link, { useLinkStatus } from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useUiMode } from '@/context/ui-mode-context';
 import { createClient } from '@/lib/supabase/client';
@@ -21,7 +21,15 @@ import {
   ChevronDown
 } from 'lucide-react';
 
-export default function DashboardMainLayout({ 
+// Spins the tapped nav icon from click until the destination page is ready
+// (useLinkStatus reports the pending state of the nearest ancestor <Link>).
+// See docs/superpowers/specs/2026-07-12-nav-loading-indicator-design.md.
+function NavIcon({ icon: Icon }: { icon: React.ComponentType<{ className?: string }> }) {
+  const { pending } = useLinkStatus();
+  return <Icon className={`w-5 h-5 ${pending ? 'animate-spin' : ''}`} />;
+}
+
+export default function DashboardMainLayout({
   children,
   patientName = '',
   patientPhone = '',
@@ -129,11 +137,11 @@ export default function DashboardMainLayout({
     // Mobile-first: keep the nav to exactly 5 icons. Secondary destinations
     // (Medical Profile, Emergency) live in the profile menu, not here.
     const baseItems = [
-      { href: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
-      { href: '/medications', label: 'Medications', icon: <Pill className="w-5 h-5" /> },
-      { href: '/schedule-planner', label: 'Scheduler', icon: <Calendar className="w-5 h-5" /> },
-      { href: '/health-vault', label: 'Health Vault', icon: <FolderHeart className="w-5 h-5" /> },
-      { href: '/settings', label: 'Settings', icon: <Settings className="w-5 h-5" /> },
+      { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { href: '/medications', label: 'Medications', icon: Pill },
+      { href: '/schedule-planner', label: 'Scheduler', icon: Calendar },
+      { href: '/health-vault', label: 'Health Vault', icon: FolderHeart },
+      { href: '/settings', label: 'Settings', icon: Settings },
     ];
 
     if (viewMode === 'PATIENT_MONITOR') {
@@ -222,7 +230,7 @@ export default function DashboardMainLayout({
               }`}
               title={item.label}
             >
-              <span>{item.icon}</span>
+              <span><NavIcon icon={item.icon} /></span>
               {!isElderly && (
                 <span className="absolute left-20 scale-0 group-hover:scale-100 transition-all duration-200 bg-foreground text-background text-xs font-bold px-2.5 py-1 rounded shadow-sm pointer-events-none whitespace-nowrap z-50 font-mono">
                   {item.label}
@@ -262,7 +270,7 @@ export default function DashboardMainLayout({
               }`}
               title={item.label}
             >
-              <span className={isElderly ? "text-2xl" : "text-lg"}>{item.icon}</span>
+              <span className={isElderly ? "text-2xl" : "text-lg"}><NavIcon icon={item.icon} /></span>
             </Link>
           );
         })}
