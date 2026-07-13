@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { calculateNextReminder } from '@/lib/medication-utils';
 import { useUiMode } from '@/context/ui-mode-context';
-import { Plus, Package, Clock, Pause, Play, SquarePen, Trash2, Pill, X } from 'lucide-react';
+import { Plus, Package, Clock, Pause, Play, SquarePen, Trash2, Pill, X, ChevronDown } from 'lucide-react';
 import GuideButton from '@/components/guide/guide-button';
 import { getUnitIcon } from '@/components/ui/custom-icons';
 import { getSeverityTheme } from '@/lib/severity-theme';
@@ -54,6 +54,21 @@ export default function MedicationList({
   const [meds, setMeds] = useState<Medication[]>(initialMeds);
   const [loadingId, setLoadingId] = useState<number | null>(null);
   const [stockBusyId, setStockBusyId] = useState<number | null>(null);
+
+  // Tracks which medications' linked-composition line is expanded. A Set (not a single
+  // id) so multiple cards can be open independently, not accordion-exclusive.
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+  const toggleExpanded = (id: number) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   // In-app dialog state (native prompt/confirm/alert are blocked in sandboxed frames).
   const [stockModalMed, setStockModalMed] = useState<Medication | null>(null);
@@ -299,17 +314,39 @@ export default function MedicationList({
                         {med.dosage && med.dosage !== 'N/A' && <> · {med.dosage}</>}
                       </p>
                       {med.linked_brand_name && (
-                        <p className="text-[11px] text-muted-foreground/80 font-medium mt-1 truncate">
-                          {med.linked_brand_name}{med.linked_composition ? ` — ${med.linked_composition}` : ''}
-                          {med.linked_is_discontinued && (
-                            <span className="ml-1.5 inline-flex items-center rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-semibold text-muted-foreground align-middle">
-                              Discontinued
+                        <div className="mt-1">
+                          <button
+                            type="button"
+                            onClick={() => toggleExpanded(med.id)}
+                            className="flex items-center gap-1 text-left w-full cursor-pointer"
+                          >
+                            <span
+                              className={`text-[11px] text-muted-foreground/80 font-medium flex-1 min-w-0 ${
+                                expandedIds.has(med.id) ? '' : 'truncate'
+                              }`}
+                            >
+                              {med.linked_brand_name}{med.linked_composition ? ` — ${med.linked_composition}` : ''}
+                              {med.linked_is_discontinued && (
+                                <span className="ml-1.5 inline-flex items-center rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-semibold text-muted-foreground align-middle">
+                                  Discontinued
+                                </span>
+                              )}
                             </span>
+                            <ChevronDown
+                              className={`w-3.5 h-3.5 text-muted-foreground/60 shrink-0 transition-transform ${
+                                expandedIds.has(med.id) ? 'rotate-180' : ''
+                              }`}
+                            />
+                          </button>
+                          {expandedIds.has(med.id) && med.linked_manufacturer && (
+                            <p className="text-[9px] text-muted-foreground/70 mt-0.5">
+                              Manufacturer: {med.linked_manufacturer}
+                            </p>
                           )}
                           <span className="block text-[9px] text-muted-foreground/70 mt-0.5">
                             Patient-selected from catalog · as of {med.linked_snapshot_date}
                           </span>
-                        </p>
+                        </div>
                       )}
                       {/* Category + frequency pills */}
                       <div className="flex items-center gap-1.5 mt-2 flex-wrap">
