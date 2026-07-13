@@ -4,6 +4,7 @@ const { supabase } = require('./db');
 const moment = require('moment-timezone');
 const { STATES, FREQUENCIES, CALLBACK_ACTIONS, MAIN_MENU, MAX_SNOOZES, SNOOZE_MINUTES } = require('./constants');
 const { isValidTime, calculateNextReminder, escapeHTML, activeSnoozes } = require('./utils');
+const { dosesPerDay } = require('./reminders');
 
 const userStates = {};
 
@@ -245,12 +246,19 @@ const handleCaregiverPanel = async (chatId) => {
           const nextDate = new Date(med.next_reminder_at);
           const nextTimeStr = moment(med.next_reminder_at).tz('Asia/Kolkata').format('h:mm A');
           
-          const tabletsPerDay = med.frequency === 'once_daily' ? 1 : med.frequency === 'twice_daily' ? 2 : med.frequency === 'thrice_daily' ? 3 : 1;
-          const daysRemaining = Math.floor(med.tablet_count / tabletsPerDay);
-          const isLowStock = daysRemaining <= 3;
-          const stockStatus = isLowStock 
-            ? `⚠️ LOW STOCK (Only ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining)` 
-            : `Stock: ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining (${med.tablet_count} left)`;
+          // tablet_count is null when stock tracking is simply not enabled for this
+          // medication (a normal, common state, e.g. vitamins) — not an error. Without this
+          // guard, `null / tabletsPerDay` coerces to 0 in JS and falsely reports LOW STOCK
+          // to the caregiver for a medication that was never being tracked at all.
+          const hasStockTracking = med.tablet_count !== null && med.tablet_count !== undefined;
+          const tabletsPerDay = dosesPerDay(med.frequency);
+          const daysRemaining = hasStockTracking ? Math.floor(med.tablet_count / tabletsPerDay) : null;
+          const isLowStock = hasStockTracking && daysRemaining <= 3;
+          const stockStatus = !hasStockTracking
+            ? 'Stock tracking not enabled'
+            : isLowStock
+              ? `⚠️ LOW STOCK (Only ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining)`
+              : `Stock: ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining (${med.tablet_count} left)`;
 
           // Weekly adherence
           let adherenceStr = 'N/A';
