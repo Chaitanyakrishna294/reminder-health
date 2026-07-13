@@ -319,6 +319,8 @@ export default function MedicationList({
                             type="button"
                             onClick={() => toggleExpanded(med.id)}
                             className="flex items-center gap-1 text-left w-full cursor-pointer"
+                            aria-expanded={expandedIds.has(med.id)}
+                            aria-label="Toggle medication details"
                           >
                             <span
                               className={`text-[11px] text-muted-foreground/80 font-medium flex-1 min-w-0 ${
@@ -336,6 +338,7 @@ export default function MedicationList({
                               className={`w-3.5 h-3.5 text-muted-foreground/60 shrink-0 transition-transform ${
                                 expandedIds.has(med.id) ? 'rotate-180' : ''
                               }`}
+                              aria-hidden="true"
                             />
                           </button>
                           {expandedIds.has(med.id) && med.linked_manufacturer && (
