@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import Link from 'next/link';
-import { Download, Share, SquarePlus, Check } from 'lucide-react';
+import { Download, Share, SquarePlus, MoreVertical } from 'lucide-react';
 
 // Mirrors the type used by components/install-prompt.tsx — not in lib.dom yet.
 interface BeforeInstallPromptEvent extends Event {
@@ -11,27 +11,30 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
-type Platform = 'checking' | 'installed' | 'promptable' | 'ios' | 'unsupported';
+type Platform = 'checking' | 'promptable' | 'ios' | 'manual';
 
 /**
  * Standalone, shareable "install this app" page (e.g. for a WhatsApp/SMS link).
- * beforeinstallprompt can only fire once a user is actually on the page in a
- * supporting browser, so this detects the platform and shows the right action:
- * a real one-tap install button (Chrome/Edge/Android), manual steps (iOS Safari,
- * which never fires beforeinstallprompt), or a "just continue" fallback.
+ * beforeinstallprompt can only fire once a user is on the page in a supporting
+ * browser, so this detects the situation and does the right thing:
+ * - already installed (opened standalone, or just installed) → redirect to /dashboard
+ * - Chrome/Edge/Android → one-tap install button
+ * - iOS Safari (never fires beforeinstallprompt) → Add-to-Home-Screen steps
+ * - anything else → manual browser-menu install steps
  */
 export default function InstallPage() {
+  const router = useRouter();
   const [platform, setPlatform] = useState<Platform>('checking');
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
-  const [justInstalled, setJustInstalled] = useState(false);
 
   useEffect(() => {
     const isStandalone =
       window.matchMedia('(display-mode: standalone)').matches ||
       (navigator as unknown as { standalone?: boolean }).standalone === true;
 
+    // Already installed → send them straight into the app.
     if (isStandalone) {
-      setPlatform('installed');
+      router.replace('/dashboard');
       return;
     }
 
@@ -42,18 +45,16 @@ export default function InstallPage() {
       setDeferred(e as BeforeInstallPromptEvent);
       setPlatform('promptable');
     };
-    const onInstalled = () => {
-      setJustInstalled(true);
-      setPlatform('installed');
-    };
+    // Fires right after a successful install → the app now exists, go to it.
+    const onInstalled = () => router.replace('/dashboard');
 
     window.addEventListener('beforeinstallprompt', onBeforeInstall);
     window.addEventListener('appinstalled', onInstalled);
 
     // beforeinstallprompt fires almost immediately if it's going to fire at all;
-    // give it a beat, then fall back to iOS instructions or the generic message.
+    // give it a beat, then fall back to manual steps (iOS-specific or generic).
     const timer = setTimeout(() => {
-      setPlatform((current) => (current === 'checking' ? (isIOS ? 'ios' : 'unsupported') : current));
+      setPlatform((current) => (current === 'checking' ? (isIOS ? 'ios' : 'manual') : current));
     }, 800);
 
     return () => {
@@ -61,14 +62,15 @@ export default function InstallPage() {
       window.removeEventListener('appinstalled', onInstalled);
       clearTimeout(timer);
     };
-  }, []);
+  }, [router]);
 
   const handleInstall = async () => {
     if (!deferred) return;
     await deferred.prompt();
     try {
       const { outcome } = await deferred.userChoice;
-      if (outcome === 'accepted') setPlatform('installed');
+      // appinstalled also redirects, but this is more immediate on accept.
+      if (outcome === 'accepted') router.replace('/dashboard');
     } catch {
       /* user dismissed the native dialog */
     }
@@ -94,23 +96,6 @@ export default function InstallPage() {
 
         {platform === 'checking' && (
           <p className="py-6 text-sm text-muted-foreground font-semibold">Checking your browser…</p>
-        )}
-
-        {platform === 'installed' && (
-          <div className="space-y-4 py-2">
-            <div className="inline-flex items-center justify-center w-14 h-14 bg-success/15 text-success rounded-full border border-success/30">
-              <Check className="w-7 h-7" />
-            </div>
-            <p className="text-sm font-bold text-foreground">
-              {justInstalled ? 'Installed! Open it from your home screen anytime.' : "You're already using the installed app."}
-            </p>
-            <Link
-              href="/dashboard"
-              className="inline-block rounded-2xl bg-primary text-primary-foreground font-black px-6 py-3 text-sm hover:bg-primary-hover transition-all active:scale-[0.98]"
-            >
-              Open Dashboard
-            </Link>
-          </div>
         )}
 
         {platform === 'promptable' && (
@@ -146,17 +131,32 @@ export default function InstallPage() {
           </div>
         )}
 
-        {platform === 'unsupported' && (
+        {platform === 'manual' && (
           <div className="space-y-3">
-            <p className="text-xs font-semibold text-muted-foreground">
-              This browser doesn&apos;t support one-tap install. Open this link in Chrome or Edge, or just continue in the browser.
+            <div className="space-y-3 text-left bg-muted/30 border border-border rounded-2xl p-4">
+              <p className="text-xs font-black text-muted-foreground uppercase tracking-widest text-center mb-1">
+                Install from your browser menu
+              </p>
+              <div className="flex items-start gap-3">
+                <span className="shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-black flex items-center justify-center">1</span>
+                <p className="text-xs font-bold text-foreground flex items-center gap-1.5 flex-wrap">
+                  Open your browser menu <MoreVertical className="w-3.5 h-3.5 shrink-0" /> (top-right)
+                </p>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-black flex items-center justify-center">2</span>
+                <p className="text-xs font-bold text-foreground flex items-center gap-1.5 flex-wrap">
+                  Tap <SquarePlus className="w-3.5 h-3.5 shrink-0" /> &quot;Install app&quot; or &quot;Add to Home screen&quot;
+                </p>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-black flex items-center justify-center">3</span>
+                <p className="text-xs font-bold text-foreground">Confirm — the app icon appears on your device</p>
+              </div>
+            </div>
+            <p className="text-[11px] text-muted-foreground font-semibold">
+              Don&apos;t see the option? Open this page in Chrome or Edge.
             </p>
-            <Link
-              href="/dashboard"
-              className="inline-block rounded-2xl bg-muted text-foreground font-black px-6 py-3 text-sm hover:bg-muted/80 transition-all active:scale-[0.98]"
-            >
-              Continue in Browser
-            </Link>
           </div>
         )}
       </div>
