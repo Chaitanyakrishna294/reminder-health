@@ -5,6 +5,7 @@ import { UiModeProvider } from "@/context/ui-mode-context";
 import { ThemeProvider } from "@/context/theme-context";
 import CookieConsent from "@/components/cookie-consent";
 import InstallPrompt from "@/components/install-prompt";
+import RegisterSW from "@/components/register-sw";
 
 // Variable fonts: one file per family covers every weight (vs 12 static files).
 const inter = Inter({
@@ -50,6 +51,7 @@ export default function RootLayout({
         <ThemeProvider>
           <UiModeProvider>
             {children}
+            <RegisterSW />
             <InstallPrompt />
             <CookieConsent />
           </UiModeProvider>
