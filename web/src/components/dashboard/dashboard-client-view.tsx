@@ -17,7 +17,6 @@ import moment from 'moment-timezone';
 import { type OverrideEntry, findOverride, toOverrideDateStr } from '@/lib/schedule/dose-engine';
 import MedicationSlider from '@/components/dashboard/medication-slider';
 import { getUnitIcon, getCountdownText, PinkBubbles } from '@/components/dashboard/dashboard-helpers';
-import CarePlusLink from '@/components/billing/care-plus-link';
 
 import { createClient } from '@/lib/supabase/client';
 import { getSeverityTheme } from '@/lib/severity-theme';
@@ -671,11 +670,6 @@ export default function DashboardClientView({
       <>
         {dueGate}
         <div className={`space-y-8 w-full max-w-4xl mx-auto transition-colors duration-500 ${isGravityState ? 'pb-24' : ''}`}>
-          {/* Care+ premium spotlight — own account only, hidden while monitoring a patient */}
-          {viewMode !== 'PATIENT_MONITOR' && myTelegramChatId && (
-            <CarePlusLink isElderly={isElderly} />
-          )}
-
           {/* Gravity State Dimmer Backdrop (Disabled) */}
 
           {/* Push Banner */}
@@ -895,11 +889,6 @@ export default function DashboardClientView({
     <>
       {dueGate}
       <div className={`space-y-8 w-full transition-all duration-500 relative ${isGravityState ? 'gravity-active' : ''}`}>
-
-      {/* Care+ premium spotlight — own account only, hidden while monitoring a patient */}
-      {viewMode !== 'PATIENT_MONITOR' && myTelegramChatId && (
-        <CarePlusLink isElderly={isElderly} />
-      )}
 
       {/* Push Banner */}
       {showPushBanner && (

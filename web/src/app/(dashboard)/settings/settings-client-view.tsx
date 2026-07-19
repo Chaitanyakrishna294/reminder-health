@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useUiMode } from '@/context/ui-mode-context';
 import { createClient } from '@/lib/supabase/client';
-import CarePlusCard from '@/components/billing/care-plus-card';
 import { 
   Settings, 
   User, 
@@ -64,7 +63,7 @@ export default function SettingsClientView({
 }: SettingsClientViewProps) {
   const router = useRouter();
   const supabase = createClient();
-  const { isElderly, toggleMode, viewMode, setViewMode } = useUiMode();
+  const { isElderly, toggleMode, setViewMode } = useUiMode();
 
   // State management
   const [linkedCaregivers, setLinkedCaregivers] = useState(initialLinkedCaregivers);
@@ -580,18 +579,6 @@ export default function SettingsClientView({
           </button>
         </div>
       </div>
-
-      {/* SECTION 2.4: CARE+ PLAN (Free vs Care+ comparison + 7-day free trial) */}
-      {viewMode !== 'PATIENT_MONITOR' && (
-        <CarePlusCard
-          telegramId={user.telegramChatId}
-          isElderly={isElderly}
-          onActivated={() => window.location.reload()}
-        />
-      )}
-
-      {/* Voice-call reminders moved to its own members-only page (/care-plus/voice),
-          reached from the Care+ hub. */}
 
       {/* SECTION 3: UNIFIED CAREGIVER & CLIENT MANAGEMENT */}
       <div 
