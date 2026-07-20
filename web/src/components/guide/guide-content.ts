@@ -87,14 +87,14 @@ export const TOURS: Record<string, GuideStep[]> = {
       target: 'mednew-strength',
       wizardStep: 3,
       title: 'Strength',
-      message: 'The strength, like 500mg — it’s printed on the box or strip. This one is optional.',
+      message: 'Type the strength, like 500mg — it’s printed on the box or strip. This one is optional.',
       mood: 'curious',
     },
     {
       target: 'mednew-amount',
       wizardStep: 3,
       title: 'How much to take',
-      message: 'How many to take each time — for example, 1 tablet or 2 tablets.',
+      message: 'Use − and + to set how many to take each time — for example, 1 tablet or 2.',
       mood: 'encouraging',
     },
     {
@@ -115,7 +115,7 @@ export const TOURS: Record<string, GuideStep[]> = {
       target: 'mednew-reason',
       wizardStep: 5,
       title: 'What it’s for',
-      message: 'Optional: a short note like “for blood pressure”, so it’s easy to recognise later.',
+      message: 'Add a short note like “for blood pressure”, so it’s easy to recognise later. This is optional.',
       mood: 'encouraging',
     },
     {

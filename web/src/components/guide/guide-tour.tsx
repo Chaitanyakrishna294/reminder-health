@@ -95,34 +95,52 @@ export default function GuideTour() {
     cardLeft = (vw - cardW) / 2;
   }
 
-  return (
-    <div className="fixed inset-0 z-[130]" role="dialog" aria-modal="true" aria-label="Guide">
-      {/* Click-anywhere-to-close catcher (transparent). */}
-      <button
-        aria-label="Close guide"
-        onClick={stopTour}
-        className="absolute inset-0 w-full h-full cursor-default"
-        style={{ background: 'transparent' }}
-      />
+  // Interactive tutorials (the Add Medication wizard, whose steps carry a wizardStep)
+  // leave a live "hole" over the highlighted field so the user can actually use it;
+  // read-only tours close on any click as before.
+  const interactive = step?.wizardStep != null;
+  const holeTop = rect ? rect.top - 8 : 0;
+  const holeLeft = rect ? rect.left - 8 : 0;
+  const holeW = rect ? rect.width + 16 : 0;
+  const holeH = rect ? rect.height + 16 : 0;
+  const catcher = 'absolute pointer-events-auto cursor-default';
 
+  return (
+    // Container lets pointer events fall through; only the catchers and bubble catch them,
+    // so the spotlit field stays interactive in tutorial mode.
+    <div className="fixed inset-0 z-[130] pointer-events-none" role="dialog" aria-modal={interactive ? undefined : true} aria-label="Guide">
       {/* Spotlight: highlight the target and lightly dim everything else. */}
       {hasTarget && rect && (
         <div
           className="absolute rounded-2xl pointer-events-none transition-all duration-300"
           style={{
-            top: rect.top - 8,
-            left: rect.left - 8,
-            width: rect.width + 16,
-            height: rect.height + 16,
+            top: holeTop,
+            left: holeLeft,
+            width: holeW,
+            height: holeH,
             boxShadow: '0 0 0 9999px rgba(15,28,90,0.45)',
             outline: '2px solid rgba(242,107,138,0.9)',
           }}
         />
       )}
 
+      {/* Close catchers. Tutorial mode: four panels around the live hole, so clicking the
+          dimmed area (or ✕ / Esc) closes but the field itself stays usable. Otherwise a
+          single full-screen catcher closes on any click. */}
+      {hasTarget && rect && interactive ? (
+        <>
+          <button aria-label="Close guide" tabIndex={-1} onClick={stopTour} className={catcher} style={{ top: 0, left: 0, width: '100%', height: Math.max(0, holeTop) }} />
+          <button aria-label="Close guide" tabIndex={-1} onClick={stopTour} className={catcher} style={{ top: holeTop + holeH, left: 0, width: '100%', bottom: 0 }} />
+          <button aria-label="Close guide" tabIndex={-1} onClick={stopTour} className={catcher} style={{ top: holeTop, left: 0, width: Math.max(0, holeLeft), height: holeH }} />
+          <button aria-label="Close guide" tabIndex={-1} onClick={stopTour} className={catcher} style={{ top: holeTop, left: holeLeft + holeW, right: 0, height: holeH }} />
+        </>
+      ) : (
+        <button aria-label="Close guide" onClick={stopTour} className={`${catcher} inset-0 w-full h-full`} style={{ background: 'transparent' }} />
+      )}
+
       {/* Step bubble — the guider mascot lives inside it. */}
       <div
-        className="absolute bg-card border border-border rounded-3xl shadow-2xl p-5 transition-all duration-300 animate-fade-in"
+        className="absolute bg-card border border-border rounded-3xl shadow-2xl p-5 transition-all duration-300 animate-fade-in pointer-events-auto"
         style={{ top: cardTop, left: cardLeft, width: cardW }}
       >
         <div className="flex items-start gap-3">
