@@ -9,6 +9,8 @@ import moment from 'moment-timezone';
 import { useUiMode } from '@/context/ui-mode-context';
 import { type UnitType, unitOptions, stepMeta, frequencies, priorities } from '@/components/medications/medication-form-options';
 import MedicationCatalogLink from '@/components/medications/medication-catalog-link';
+import GuideButton from '@/components/guide/guide-button';
+import GuideAutoStart from '@/components/guide/guide-auto-start';
 import type { CatalogLinkValue } from '@/lib/medications/catalog';
 import { validateMedicationStep, buildSharedMedicationFields } from '@/lib/medications/form-logic';
 import {
@@ -215,13 +217,16 @@ export default function NewMedicationPage() {
     <div className={`mx-auto transition-all duration-300 ${isElderly ? 'max-w-2xl space-y-6' : 'max-w-xl space-y-5'}`}>
       
       {/* Page Header */}
-      <div>
-        <h1 className={`font-bold tracking-tight text-foreground ${isElderly ? 'text-4xl' : 'text-[26px]'}`}>
-          Add Medication
-        </h1>
-        <p className={`text-muted-foreground mt-1 font-medium ${isElderly ? 'text-lg' : 'text-[13px]'}`}>
-          Set up a new medication in 6 guided steps.
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className={`font-bold tracking-tight text-foreground ${isElderly ? 'text-4xl' : 'text-[26px]'}`}>
+            Add Medication
+          </h1>
+          <p className={`text-muted-foreground mt-1 font-medium ${isElderly ? 'text-lg' : 'text-[13px]'}`}>
+            Set up a new medication in 6 guided steps.
+          </p>
+        </div>
+        <GuideButton tour="newMedication" className="shrink-0 mt-1" label="How adding a medication works" />
       </div>
 
       {/* Error Banner */}
@@ -236,7 +241,7 @@ export default function NewMedicationPage() {
         <div className="bg-white rounded-[22px] overflow-hidden" style={{ boxShadow: CARD_SHADOW }}>
           
           {/* ── Premium Stepper ── */}
-          <div className="px-6 pt-6 pb-4 md:px-8 md:pt-8">
+          <div data-tour="mednew-steps" className="px-6 pt-6 pb-4 md:px-8 md:pt-8">
             <div className="flex items-center justify-between gap-1">
               {stepMeta.map((s, i) => {
                 const stepNum = i + 1;
@@ -285,7 +290,7 @@ export default function NewMedicationPage() {
             <form onSubmit={handleSubmit}>
 
               {/* Current step label */}
-              <div className="flex items-center gap-2 mb-5 pb-4 border-b border-[#0F1C5A]/[0.06]">
+              <div data-tour="mednew-current" className="flex items-center gap-2 mb-5 pb-4 border-b border-[#0F1C5A]/[0.06]">
                 <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
                   {stepMeta[step - 1].icon}
                 </div>
@@ -720,7 +725,7 @@ export default function NewMedicationPage() {
               </div>
 
               {/* ── Wizard Navigation ── */}
-              <div className="flex items-center justify-between pt-5 mt-6 border-t border-[#0F1C5A]/[0.06] gap-3">
+              <div data-tour="mednew-nav" className="flex items-center justify-between pt-5 mt-6 border-t border-[#0F1C5A]/[0.06] gap-3">
                 {step > 1 ? (
                   <button
                     type="button"
@@ -781,6 +786,9 @@ export default function NewMedicationPage() {
           Loading patient configuration...
         </div>
       )}
+
+      {/* Auto-start the guided tour once for first-time users (then summonable via the ? button). */}
+      {targetTelegramChatId && <GuideAutoStart tour="newMedication" />}
     </div>
   );
 }

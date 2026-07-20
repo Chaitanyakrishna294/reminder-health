@@ -13,6 +13,7 @@ import { PremiumToast } from '@/components/ui/premium-toast';
 import MedDueGate from '@/components/dashboard/med-due-gate';
 import BrainMascot from '@/components/dashboard/brain-mascot';
 import GuideButton from '@/components/guide/guide-button';
+import GuideAutoStart from '@/components/guide/guide-auto-start';
 import moment from 'moment-timezone';
 import { type OverrideEntry, findOverride, toOverrideDateStr } from '@/lib/schedule/dose-engine';
 import MedicationSlider from '@/components/dashboard/medication-slider';
@@ -669,6 +670,7 @@ export default function DashboardClientView({
     return (
       <>
         {dueGate}
+        {viewMode !== 'PATIENT_MONITOR' && <GuideAutoStart tour="dashboard" />}
         <div className={`space-y-8 w-full max-w-4xl mx-auto transition-colors duration-500 ${isGravityState ? 'pb-24' : ''}`}>
           {/* Gravity State Dimmer Backdrop (Disabled) */}
 
@@ -888,6 +890,7 @@ export default function DashboardClientView({
   return (
     <>
       {dueGate}
+      {viewMode !== 'PATIENT_MONITOR' && <GuideAutoStart tour="dashboard" />}
       <div className={`space-y-8 w-full transition-all duration-500 relative ${isGravityState ? 'gravity-active' : ''}`}>
 
       {/* Push Banner */}

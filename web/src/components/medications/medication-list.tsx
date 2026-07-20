@@ -8,6 +8,7 @@ import { calculateNextReminder } from '@/lib/medication-utils';
 import { useUiMode } from '@/context/ui-mode-context';
 import { Plus, Package, Clock, Pause, Play, SquarePen, Trash2, Pill, X, ChevronDown } from 'lucide-react';
 import GuideButton from '@/components/guide/guide-button';
+import GuideAutoStart from '@/components/guide/guide-auto-start';
 import { getUnitIcon } from '@/components/ui/custom-icons';
 import { getSeverityTheme } from '@/lib/severity-theme';
 
@@ -236,6 +237,8 @@ export default function MedicationList({
 
   return (
     <div className="space-y-5">
+      {/* Auto-start the guided tour once for first-time users (then summonable via the ? button). */}
+      <GuideAutoStart tour="medications" />
       {/* Header */}
       <div data-tour="med-hero" className="flex items-end justify-between gap-3">
         <div>

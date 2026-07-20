@@ -41,6 +41,29 @@ export const TOURS: Record<string, GuideStep[]> = {
       mood: 'proud',
     },
   ],
+  newMedication: [
+    {
+      target: 'mednew-steps',
+      title: 'Six simple steps',
+      message:
+        'Adding a medicine takes six quick steps — Details, Schedule, Dosage, Inventory, Priority, and a final Review. This bar tracks where you are, and you can tap any step to jump straight to it.',
+      mood: 'curious',
+    },
+    {
+      target: 'mednew-current',
+      title: 'One step at a time',
+      message:
+        'Each step asks for just one part of the plan. Fill it in — nothing is saved until the last step, so it’s fine to go back and change anything.',
+      mood: 'encouraging',
+    },
+    {
+      target: 'mednew-nav',
+      title: 'Moving through',
+      message:
+        'Tap Continue to go forward or Back to revise; your progress is kept as you go. On the final step, tap Add Medication to switch on your reminders.',
+      mood: 'proud',
+    },
+  ],
   medications: [
     {
       target: 'med-hero',
