@@ -6,6 +6,9 @@ export interface GuideStep {
   title: string;
   message: string;
   mood?: MascotMood;
+  /** For multi-step forms: which wizard step this field lives on, so the page can
+   *  jump there before the field is spotlighted. Used by the Add Medication wizard. */
+  wizardStep?: number;
 }
 
 // Single source of truth for all guided tours. Add a tour or edit copy here only;
@@ -41,26 +44,92 @@ export const TOURS: Record<string, GuideStep[]> = {
       mood: 'proud',
     },
   ],
+  // A field-by-field walkthrough. Each step jumps the wizard to `wizardStep`, then
+  // spotlights one input and explains it in plain English.
   newMedication: [
     {
-      target: 'mednew-steps',
-      title: 'Six simple steps',
-      message:
-        'Adding a medicine takes six quick steps — Details, Schedule, Dosage, Inventory, Priority, and a final Review. This bar tracks where you are, and you can tap any step to jump straight to it.',
+      target: 'mednew-name',
+      wizardStep: 1,
+      title: 'Name of the medicine',
+      message: 'Type the medicine’s name here — like Paracetamol or Atorvastatin.',
       mood: 'curious',
     },
     {
-      target: 'mednew-current',
-      title: 'One step at a time',
+      target: 'mednew-catalog',
+      wizardStep: 1,
+      title: 'Link the real medicine',
       message:
-        'Each step asks for just one part of the plan. Fill it in — nothing is saved until the last step, so it’s fine to go back and change anything.',
+        'If you know the exact brand, search and pick it here. It’s optional — but adding it helps your doctor see exactly what you take.',
       mood: 'encouraging',
     },
     {
-      target: 'mednew-nav',
-      title: 'Moving through',
-      message:
-        'Tap Continue to go forward or Back to revise; your progress is kept as you go. On the final step, tap Add Medication to switch on your reminders.',
+      target: 'mednew-form',
+      wizardStep: 1,
+      title: 'What form is it?',
+      message: 'Choose the form it comes in — tablet, capsule, syrup, drops, and so on.',
+      mood: 'curious',
+    },
+    {
+      target: 'mednew-frequency',
+      wizardStep: 2,
+      title: 'How often you take it',
+      message: 'Pick how many times a day you take it — once, twice, or thrice.',
+      mood: 'reminder',
+    },
+    {
+      target: 'mednew-times',
+      wizardStep: 2,
+      title: 'Time of each dose',
+      message: 'Set the time for every dose. Your reminders arrive at exactly these times.',
+      mood: 'reminder',
+    },
+    {
+      target: 'mednew-strength',
+      wizardStep: 3,
+      title: 'Strength',
+      message: 'The strength, like 500mg — it’s printed on the box or strip. This one is optional.',
+      mood: 'curious',
+    },
+    {
+      target: 'mednew-amount',
+      wizardStep: 3,
+      title: 'How much to take',
+      message: 'How many to take each time — for example, 1 tablet or 2 tablets.',
+      mood: 'encouraging',
+    },
+    {
+      target: 'mednew-inventory',
+      wizardStep: 4,
+      title: 'Track your stock',
+      message: 'Turn this on and I’ll count your pills down with each dose, then warn you before you run out.',
+      mood: 'curious',
+    },
+    {
+      target: 'mednew-stock',
+      wizardStep: 4,
+      title: 'How many you have',
+      message: 'Enter how many you have now, and the low number you’d like to be warned at.',
+      mood: 'reminder',
+    },
+    {
+      target: 'mednew-reason',
+      wizardStep: 5,
+      title: 'What it’s for',
+      message: 'Optional: a short note like “for blood pressure”, so it’s easy to recognise later.',
+      mood: 'encouraging',
+    },
+    {
+      target: 'mednew-priority',
+      wizardStep: 5,
+      title: 'How important is it',
+      message: 'Set how important it is. Critical doses can alert your caregiver if one is missed.',
+      mood: 'reminder',
+    },
+    {
+      target: 'mednew-review',
+      wizardStep: 6,
+      title: 'Check and save',
+      message: 'Look over everything here, then tap Add Medication to switch on your reminders. You can edit it anytime.',
       mood: 'proud',
     },
   ],

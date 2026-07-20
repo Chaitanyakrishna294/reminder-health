@@ -25,16 +25,11 @@ function GuiderMascot({ size }: { size: number }) {
 }
 
 export default function GuideTour() {
-  const { activeTour, stopTour } = useGuide();
+  const { activeTour, stopTour, stepIndex: index, setStepIndex } = useGuide();
   const steps = activeTour ? TOURS[activeTour] : null;
-  const [index, setIndex] = useState(0);
   const [rect, setRect] = useState<DOMRect | null>(null);
   const [vw, setVw] = useState(0);
   const [vh, setVh] = useState(0);
-
-  useEffect(() => {
-    setIndex(0);
-  }, [activeTour]);
 
   const step = steps ? steps[index] : null;
 
@@ -54,11 +49,15 @@ export default function GuideTour() {
     };
     const el = document.querySelector(`[data-tour="${step.target}"]`) as HTMLElement | null;
     if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    const t = setTimeout(measure, 320);
+    // Re-measure a few times: when a tour drives another component (e.g. the Add
+    // Medication wizard switching step), the target may render a moment after the
+    // step changes, so a single measure can miss it.
+    measure();
+    const timers = [90, 240, 430, 680, 1000].map((d) => setTimeout(measure, d));
     window.addEventListener('resize', measure);
     window.addEventListener('scroll', measure, true);
     return () => {
-      clearTimeout(t);
+      timers.forEach(clearTimeout);
       window.removeEventListener('resize', measure);
       window.removeEventListener('scroll', measure, true);
     };
@@ -75,8 +74,8 @@ export default function GuideTour() {
 
   const total = steps.length;
   const isLast = index === total - 1;
-  const goNext = () => (isLast ? stopTour() : setIndex((i) => i + 1));
-  const goBack = () => setIndex((i) => Math.max(0, i - 1));
+  const goNext = () => (isLast ? stopTour() : setStepIndex((i) => i + 1));
+  const goBack = () => setStepIndex((i) => Math.max(0, i - 1));
 
   // Is the target present and on-screen enough to spotlight?
   const hasTarget = !!rect && rect.width > 4 && rect.height > 4 && rect.bottom > 0 && rect.top < vh;

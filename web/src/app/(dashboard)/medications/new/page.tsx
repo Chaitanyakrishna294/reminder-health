@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
@@ -11,6 +11,8 @@ import { type UnitType, unitOptions, stepMeta, frequencies, priorities } from '@
 import MedicationCatalogLink from '@/components/medications/medication-catalog-link';
 import GuideButton from '@/components/guide/guide-button';
 import GuideAutoStart from '@/components/guide/guide-auto-start';
+import { useGuide } from '@/components/guide/guide-context';
+import { TOURS } from '@/components/guide/guide-content';
 import type { CatalogLinkValue } from '@/lib/medications/catalog';
 import { validateMedicationStep, buildSharedMedicationFields } from '@/lib/medications/form-logic';
 import {
@@ -67,6 +69,25 @@ export default function NewMedicationPage() {
   const supabase = createClient();
   const { isElderly, viewMode } = useUiMode();
   const activeRole = viewMode === 'PATIENT_MONITOR' ? 'CAREGIVER' : 'PATIENT';
+
+  // Guided tour: as it advances field-by-field, jump the wizard to the step each field
+  // lives on so the real input is on screen to be spotlighted. When the tour ends, put
+  // the user back on the step they were on before it started.
+  const { activeTour, stepIndex } = useGuide();
+  const prevTourRef = useRef<string | null>(null);
+  const stepBeforeTourRef = useRef(1);
+  useEffect(() => {
+    if (activeTour === 'newMedication') {
+      if (prevTourRef.current !== 'newMedication') stepBeforeTourRef.current = step;
+      const ws = TOURS.newMedication[stepIndex]?.wizardStep;
+      if (ws) setStep(ws);
+    } else if (prevTourRef.current === 'newMedication') {
+      setStep(stepBeforeTourRef.current);
+    }
+    prevTourRef.current = activeTour;
+    // `step` is intentionally excluded — this effect reacts to tour movement, not step edits.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTour, stepIndex]);
 
   useEffect(() => {
     if (activeRole === 'CAREGIVER') {
@@ -241,7 +262,7 @@ export default function NewMedicationPage() {
         <div className="bg-white rounded-[22px] overflow-hidden" style={{ boxShadow: CARD_SHADOW }}>
           
           {/* ── Premium Stepper ── */}
-          <div data-tour="mednew-steps" className="px-6 pt-6 pb-4 md:px-8 md:pt-8">
+          <div className="px-6 pt-6 pb-4 md:px-8 md:pt-8">
             <div className="flex items-center justify-between gap-1">
               {stepMeta.map((s, i) => {
                 const stepNum = i + 1;
@@ -290,7 +311,7 @@ export default function NewMedicationPage() {
             <form onSubmit={handleSubmit}>
 
               {/* Current step label */}
-              <div data-tour="mednew-current" className="flex items-center gap-2 mb-5 pb-4 border-b border-[#0F1C5A]/[0.06]">
+              <div className="flex items-center gap-2 mb-5 pb-4 border-b border-[#0F1C5A]/[0.06]">
                 <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
                   {stepMeta[step - 1].icon}
                 </div>
@@ -310,16 +331,19 @@ export default function NewMedicationPage() {
                     <input
                       type="text"
                       required
+                      data-tour="mednew-name"
                       value={drugName}
                       onChange={(e) => setDrugName(e.target.value)}
                       className={inputClass}
                       placeholder="e.g., Paracetamol, Atorvastatin"
                       autoFocus
                     />
-                    <MedicationCatalogLink value={catalogLink} onChange={setCatalogLink} />
+                    <div data-tour="mednew-catalog">
+                      <MedicationCatalogLink value={catalogLink} onChange={setCatalogLink} />
+                    </div>
                   </div>
 
-                  <div>
+                  <div data-tour="mednew-form">
                     <label className={labelClass}>Medication Form</label>
                     <p className="text-xs text-muted-foreground mb-3">Select the type of medication unit.</p>
                     <div className="flex flex-col gap-2">
@@ -367,7 +391,7 @@ export default function NewMedicationPage() {
               {/* STEP 2: Schedule & Times */}
               {step === 2 && (
                 <div className="space-y-6">
-                  <div>
+                  <div data-tour="mednew-frequency">
                     <label className={labelClass}>Select Frequency</label>
                     <div className="grid grid-cols-1 gap-3 mt-1">
                       {frequencies.map((freq) => (
@@ -402,7 +426,7 @@ export default function NewMedicationPage() {
                     </div>
                   </div>
 
-                  <div className="pt-4 border-t border-[#0F1C5A]/[0.06]">
+                  <div data-tour="mednew-times" className="pt-4 border-t border-[#0F1C5A]/[0.06]">
                     <label className={labelClass}>Reminder Times</label>
                     <p className="text-xs text-muted-foreground mb-3">Set the time for each dose in 24-hour format.</p>
                     <div className="grid grid-cols-1 gap-2.5">
@@ -433,7 +457,7 @@ export default function NewMedicationPage() {
               {/* STEP 3: Dosage & Strength */}
               {step === 3 && (
                 <div className="space-y-6">
-                  <div>
+                  <div data-tour="mednew-strength">
                     <label className={labelClass}>Strength</label>
                     <input
                       type="text"
@@ -460,7 +484,7 @@ export default function NewMedicationPage() {
                     </div>
                   </div>
 
-                  <div className="pt-4 border-t border-[#0F1C5A]/[0.06]">
+                  <div data-tour="mednew-amount" className="pt-4 border-t border-[#0F1C5A]/[0.06]">
                     <label className={labelClass}>Dosage Amount</label>
                     <p className="text-xs text-muted-foreground mb-3">Units taken per reminder.</p>
                     <div className="flex items-center gap-3 mt-2">
@@ -500,7 +524,7 @@ export default function NewMedicationPage() {
               {/* STEP 4: Inventory Tracking */}
               {step === 4 && (
                 <div className="space-y-5">
-                  <div className="flex items-center justify-between p-4 bg-[#F6F6F9] rounded-2xl">
+                  <div data-tour="mednew-inventory" className="flex items-center justify-between p-4 bg-[#F6F6F9] rounded-2xl">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                         <Layers className="w-5 h-5 text-primary" />
@@ -522,7 +546,7 @@ export default function NewMedicationPage() {
                   </div>
 
                   {enableInventory && (
-                    <div className="space-y-4 pt-2" style={{ animation: 'fadeIn 0.2s ease-out' }}>
+                    <div data-tour="mednew-stock" className="space-y-4 pt-2" style={{ animation: 'fadeIn 0.2s ease-out' }}>
                       <div>
                         <label className={labelClass}>Current Stock</label>
                         <div className="relative">
@@ -564,7 +588,7 @@ export default function NewMedicationPage() {
               {/* STEP 5: Reason & Priority */}
               {step === 5 && (
                 <div className="space-y-6">
-                  <div>
+                  <div data-tour="mednew-reason">
                     <label className={labelClass}>Medication Reason</label>
                     <p className="text-xs text-muted-foreground mb-2">Optional. Helps identify the purpose.</p>
                     <input
@@ -576,7 +600,7 @@ export default function NewMedicationPage() {
                     />
                   </div>
 
-                  <div className="pt-4 border-t border-[#0F1C5A]/[0.06]">
+                  <div data-tour="mednew-priority" className="pt-4 border-t border-[#0F1C5A]/[0.06]">
                     <label className={labelClass}>Priority Level</label>
                     <p className="text-xs text-muted-foreground mb-3">Determines escalation behavior on missed doses.</p>
                     <div className="grid grid-cols-1 gap-2.5">
@@ -638,7 +662,7 @@ export default function NewMedicationPage() {
               {step === 6 && (
                 <div className="space-y-5">
                   {/* Summary Card */}
-                  <div className="rounded-2xl bg-[#F6F6F9] overflow-hidden">
+                  <div data-tour="mednew-review" className="rounded-2xl bg-[#F6F6F9] overflow-hidden">
                     {/* Drug name header */}
                     <div className="bg-primary/8 px-5 py-4">
                       <div className="flex items-center gap-3">
@@ -725,7 +749,7 @@ export default function NewMedicationPage() {
               </div>
 
               {/* ── Wizard Navigation ── */}
-              <div data-tour="mednew-nav" className="flex items-center justify-between pt-5 mt-6 border-t border-[#0F1C5A]/[0.06] gap-3">
+              <div className="flex items-center justify-between pt-5 mt-6 border-t border-[#0F1C5A]/[0.06] gap-3">
                 {step > 1 ? (
                   <button
                     type="button"
