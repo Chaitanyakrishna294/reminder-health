@@ -6,7 +6,7 @@
 
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
-CREATE TABLE public.medication_catalog (
+CREATE TABLE IF NOT EXISTS public.medication_catalog (
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   brand_name text NOT NULL,
   manufacturer_name text,
@@ -19,7 +19,7 @@ CREATE TABLE public.medication_catalog (
 
 -- Trigram index powers both substring search and the similarity()-ranked fuzzy search in
 -- search_medication_catalog below, against ~254k brand names.
-CREATE INDEX medication_catalog_brand_name_trgm_idx
+CREATE INDEX IF NOT EXISTS medication_catalog_brand_name_trgm_idx
   ON public.medication_catalog USING gin (brand_name gin_trgm_ops);
 
 -- Global reference data: any authenticated user may read it. Nothing in this table is
@@ -28,6 +28,7 @@ CREATE INDEX medication_catalog_brand_name_trgm_idx
 -- RLS entirely — no INSERT/UPDATE/DELETE policy is defined for any client role.
 ALTER TABLE public.medication_catalog ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Authenticated users can read medication catalog" ON public.medication_catalog;
 CREATE POLICY "Authenticated users can read medication catalog"
   ON public.medication_catalog FOR SELECT
   TO authenticated

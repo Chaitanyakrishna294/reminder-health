@@ -3,54 +3,10 @@
 // stateless — no behavior change versus the prior inline definitions.
 
 import React from 'react';
-import {
-  Pill,
-  Beaker,
-  Droplets,
-  Wind,
-  Sparkles,
-  Package,
-  CircleDot,
-  Bandage,
-} from 'lucide-react';
-import { SpoonIcon, CreamBottleIcon, TabletIcon } from '@/components/ui/custom-icons';
 
-/**
- * Map a medication unit type to its icon. Falls back to a neutral dot for unknown
- * types. `className` controls sizing at each call site.
- */
-export const getUnitIcon = (unitType?: string, className: string = 'w-6 h-6') => {
-  const type = unitType?.toUpperCase() || 'TABLET';
-  switch (type) {
-    case 'TABLET':
-      return <TabletIcon className={className} />;
-    case 'CAPSULE':
-      return <Pill className={className} />;
-    case 'ML':
-    case 'LIQUID':
-      return <Beaker className={className} />;
-    case 'DROP':
-    case 'DROPS':
-      return <Droplets className={className} />;
-    case 'SPRAY':
-      return <Wind className={className} />;
-    case 'APPLICATION':
-      return <CreamBottleIcon className={className} />;
-    case 'TEASPOON':
-      return <SpoonIcon className={className} />;
-    case 'PATCH':
-      return <Bandage className={className} />;
-    case 'POWDER':
-      return <Sparkles className={className} />;
-    case 'INHALER':
-    case 'INHALATION':
-      return <Wind className={className} />;
-    case 'OTHER':
-      return <Package className={className} />;
-    default:
-      return <CircleDot className={className} />;
-  }
-};
+// Single source of truth for the unit-type icon map lives in custom-icons.tsx;
+// re-exported here so existing '@/components/dashboard/dashboard-helpers' imports keep working.
+export { getUnitIcon } from '@/components/ui/custom-icons';
 
 /**
  * Human-readable countdown / overdue text for a scheduled dose time.

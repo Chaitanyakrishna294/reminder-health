@@ -11,8 +11,8 @@
 -- failure left a "used" code redeemable again for up to 15 more minutes. The RPC below
 -- does both in one transaction. See docs/superpowers/specs/2026-07-11-link-codes-hardening-design.md.
 
-ALTER TABLE public.link_codes ADD COLUMN code_hash text;
-ALTER TABLE public.link_codes DROP COLUMN code;
+ALTER TABLE public.link_codes ADD COLUMN IF NOT EXISTS code_hash text;
+ALTER TABLE public.link_codes DROP COLUMN IF EXISTS code;
 
 -- No replacement policy: direct client access to this table is never legitimate again.
 -- The bot writes via its service_role key, which bypasses RLS regardless.

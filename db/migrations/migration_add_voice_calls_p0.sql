@@ -6,7 +6,7 @@
 -- alter or drop anything the existing medication-reminder pipeline depends on
 -- (medications, reminder_events, reminder_logs, profiles, scheduler_locks...).
 -- Idempotent: safe to re-run.
--- NOT YET APPLIED — review before running against the live project.
+-- APPLIED to the live project (see APPLIED.md) — header previously said otherwise.
 -- ============================================================================
 
 -- Per-patient voice service configuration -----------------------------------

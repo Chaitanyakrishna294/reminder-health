@@ -1,3 +1,6 @@
+-- ⚠ SUPERSEDED by migration_health_vault_combined.sql — do NOT run on fresh
+-- environments; kept only as historical record. See APPLIED.md.
+--
 -- RE-MIND-eЯ Health Vault Sprint 2 migration
 -- Run this script in the Supabase SQL Editor.
 

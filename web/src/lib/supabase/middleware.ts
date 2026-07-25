@@ -32,7 +32,22 @@ export async function updateSession(request: NextRequest) {
 
   const url = request.nextUrl.clone();
   const isAuthPage = ['/login', '/register', '/forgot-password'].includes(url.pathname);
-  const isProtectedRoute = ['/dashboard', '/medications', '/caregivers', '/events', '/stock', '/link-account', '/update-password'].some(path => url.pathname.startsWith(path));
+  // Every (dashboard)-group route + the two standalone authed pages. Keep in sync
+  // with src/app/(dashboard)/* — (dashboard)/layout.tsx is the second gate.
+  const isProtectedRoute = [
+    '/dashboard',
+    '/medications',
+    '/schedule-planner',
+    '/health-vault',
+    '/medical-profile',
+    '/emergency',
+    '/settings',
+    '/care-circle',
+    '/care-plus',
+    '/admin-diagnostics',
+    '/link-account',
+    '/update-password',
+  ].some(path => url.pathname.startsWith(path));
 
   // Redirect to login if user is not authenticated and attempts to access protected routes
   if (!user && isProtectedRoute) {
