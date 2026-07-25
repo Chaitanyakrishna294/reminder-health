@@ -67,46 +67,23 @@ export default function AdminDiagnosticsPage() {
 
   const fetchDiagnostics = useCallback(async () => {
     try {
-      // 1. Fetch active subscriptions count
-      const { count: subCount, error: subErr } = await supabase
-        .from('push_subscriptions')
-        .select('*', { count: 'exact', head: true });
-        
-      if (subErr) throw subErr;
+      // Cross-user telemetry comes from the ADMIN_EMAILS-gated service-role route;
+      // push_logs RLS no longer allows reading other users' rows from the browser.
+      const res = await fetch('/api/admin/diagnostics');
+      if (res.status === 403) {
+        router.push('/dashboard');
+        return;
+      }
+      if (!res.ok) throw new Error(`Diagnostics fetch failed (${res.status})`);
+      const { subCount, logs: logsData, statusRows: allStatsLogs, adhEvents } = (await res.json()) as {
+        subCount: number;
+        logs: PushLog[];
+        statusRows: { status: string; created_at: string }[];
+        adhEvents: { reminder_status: string; reviewed_from_status: string | null; resolution_channel: string | null }[];
+      };
 
-      // 2. Fetch push logs from push_logs table
-      const { data: logsData, error: logsErr } = await supabase
-        .from('push_logs')
-        .select(`
-          id,
-          user_id,
-          status,
-          gateway,
-          error_message,
-          created_at,
-          profiles:user_id (
-            full_name
-          )
-        `)
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (logsErr) throw logsErr;
-
-      // 3. Compute stats
       const typedLogs = (logsData || []) as any[] as PushLog[];
       setLogs(typedLogs);
-
-      // Fetch all logs from last 7 days for aggregate metrics
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      
-      const { data: allStatsLogs, error: statsErr } = await supabase
-        .from('push_logs')
-        .select('status, created_at')
-        .gte('created_at', sevenDaysAgo.toISOString());
-
-      if (statsErr) throw statsErr;
 
       const total = allStatsLogs?.length || 0;
       const sent = allStatsLogs?.filter(l => l.status === 'SENT').length || 0;
@@ -132,17 +109,7 @@ export default function AdminDiagnosticsPage() {
         lastPushTime: lastPush,
       });
 
-      // 4. Fetch 30-day medication events for adherence outcomes
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      
-      const { data: adhEvents, error: adhErr } = await supabase
-        .from('reminder_events')
-        .select('reminder_status, reviewed_at, reviewed_from_status, resolution_channel')
-        .gte('scheduled_for', thirtyDaysAgo.toISOString());
-
-      if (adhErr) throw adhErr;
-
+      // 30-day medication events for adherence outcomes (from the same admin route)
       let takenImmediately = 0;
       let takenAfterReview = 0;
       let skippedImmediately = 0;
@@ -157,7 +124,7 @@ export default function AdminDiagnosticsPage() {
         CAREGIVER_CONSOLE: 0,
       };
 
-      adhEvents?.forEach(event => {
+      (adhEvents || []).forEach((event: { reminder_status: string; reviewed_from_status: string | null; resolution_channel: string | null }) => {
         const status = event.reminder_status;
         const fromStatus = event.reviewed_from_status;
         
@@ -197,7 +164,7 @@ export default function AdminDiagnosticsPage() {
     } finally {
       setLoading(false);
     }
-  }, [supabase]);
+  }, [router]);
 
   // Check authentication
   useEffect(() => {
@@ -235,8 +202,8 @@ export default function AdminDiagnosticsPage() {
     if (!confirm('Are you sure you want to purge all notification diagnostic logs?')) return;
     try {
       setLoading(true);
-      const { error } = await supabase.from('push_logs').delete().neq('id', 0);
-      if (error) throw error;
+      const res = await fetch('/api/admin/diagnostics', { method: 'DELETE' });
+      if (!res.ok) throw new Error(`Purge failed (${res.status})`);
       fetchDiagnostics();
     } catch (err) {
       alert('Failed to clear logs: ' + (err as Error).message);
