@@ -5,14 +5,19 @@ import crypto from 'crypto';
 import { isBotAlive, isRecentlySent } from '@/lib/schedule/bot-liveness';
 import { sendBrowserPush } from '@/lib/push/send-push';
 import { calculateNextReminder } from '@/lib/medication-utils';
+import moment from 'moment-timezone';
+import { sendTelegramMessage, doseKeyboard, caregiverAlertKeyboard, escapeTelegramHTML } from '@/lib/telegram';
 
 // Reminder send-FAILOVER. The Render bot (src/scheduler.js) is primary and writes a
 // heartbeat each tick. This route is pinged every minute by an external cron with a
 // CRON_SECRET Bearer. If the heartbeat is fresh the bot is alive and this route is a
 // total no-op. If it is stale/missing the bot is down: this route takes over and
-// sends browser push (initial dose, gentle reminder, caregiver escalation, snooze
-// re-fire) using the SAME exactly-once guards the bot uses. Telegram is never sent
-// here (it is dead when the bot is down). See docs/superpowers/specs/2026-07-11-*.
+// sends browser push AND Telegram (initial dose, gentle reminder, caregiver
+// escalation, snooze re-fire) using the SAME exactly-once guards the bot uses.
+// Telegram *sending* works while the bot process is down — only callback handling
+// waits for the bot to resume (see lib/telegram.ts). Requires TELEGRAM_BOT_TOKEN
+// on Vercel; without it, sends degrade to push-only as before.
+// See docs/superpowers/specs/2026-07-11-*.
 export const dynamic = 'force-dynamic';
 
 function isAuthorized(request: Request): boolean {
@@ -116,6 +121,11 @@ export async function GET(request: Request) {
 
       if (eventErr || !eventData || eventData.length === 0) continue; // duplicate — already handled elsewhere
 
+      await sendTelegramMessage(
+        med.telegram_id,
+        `💊 Time to take <b>${escapeTelegramHTML(med.drug_name)}</b>${med.dosage ? ` (${escapeTelegramHTML(med.dosage)})` : ''}`,
+        doseKeyboard(med.id, new Date(scheduledFor).getTime(), 0),
+      );
       await sendBrowserPush(med.telegram_id, {
         title: '💊 Medication Reminder',
         body: `Time to take ${med.drug_name}${med.dosage ? ` (${med.dosage})` : ''}.`,
@@ -131,6 +141,13 @@ export async function GET(request: Request) {
     } else {
       for (const t of transitions || []) {
         if (t.new_status === 'GENTLE_REMINDER') {
+          // snoozeCount 0 keeps the Snooze button visible; the bot's DB-side cap
+          // check still rejects over-cap taps once it resumes.
+          await sendTelegramMessage(
+            t.telegram_id,
+            `⏰ <b>Gentle Reminder:</b> Please take your <b>${escapeTelegramHTML(t.drug_name)}</b>${t.dosage ? ` (${escapeTelegramHTML(t.dosage)})` : ''}.`,
+            doseKeyboard(t.medication_id, new Date(t.scheduled_for).getTime(), 0),
+          );
           await sendBrowserPush(t.telegram_id, {
             title: '⏰ Gentle Reminder',
             body: `Please remember to take your ${t.drug_name}${t.dosage ? ` (${t.dosage})` : ''}.`,
@@ -154,7 +171,13 @@ export async function GET(request: Request) {
             .eq('is_active', true)
             .eq('can_receive_escalations', true);
 
+          const priorityLabel = t.priority_level === 'critical' ? '🔴 CRITICAL' : t.priority_level === 'important' ? '🟠 IMPORTANT' : '🟢 NORMAL';
+          const dueAt = moment(t.scheduled_for).tz('Asia/Kolkata').format('h:mm A');
+          const alertHtml = `🚨 <b>Medication Alert (${priorityLabel})</b>\n\nA medication for <b>${escapeTelegramHTML(patientName)}</b> (<b>${escapeTelegramHTML(t.drug_name)}</b>${t.dosage ? ` - ${escapeTelegramHTML(t.dosage)}` : ''} due at <b>${dueAt}</b>) has not yet been confirmed. Please verify or check with them.`;
+          const alertButtons = caregiverAlertKeyboard(t.medication_id, new Date(t.scheduled_for).getTime());
+
           for (const cg of caregivers || []) {
+            await sendTelegramMessage(cg.caregiver_chat_id, alertHtml, alertButtons);
             await sendBrowserPush(cg.caregiver_chat_id, {
               title: `⚠️ ${patientName} Missed Medication`,
               body: `${patientName} has not taken ${t.drug_name}. Action required.`,
@@ -184,6 +207,11 @@ export async function GET(request: Request) {
         .eq('reminder_status', 'SNOOZED')
         .select();
       if (!updated || updated.length === 0) continue;
+      await sendTelegramMessage(
+        med.telegram_id,
+        `💊 Time to take <b>${escapeTelegramHTML(med.drug_name)}</b>${med.dosage ? ` (${escapeTelegramHTML(med.dosage)})` : ''}`,
+        doseKeyboard(med.id, new Date(ev.scheduled_for).getTime(), ev.snooze_count ?? 0),
+      );
       await sendBrowserPush(med.telegram_id, {
         title: '⏰ Snooze Reminder',
         body: `Time to take ${med.drug_name}${med.dosage ? ` (${med.dosage})` : ''}.`,
