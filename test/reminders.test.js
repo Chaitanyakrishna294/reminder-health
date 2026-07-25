@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { dosesPerDay, buildDoseKeyboard, buildTakePromptMessage } = require('../src/reminders');
+const { dosesPerDay, buildDoseKeyboard, buildTakePromptMessage, daysOfStockLeft } = require('../src/reminders');
 const { CALLBACK_ACTIONS, MAX_SNOOZES } = require('../src/constants');
 
 // These functions were extracted verbatim from scheduler.js's inline copies.
@@ -35,6 +35,19 @@ test('buildDoseKeyboard drops Snooze once the cap is reached', () => {
 test('buildDoseKeyboard defaults snoozeCount to 0 (Snooze shown)', () => {
   const row = buildDoseKeyboard(1, 2).inline_keyboard[0];
   assert.strictEqual(row.length, 3);
+});
+
+test('daysOfStockLeft: current_stock first, dosage_amount in burn rate, null = tracking off', () => {
+  // 20 tablets, 2 per dose, twice daily → 5 days (not 10)
+  assert.strictEqual(daysOfStockLeft({ current_stock: 20, dosage_amount: 2, frequency: 'twice_daily' }), 5);
+  // falls back to tablet_count when current_stock is null (legacy rows)
+  assert.strictEqual(daysOfStockLeft({ current_stock: null, tablet_count: 6, frequency: 'once_daily' }), 6);
+  // missing/zero dosage_amount treated as 1
+  assert.strictEqual(daysOfStockLeft({ current_stock: 9, frequency: 'thrice_daily' }), 3);
+  assert.strictEqual(daysOfStockLeft({ current_stock: 9, dosage_amount: 0, frequency: 'thrice_daily' }), 3);
+  // no stock recorded → null, never 0/LOW STOCK
+  assert.strictEqual(daysOfStockLeft({ frequency: 'once_daily' }), null);
+  assert.strictEqual(daysOfStockLeft({ current_stock: null, tablet_count: null, frequency: 'once_daily' }), null);
 });
 
 test('buildTakePromptMessage appends and HTML-escapes the dosage', () => {

@@ -97,9 +97,13 @@ export default async function DashboardPage() {
   // Active alerts (Low stock)
   const lowStockMedicines = (medications || [])
     .filter(m => {
-      if (m.tablet_count === null || m.tablet_count === undefined) return false;
-      const tabletsPerDay = m.frequency === 'once_daily' ? 1 : m.frequency === 'twice_daily' ? 2 : m.frequency === 'thrice_daily' ? 3 : 1;
-      const daysRemaining = Math.floor(m.tablet_count / tabletsPerDay);
+      // current_stock is the source of truth; tablet_count is its floored DB-trigger
+      // mirror. Burn rate must include dosage_amount (2 tablets × 2/day = 4/day).
+      const stock = m.current_stock ?? m.tablet_count;
+      if (stock === null || stock === undefined) return false;
+      const dosesPerDay = m.frequency === 'twice_daily' ? 2 : m.frequency === 'thrice_daily' ? 3 : 1;
+      const perDay = dosesPerDay * (Number(m.dosage_amount) || 1);
+      const daysRemaining = Math.floor(stock / perDay);
       return daysRemaining <= 3 && m.low_stock_alert_enabled;
     })
     .map(m => ({ id: m.id, drug_name: m.drug_name, tablet_count: m.tablet_count, current_stock: m.current_stock }));

@@ -84,15 +84,11 @@ const escapeHTML = (val) => {
     .replace(/'/g, '&#039;');
 };
 
-// In-memory snooze tracking
-const activeSnoozes = {};
-
 module.exports = {
   delay,
   isValidTime,
   calculateNextReminder,
   escapeHTML,
-  activeSnoozes,
   DEFAULT_TIMEZONE
 };
 

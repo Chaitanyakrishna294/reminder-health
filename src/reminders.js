@@ -63,8 +63,24 @@ const buildDoseKeyboard = (medicationId, scheduledTimeMs, snoozeCount = 0) => {
 const buildTakePromptMessage = (drugName, dosage) =>
   `💊 Time to take <b>${escapeHTML(drugName)}</b>${dosage ? ` (${escapeHTML(dosage)})` : ''}`;
 
+/**
+ * Days of stock remaining for a medication, or null when stock tracking is off
+ * (no stock value recorded). Reads current_stock (source of truth; tablet_count
+ * is a floored mirror kept by a DB trigger) and accounts for dosage_amount —
+ * a med taken 2 tablets × 2 times a day burns 4/day, not 2.
+ * @param {{current_stock?: number|null, tablet_count?: number|null, frequency: string, dosage_amount?: number|null}} med
+ * @returns {number|null}
+ */
+const daysOfStockLeft = (med) => {
+  const stock = med.current_stock ?? med.tablet_count;
+  if (stock === null || stock === undefined) return null;
+  const perDay = dosesPerDay(med.frequency) * (Number(med.dosage_amount) || 1);
+  return Math.floor(stock / perDay);
+};
+
 module.exports = {
   dosesPerDay,
   buildDoseKeyboard,
   buildTakePromptMessage,
+  daysOfStockLeft,
 };

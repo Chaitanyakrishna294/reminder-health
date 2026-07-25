@@ -3,8 +3,8 @@ const { bot } = require('./bot');
 const { supabase } = require('./db');
 const moment = require('moment-timezone');
 const { STATES, FREQUENCIES, CALLBACK_ACTIONS, MAIN_MENU, MAX_SNOOZES, SNOOZE_MINUTES } = require('./constants');
-const { isValidTime, calculateNextReminder, escapeHTML, activeSnoozes } = require('./utils');
-const { dosesPerDay } = require('./reminders');
+const { isValidTime, calculateNextReminder, escapeHTML } = require('./utils');
+const { daysOfStockLeft } = require('./reminders');
 
 const userStates = {};
 
@@ -246,19 +246,15 @@ const handleCaregiverPanel = async (chatId) => {
           const nextDate = new Date(med.next_reminder_at);
           const nextTimeStr = moment(med.next_reminder_at).tz('Asia/Kolkata').format('h:mm A');
           
-          // tablet_count is null when stock tracking is simply not enabled for this
-          // medication (a normal, common state, e.g. vitamins) — not an error. Without this
-          // guard, `null / tabletsPerDay` coerces to 0 in JS and falsely reports LOW STOCK
-          // to the caregiver for a medication that was never being tracked at all.
-          const hasStockTracking = med.tablet_count !== null && med.tablet_count !== undefined;
-          const tabletsPerDay = dosesPerDay(med.frequency);
-          const daysRemaining = hasStockTracking ? Math.floor(med.tablet_count / tabletsPerDay) : null;
-          const isLowStock = hasStockTracking && daysRemaining <= 3;
-          const stockStatus = !hasStockTracking
+          // daysOfStockLeft returns null when stock tracking is simply not enabled for
+          // this medication (a normal, common state, e.g. vitamins) — not an error.
+          const daysRemaining = daysOfStockLeft(med);
+          const isLowStock = daysRemaining !== null && daysRemaining <= 3;
+          const stockStatus = daysRemaining === null
             ? 'Stock tracking not enabled'
             : isLowStock
               ? `⚠️ LOW STOCK (Only ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining)`
-              : `Stock: ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining (${med.tablet_count} left)`;
+              : `Stock: ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining (${med.current_stock ?? med.tablet_count} left)`;
 
           // Weekly adherence
           let adherenceStr = 'N/A';
@@ -278,7 +274,7 @@ const handleCaregiverPanel = async (chatId) => {
         // Today's Timeline View
         let timelineText = '';
         if (todayLogs && todayLogs.length > 0) {
-          todayLogs.sort((a, b) => a.scheduled_time.localeCompare(b));
+          todayLogs.sort((a, b) => a.scheduled_time.localeCompare(b.scheduled_time));
           todayLogs.forEach(log => {
             const timeStr = moment(log.scheduled_time).tz('Asia/Kolkata').format('hh:mm A');
             let statusEmojiStr = '⏳ Pending';
@@ -1135,6 +1131,8 @@ const initCommands = () => {
           frequency: state.frequency,
           reminder_times: state.times,
           current_stock: state.tablet_count,
+          // Explicit, not left to the column default: alerts on iff stock was captured.
+          low_stock_alert_enabled: state.tablet_count != null,
           priority_level: state.priority_level || 'normal',
           next_reminder_at: nextReminderAt.toISOString()
         }]);
@@ -1440,9 +1438,6 @@ const initCommands = () => {
 
         console.log(`[Workflow State Change] Callback SNOOZED event ID ${event.id} (new snooze_count: ${currentSnoozes + 1})`);
 
-        // Maintain in-memory snooze tracker as well
-        activeSnoozes[medId] = currentSnoozes + 1;
-
         await bot.editMessageText(`${query.message.text}\n\n[Status: ⏰ Snoozed for ${SNOOZE_MINUTES}m]`, { chat_id: chatId, message_id: messageId, reply_markup: { inline_keyboard: [] } });
         await bot.answerCallbackQuery(query.id, { text: `Snoozed for ${SNOOZE_MINUTES}m` });
         return;
@@ -1524,9 +1519,6 @@ const initCommands = () => {
       if (getMedErr || !medData) {
         throw new Error('Medication record not found for logging.');
       }
-
-      // Clean up in-memory snoozes if action is taken/skip
-      delete activeSnoozes[medId];
 
       // Update old scheduling columns on medications table for backward compatibility
       await supabase

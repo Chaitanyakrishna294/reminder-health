@@ -4,9 +4,9 @@ const moment = require('moment-timezone');
 const webpush = require('web-push');
 const { bot } = require('./bot');
 const { supabase } = require('./db');
-const { delay, calculateNextReminder, escapeHTML, activeSnoozes } = require('./utils');
+const { delay, calculateNextReminder, escapeHTML } = require('./utils');
 const { CALLBACK_ACTIONS } = require('./constants');
-const { dosesPerDay, buildDoseKeyboard, buildTakePromptMessage } = require('./reminders');
+const { buildDoseKeyboard, buildTakePromptMessage, daysOfStockLeft } = require('./reminders');
 
 // Unique id for this process, used to claim the cross-instance minute-tick lease
 // so two overlapping instances (deploy/restart) can't double-escalate reminders.
@@ -219,14 +219,9 @@ const initScheduler = () => {
 
           const scheduledTimeMs = new Date(med.next_reminder_at).getTime();
 
-          // Reset snooze counter in activeSnoozes if this is a fresh regular reminder cycle
-          const nextTimeIST = moment(med.next_reminder_at).tz('Asia/Kolkata').format('HH:mm');
-          if (med.reminder_times.includes(nextTimeIST)) {
-            delete activeSnoozes[med.id];
-          }
-
-          const currentSnoozes = activeSnoozes[med.id] || 0;
-          const inlineKeyboard = buildDoseKeyboard(med.id, scheduledTimeMs, currentSnoozes);
+          // A new dose always starts with a fresh snooze budget; per-dose counts live in
+          // reminder_events.snooze_count (DB-authoritative, survives worker restarts).
+          const inlineKeyboard = buildDoseKeyboard(med.id, scheduledTimeMs, 0);
           const message = buildTakePromptMessage(med.drug_name, med.dosage);
 
           try {
@@ -251,9 +246,9 @@ const initScheduler = () => {
             }
 
             // 2. Insert event in reminder_events table (Idempotency check via Unique Constraint)
+            // Retry/gentle-reminder timing is owned by scan_and_escalate_overdue_reminders
+            // in SQL — retry_reminder_at is intentionally null here.
             const scheduledFor = med.next_reminder_at;
-            const intervalMinutes = med.priority_level === 'critical' ? 5 : 15;
-            const retryReminderAt = new Date(Date.now() + intervalMinutes * 60 * 1000).toISOString();
 
             const payload = {
               medication_id: med.id,
@@ -261,7 +256,7 @@ const initScheduler = () => {
               scheduled_for: scheduledFor,
               reminder_status: 'SENT',
               retry_count: 0,
-              snooze_count: currentSnoozes,
+              snooze_count: 0,
               retry_reminder_at: null
             };
             console.log('[Scheduler] reminder_event payload:', payload);
@@ -639,12 +634,12 @@ const initScheduler = () => {
       if (!activeMeds || activeMeds.length === 0) return;
 
       for (const med of activeMeds) {
-        if (med.tablet_count === null || med.tablet_count === undefined) continue;
-        const tabletsPerDay = dosesPerDay(med.frequency);
-        const daysRemaining = Math.floor(med.tablet_count / tabletsPerDay);
+        const daysRemaining = daysOfStockLeft(med);
+        if (daysRemaining === null) continue;
 
         if (daysRemaining <= 3) {
-          const message = `⚠️ Your medication stock for <b>${escapeHTML(med.drug_name)}</b> is running low.\n\nOnly ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining (${med.tablet_count} tablets left).\n\nPlease refill your medicine soon.`;
+          const stockLeft = med.current_stock ?? med.tablet_count;
+          const message = `⚠️ Your medication stock for <b>${escapeHTML(med.drug_name)}</b> is running low.\n\nOnly ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining (${stockLeft} left).\n\nPlease refill your medicine soon.`;
           
           const inlineKeyboard = {
             inline_keyboard: [
@@ -827,9 +822,8 @@ const initScheduler = () => {
       const lowStockByPatient = new Map();
       patientIds.forEach(id => lowStockByPatient.set(id, []));
       (allMeds || []).forEach(med => {
-        if (med.tablet_count === null || med.tablet_count === undefined) return;
-        const tabletsPerDay = dosesPerDay(med.frequency);
-        const daysRemaining = Math.floor(med.tablet_count / tabletsPerDay);
+        const daysRemaining = daysOfStockLeft(med);
+        if (daysRemaining === null) return;
         if (daysRemaining <= 3) {
           const arr = lowStockByPatient.get(med.telegram_id);
           if (arr) arr.push({ drug_name: med.drug_name, daysRemaining });
