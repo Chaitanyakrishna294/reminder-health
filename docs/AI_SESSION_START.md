@@ -1,20 +1,21 @@
 # Read First
 
-1. [PROJECT_CONTEXT.md](file:///c:/Users/chait/OneDrive/Documents/GitHub/reminder-health/docs/PROJECT_CONTEXT.md)
-2. [CURRENT_SYSTEM_STATE.md](file:///c:/Users/chait/OneDrive/Documents/GitHub/reminder-health/docs/CURRENT_SYSTEM_STATE.md)
-3. [ARCHITECTURE_DECISIONS.md](file:///c:/Users/chait/OneDrive/Documents/GitHub/reminder-health/docs/ARCHITECTURE_DECISIONS.md)
-4. [SPRINT_STATUS.md](file:///c:/Users/chait/OneDrive/Documents/GitHub/reminder-health/docs/SPRINT_STATUS.md)
-5. Latest [PROJECT_JOURNAL.md](file:///c:/Users/chait/OneDrive/Documents/GitHub/reminder-health/docs/PROJECT_JOURNAL.md) Entries
+**→ [WORK_LEDGER.md](WORK_LEDGER.md) is the canonical entry point** (full codebase map, recipes,
+docs trust index). The reading list below is kept for history; most of it is stale — see
+WORK_LEDGER §9 before trusting any state claims.
 
-Current Sprint:
-5.7C
+Supporting reads, in order of usefulness:
 
-Current Focus:
-Care Circle RCA Fixes
+1. [KNOWN_ISSUES.md](KNOWN_ISSUES.md) — freshest issue state
+2. [ARCHITECTURE_DECISIONS.md](ARCHITECTURE_DECISIONS.md) — ADR-001..006, still binding
+3. [PROJECT.md](../PROJECT.md) — terse whole-system reference
+4. [PROJECT_WALKTHROUGH.md](PROJECT_WALKTHROUGH.md) + [FAQ.md](FAQ.md) — narrated tour
 
-Do Not Modify:
+Stale (superseded by WORK_LEDGER): PROJECT_CONTEXT.md (glossary still fine),
+CURRENT_SYSTEM_STATE.md, SPRINT_STATUS.md, PROJECT_JOURNAL.md, FEATURE_INVENTORY.md,
+ENGINEERING_STATE.md.
+
+Do Not Modify without ADR review:
 - Permission Model
 - Care Circle Architecture
 - Notification Architecture
-
-Without ADR Review
