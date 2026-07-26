@@ -229,7 +229,7 @@ Bot uses service_role, so RLS tightening can only break the web app, never the b
 | `VAPID_SUBJECT` `NEXT_PUBLIC_VAPID_PUBLIC_KEY` `VAPID_PRIVATE_KEY` | Render + Vercel | Push (worker warns+disables if missing; **absent from `.env.example`**) |
 | `NEXT_PUBLIC_SUPABASE_URL` `NEXT_PUBLIC_SUPABASE_ANON_KEY` `SUPABASE_SERVICE_ROLE_KEY` | Vercel (+`web/.env.local`) | Web core |
 | `CRON_SECRET` | Vercel | `/api/cron/tick` bearer; 503 if unset |
-| `TELEGRAM_BOT_TOKEN` | Vercel too | Failover Telegram sends from `/api/cron/tick`; push-only without it |
+| `TELEGRAM_BOT_TOKEN` | Vercel too (set 2026-07-26) | Failover Telegram sends from `/api/cron/tick`; push-only without it |
 | `ADMIN_EMAILS` | Vercel | Comma-separated allowlist for `/admin-diagnostics`; empty = nobody |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Vercel | Optional captcha |
 | `VOICE_CALLS_ENABLED` `PUBLIC_WEBHOOK_BASE_URL` `EXOTEL_*` `VOICE_DAILY_CALL_CAP` `VOICE_MONTHLY_CALL_QUOTA` | **both** Render & Vercel identically | Voice stack (dormant) |
@@ -265,7 +265,9 @@ non-idempotent migrations guarded; superseded vault migrations marked.
 - `ADMIN_EMAILS` on Vercel is intentionally unset (nobody can open
   /admin-diagnostics) — the context email krishnac0294@gmail.com is a TEST mail,
   never auto-enroll it; the maintainer adds their real email when needed.
-- `TELEGRAM_BOT_TOKEN` not yet set on Vercel — failover is push-only until then.
+- Next 16 deprecation warning at build: the `middleware` file convention → rename
+  `web/src/middleware.ts` to `proxy.ts` per the Next migration guide before a
+  future Next upgrade removes support (cosmetic today; builds fine).
 - `check_rate_limit` anon grant was revoked by the 07-09 hardening loop — any future
   unauthenticated rate-limit path is silently broken (web uses service client; fine today).
 - `userStates` (bot conversation FSM) is still in-memory; a worker restart drops
