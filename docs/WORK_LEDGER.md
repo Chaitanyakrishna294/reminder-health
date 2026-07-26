@@ -259,13 +259,13 @@ dead component + boilerplate assets deleted; `logo2.png` 1.5 MB → 14 KB;
 non-idempotent migrations guarded; superseded vault migrations marked.
 
 *Still open*
-- **PENDING migrations** (see `db/migrations/APPLIED.md`): push_logs own-rows RLS
-  (deploy web first), notifications no-client-insert, are_profiles_connected dual-read.
-  Until applied: any signed-in user can read all push_logs, forge self-notifications,
-  and web-only pairs can't chat.
-- **Exotel credentials**: `docs/EXOTEL_SUPPORT_BRIEF.md` has a live account id +
-  ExoPhone and an unresolved "rotate the API key/token after testing" warning —
-  manual action for the maintainer.
+- **Voice/Exotel is SHELVED** (2026-07-26): the maintainer is not pursuing Exotel
+  (personal cost). Don't resume voice work; the stack stays dormant at zero cost.
+  The "rotate key" warning in `docs/EXOTEL_SUPPORT_BRIEF.md` is moot.
+- `ADMIN_EMAILS` on Vercel is intentionally unset (nobody can open
+  /admin-diagnostics) — the context email krishnac0294@gmail.com is a TEST mail,
+  never auto-enroll it; the maintainer adds their real email when needed.
+- `TELEGRAM_BOT_TOKEN` not yet set on Vercel — failover is push-only until then.
 - `check_rate_limit` anon grant was revoked by the 07-09 hardening loop — any future
   unauthenticated rate-limit path is silently broken (web uses service client; fine today).
 - `userStates` (bot conversation FSM) is still in-memory; a worker restart drops

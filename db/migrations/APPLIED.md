@@ -58,16 +58,13 @@ maintainer applies it in the Supabase SQL editor (project `jaflclnakwtikqbfhfdk`
 | 46 | `migration_link_codes_hardening_2026_07.sql` | 2026-07-11 |
 | 47 | `migration_scheduler_heartbeat_2026_07.sql` | 2026-07-11 |
 | 48 | `migration_medication_catalog_2026_07.sql` | 2026-07-12 |
+| 49 | `migration_push_logs_rls_2026_07.sql` | 2026-07-26 |
+| 50 | `migration_notifications_no_client_insert_2026_07.sql` | 2026-07-26 |
+| 51 | `migration_are_profiles_connected_dual_read_2026_07.sql` | 2026-07-26 (validated: dual-read + SECURITY DEFINER confirmed) |
 
 ## PENDING (written, not yet applied)
 
-| File | Depends on |
-|---|---|
-| `migration_push_logs_rls_2026_07.sql` | deploy web first (admin page now reads via service route) |
-| `migration_notifications_no_client_insert_2026_07.sql` | — |
-| `migration_are_profiles_connected_dual_read_2026_07.sql` | — |
-
-Move rows up to "Applied order" once run.
+None.
 
 ## Current function definitions (latest file wins)
 
