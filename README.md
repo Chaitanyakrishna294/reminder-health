@@ -224,3 +224,13 @@ node index.js
 # Conclusion
 
 Re-MIND-eЯ Version 1 is a beginner-friendly healthcare reminder system designed to improve medication adherence using a simple Telegram-based interface for elderly and non-technical users.
+
+---
+
+# License
+
+This project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0) - see the [LICENSE](LICENSE) file for details.
+
+Copyright (C) 2026 chaitanya krishna
+
+You are free to use, study, and modify this code. However, if you run a modified version of this software as a network service (bot, website, API), you **must** make your complete source code available to its users under the same license.
