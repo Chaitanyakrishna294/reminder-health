@@ -145,6 +145,7 @@ through RPCs, never raw table writes. `lib/rate-limit.ts` and `lib/medications/c
 | `lib/reminder-events.ts` | `resolveReminderEvent`/`correctReminderEvent` RPC wrappers — the single dose ledger |
 | `lib/medication-utils.ts` | Web mirror of bot time math (lockstep rule, §1) |
 | `lib/schedule/dose-engine.ts` · `bot-liveness.ts` | Pure helpers, have tests |
+| `lib/schedule/dose-attention.ts` | Pending-vs-attention (missed) status partition + gate-queue order; shared by gate, missed strip, hero; has test |
 | `lib/push/register-push.ts` (client) · `send-push.ts` (server) | Web-push both directions |
 | `lib/plan.ts` · `billing/use-plan-status.ts` · `billing/luxe.ts` | Plan gate, client mirror, Care+ inline-style tokens (deliberately outside Tailwind) |
 | `lib/rate-limit.ts` · `razorpay.ts` · `sms.ts` · `severity-theme.ts` · `medications/{catalog,form-logic}.ts` | As named |
@@ -157,7 +158,8 @@ Hook: `use-realtime-notifications` (realtime `notifications` channel → bell).
 
 Components live in `components/{layout,dashboard,medications,guide,billing,settings,medical,shared,ui}/`.
 Big ones: `dashboard-client-view.tsx` (86 KB), `settings-client-view.tsx` (42 KB),
-`medication-list.tsx` (26 KB). Guided tours: `components/guide/*` (`TOURS` map in `guide-content.ts`,
+`medication-list.tsx` (26 KB). Also `missed-dose-strip.tsx` (top-pinned missed-dose alert, spec
+2026-07-27). Guided tours: `components/guide/*` (`TOURS` map in `guide-content.ts`,
 `data-tour` attributes, `GuideAutoStart`).
 
 **Recipes**
