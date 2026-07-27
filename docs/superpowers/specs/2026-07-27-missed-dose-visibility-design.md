@@ -48,8 +48,13 @@ Attention statuses (one definition, used by all three parts):
 ### Part 1 — Gate extension (`med-due-gate.tsx` + `dashboard-client-view.tsx`)
 
 - `dueQueue` additionally includes today's events in attention statuses,
-  subject to the same 30-minute `medGateSnoozes` suppression. Oldest
-  `scheduled_for` first (existing sort already does this).
+  subject to the same 30-minute `medGateSnoozes` suppression.
+- **Queue order: present doses first, missed backlog after.** Doses due now
+  (pending states, `scheduled_for <= now`) come first, soonest first — the
+  dose the user most likely opened the app for. Only once every present dose
+  is answered does the gate move on to previously missed doses
+  (attention statuses), oldest first. The "N doses to confirm" counter spans
+  the whole queue.
 - `MedDueGate` gets a `mode: 'due' | 'missed'` prop (derived from the event's
   status being an attention status). `missed` mode changes copy only:
   - Header: "You missed <drug> at <time>." then "Did you take it?"
@@ -115,7 +120,7 @@ Tested with a bare node:assert script `dose-attention.test.ts` run via
 ## Testing & verification
 
 1. `dose-attention.test.ts` — unit coverage for the partition (statuses,
-   ordering, empty cases).
+   due-before-missed gate ordering, empty cases).
 2. Manual dev-server verification (launch config `web`, port 3001): seed a
    missed dose, confirm gate → snooze → strip at top with no scroll →
    resolve → strip disappears; caregiver monitor view shows strip;
