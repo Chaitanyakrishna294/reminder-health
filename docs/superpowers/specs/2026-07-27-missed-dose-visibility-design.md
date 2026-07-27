@@ -60,6 +60,21 @@ Attention statuses (one definition, used by all three parts):
   - Header: "You missed <drug> at <time>." then "Did you take it?"
   - Buttons: "Yes, I took it late" / "No, I missed it" / "Ask me later"
   - Mascot mood `concerned`, red accent instead of pink.
+- **View toggle: "One by one" / "All at once"** (shown only when the queue has
+  more than one dose; default is one-by-one). Covers the catch-up scenario —
+  e.g. returning from a trip with 10 unlogged doses:
+  - *One by one* (default): the existing detailed card — one dose, full drug
+    info, big buttons. Safest for elderly users; nothing changes for them.
+  - *All at once*: a compact list of every queued dose — drug name +
+    scheduled time per row, with small "✓ Taken" / "✗ Skipped" buttons on
+    each row. Each tap resolves that dose individually through the same RPC
+    (no bulk "mark all" button — each dose gets its own deliberate tap, which
+    also keeps stock math and the dose ledger honest). Resolved rows show a
+    brief confirmation state, and the gate closes when the list empties.
+  - Toggle choice is session-local UI state, not persisted — every gate
+    appearance starts back at one-by-one.
+  - In list view, "Ask me later" snoozes ALL remaining queued doses for 30
+    minutes (they fall through to the missed strip, Part 2).
 - Resolution path unchanged: `resolveReminderEvent` with TAKEN/SKIP,
   `actorRole: 'PATIENT'`. Patient-self view only (never PATIENT_MONITOR),
   exactly as today. Emergency-card escape hatch stays.
@@ -109,8 +124,9 @@ Tested with a bare node:assert script `dose-attention.test.ts` run via
   existing `onResolved` state update and 60-second re-render clock already
   reconcile; `resolve_reminder_event` returns `already_resolved: true` and the
   UI treats it as success.
-- **Many missed doses:** gate shows "N doses to confirm" counter (existing);
-  strip lists all rows.
+- **Many missed doses:** gate shows "N doses to confirm" counter (existing)
+  and offers the "All at once" list view for fast catch-up; strip lists all
+  rows.
 - **Virtual events** (no DB row yet): `resolveReminderEvent` passes
   `eventId: null` and the RPC creates the row — already the existing behavior
   for virtual due doses.
