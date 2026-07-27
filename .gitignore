@@ -35,6 +35,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
+# Local datasets (source CSVs already imported into Supabase — do not commit)
+dataset/
+
 # Test coverage
 coverage/
 **/coverage/
