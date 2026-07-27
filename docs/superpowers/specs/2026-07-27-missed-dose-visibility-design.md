@@ -95,10 +95,13 @@ Attention statuses (one definition, used by all three parts):
 
 ### Part 3 — Hero truth (`dashboard-client-view.tsx`)
 
-- `nextPendingEvent` selection becomes: first attention-status event (oldest
-  first) if any exist, else current pending-state logic. The hero's existing
-  `isMissed` red state then renders for it (it already triggers on
-  `scheduled_for <= now`).
+- `nextPendingEvent` selection (amended 2026-07-27 post-review, maintainer
+  approved): a due-now pending dose wins the hero if one exists (keeping its
+  action buttons — essential for caregiver-role self-users who never see the
+  gate), THEN the oldest attention-status event, then the soonest upcoming
+  dose. Missed-dose visibility is guaranteed by the strip pinned above the
+  hero, not by hero eviction. The hero's existing `isMissed` red state
+  renders for any past-due selection (it triggers on `scheduled_for <= now`).
 - `heroMood`/`isGravityState` already account for `todayMissed`; extend the
   count to include `PENDING_REVIEW`/`UNCONFIRMED` so mood and the "Attention:
   You have missed doses" banner agree with the new definition.

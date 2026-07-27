@@ -425,16 +425,21 @@ export default function DashboardClientView({
   const isPendingState = (status: string) => isPendingStatus(status);
   const nowMs = Date.now();
   const { attention: attentionEvents } = partitionDoseAttention(events);
-  // Hero: a missed dose always outranks the calm "next up" pick, so the top of
-  // the page never shows a serene card while something needs attention.
-  const nextPendingEvent = attentionEvents[0] ?? [...events]
+  // Hero priority: a dose due RIGHT NOW wins (it keeps its action buttons —
+  // vital for caregiver-role self-users who never see the gate), then the
+  // missed backlog (resolved via the strip pinned above), then the calm
+  // "next up" pick. The page still can't look serene while something is
+  // missed: the strip, banners, and mood all key off the attention set.
+  const sortedPending = [...events]
     .filter(e => isPendingState(e.reminder_status))
     .sort((a, b) => {
       const aOverdue = new Date(a.scheduled_for).getTime() <= nowMs;
       const bOverdue = new Date(b.scheduled_for).getTime() <= nowMs;
       if (aOverdue !== bOverdue) return aOverdue ? -1 : 1; // overdue to the top
       return new Date(a.scheduled_for).getTime() - new Date(b.scheduled_for).getTime();
-    })[0];
+    });
+  const dueNowPending = sortedPending.find(e => new Date(e.scheduled_for).getTime() <= nowMs);
+  const nextPendingEvent = dueNowPending ?? attentionEvents[0] ?? sortedPending[0];
 
   const heroMood = activeEscalations > 0 || todayMissed > 0 ? 'concerned' : nextPendingEvent ? 'happy' : 'proud';
   const upcomingCount = events.filter(e => isPendingState(e.reminder_status)).length;

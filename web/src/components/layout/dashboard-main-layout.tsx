@@ -294,7 +294,7 @@ export default function DashboardMainLayout({
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black bg-[#EAF3FF] text-primary border border-primary/20 uppercase tracking-wider shrink-0">
-                  <Shield className="w-4 h-4" /> READ ONLY
+                  <Shield className="w-4 h-4" /> READ ONLY — EXCEPT MISSED DOSES
                 </span>
               )}
 
