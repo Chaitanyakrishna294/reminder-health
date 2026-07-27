@@ -16,7 +16,8 @@ import GuideButton from '@/components/guide/guide-button';
 import GuideAutoStart from '@/components/guide/guide-auto-start';
 import moment from 'moment-timezone';
 import { type OverrideEntry, findOverride, toOverrideDateStr } from '@/lib/schedule/dose-engine';
-import { isPendingStatus, buildGateQueue } from '@/lib/schedule/dose-attention';
+import { isPendingStatus, isAttentionStatus, partitionDoseAttention, buildGateQueue } from '@/lib/schedule/dose-attention';
+import MissedDoseStrip from '@/components/dashboard/missed-dose-strip';
 import MedicationSlider from '@/components/dashboard/medication-slider';
 import { getUnitIcon, getCountdownText, PinkBubbles } from '@/components/dashboard/dashboard-helpers';
 
@@ -396,7 +397,9 @@ export default function DashboardClientView({
   // Dynamic calculations based on current state (timezone-safe, calculated on client)
   const todayTaken = events.filter(e => e.reminder_status === 'TAKEN' || e.reminder_status === 'RESOLVED_BY_CG').length;
   const todaySkipped = events.filter(e => e.reminder_status === 'SKIPPED').length;
-  const todayMissed = events.filter(e => e.reminder_status === 'MISSED').length;
+  // "Missed" for banners/mood spans the whole attention backlog, so the page
+  // can't show a calm face while PENDING_REVIEW/UNCONFIRMED doses exist.
+  const todayMissed = events.filter(e => isAttentionStatus(e.reminder_status)).length;
   const activeEscalations = events.filter(e => e.reminder_status === 'ESCALATED_TO_CG' || e.reminder_status === 'ESCALATED').length;
   const todayTotal = events.length;
 
@@ -406,24 +409,19 @@ export default function DashboardClientView({
   // writes once a dose fires (SENT, GENTLE_REMINDER, ESCALATED, …) — otherwise a dose vanishes
   // from "Next Medication" the moment its time arrives (when the virtual FUTURE_SCHEDULED event
   // is replaced by a real SENT row). It should stay until the patient takes or skips it.
-  const isPendingState = (status: string) => {
-    return [
-      // Client-side virtual / legacy states
-      'PENDING_PATIENT', 'RETRYING_PATIENT', 'SNOOZED', 'ESCALATED_TO_CG', 'FUTURE_SCHEDULED',
-      // Real reminder_events statuses for a fired-but-unresolved dose
-      'SENT', 'DISPLAYED', 'OPENED', 'GENTLE_REMINDER', 'REMINDED', 'RETRYING',
-      'ESCALATED', 'CAREGIVER_ACKNOWLEDGED',
-    ].includes(status);
-  };
-  // Surface missed/overdue doses first (a dose past its time that isn't resolved),
-  // then the soonest upcoming. Falls back to nothing when all are resolved → card hides.
+  // Pending vs attention (missed backlog) is defined once in
+  // lib/schedule/dose-attention.ts — shared with the gate queue and the strip.
+  const isPendingState = (status: string) => isPendingStatus(status);
   const nowMs = Date.now();
-  const nextPendingEvent = [...events]
+  const { attention: attentionEvents } = partitionDoseAttention(events);
+  // Hero: a missed dose always outranks the calm "next up" pick, so the top of
+  // the page never shows a serene card while something needs attention.
+  const nextPendingEvent = attentionEvents[0] ?? [...events]
     .filter(e => isPendingState(e.reminder_status))
     .sort((a, b) => {
       const aOverdue = new Date(a.scheduled_for).getTime() <= nowMs;
       const bOverdue = new Date(b.scheduled_for).getTime() <= nowMs;
-      if (aOverdue !== bOverdue) return aOverdue ? -1 : 1; // overdue/missed to the top
+      if (aOverdue !== bOverdue) return aOverdue ? -1 : 1; // overdue to the top
       return new Date(a.scheduled_for).getTime() - new Date(b.scheduled_for).getTime();
     })[0];
 
@@ -467,6 +465,19 @@ export default function DashboardClientView({
       }
       onSnooze={handleGateSnooze}
       onSnoozeAll={handleGateSnoozeAll}
+    />
+  ) : null;
+
+  // Top-of-page missed strip: renders in every layout, including caregiver
+  // monitor. Resolving is the only way to clear it — snoozing the gate does
+  // not hide it. (While the gate overlay is up, the strip sits behind it.)
+  const missedStrip = (mounted && attentionEvents.length > 0) ? (
+    <MissedDoseStrip
+      events={attentionEvents}
+      userRole={userRole}
+      onResolved={(eventId, newStatus) =>
+        setEvents(prev => prev.map(e => (e.id === eventId ? { ...e, reminder_status: newStatus } : e)))
+      }
     />
   ) : null;
 
@@ -678,6 +689,7 @@ export default function DashboardClientView({
         {dueGate}
         {viewMode !== 'PATIENT_MONITOR' && <GuideAutoStart tour="dashboard" />}
         <div className={`space-y-8 w-full max-w-4xl mx-auto transition-colors duration-500 ${isGravityState ? 'pb-24' : ''}`}>
+          {missedStrip}
           {/* Gravity State Dimmer Backdrop (Disabled) */}
 
           {/* Push Banner */}
@@ -740,8 +752,10 @@ export default function DashboardClientView({
   
           {/* 1. NEXT MEDICATION */}
           <div className={`bg-card rounded-3xl p-8 border border-border shadow-sm space-y-6 ${
-            nextPendingEvent?.reminder_status === 'ESCALATED_TO_CG' || nextPendingEvent?.medications.priority_level === 'critical'
-              ? 'border-danger animate-red-glow bg-danger/5' 
+            nextPendingEvent?.reminder_status === 'ESCALATED_TO_CG' ||
+            nextPendingEvent?.medications.priority_level === 'critical' ||
+            (nextPendingEvent && isAttentionStatus(nextPendingEvent.reminder_status))
+              ? 'border-danger animate-red-glow bg-danger/5'
               : 'border-primary'
           }`}>
             <h2 className="text-3xl font-black text-muted-foreground tracking-tight uppercase flex items-center gap-2">
@@ -898,6 +912,7 @@ export default function DashboardClientView({
       {dueGate}
       {viewMode !== 'PATIENT_MONITOR' && <GuideAutoStart tour="dashboard" />}
       <div className={`space-y-8 w-full transition-all duration-500 relative ${isGravityState ? 'gravity-active' : ''}`}>
+      {missedStrip}
 
       {/* Push Banner */}
       {showPushBanner && (
