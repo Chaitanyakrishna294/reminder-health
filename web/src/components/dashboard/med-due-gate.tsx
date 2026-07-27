@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { resolveReminderEvent } from '@/lib/reminder-events';
@@ -57,6 +57,13 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
   const [view, setView] = useState<'one' | 'list'>('one');
   // List rows already saved, kept on screen briefly as confirmation before removal.
   const [flashIds, setFlashIds] = useState<number[]>([]);
+  // One-by-one: pin the dose being asked. The parent re-renders every 60s and on
+  // realtime events, which can reorder the queue — without the pin, a newly-due
+  // dose could jump to position 0 under the patient's finger and their tap would
+  // log TAKEN for a dose they never took. The shown dose only advances when the
+  // pinned dose leaves the queue (resolved / snoozed / unresolvable), never by
+  // queue reordering.
+  const [askedId, setAskedId] = useState<number | null>(null);
 
   useEffect(() => {
     const f = () => setSmall(window.innerWidth < 420);
@@ -65,7 +72,26 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
     return () => window.removeEventListener('resize', f);
   }, []);
 
-  const event = queue[0];
+  const asked = askedId !== null ? queue.find(e => e.id === askedId) : undefined;
+  const event = asked ?? queue[0];
+
+  useEffect(() => {
+    if (event && event.id !== askedId) setAskedId(event.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [event?.id]);
+
+  // List view: freeze row order for the life of the gate. Ids keep their first-seen
+  // position; newly-due doses append at the END so rows never shift under a tap.
+  const orderRef = useRef<number[]>([]);
+  const orderedQueue = useMemo(() => {
+    const present = new Map(queue.map(e => [e.id, e]));
+    const kept = orderRef.current.filter(id => present.has(id));
+    const keptSet = new Set(kept);
+    const order = [...kept, ...queue.filter(e => !keptSet.has(e.id)).map(e => e.id)];
+    orderRef.current = order;
+    return order.map(id => present.get(id)!);
+  }, [queue]);
+
   const remaining = queue.length;
   if (!event) return null;
 
@@ -254,7 +280,7 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
           </p>
 
           <div className="mt-6 w-full max-w-md space-y-2 text-left">
-            {queue.map(q => {
+            {orderedQueue.map(q => {
               const qMissed = isAttentionStatus(q.reminder_status);
               const saved = flashIds.includes(q.id);
               return (
