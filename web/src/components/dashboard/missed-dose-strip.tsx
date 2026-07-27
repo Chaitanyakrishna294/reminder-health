@@ -105,7 +105,12 @@ export default function MissedDoseStrip({ events, userRole, onResolved, onUnreso
                 </p>
               )}
             </div>
-            {unresolvableIds.has(e.id) ? null : (
+            {unresolvableIds.has(e.id) ? null : busyId === e.id ? (
+              /* Only THIS row is saving — say so, instead of silently dimming every row. */
+              <span className={`font-semibold text-muted-foreground shrink-0 ${isElderly ? 'text-lg' : 'text-sm'}`}>
+                Saving…
+              </span>
+            ) : (
               <div className="flex items-center gap-2 shrink-0">
                 <button
                   onClick={() => resolve(e, 'TAKEN')}

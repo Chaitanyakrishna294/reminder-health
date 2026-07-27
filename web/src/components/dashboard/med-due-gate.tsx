@@ -335,6 +335,11 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
                     <span className={`flex items-center gap-1 text-success font-black ${isElderly ? 'text-lg' : 'text-sm'}`}>
                       <Check className="w-4 h-4" /> Saved
                     </span>
+                  ) : busyId === q.id ? (
+                    /* Only THIS row is saving — say so, instead of silently dimming every row. */
+                    <span className={`font-semibold text-muted-foreground ${isElderly ? 'text-lg' : 'text-sm'}`}>
+                      Saving…
+                    </span>
                   ) : (
                     <div className="flex items-center gap-2 shrink-0">
                       <button

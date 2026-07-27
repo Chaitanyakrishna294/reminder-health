@@ -773,7 +773,11 @@ export default function DashboardClientView({
               : 'border-primary'
           }`}>
             <h2 className="text-3xl font-black text-muted-foreground tracking-tight uppercase flex items-center gap-2">
-              <Clock className="w-8 h-8 text-primary" /> Next Medication
+              {nextPendingEvent && isAttentionStatus(nextPendingEvent.reminder_status) ? (
+                <><AlertTriangle className="w-8 h-8 text-danger" /> Missed Medication</>
+              ) : (
+                <><Clock className="w-8 h-8 text-primary" /> Next Medication</>
+              )}
             </h2>
             {nextPendingEvent ? (
               <div className="space-y-6">
