@@ -784,7 +784,11 @@ export default function DashboardClientView({
                     <Lock className="w-5 h-5 text-muted-foreground shrink-0" />
                     <span>Read-Only Monitor Mode</span>
                   </div>
-                ) : (new Date(nextPendingEvent.scheduled_for).getTime() <= new Date().getTime()) ? (
+                ) : (
+                  /* Missed doses are resolved in the MissedDoseStrip above — no duplicate actions here. */
+                  (new Date(nextPendingEvent.scheduled_for).getTime() <= new Date().getTime()) &&
+                  !(nextPendingEvent && isAttentionStatus(nextPendingEvent.reminder_status))
+                ) ? (
                   <div className="space-y-4 mt-6">
                     {dueNowEvents.length > 1 && (
                       <button
@@ -1243,7 +1247,11 @@ export default function DashboardClientView({
                 <Lock className="w-3.5 h-3.5 shrink-0" />
                 <span>Read-Only Monitoring Mode</span>
               </div>
-            ) : (new Date(nextPendingEvent.scheduled_for).getTime() <= new Date().getTime()) ? (
+            ) : (
+              /* Missed doses are resolved in the MissedDoseStrip above — no duplicate actions here. */
+              (new Date(nextPendingEvent.scheduled_for).getTime() <= new Date().getTime()) &&
+              !(nextPendingEvent && isAttentionStatus(nextPendingEvent.reminder_status))
+            ) ? (
               FEATURE_FLAG_ENABLE_PILL_SLIDER ? (
                 <div className="mt-6 w-full max-w-sm">
                   <MedicationSlider 
