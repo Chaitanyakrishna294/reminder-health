@@ -47,13 +47,17 @@ const PERMANENT_RPC_ERRORS = [
   'NOT_AUTHORIZED',
 ] as const;
 
+/** Honest copy when the app can never save this dose: it WILL show as missed. */
+export const UNSAVEABLE_DOSE_COPY =
+  "This dose couldn't be saved from the app. It will show as missed — please tell your caregiver.";
+
 /** Honest copy for a permanently unresolvable dose, or null if retryable. */
 export function permanentResolveError(message: string): string | null {
   const code = PERMANENT_RPC_ERRORS.find(c => message.includes(c));
   if (!code) return null;
   return code === 'NOT_AUTHORIZED'
     ? "You don't have permission to log doses for this patient."
-    : "This dose can't be logged from the app — it will be recorded automatically at day's end.";
+    : UNSAVEABLE_DOSE_COPY;
 }
 
 function overdueLabel(scheduledFor: string): string {
@@ -86,6 +90,10 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
   // pinned dose leaves the queue (resolved / snoozed / unresolvable), never by
   // queue reordering.
   const [askedId, setAskedId] = useState<number | null>(null);
+  // A dose the RPC can never save. The patient must acknowledge (OK) BEFORE we
+  // mark it unresolvable — otherwise the parent filter could empty the queue and
+  // unmount the gate before the message paints, indistinguishable from a save.
+  const [permanentError, setPermanentError] = useState<{ id: number; message: string } | null>(null);
 
   useEffect(() => {
     const f = () => setSmall(window.innerWidth < 420);
@@ -149,16 +157,24 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
       console.error('[MedDueGate] resolve failed:', message);
       const permanent = permanentResolveError(message);
       if (permanent) {
-        // Retrying can never succeed — show the honest message and let the
-        // parent drop this dose from the queue (advances to the next dose).
-        setError(permanent);
-        onUnresolvable(target.id);
+        // Retrying can never succeed — but do NOT advance yet. The dose stays
+        // pinned with the honest message until the patient taps OK
+        // (acknowledge-before-advance); only then does the parent drop it.
+        setPermanentError({ id: target.id, message: permanent });
       } else {
         setError('Could not save that. Please try again.');
       }
     } finally {
       setBusyId(null);
     }
+  };
+
+  // OK tapped on an unsaveable dose: the patient has seen the message — NOW
+  // the parent may drop it from the queue (advance, or unmount the gate).
+  const acknowledgeUnsaveable = () => {
+    if (!permanentError) return;
+    onUnresolvable(permanentError.id);
+    setPermanentError(null);
   };
 
   return (
@@ -267,6 +283,23 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
             </h2>
           )}
 
+          {permanentError && permanentError.id === event.id ? (
+            /* Unsaveable dose: honest message + explicit OK before it disappears. */
+            <div className="mt-8 w-full max-w-sm space-y-3">
+              <p className={`flex items-start justify-center gap-2 text-danger font-semibold ${isElderly ? 'text-lg' : 'text-sm'}`}>
+                <AlertTriangle className={`shrink-0 mt-0.5 ${isElderly ? 'w-6 h-6' : 'w-4 h-4'}`} />
+                <span>{permanentError.message}</span>
+              </p>
+              <button
+                onClick={acknowledgeUnsaveable}
+                className={`w-full flex items-center justify-center gap-2 rounded-2xl bg-card text-foreground border border-border font-black hover:bg-muted active:scale-[0.98] transition-all cursor-pointer ${
+                  isElderly ? 'py-5 text-2xl' : 'py-4 text-lg'
+                }`}
+              >
+                OK
+              </button>
+            </div>
+          ) : (
           <div className="mt-8 w-full max-w-sm space-y-3">
             <button
               onClick={() => answer(event, 'TAKEN', false)}
@@ -299,6 +332,7 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
               {missedMode ? 'Ask me later' : 'Not yet, remind me later'}
             </button>
           </div>
+          )}
         </>
       ) : (
         <>
@@ -335,6 +369,21 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
                     <span className={`flex items-center gap-1 text-success font-black ${isElderly ? 'text-lg' : 'text-sm'}`}>
                       <Check className="w-4 h-4" /> Saved
                     </span>
+                  ) : permanentError && permanentError.id === q.id ? (
+                    /* Unsaveable dose: honest message + explicit OK before the row goes. */
+                    <div className="flex items-center gap-3 min-w-0">
+                      <p className={`text-danger font-semibold ${isElderly ? 'text-base' : 'text-xs'}`}>
+                        {permanentError.message}
+                      </p>
+                      <button
+                        onClick={acknowledgeUnsaveable}
+                        className={`shrink-0 rounded-xl bg-card border border-border text-foreground font-black px-3 hover:bg-muted active:scale-[0.97] transition-all cursor-pointer ${
+                          isElderly ? 'py-3 text-lg' : 'py-2 text-xs'
+                        }`}
+                      >
+                        OK
+                      </button>
+                    </div>
                   ) : busyId === q.id ? (
                     /* Only THIS row is saving — say so, instead of silently dimming every row. */
                     <span className={`font-semibold text-muted-foreground ${isElderly ? 'text-lg' : 'text-sm'}`}>

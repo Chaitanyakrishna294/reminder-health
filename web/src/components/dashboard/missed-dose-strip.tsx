@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { resolveReminderEvent } from '@/lib/reminder-events';
-import { permanentResolveError } from '@/components/dashboard/med-due-gate';
+import { permanentResolveError, UNSAVEABLE_DOSE_COPY } from '@/components/dashboard/med-due-gate';
 import { useUiMode } from '@/context/ui-mode-context';
 import { AlertTriangle, Check, X } from 'lucide-react';
 import type { ReminderEvent } from '@/components/dashboard/todays-schedule';
@@ -100,8 +100,7 @@ export default function MissedDoseStrip({ events, userRole, onResolved, onUnreso
               </p>
               {unresolvableIds.has(e.id) && (
                 <p className={`font-semibold text-muted-foreground ${isElderly ? 'text-base' : 'text-xs'}`}>
-                  {permanentMsgs[e.id] ??
-                    "This dose can't be logged from the app — it will be recorded automatically at day's end."}
+                  {permanentMsgs[e.id] ?? UNSAVEABLE_DOSE_COPY}
                 </p>
               )}
             </div>
