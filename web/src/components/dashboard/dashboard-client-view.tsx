@@ -115,6 +115,17 @@ export default function DashboardClientView({
   // Doses the user chose "remind me later" on → suppressed until this epoch ms.
   // (The 60s `currentTime` clock below re-renders, so the gate re-evaluates live.)
   const [snoozedUntil, setSnoozedUntil] = useState<Record<number, number>>({});
+  // Doses the resolve RPC can NEVER save (planner-shifted virtual dose, deactivated
+  // med, no permission). Session-local: the gate stops re-asking them and the missed
+  // strip renders them info-only, instead of an all-day "try again" loop.
+  const [unresolvableIds, setUnresolvableIds] = useState<Set<number>>(new Set());
+  const markUnresolvable = (eventId: number) =>
+    setUnresolvableIds(prev => {
+      if (prev.has(eventId)) return prev;
+      const next = new Set(prev);
+      next.add(eventId);
+      return next;
+    });
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [hoveredEvent, setHoveredEvent] = useState<ReminderEvent | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<ReminderEvent | null>(null);
@@ -433,7 +444,7 @@ export default function DashboardClientView({
   // then the missed backlog (MISSED / PENDING_REVIEW / UNCONFIRMED), oldest first.
   // Only for the patient on their own dashboard (never when a caregiver is monitoring).
   const dueQueue = (userRole === 'PATIENT' && viewMode !== 'PATIENT_MONITOR')
-    ? buildGateQueue(events, nowMs, snoozedUntil)
+    ? buildGateQueue(events, nowMs, snoozedUntil).filter(e => !unresolvableIds.has(e.id))
     : [];
   // "Remind me later" — suppress this dose for 30 min (persisted), then it returns.
   const handleGateSnooze = (eventId: number) => {
@@ -465,6 +476,7 @@ export default function DashboardClientView({
       }
       onSnooze={handleGateSnooze}
       onSnoozeAll={handleGateSnoozeAll}
+      onUnresolvable={markUnresolvable}
     />
   ) : null;
 
@@ -478,6 +490,8 @@ export default function DashboardClientView({
       onResolved={(eventId, newStatus) =>
         setEvents(prev => prev.map(e => (e.id === eventId ? { ...e, reminder_status: newStatus } : e)))
       }
+      onUnresolvable={markUnresolvable}
+      unresolvableIds={unresolvableIds}
     />
   ) : null;
 

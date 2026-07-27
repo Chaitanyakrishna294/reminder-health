@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { resolveReminderEvent } from '@/lib/reminder-events';
+import { permanentResolveError } from '@/components/dashboard/med-due-gate';
 import { useUiMode } from '@/context/ui-mode-context';
 import { AlertTriangle, Check, X } from 'lucide-react';
 import type { ReminderEvent } from '@/components/dashboard/todays-schedule';
@@ -12,6 +13,10 @@ interface MissedDoseStripProps {
   events: ReminderEvent[];
   userRole: 'PATIENT' | 'CAREGIVER';
   onResolved: (eventId: number, newStatus: string) => void;
+  /** The RPC can never resolve this dose this session — mark it so nothing keeps retrying. */
+  onUnresolvable: (eventId: number) => void;
+  /** Doses already marked unresolvable (by this strip or the gate): render info-only, no buttons. */
+  unresolvableIds: Set<number>;
 }
 
 /**
@@ -19,11 +24,14 @@ interface MissedDoseStripProps {
  * resolving each dose is the only way to clear it (snoozing the gate merely
  * defers the question, never this strip).
  */
-export default function MissedDoseStrip({ events, userRole, onResolved }: MissedDoseStripProps) {
+export default function MissedDoseStrip({ events, userRole, onResolved, onUnresolvable, unresolvableIds }: MissedDoseStripProps) {
   const supabase = createClient();
   const { isElderly } = useUiMode();
   const [busyId, setBusyId] = useState<number | null>(null);
   const [failedId, setFailedId] = useState<number | null>(null);
+  // Honest per-dose copy for permanently unresolvable doses learned by THIS strip.
+  // Doses the gate marked (no message here) fall back to the generic copy below.
+  const [permanentMsgs, setPermanentMsgs] = useState<Record<number, string>>({});
 
   if (events.length === 0) return null;
 
@@ -42,8 +50,16 @@ export default function MissedDoseStrip({ events, userRole, onResolved }: Missed
       });
       onResolved(event.id, res.reminder_status);
     } catch (err: unknown) {
-      console.error('[MissedDoseStrip] resolve failed:', err instanceof Error ? err.message : String(err));
-      setFailedId(event.id);
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('[MissedDoseStrip] resolve failed:', message);
+      const permanent = permanentResolveError(message);
+      if (permanent) {
+        // Retrying can never succeed — stop offering the buttons and say why.
+        setPermanentMsgs(prev => ({ ...prev, [event.id]: permanent }));
+        onUnresolvable(event.id);
+      } else {
+        setFailedId(event.id);
+      }
     } finally {
       setBusyId(null);
     }
@@ -78,31 +94,39 @@ export default function MissedDoseStrip({ events, userRole, onResolved }: Missed
               </p>
               <p className={`font-semibold text-muted-foreground ${isElderly ? 'text-base' : 'text-xs'}`}>
                 {timeStr(e.scheduled_for)}
-                {failedId === e.id && (
+                {failedId === e.id && !unresolvableIds.has(e.id) && (
                   <span className="text-danger"> · Could not save, try again</span>
                 )}
               </p>
+              {unresolvableIds.has(e.id) && (
+                <p className={`font-semibold text-muted-foreground ${isElderly ? 'text-base' : 'text-xs'}`}>
+                  {permanentMsgs[e.id] ??
+                    "This dose can't be logged from the app — it will be recorded automatically at day's end."}
+                </p>
+              )}
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                onClick={() => resolve(e, 'TAKEN')}
-                disabled={busyId !== null}
-                className={`flex items-center gap-1.5 rounded-xl bg-success text-success-foreground font-black px-3 shadow-sm hover:bg-success/90 active:scale-[0.97] transition-all disabled:opacity-50 cursor-pointer ${
-                  isElderly ? 'py-3 text-lg' : 'py-2 text-xs'
-                }`}
-              >
-                <Check className="w-4 h-4" /> Took it
-              </button>
-              <button
-                onClick={() => resolve(e, 'SKIP')}
-                disabled={busyId !== null}
-                className={`flex items-center gap-1.5 rounded-xl bg-card border border-border text-foreground font-black px-3 hover:bg-muted active:scale-[0.97] transition-all disabled:opacity-50 cursor-pointer ${
-                  isElderly ? 'py-3 text-lg' : 'py-2 text-xs'
-                }`}
-              >
-                <X className="w-4 h-4" /> Missed it
-              </button>
-            </div>
+            {unresolvableIds.has(e.id) ? null : (
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => resolve(e, 'TAKEN')}
+                  disabled={busyId !== null}
+                  className={`flex items-center gap-1.5 rounded-xl bg-success text-success-foreground font-black px-3 shadow-sm hover:bg-success/90 active:scale-[0.97] transition-all disabled:opacity-50 cursor-pointer ${
+                    isElderly ? 'py-3 text-lg' : 'py-2 text-xs'
+                  }`}
+                >
+                  <Check className="w-4 h-4" /> Took it
+                </button>
+                <button
+                  onClick={() => resolve(e, 'SKIP')}
+                  disabled={busyId !== null}
+                  className={`flex items-center gap-1.5 rounded-xl bg-card border border-border text-foreground font-black px-3 hover:bg-muted active:scale-[0.97] transition-all disabled:opacity-50 cursor-pointer ${
+                    isElderly ? 'py-3 text-lg' : 'py-2 text-xs'
+                  }`}
+                >
+                  <X className="w-4 h-4" /> Missed it
+                </button>
+              </div>
+            )}
           </li>
         ))}
       </ul>

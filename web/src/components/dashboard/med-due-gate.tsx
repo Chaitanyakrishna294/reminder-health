@@ -32,6 +32,28 @@ interface MedDueGateProps {
   onSnooze: (eventId: number) => void;
   /** List view "Ask me later": snooze every queued dose for 30 min. */
   onSnoozeAll: () => void;
+  /** The RPC can never resolve this dose (deactivated med, planner-shifted
+   *  virtual dose, no permission) — parent removes it from the queue for the
+   *  session so the gate doesn't re-ask forever. */
+  onUnresolvable: (eventId: number) => void;
+}
+
+/** RPC error codes that will fail on every retry — retrying is dishonest. */
+const PERMANENT_RPC_ERRORS = [
+  'INVALID_SCHEDULED_TIME',
+  'MEDICATION_NOT_FOUND',
+  'EVENT_MEDICATION_MISMATCH',
+  'VIRTUAL_EVENT_MUST_BE_FOR_TODAY',
+  'NOT_AUTHORIZED',
+] as const;
+
+/** Honest copy for a permanently unresolvable dose, or null if retryable. */
+export function permanentResolveError(message: string): string | null {
+  const code = PERMANENT_RPC_ERRORS.find(c => message.includes(c));
+  if (!code) return null;
+  return code === 'NOT_AUTHORIZED'
+    ? "You don't have permission to log doses for this patient."
+    : "This dose can't be logged from the app — it will be recorded automatically at day's end.";
 }
 
 function overdueLabel(scheduledFor: string): string {
@@ -46,7 +68,7 @@ function overdueLabel(scheduledFor: string): string {
 const fmtTime = (iso: string) =>
   new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSnoozeAll }: MedDueGateProps) {
+export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSnoozeAll, onUnresolvable }: MedDueGateProps) {
   const supabase = createClient();
   const router = useRouter();
   const { isElderly } = useUiMode();
@@ -125,7 +147,15 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       console.error('[MedDueGate] resolve failed:', message);
-      setError('Could not save that. Please try again.');
+      const permanent = permanentResolveError(message);
+      if (permanent) {
+        // Retrying can never succeed — show the honest message and let the
+        // parent drop this dose from the queue (advances to the next dose).
+        setError(permanent);
+        onUnresolvable(target.id);
+      } else {
+        setError('Could not save that. Please try again.');
+      }
     } finally {
       setBusyId(null);
     }
