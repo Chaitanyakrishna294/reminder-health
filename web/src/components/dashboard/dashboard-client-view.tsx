@@ -16,6 +16,7 @@ import GuideButton from '@/components/guide/guide-button';
 import GuideAutoStart from '@/components/guide/guide-auto-start';
 import moment from 'moment-timezone';
 import { type OverrideEntry, findOverride, toOverrideDateStr } from '@/lib/schedule/dose-engine';
+import { isPendingStatus, buildGateQueue } from '@/lib/schedule/dose-attention';
 import MedicationSlider from '@/components/dashboard/medication-slider';
 import { getUnitIcon, getCountdownText, PinkBubbles } from '@/components/dashboard/dashboard-helpers';
 
@@ -430,16 +431,11 @@ export default function DashboardClientView({
   const upcomingCount = events.filter(e => isPendingState(e.reminder_status)).length;
   const activeEvent = hoveredEvent || selectedEvent;
 
-  // "Did you take it?" gate: due/overdue, unresolved doses, shown before the dashboard.
+  // "Did you take it?" gate, shown before the dashboard. Present doses first,
+  // then the missed backlog (MISSED / PENDING_REVIEW / UNCONFIRMED), oldest first.
   // Only for the patient on their own dashboard (never when a caregiver is monitoring).
   const dueQueue = (userRole === 'PATIENT' && viewMode !== 'PATIENT_MONITOR')
-    ? [...events]
-        .filter(e =>
-          isPendingState(e.reminder_status) &&
-          new Date(e.scheduled_for).getTime() <= nowMs &&
-          !(snoozedUntil[e.id] && nowMs < snoozedUntil[e.id])
-        )
-        .sort((a, b) => new Date(a.scheduled_for).getTime() - new Date(b.scheduled_for).getTime())
+    ? buildGateQueue(events, nowMs, snoozedUntil)
     : [];
   // "Remind me later" — suppress this dose for 30 min (persisted), then it returns.
   const handleGateSnooze = (eventId: number) => {
@@ -450,17 +446,27 @@ export default function DashboardClientView({
       return next;
     });
   };
-  // Reactive gate: always asks about the earliest unhandled due dose. As doses are
+  // List view "Ask me later" — suppress every queued dose for 30 min at once.
+  const handleGateSnoozeAll = () => {
+    const until = Date.now() + 30 * 60 * 1000;
+    setSnoozedUntil(prev => {
+      const next = { ...prev };
+      dueQueue.forEach(e => { next[e.id] = until; });
+      try { localStorage.setItem('medGateSnoozes', JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  };
+  // Reactive gate: always asks about the head of the queue. As doses are
   // answered/snoozed (or new ones come due via the 60s clock), the queue updates live.
   const dueGate = (mounted && dueQueue.length > 0) ? (
     <MedDueGate
-      event={dueQueue[0] as any}
-      remaining={dueQueue.length}
+      queue={dueQueue as any}
       userRole={userRole}
       onResolved={(eventId, newStatus) =>
         setEvents(prev => prev.map(e => (e.id === eventId ? { ...e, reminder_status: newStatus } : e)))
       }
       onSnooze={handleGateSnooze}
+      onSnoozeAll={handleGateSnoozeAll}
     />
   ) : null;
 
