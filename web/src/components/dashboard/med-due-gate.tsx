@@ -307,8 +307,8 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
           </div>
 
           <button
-            onClick={() => busyId === null && onSnoozeAll()}
-            disabled={busyId !== null}
+            onClick={() => busyId === null && flashIds.length === 0 && onSnoozeAll()}
+            disabled={busyId !== null || flashIds.length > 0}
             className={`mt-4 flex items-center justify-center gap-2 rounded-2xl text-muted-foreground hover:text-foreground font-semibold transition-all disabled:opacity-50 cursor-pointer ${
               isElderly ? 'py-3 text-lg' : 'py-2.5 text-sm'
             }`}
