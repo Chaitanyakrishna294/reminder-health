@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { resolveReminderEvent } from '@/lib/reminder-events';
 import { isAttentionStatus } from '@/lib/schedule/dose-attention';
 import { useUiMode } from '@/context/ui-mode-context';
+import { useTheme } from '@/context/theme-context';
 import { getUnitIcon } from '@/components/ui/custom-icons';
 import { Check, X, Clock, Siren, AlertTriangle } from 'lucide-react';
 import BrainMascot from './brain-mascot';
@@ -76,6 +77,7 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
   const supabase = createClient();
   const router = useRouter();
   const { isElderly } = useUiMode();
+  const { theme } = useTheme();
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [small, setSmall] = useState(false);
@@ -100,6 +102,59 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
     f();
     window.addEventListener('resize', f);
     return () => window.removeEventListener('resize', f);
+  }, []);
+
+  // Modal focus management: the gate covers the dashboard, but without this a
+  // keyboard/screen-reader user could Tab into the dashboard's own Take/Skip
+  // buttons BEHIND the overlay and log a dose they cannot see. On mount, move
+  // focus into the gate; while open, trap Tab inside it; on unmount, restore
+  // focus. Escape deliberately does nothing — there is no dismiss, snoozing is
+  // an explicit button.
+  const containerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    container.focus();
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      const gate = containerRef.current;
+      if (!gate) return;
+      const focusables = Array.from(
+        gate.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        )
+      );
+      if (focusables.length === 0) {
+        e.preventDefault();
+        gate.focus();
+        return;
+      }
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement;
+      // Focus escaped (e.g. the focused button became disabled) — pull it back.
+      if (!(active instanceof HTMLElement) || !gate.contains(active)) {
+        e.preventDefault();
+        first.focus();
+        return;
+      }
+      if (e.shiftKey) {
+        if (active === first || active === gate) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else if (active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown, true);
+      if (previouslyFocused && previouslyFocused.isConnected) previouslyFocused.focus();
+    };
   }, []);
 
   const asked = askedId !== null ? queue.find(e => e.id === askedId) : undefined;
@@ -129,6 +184,22 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
   const med = event.medications;
   // Keep showing the list while a saved-row confirmation is still flashing.
   const effectiveView = remaining > 1 || flashIds.length > 0 ? view : 'one';
+
+  // Theme-aware page gradient. The text inside uses semantic tokens that flip
+  // to near-white in dark mode, so the background MUST flip with the app theme
+  // too. This must key off the app's .dark class (via useTheme), NOT Tailwind's
+  // `dark:` variant — globals.css defines no `@custom-variant dark`, so `dark:`
+  // tracks the OS prefers-color-scheme, which the in-app toggle can disagree with.
+  const gateBackground =
+    theme === 'dark'
+      ? missedMode
+        ? // Red-tinted deep navy (missed): danger mood, light text stays readable.
+          'radial-gradient(120% 90% at 50% 0%, #47203A 0%, #0F1C5A 55%, #351430 100%)'
+        : // Deep navy (due): mirrors --auth-radial's dark treatment.
+          'radial-gradient(120% 90% at 50% 0%, #1E2E6E 0%, #0F1C5A 55%, #0A1340 100%)'
+      : missedMode
+        ? 'radial-gradient(120% 90% at 50% 0%, #FDE8EA 0%, #F8F9FB 55%, #FFF0EE 100%)'
+        : 'radial-gradient(120% 90% at 50% 0%, #FDEEF2 0%, #F8F9FB 55%, #EAF3FF 100%)';
 
   const answer = async (target: GateEvent, action: 'TAKEN' | 'SKIP', flash: boolean) => {
     if (busyId !== null) return;
@@ -179,15 +250,13 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
 
   return (
     <div
+      ref={containerRef}
+      tabIndex={-1}
       role="dialog"
       aria-modal="true"
       aria-label="Medication check"
-      className="fixed inset-0 z-[120] flex flex-col items-center justify-center px-6 py-10 text-center overflow-y-auto"
-      style={{
-        background: missedMode
-          ? 'radial-gradient(120% 90% at 50% 0%, #FDE8EA 0%, #F8F9FB 55%, #FFF0EE 100%)'
-          : 'radial-gradient(120% 90% at 50% 0%, #FDEEF2 0%, #F8F9FB 55%, #EAF3FF 100%)',
-      }}
+      className="fixed inset-0 z-[120] flex flex-col items-center justify-center px-6 py-10 text-center overflow-y-auto outline-none"
+      style={{ background: gateBackground }}
     >
       {remaining > 1 && (
         <span className="absolute top-6 text-xs font-mono font-bold text-muted-foreground tracking-widest">
@@ -324,7 +393,7 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
             <button
               onClick={() => busyId === null && onSnooze(event.id)}
               disabled={busyId !== null}
-              className={`w-full flex items-center justify-center gap-2 rounded-2xl text-muted-foreground hover:text-foreground font-semibold transition-all disabled:opacity-50 cursor-pointer ${
+              className={`w-full flex items-center justify-center gap-2 min-h-11 rounded-2xl text-muted-foreground hover:text-foreground font-semibold transition-all disabled:opacity-50 cursor-pointer ${
                 isElderly ? 'py-3 text-lg' : 'py-2.5 text-sm'
               }`}
             >
@@ -377,7 +446,7 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
                       </p>
                       <button
                         onClick={acknowledgeUnsaveable}
-                        className={`shrink-0 rounded-xl bg-card border border-border text-foreground font-black px-3 hover:bg-muted active:scale-[0.97] transition-all cursor-pointer ${
+                        className={`shrink-0 min-h-11 rounded-xl bg-card border border-border text-foreground font-black px-3 hover:bg-muted active:scale-[0.97] transition-all cursor-pointer ${
                           isElderly ? 'py-3 text-lg' : 'py-2 text-xs'
                         }`}
                       >
@@ -390,11 +459,14 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
                       Saving…
                     </span>
                   ) : (
-                    <div className="flex items-center gap-2 shrink-0">
+                    /* Opposing actions that write the dose ledger: ≥44px touch
+                       targets and a wider gap in BOTH modes so a mis-tap can't
+                       log the opposite of what the patient meant. */
+                    <div className="flex items-center gap-3 shrink-0">
                       <button
                         onClick={() => answer(q, 'TAKEN', true)}
                         disabled={busyId !== null}
-                        className={`flex items-center gap-1 rounded-xl bg-success text-success-foreground font-black px-3 shadow-sm hover:bg-success/90 active:scale-[0.97] transition-all disabled:opacity-50 cursor-pointer ${
+                        className={`flex items-center gap-1 min-h-11 rounded-xl bg-success text-success-foreground font-black px-3 shadow-sm hover:bg-success/90 active:scale-[0.97] transition-all disabled:opacity-50 cursor-pointer ${
                           isElderly ? 'py-3 text-lg' : 'py-2 text-xs'
                         }`}
                       >
@@ -403,7 +475,7 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
                       <button
                         onClick={() => answer(q, 'SKIP', true)}
                         disabled={busyId !== null}
-                        className={`flex items-center gap-1 rounded-xl bg-card border border-border text-foreground font-black px-3 hover:bg-muted active:scale-[0.97] transition-all disabled:opacity-50 cursor-pointer ${
+                        className={`flex items-center gap-1 min-h-11 rounded-xl bg-card border border-border text-foreground font-black px-3 hover:bg-muted active:scale-[0.97] transition-all disabled:opacity-50 cursor-pointer ${
                           isElderly ? 'py-3 text-lg' : 'py-2 text-xs'
                         }`}
                       >
@@ -419,7 +491,7 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
           <button
             onClick={() => busyId === null && flashIds.length === 0 && onSnoozeAll()}
             disabled={busyId !== null || flashIds.length > 0}
-            className={`mt-4 flex items-center justify-center gap-2 rounded-2xl text-muted-foreground hover:text-foreground font-semibold transition-all disabled:opacity-50 cursor-pointer ${
+            className={`mt-4 flex items-center justify-center gap-2 min-h-11 rounded-2xl text-muted-foreground hover:text-foreground font-semibold transition-all disabled:opacity-50 cursor-pointer ${
               isElderly ? 'py-3 text-lg' : 'py-2.5 text-sm'
             }`}
           >

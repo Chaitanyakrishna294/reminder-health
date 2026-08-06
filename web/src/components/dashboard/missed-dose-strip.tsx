@@ -69,10 +69,13 @@ export default function MissedDoseStrip({ events, userRole, onResolved, onUnreso
     new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   return (
-    <div
-      role="alert"
-      className="bg-danger/5 border-2 border-danger/30 rounded-3xl p-5 space-y-3 animate-fade-in"
-    >
+    <div className="bg-danger/5 border-2 border-danger/30 rounded-3xl p-5 space-y-3 animate-fade-in">
+      {/* Live region for the SUMMARY only. The interactive list must NOT sit
+          inside role="alert" — it would re-announce the whole strip on every
+          state change and put the buttons inside a live region. */}
+      <p role="alert" className="sr-only">
+        {events.length === 1 ? '1 missed dose needs your attention' : `${events.length} missed doses need your attention`}
+      </p>
       <h2
         className={`flex items-center gap-2 font-black text-danger tracking-tight ${
           isElderly ? 'text-2xl' : 'text-base'
@@ -110,11 +113,14 @@ export default function MissedDoseStrip({ events, userRole, onResolved, onUnreso
                 Saving…
               </span>
             ) : (
-              <div className="flex items-center gap-2 shrink-0">
+              /* Opposing actions that write the dose ledger: ≥44px touch targets
+                 and a wider gap in BOTH modes so a mis-tap can't log the
+                 opposite of what the patient meant. */
+              <div className="flex items-center gap-3 shrink-0">
                 <button
                   onClick={() => resolve(e, 'TAKEN')}
                   disabled={busyId !== null}
-                  className={`flex items-center gap-1.5 rounded-xl bg-success text-success-foreground font-black px-3 shadow-sm hover:bg-success/90 active:scale-[0.97] transition-all disabled:opacity-50 cursor-pointer ${
+                  className={`flex items-center gap-1.5 min-h-11 rounded-xl bg-success text-success-foreground font-black px-3 shadow-sm hover:bg-success/90 active:scale-[0.97] transition-all disabled:opacity-50 cursor-pointer ${
                     isElderly ? 'py-3 text-lg' : 'py-2 text-xs'
                   }`}
                 >
@@ -123,7 +129,7 @@ export default function MissedDoseStrip({ events, userRole, onResolved, onUnreso
                 <button
                   onClick={() => resolve(e, 'SKIP')}
                   disabled={busyId !== null}
-                  className={`flex items-center gap-1.5 rounded-xl bg-card border border-border text-foreground font-black px-3 hover:bg-muted active:scale-[0.97] transition-all disabled:opacity-50 cursor-pointer ${
+                  className={`flex items-center gap-1.5 min-h-11 rounded-xl bg-card border border-border text-foreground font-black px-3 hover:bg-muted active:scale-[0.97] transition-all disabled:opacity-50 cursor-pointer ${
                     isElderly ? 'py-3 text-lg' : 'py-2 text-xs'
                   }`}
                 >
