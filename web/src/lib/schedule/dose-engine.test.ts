@@ -30,15 +30,24 @@ assert.equal(findOverride(overrides, 1, '2026-07-08')?.isSkipped, true);
 assert.equal(findOverride(overrides, 2, '2026-07-08'), undefined);
 assert.equal(findOverride([], 1, '2026-07-07'), undefined);
 
-// ── toOverrideDateStr: planner and dashboard must derive the SAME key from the
-// same instant, regardless of the machine's local timezone. (Both key by UTC
-// date; an override saved by the planner must be found by the dashboard.) ──
-const instant = new Date('2026-07-07T20:30:00.000Z');
-assert.equal(toOverrideDateStr(instant), '2026-07-07');
-assert.equal(toOverrideDateStr(new Date(instant)), toOverrideDateStr(instant));
-// Late-evening IST (early next day locally) still keys by the UTC date, so
-// both callers agree even across the midnight boundary.
-assert.equal(toOverrideDateStr(new Date('2026-07-07T23:59:59.999Z')), '2026-07-07');
-assert.equal(toOverrideDateStr(new Date('2026-07-08T00:00:00.000Z')), '2026-07-08');
+// ── toOverrideDateStr: the key is the viewer's LOCAL calendar date. The planner
+// and the dashboard must derive the SAME key from the same instant on any
+// machine, so all expectations below are built from local date parts (never
+// from UTC instants — keying by toISOString was the bug: in IST it shifted
+// local-midnight dates and pre-05:30 times onto the previous UTC day). ──
+// A date built at local midnight (exactly what the planner's month grid makes)
+// keys to that same local day — in IST the old UTC keying said the day before.
+assert.equal(toOverrideDateStr(new Date(2026, 6, 7)), '2026-07-07');
+// Late evening local time is still the same local day.
+assert.equal(toOverrideDateStr(new Date(2026, 6, 7, 20, 30)), '2026-07-07');
+// The last local millisecond of the day and the first of the next stay on
+// their own sides of local midnight.
+assert.equal(toOverrideDateStr(new Date(2026, 6, 7, 23, 59, 59, 999)), '2026-07-07');
+assert.equal(toOverrideDateStr(new Date(2026, 6, 8, 0, 0, 0, 0)), '2026-07-08');
+// Two different Date objects for the same local day agree (planner's grid date
+// at midnight vs the dashboard's "now" mid-afternoon) — the shared-key contract.
+assert.equal(toOverrideDateStr(new Date(2026, 6, 7)), toOverrideDateStr(new Date(2026, 6, 7, 14, 5)));
+// Single-digit month/day are zero-padded to a stable YYYY-MM-DD shape.
+assert.equal(toOverrideDateStr(new Date(2026, 0, 3)), '2026-01-03');
 
 console.log('dose-engine: all checks passed');

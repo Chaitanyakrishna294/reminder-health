@@ -365,7 +365,7 @@ export default function SchedulePlannerPage() {
 
   const handleApplyOverride = () => {
     if (!selectedMedForOverride) return;
-    const dateStr = selectedDate.toISOString().split('T')[0];
+    const dateStr = toOverrideDateStr(selectedDate);
     const filtered = overrides.filter(
       (o) => !(o.medicationId === selectedMedForOverride.id && o.dateStr === dateStr)
     );
@@ -383,7 +383,7 @@ export default function SchedulePlannerPage() {
   };
 
   const handleRemoveOverride = (medId: number) => {
-    const dateStr = selectedDate.toISOString().split('T')[0];
+    const dateStr = toOverrideDateStr(selectedDate);
     saveOverrides(overrides.filter((o) => !(o.medicationId === medId && o.dateStr === dateStr)));
   };
 
@@ -732,10 +732,10 @@ export default function SchedulePlannerPage() {
                   <Plus className="w-3 h-3" strokeWidth={2.5} />
                 </button>
               </div>
-              {canEdit && overrides.some(o => o.dateStr === selectedDate.toISOString().split('T')[0]) && (
+              {canEdit && overrides.some(o => o.dateStr === toOverrideDateStr(selectedDate)) && (
                 <button
                   onClick={() => {
-                    const dateStr = selectedDate.toISOString().split('T')[0];
+                    const dateStr = toOverrideDateStr(selectedDate);
                     saveOverrides(overrides.filter(o => o.dateStr !== dateStr));
                   }}
                   className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[10px] font-semibold transition-all cursor-pointer"

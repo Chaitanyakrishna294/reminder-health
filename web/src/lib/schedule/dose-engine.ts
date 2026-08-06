@@ -14,14 +14,23 @@
 /** A user-saved, per-day adjustment to a medication's schedule. */
 export interface OverrideEntry {
   medicationId: number;
-  dateStr: string; // YYYY-MM-DD (UTC date, via Date#toISOString)
+  dateStr: string; // YYYY-MM-DD (viewer's LOCAL calendar date, via toOverrideDateStr)
   overriddenTime?: string; // HH:MM the dose was shifted to
   isSkipped?: boolean; // dose skipped for this day
 }
 
-/** The YYYY-MM-DD key both callers use to match overrides (UTC date). */
+/**
+ * The YYYY-MM-DD key both callers use to match overrides. This is the viewer's
+ * LOCAL calendar date (from Date#getFullYear/getMonth/getDate), NOT the UTC
+ * date — for IST (UTC+5:30) the two disagree between 00:00 and 05:29 local, and
+ * the planner's month grid builds its Dates at local midnight, so keying by UTC
+ * put overrides on the previous day. The planner and the dashboard must both
+ * derive the key through this function so a skip saved for a calendar day is
+ * found on that same calendar day.
+ */
 export function toOverrideDateStr(date: Date): string {
-  return date.toISOString().split('T')[0];
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}`;
 }
 
 /**
