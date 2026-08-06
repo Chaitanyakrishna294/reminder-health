@@ -25,6 +25,7 @@ import {
   parseTimeToMinutes,
   toOverrideDateStr,
 } from '@/lib/schedule/dose-engine';
+import { PRIORITY, TONE_VAR, priorityMeta } from '@/lib/design/semantics';
 
 interface ScheduledMed {
   id: number;
@@ -40,12 +41,20 @@ interface ScheduledMed {
 
 const HOUR_HEIGHT = 64; // px per hour on the timeline rail
 
+// Time-of-day shading. Previously each band borrowed a STATUS hue — orange for morning,
+// green for afternoon, pink for evening — the same three colors the priority dots use,
+// at low alpha. On one screen, orange meant both "before noon" and "important dose".
+// Bands are background information, so they get one neutral hue at four depths and stay
+// out of the way of anything that encodes state.
+//
+// `showLabel` suppresses the duplicate on the 9pm-midnight band: it is the same night as
+// the midnight-5am one, split only because the rail starts at 00:00.
 const DAY_BANDS = [
-  { from: 0, to: 5, label: 'Night', icon: Moon, color: 'rgba(15,28,90,0.05)', text: '#5b6aa8' },
-  { from: 5, to: 12, label: 'Morning', icon: Sunrise, color: 'rgba(255,149,0,0.07)', text: '#c47600' },
-  { from: 12, to: 17, label: 'Afternoon', icon: Sun, color: 'rgba(52,199,89,0.07)', text: '#1f9d4d' },
-  { from: 17, to: 21, label: 'Evening', icon: Sunset, color: 'rgba(242,107,138,0.08)', text: '#d23e64' },
-  { from: 21, to: 24, label: 'Night', icon: Moon, color: 'rgba(15,28,90,0.05)', text: '#5b6aa8' },
+  { from: 0, to: 5, label: 'Night', icon: Moon, color: 'rgba(15,28,90,0.055)', showLabel: true },
+  { from: 5, to: 12, label: 'Morning', icon: Sunrise, color: 'rgba(15,28,90,0.012)', showLabel: true },
+  { from: 12, to: 17, label: 'Afternoon', icon: Sun, color: 'rgba(15,28,90,0.025)', showLabel: true },
+  { from: 17, to: 21, label: 'Evening', icon: Sunset, color: 'rgba(15,28,90,0.04)', showLabel: true },
+  { from: 21, to: 24, label: 'Night', icon: Moon, color: 'rgba(15,28,90,0.055)', showLabel: false },
 ];
 
 function formatTimeLabel(t: string): string {
@@ -65,8 +74,9 @@ function hourLabel(h: number): string {
   return (h - 12) + 'p';
 }
 
-const priorityColor = (p: string) =>
-  p === 'critical' ? 'var(--danger)' : p === 'important' ? 'var(--warning)' : 'var(--primary)';
+// Routine used to be pink here — the same pink as the brand, the primary CTA and the
+// Evening chart band, so a dot could mean three different things on one screen.
+const priorityColor = (p: string) => TONE_VAR[priorityMeta(p).tone];
 
 // Soft diffuse card shadow shared with the Medications page.
 const CARD_SHADOW = '0 1px 3px rgba(16, 28, 90, 0.04), 0 10px 30px rgba(16, 28, 90, 0.06)';
@@ -82,22 +92,28 @@ interface DoseCardProps {
   onDragMove: (e: React.PointerEvent, medId: number) => void;
   endDrag: (medId: number) => void;
   setDragging: (v: null) => void;
+  /** Below sm the card stacks into two rows so the medication name stays legible. */
+  narrow: boolean;
 }
 
 function DoseCard({
   med, groupMinutes, canEdit, dragging,
   openOverride, handleRemoveOverride,
-  startDrag, onDragMove, endDrag, setDragging,
+  startDrag, onDragMove, endDrag, setDragging, narrow,
 }: DoseCardProps) {
   const isDraggingThis = dragging?.medId === med.id;
-  const accent = med.isSkipped ? '#C7C7CC' : priorityColor(med.priority_level);
+  const accent = med.isSkipped ? 'var(--muted-foreground)' : priorityColor(med.priority_level);
+  // These were hardcoded light hexes (#FFFFFF / #F2F2F7 / #FFF3E0 / #FFEDF2). Because
+  // they are inline styles, globals.css's dark-mode compat layer — which only rewrites
+  // `.bg-white` and friends — could not reach them, so in dark mode the card stayed
+  // white while the name rendered in light `--foreground` ink: unreadable.
   const cardBg = med.isSkipped
-    ? '#F2F2F7'
+    ? 'var(--muted)'
     : med.isOverridden
-      ? '#FFF3E0'
+      ? 'color-mix(in srgb, var(--warning) 12%, var(--card))'
       : isDraggingThis
-        ? '#FFEDF2'
-        : '#FFFFFF';
+        ? 'var(--primary-soft)'
+        : 'var(--card)';
   const displayTime = isDraggingThis && dragging
     ? formatTimeLabel(
         Math.floor(dragging.currentMinutes / 60).toString().padStart(2, '0') + ':' +
@@ -105,60 +121,110 @@ function DoseCard({
       )
     : formatTimeLabel(med.time);
 
+  // Row 1 is the identity (what medication, how much). Row 2 is the state and the
+  // controls. On a wide screen both sit on one line; below `sm` they stack, because a
+  // 240px column cannot fit 44px of drag handle + 44px of button + a time pill and
+  // still leave the NAME legible — and the name is the point of the row.
+  const nameBlock = (
+    <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
+      <p className={'text-[12px] font-bold truncate ' + (med.isSkipped ? 'text-muted-foreground line-through' : 'text-foreground')}>
+        {med.drug_name}
+      </p>
+      {/* `dosage` is the free-text strength and is literally "N/A" when unset — the
+          planner was printing that placeholder next to every such dose. */}
+      {med.dosage && med.dosage !== 'N/A' && (
+        <span className="shrink-0 text-[10px] font-medium text-muted-foreground">{med.dosage}</span>
+      )}
+    </div>
+  );
+
+  const statusAndTime = (
+    <>
+      {/* "skip"/"adj" at 8px were closer to noise than labels. Spelled out, at a size
+          that survives a phone at arm's length. */}
+      {med.isSkipped && (
+        <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 bg-danger/10 text-danger-strong">Skipped</span>
+      )}
+      {med.isOverridden && !med.isSkipped && (
+        <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 bg-warning/10 text-warning-strong">Moved</span>
+      )}
+      <span className={'shrink-0 inline-flex items-center gap-0.5 whitespace-nowrap text-[10px] font-bold font-mono px-2 py-0.5 rounded-full ' + (isDraggingThis ? 'text-primary bg-primary/15' : 'text-primary bg-primary/10')}>
+        <Clock className="w-2.5 h-2.5" strokeWidth={2.5} />{displayTime}
+      </span>
+    </>
+  );
+
+  const dragHandle = canEdit ? (
+    <div
+      className="shrink-0 cursor-grab active:cursor-grabbing touch-none w-11 h-11 flex items-center justify-center"
+      onPointerDown={(e) => startDrag(e, med.id, groupMinutes)}
+      onPointerMove={(e) => onDragMove(e, med.id)}
+      onPointerUp={() => endDrag(med.id)}
+      onPointerCancel={() => setDragging(null)}
+      role="button"
+      aria-label={`Drag to reschedule ${med.drug_name}`}
+    >
+      <GripVertical className="w-4 h-4 text-muted-foreground/60 group-hover/card:text-muted-foreground transition-colors" />
+    </div>
+  ) : null;
+
+  // These were 24px AND `opacity-0 group-hover:opacity-100` — a hover-only control on a
+  // screen most people use on a phone, i.e. no way to reach "move this dose" or "skip
+  // today" at all by touch. Always visible, 44px.
+  const editControls = canEdit ? (
+    <div className="shrink-0 flex items-center gap-1">
+      {med.isOverridden || med.isSkipped ? (
+        <button
+          onClick={() => handleRemoveOverride(med.id)}
+          className="inline-flex items-center justify-center w-11 h-11 rounded-full cursor-pointer transition-all bg-danger/10 text-danger-strong hover:bg-danger/15"
+          title="Restore to the usual time"
+          aria-label={`Restore ${med.drug_name} to its usual time`}
+        >
+          <RotateCcw className="w-4 h-4" strokeWidth={2.5} />
+        </button>
+      ) : (
+        <button
+          onClick={() => openOverride(med)}
+          className="inline-flex items-center justify-center w-11 h-11 rounded-full text-foreground/70 bg-muted hover:bg-accent-surface cursor-pointer transition-all"
+          title="Adjust or skip this dose"
+          aria-label={`Adjust or skip today's ${med.drug_name} dose`}
+        >
+          <Edit2 className="w-4 h-4" strokeWidth={2.5} />
+        </button>
+      )}
+    </div>
+  ) : null;
+
+  if (narrow) {
+    return (
+      <div
+        className={'group/card flex flex-col gap-1 rounded-2xl px-2.5 py-2 select-none w-full ' + (med.isSkipped ? 'opacity-60' : '')}
+        style={{ background: cardBg, boxShadow: CARD_SHADOW }}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="shrink-0 w-2 h-2 rounded-full" style={{ background: accent }} />
+          {nameBlock}
+        </div>
+        <div className="flex items-center gap-1.5">
+          {statusAndTime}
+          <span className="flex-1" />
+          {dragHandle}
+          {editControls}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className={'group/card flex items-center gap-2 rounded-2xl px-2.5 py-2 select-none w-full ' + (med.isSkipped ? 'opacity-60' : '')}
       style={{ background: cardBg, boxShadow: CARD_SHADOW }}
     >
-      {canEdit && (
-        <div
-          className="shrink-0 cursor-grab active:cursor-grabbing touch-none"
-          onPointerDown={(e) => startDrag(e, med.id, groupMinutes)}
-          onPointerMove={(e) => onDragMove(e, med.id)}
-          onPointerUp={() => endDrag(med.id)}
-          onPointerCancel={() => setDragging(null)}
-        >
-          <GripVertical className="w-3.5 h-3.5 text-muted-foreground/40 group-hover/card:text-muted-foreground/70 transition-colors" />
-        </div>
-      )}
+      {dragHandle}
       <span className="shrink-0 w-2 h-2 rounded-full" style={{ background: accent }} />
-      <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
-        <p className={'text-[12px] font-bold truncate ' + (med.isSkipped ? 'text-muted-foreground line-through' : 'text-foreground')}>
-          {med.drug_name}
-        </p>
-        <span className="shrink-0 text-[9px] font-medium text-muted-foreground">{med.dosage}</span>
-      </div>
-      {med.isSkipped && (
-        <span className="shrink-0 text-[8px] font-bold uppercase tracking-wide rounded-full px-1.5 py-0.5" style={{ color: '#FF3B30', background: '#FFECEA' }}>skip</span>
-      )}
-      {med.isOverridden && !med.isSkipped && (
-        <span className="shrink-0 text-[8px] font-bold uppercase tracking-wide rounded-full px-1.5 py-0.5" style={{ color: '#FF9500', background: '#FFF3E0' }}>adj</span>
-      )}
-      <span className={'shrink-0 inline-flex items-center gap-0.5 text-[10px] font-bold font-mono px-2 py-0.5 rounded-full ' + (isDraggingThis ? 'text-primary bg-primary/15' : 'text-primary bg-primary/10')}>
-        <Clock className="w-2.5 h-2.5" strokeWidth={2.5} />{displayTime}
-      </span>
-      {canEdit && (
-        <div className="shrink-0 opacity-0 group-hover/card:opacity-100 transition-opacity">
-          {med.isOverridden || med.isSkipped ? (
-            <button
-              onClick={() => handleRemoveOverride(med.id)}
-              className="inline-flex items-center justify-center w-6 h-6 rounded-full cursor-pointer transition-all"
-              style={{ color: '#FF3B30', background: '#FFECEA' }}
-              title="Restore"
-            >
-              <RotateCcw className="w-3 h-3" strokeWidth={2.5} />
-            </button>
-          ) : (
-            <button
-              onClick={() => openOverride(med)}
-              className="inline-flex items-center justify-center w-6 h-6 rounded-full text-foreground/60 bg-[#F2F2F7] hover:bg-[#E5E5EA] cursor-pointer transition-all"
-              title="Adjust"
-            >
-              <Edit2 className="w-3 h-3" strokeWidth={2.5} />
-            </button>
-          )}
-        </div>
-      )}
+      {nameBlock}
+      {statusAndTime}
+      {editControls}
     </div>
   );
 }
@@ -179,6 +245,17 @@ export default function SchedulePlannerPage() {
   const [now, setNow] = useState<Date>(new Date());
   const railRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1.0);
+  // Dose cards live in a ~240px column (the rail's hour gutter takes 48px). One row
+  // cannot hold a 44px drag handle, the dot, the name, the time pill AND a 44px action
+  // button in that space — the medication name was being crushed to 0-22px, i.e. the
+  // one thing the row exists to tell you. Below `sm` the card becomes two rows.
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const f = () => setNarrow(window.innerWidth < 640);
+    f();
+    window.addEventListener('resize', f);
+    return () => window.removeEventListener('resize', f);
+  }, []);
   const [dragging, setDragging] = useState<{
     medId: number;
     originalMinutes: number;
@@ -465,9 +542,11 @@ export default function SchedulePlannerPage() {
   const skippedCount = selectedMeds.length - activeDoses.length;
 
   // Compute non-overlapping card tops: each card sits at its natural time position
-  // or just below the previous card if they would overlap (36px per card).
+  // or just below the previous card if they would overlap.
+  // Card height follows the card's own layout — narrow screens stack it into two rows
+  // (see DoseCard), so reserving the one-row 36px there would overlap every card.
   const cardTops = useMemo(() => {
-    const CARD_H = 36;
+    const CARD_H = narrow ? 104 : 36;
     const tops: number[] = [];
     let minY = 0;
     for (const med of selectedMeds) {
@@ -478,7 +557,7 @@ export default function SchedulePlannerPage() {
       minY = top + CARD_H;
     }
     return tops;
-  }, [selectedMeds, hourHeight]);
+  }, [selectedMeds, hourHeight, narrow]);
   const criticalCount = activeDoses.filter((m) => m.priority_level === 'critical').length;
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   const nextDose = isToday
@@ -533,7 +612,7 @@ export default function SchedulePlannerPage() {
         >
           <Clock className="w-4 h-4 shrink-0 text-primary" strokeWidth={2.5} />
           <div className="leading-tight">
-            <p className="text-[8px] uppercase tracking-widest font-semibold text-muted-foreground">
+            <p className="text-[10px] uppercase tracking-widest font-black text-muted-foreground">
               {isToday ? 'Next dose' : 'First dose'}
             </p>
             {nextDose ? (
@@ -541,7 +620,14 @@ export default function SchedulePlannerPage() {
                 {nextDose.drug_name} · {formatTimeLabel(nextDose.time)}
               </p>
             ) : (
-              <p className="text-xs font-semibold text-muted-foreground">None today</p>
+              /* "None today" alongside "1 dose planned" was a straight contradiction:
+                 the dose exists, it is just already behind us. And on a future date the
+                 word "today" was simply wrong. Say which of the three it actually is. */
+              <p className="text-xs font-semibold text-muted-foreground">
+                {activeDoses.length > 0
+                  ? isToday ? 'All done for today' : 'None scheduled'
+                  : isToday ? 'Nothing due today' : 'Nothing scheduled'}
+              </p>
             )}
           </div>
         </div>
@@ -552,7 +638,7 @@ export default function SchedulePlannerPage() {
         <div className="flex items-center justify-between mb-3">
           <button
             onClick={() => shiftWeek(-1)}
-            className="w-9 h-9 rounded-full flex items-center justify-center bg-[#F2F2F7] hover:bg-[#E5E5EA] text-foreground transition-all cursor-pointer"
+            className="w-11 h-11 rounded-full flex items-center justify-center bg-[#F2F2F7] hover:bg-[#E5E5EA] text-foreground transition-all cursor-pointer"
             aria-label="Previous week"
           >
             <ChevronLeft className="w-4 h-4" strokeWidth={2.5} />
@@ -566,9 +652,9 @@ export default function SchedulePlannerPage() {
             <button
               onClick={() => setShowMonth((s) => !s)}
               className={
-                'inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-semibold cursor-pointer transition-all ' +
+                'inline-flex items-center gap-1 h-11 px-3.5 rounded-full text-[11px] font-semibold cursor-pointer transition-all ' +
                 (showMonth
-                  ? 'bg-primary text-white'
+                  ? 'bg-primary-strong text-primary-strong-foreground'
                   : 'bg-[#F2F2F7] text-muted-foreground hover:text-foreground')
               }
             >
@@ -577,7 +663,7 @@ export default function SchedulePlannerPage() {
           </div>
           <button
             onClick={() => shiftWeek(1)}
-            className="w-9 h-9 rounded-full flex items-center justify-center bg-[#F2F2F7] hover:bg-[#E5E5EA] text-foreground transition-all cursor-pointer"
+            className="w-11 h-11 rounded-full flex items-center justify-center bg-[#F2F2F7] hover:bg-[#E5E5EA] text-foreground transition-all cursor-pointer"
             aria-label="Next week"
           >
             <ChevronRight className="w-4 h-4" strokeWidth={2.5} />
@@ -677,7 +763,7 @@ export default function SchedulePlannerPage() {
                 const isTod = date.toDateString() === new Date().toDateString();
                 const load = getMedicationsForDate(date).filter((m) => !m.isSkipped).length;
                 const cellClass = isSel
-                  ? 'bg-primary text-white'
+                  ? 'bg-primary-strong text-primary-strong-foreground'
                   : isTod
                     ? 'bg-primary-soft text-foreground'
                     : 'hover:bg-[#F2F2F7] text-foreground';
@@ -718,7 +804,7 @@ export default function SchedulePlannerPage() {
               <div className="flex items-center gap-0.5 bg-[#F2F2F7] rounded-full px-1 py-1">
                 <button
                   onClick={() => setZoom(z => Math.max(0.5, +(z - 0.25).toFixed(2)))}
-                  className="w-6 h-6 rounded-full flex items-center justify-center hover:bg-white text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+                  className="w-11 h-11 rounded-full flex items-center justify-center hover:bg-white text-muted-foreground hover:text-foreground transition-all cursor-pointer"
                   aria-label="Zoom out"
                 >
                   <Minus className="w-3 h-3" strokeWidth={2.5} />
@@ -726,7 +812,7 @@ export default function SchedulePlannerPage() {
                 <span className="text-[10px] font-bold text-foreground w-8 text-center tabular-nums">{Math.round(zoom * 100)}%</span>
                 <button
                   onClick={() => setZoom(z => Math.min(3, +(z + 0.25).toFixed(2)))}
-                  className="w-6 h-6 rounded-full flex items-center justify-center hover:bg-white text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+                  className="w-11 h-11 rounded-full flex items-center justify-center hover:bg-white text-muted-foreground hover:text-foreground transition-all cursor-pointer"
                   aria-label="Zoom in"
                 >
                   <Plus className="w-3 h-3" strokeWidth={2.5} />
@@ -769,9 +855,11 @@ export default function SchedulePlannerPage() {
                       className="absolute left-0 right-0 flex items-start"
                       style={{ top: band.from * hourHeight, height: (band.to - band.from) * hourHeight, background: band.color }}
                     >
-                      <span className="ml-14 mt-1 inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider" style={{ color: band.text }}>
-                        <BandIcon className="w-3 h-3" /> {band.label}
-                      </span>
+                      {band.showLabel && (
+                        <span className="ml-14 mt-1 inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                          <BandIcon className="w-3 h-3" /> {band.label}
+                        </span>
+                      )}
                     </div>
                   );
                 })}
@@ -791,7 +879,7 @@ export default function SchedulePlannerPage() {
                     <div className="relative flex items-center">
                       <span className="absolute -left-1 w-2.5 h-2.5 rounded-full bg-danger ring-2 ring-white" />
                       <div className="w-full border-t-2 border-danger/70 border-dashed" />
-                      <span className="absolute right-0 -top-4 text-[8px] font-black text-danger bg-danger/10 px-1.5 py-0.5 rounded-full">NOW</span>
+                      <span className="absolute right-0 -top-4 text-[10px] font-black text-danger-strong bg-card border border-danger px-2 py-0.5 rounded-full">NOW</span>
                     </div>
                   </div>
                 )}
@@ -832,6 +920,7 @@ export default function SchedulePlannerPage() {
                         onDragMove={onDragMove}
                         endDrag={endDrag}
                         setDragging={setDragging}
+                        narrow={narrow}
                       />
                     </div>
                   );
@@ -846,32 +935,63 @@ export default function SchedulePlannerPage() {
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-white rounded-[22px] p-4" style={{ boxShadow: CARD_SHADOW }}>
               <p className="text-2xl font-bold text-foreground leading-none">{activeDoses.length}</p>
-              <p className="text-[10px] font-semibold text-muted-foreground mt-1 uppercase tracking-wide">Doses today</p>
+              {/* Was a flat "DOSES TODAY" — plural for a count of 1, and still "today"
+                  while you were looking at next Thursday. */}
+              <p className="text-[10px] font-semibold text-muted-foreground mt-1 uppercase tracking-wide">
+                {activeDoses.length === 1 ? 'Dose' : 'Doses'} {isToday ? 'today' : 'that day'}
+              </p>
             </div>
             <div className="bg-white rounded-[22px] p-4" style={{ boxShadow: CARD_SHADOW }}>
-              <p className="text-2xl font-bold leading-none" style={{ color: criticalCount > 0 ? '#FF3B30' : 'var(--foreground)' }}>{criticalCount}</p>
+              <p className="text-2xl font-bold leading-none" style={{ color: criticalCount > 0 ? 'var(--danger-strong)' : 'var(--foreground)' }}>{criticalCount}</p>
               <p className="text-[10px] font-semibold text-muted-foreground mt-1 uppercase tracking-wide">Critical</p>
             </div>
           </div>
 
+          {/* Labels and colors both come from the shared map now. This legend used to
+              hardcode its own hexes AND call the lowest level "Routine" while the wizard
+              you set it in called it "Normal" — so the key did not explain the app. */}
           <div className="bg-white rounded-[22px] p-5 space-y-3" style={{ boxShadow: CARD_SHADOW }}>
             <h4 className="text-xs font-bold tracking-tight text-foreground">Priority key</h4>
-            {[
-              { c: '#FF3B30', l: 'Critical: never miss' },
-              { c: '#FF9500', l: 'Important' },
-              { c: '#F26B8A', l: 'Routine' },
-            ].map((row, i) => (
-              <div key={i} className="flex items-center gap-2.5">
-                <span className="w-3 h-3 rounded-full" style={{ background: row.c }} />
-                <span className="text-[11px] font-medium text-muted-foreground">{row.l}</span>
-              </div>
-            ))}
+            {(['critical', 'important', 'normal'] as const).map((level) => {
+              const meta = PRIORITY[level];
+              return (
+                <div key={level} className="flex items-center gap-2.5">
+                  <span className="w-3 h-3 rounded-full shrink-0" style={{ background: TONE_VAR[meta.tone] }} />
+                  <span className="text-[11px] font-medium text-muted-foreground">
+                    <b className="text-foreground font-bold">{meta.label}</b> — {meta.gloss}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Time-of-day legend. The rail's bands only carried tiny in-chart labels, so
+              the shading read as decoration. */}
+          <div className="bg-white rounded-[22px] p-5 space-y-3" style={{ boxShadow: CARD_SHADOW }}>
+            <h4 className="text-xs font-bold tracking-tight text-foreground">Time of day</h4>
+            <div className="grid grid-cols-2 gap-2">
+              {DAY_BANDS.filter((b) => b.showLabel).map((band) => {
+                const BandIcon = band.icon;
+                return (
+                  <div key={band.label} className="flex items-center gap-2">
+                    <span
+                      className="w-5 h-5 rounded-md shrink-0 border border-border"
+                      style={{ background: band.color }}
+                      aria-hidden="true"
+                    />
+                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
+                      <BandIcon className="w-3 h-3 shrink-0" /> {band.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           {canEdit && (
             <a
               href="/medications"
-              className="flex items-center justify-center gap-2 w-full py-3 rounded-full bg-primary text-white font-semibold text-sm hover:bg-primary-hover transition-all cursor-pointer"
+              className="flex items-center justify-center gap-2 w-full py-3 rounded-full bg-primary-strong text-primary-strong-foreground font-semibold text-sm hover:bg-primary-strong-hover transition-all cursor-pointer"
               style={{ boxShadow: '0 4px 12px rgba(242, 107, 138, 0.35)' }}
             >
               <Plus className="w-4 h-4" strokeWidth={2.5} /> Add medication
@@ -937,7 +1057,7 @@ export default function SchedulePlannerPage() {
               </button>
               <button
                 onClick={handleApplyOverride}
-                className="flex-1 py-3 bg-primary text-white hover:bg-primary-hover text-sm font-semibold rounded-full cursor-pointer transition-all"
+                className="flex-1 py-3 bg-primary-strong text-primary-strong-foreground hover:bg-primary-strong-hover text-sm font-semibold rounded-full cursor-pointer transition-all"
                 style={{ boxShadow: '0 4px 12px rgba(242, 107, 138, 0.35)' }}
               >
                 Save change

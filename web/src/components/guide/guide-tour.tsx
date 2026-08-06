@@ -168,7 +168,7 @@ export default function GuideTour() {
                 <ArrowLeft className="w-3.5 h-3.5" /> Back
               </button>
             )}
-            <button onClick={goNext} className="inline-flex items-center gap-1 text-xs font-black text-primary-foreground bg-primary hover:bg-primary-hover px-3.5 py-1.5 rounded-xl cursor-pointer">
+            <button onClick={goNext} className="inline-flex items-center gap-1 text-xs font-black text-primary-strong-foreground bg-primary-strong hover:bg-primary-strong-hover px-3.5 py-1.5 rounded-xl cursor-pointer">
               {isLast ? (<><Check className="w-3.5 h-3.5" /> Done</>) : (<>Next <ArrowRight className="w-3.5 h-3.5" /></>)}
             </button>
           </div>

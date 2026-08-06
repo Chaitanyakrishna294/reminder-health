@@ -90,7 +90,7 @@ export default function InstallPrompt() {
         onClick={handleInstall}
         aria-label="Install Re-MIND-eЯ app"
         title="Install app"
-        className="fixed bottom-4 right-4 z-[90] w-12 h-12 rounded-full bg-primary text-primary-foreground shadow-2xl flex items-center justify-center hover:bg-primary-hover transition-all cursor-pointer"
+        className="floating-bottom fixed right-4 z-[90] w-12 h-12 rounded-full bg-primary-strong text-primary-strong-foreground shadow-2xl flex items-center justify-center hover:bg-primary-strong-hover transition-all cursor-pointer"
       >
         <Download className="w-5 h-5" />
       </button>
@@ -102,7 +102,7 @@ export default function InstallPrompt() {
     <div
       role="dialog"
       aria-label="Install app"
-      className="fixed bottom-4 left-4 right-4 sm:right-auto sm:max-w-sm z-[90]"
+      className="floating-bottom fixed left-4 right-4 sm:right-auto sm:max-w-sm z-[90]"
     >
       <div className="rounded-2xl border border-border bg-card shadow-2xl p-4 flex items-center gap-3">
         <div className="shrink-0 w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
@@ -114,7 +114,7 @@ export default function InstallPrompt() {
         </div>
         <button
           onClick={handleInstall}
-          className="shrink-0 rounded-xl bg-primary text-primary-foreground font-bold px-4 py-2 text-sm hover:bg-primary-hover transition-all cursor-pointer"
+          className="shrink-0 rounded-xl bg-primary-strong text-primary-strong-foreground font-bold px-4 py-2 text-sm hover:bg-primary-strong-hover transition-all cursor-pointer"
         >
           Install
         </button>

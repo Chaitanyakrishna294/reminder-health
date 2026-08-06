@@ -441,7 +441,7 @@ export default function SharedTrustCenter() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 pb-12 font-sans">
+    <div className="max-w-5xl mx-auto space-y-8 font-sans">
       {/* Header bar */}
       <div className="flex items-center justify-between border-b border-border pb-6">
         <div className="flex items-center gap-3">
@@ -775,7 +775,7 @@ export default function SharedTrustCenter() {
               <button
                 onClick={handleSaveChanges}
                 disabled={processing !== null}
-                className="flex-1 py-2.5 bg-primary hover:bg-primary-hover text-white font-bold text-xs rounded-xl cursor-pointer transition-all disabled:opacity-50"
+                className="flex-1 py-2.5 bg-primary-strong hover:bg-primary-strong-hover text-primary-strong-foreground font-bold text-xs rounded-xl cursor-pointer transition-all disabled:opacity-50"
               >
                 {processing ? 'Saving...' : 'Save Changes'}
               </button>

@@ -86,7 +86,7 @@ export default function Navbar({ user }: NavbarProps) {
               aria-label={isElderly ? 'Switch to Normal view' : 'Switch to Elderly (large, accessible) view'}
               title={isElderly ? 'Switch to Normal view' : 'Switch to Elderly view'}
               className={`flex items-center justify-center rounded-full transition-all duration-200 border cursor-pointer hover:scale-[1.05] active:scale-[0.95] ${isElderly
-                ? 'bg-warning/20 hover:bg-warning/35 border-warning/50 text-warning-foreground w-12 h-12 shadow-sm'
+                ? 'bg-warning/20 hover:bg-warning/35 border-warning/50 text-warning-strong w-12 h-12 shadow-sm'
                 : 'bg-muted hover:bg-muted/80 border-border text-foreground/80 hover:text-foreground w-9 h-9'
                 }`}
             >

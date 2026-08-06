@@ -23,6 +23,10 @@ import { getUnitIcon, getCountdownText, PinkBubbles } from '@/components/dashboa
 
 import { createClient } from '@/lib/supabase/client';
 import { getSeverityTheme } from '@/lib/severity-theme';
+import { TONE_VAR, doseTone, CARE_LABELS } from '@/lib/design/semantics';
+import { unitPhrase } from '@/components/medications/medication-form-options';
+import { Eyebrow } from '@/components/ui/eyebrow';
+import { EmptyState } from '@/components/ui/empty-state';
 import { 
   Activity, 
   Clock, 
@@ -692,22 +696,10 @@ export default function DashboardClientView({
     return 'empty';
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'TAKEN':
-      case 'RESOLVED_BY_CG':
-        return '#7ED9A3'; // Success Green
-      case 'MISSED':
-      case 'ESCALATED_TO_CG':
-        return '#FF9FA5'; // Critical Coral
-      case 'SKIPPED':
-        return '#FFD48A'; // Warning Orange
-      case 'SNOOZED':
-        return '#5B8DEF'; // Floating Blue
-      default:
-        return '#B8C6FF'; // Lavender Accent
-    }
-  };
+  // Was a private palette of pastel hexes — "Critical Coral" #FF9FA5 for a missed dose
+  // sat right next to the brand pink, and none of the four values matched the tokens the
+  // rest of the app uses for the same states. It also didn't follow dark mode.
+  const getStatusColor = (status: string) => TONE_VAR[doseTone(status)];
 
   // ==========================================
   // ELDERLY MODE VIEW (Strictly Show ONLY: 1. Next Medication, 2. Today's Progress, 3. Low Stock Alerts)
@@ -719,7 +711,9 @@ export default function DashboardClientView({
       <>
         {dueGate}
         {viewMode !== 'PATIENT_MONITOR' && <GuideAutoStart tour="dashboard" />}
-        <div className={`space-y-8 w-full max-w-4xl mx-auto transition-colors duration-500 ${isGravityState ? 'pb-24' : ''}`}>
+        {/* Dock clearance is owned by <main> in dashboard-main-layout; adding it here
+            too just stacked two paddings. */}
+        <div className="space-y-8 w-full max-w-4xl mx-auto transition-colors duration-500">
           {missedStrip}
           {/* Gravity State Dimmer Backdrop (Disabled) */}
 
@@ -733,7 +727,7 @@ export default function DashboardClientView({
               <div className="flex items-center gap-4 w-full sm:w-auto shrink-0 justify-end">
                 <button
                   onClick={handleEnableNotifications}
-                  className="bg-primary text-primary-foreground font-black px-8 py-3 rounded-xl text-xl cursor-pointer hover:bg-primary-hover transition-all shadow-md shrink-0"
+                  className="bg-primary-strong text-primary-strong-foreground font-black px-8 py-3 rounded-xl text-xl cursor-pointer hover:bg-primary-strong-hover transition-all shadow-md shrink-0"
                 >
                   Enable Notifications
                 </button>
@@ -760,7 +754,7 @@ export default function DashboardClientView({
                   localStorage.setItem('dismissedIosPwaBanner', 'true');
                   setShowIosPwaBanner(false);
                 }}
-                className="bg-primary text-primary-foreground font-black px-8 py-3 rounded-xl text-xl cursor-pointer hover:bg-primary-hover transition-all shadow-md shrink-0"
+                className="bg-primary-strong text-primary-strong-foreground font-black px-8 py-3 rounded-xl text-xl cursor-pointer hover:bg-primary-strong-hover transition-all shadow-md shrink-0"
               >
                 Dismiss
               </button>
@@ -775,7 +769,7 @@ export default function DashboardClientView({
             </span>
             <button 
               onClick={toggleMode}
-              className="bg-primary text-primary-foreground font-black px-8 py-3 rounded-xl text-xl cursor-pointer hover:bg-primary-hover transition-all shadow-md shrink-0"
+              className="bg-primary-strong text-primary-strong-foreground font-black px-8 py-3 rounded-xl text-xl cursor-pointer hover:bg-primary-strong-hover transition-all shadow-md shrink-0"
             >
               Switch to Normal View
             </button>
@@ -829,7 +823,7 @@ export default function DashboardClientView({
                       <button
                         onClick={() => handleResolveAll('TAKEN')}
                         disabled={updatingId !== null}
-                        className="w-full h-[72px] flex items-center justify-center gap-2 text-2xl font-black rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all cursor-pointer shadow-lg disabled:opacity-50"
+                        className="w-full h-[72px] flex items-center justify-center gap-2 text-2xl font-black rounded-2xl bg-primary-strong text-primary-strong-foreground hover:bg-primary/90 transition-all cursor-pointer shadow-lg disabled:opacity-50"
                       >
                         <Check className="w-6 h-6" />
                         {updatingId === BATCH_SENTINEL ? 'Confirming…' : `I TOOK ALL ${dueNowEvents.length}`}
@@ -901,12 +895,16 @@ export default function DashboardClientView({
               />
             </div>
   
-            <div className="flex justify-between text-2xl font-bold text-muted-foreground">
+            {/* `justify-between` with no gap ran the two labels together at phone width
+                in elderly mode — it rendered as "StartedRemaining: 3 doses". */}
+            <div className="flex flex-wrap justify-between gap-x-4 gap-y-1 text-2xl font-bold text-muted-foreground">
               <span>Started</span>
               {progressPercentage === 100 ? (
-                <span className="text-success font-black">Done for the day!</span>
+                <span className="text-success-strong font-black">Done for the day!</span>
               ) : (
-                <span>Remaining: {todayTotal - todayTaken} doses</span>
+                <span>
+                  {todayTotal - todayTaken} {todayTotal - todayTaken === 1 ? 'dose' : 'doses'} left
+                </span>
               )}
             </div>
           </div>
@@ -970,7 +968,7 @@ export default function DashboardClientView({
           <div className="flex items-center gap-2.5 w-full sm:w-auto shrink-0 justify-end">
             <button
               onClick={handleEnableNotifications}
-              className="px-5 py-2.5 bg-primary text-primary-foreground text-xs font-black rounded-full hover:scale-105 active:scale-95 transition-all shadow-md cursor-pointer w-full sm:w-auto text-center"
+              className="px-5 py-2.5 bg-primary-strong text-primary-strong-foreground text-xs font-black rounded-full hover:scale-105 active:scale-95 transition-all shadow-md cursor-pointer w-full sm:w-auto text-center"
             >
               Enable Notifications
             </button>
@@ -1133,17 +1131,17 @@ export default function DashboardClientView({
       {viewMode === 'PATIENT_MONITOR' && (
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 bg-primary/5 border border-primary/20 rounded-3xl p-6 shadow-sm animate-fade-in">
           <div className="md:col-span-1 border-b md:border-b-0 md:border-r border-primary/10 pb-3 md:pb-0 md:pr-4 flex flex-col justify-center">
-            <span className="text-[10px] font-black text-primary uppercase tracking-wider">Patient Name</span>
+            <Eyebrow as="span" className="text-primary">Patient Name</Eyebrow>
             <h3 className="text-sm font-black text-foreground mt-0.5">{patientName}</h3>
           </div>
           
           <div className="md:col-span-1 border-b md:border-b-0 md:border-r border-primary/10 pb-3 md:pb-0 md:pr-4 flex flex-col justify-center">
-            <span className="text-[10px] font-black text-primary uppercase tracking-wider">Compliance Rate</span>
+            <Eyebrow as="span" className="text-primary">Compliance Rate</Eyebrow>
             <h3 className="text-sm font-black text-foreground mt-0.5">{monthlyAdherence}% Adherence</h3>
           </div>
 
           <div className="md:col-span-1 border-b md:border-b-0 md:border-r border-primary/10 pb-3 md:pb-0 md:pr-4 flex flex-col justify-center">
-            <span className="text-[10px] font-black text-primary uppercase tracking-wider">Last Taken Dose</span>
+            <Eyebrow as="span" className="text-primary">Last Taken Dose</Eyebrow>
             {(() => {
               const formattedLastTakenTime = mounted && lastTaken
                 ? new Date(lastTaken.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -1157,7 +1155,7 @@ export default function DashboardClientView({
           </div>
 
           <div className="md:col-span-1 border-b md:border-b-0 md:border-r border-primary/10 pb-3 md:pb-0 md:pr-4 flex flex-col justify-center">
-            <span className="text-[10px] font-black text-primary uppercase tracking-wider">Next Dose</span>
+            <Eyebrow as="span" className="text-primary">Next Dose</Eyebrow>
             <h3 className="text-xs font-black text-foreground mt-0.5 truncate" title={nextPendingEvent ? `${nextPendingEvent.medications.drug_name} at ${mounted ? new Date(nextPendingEvent.scheduled_for).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}` : 'All caught up!'}>
               {nextPendingEvent 
                 ? `${nextPendingEvent.medications.drug_name} (${mounted ? new Date(nextPendingEvent.scheduled_for).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'})`
@@ -1166,7 +1164,7 @@ export default function DashboardClientView({
           </div>
 
           <div className="md:col-span-1 flex flex-col justify-center">
-            <span className="text-[10px] font-black text-primary uppercase tracking-wider">Alert Status</span>
+            <Eyebrow as="span" className="text-primary">Alert Status</Eyebrow>
             <div className="mt-0.5">
               {activeEscalations > 0 ? (
                 <span className="inline-flex items-center gap-1.5 text-[10px] font-black text-danger bg-danger/10 border border-danger/25 px-2.5 py-0.5 rounded-full animate-pulse uppercase tracking-wider">
@@ -1197,20 +1195,25 @@ export default function DashboardClientView({
               : 'bg-card border-border'
         }`}>
           {nextPendingEvent && !isMissed && <PinkBubbles />}
-          {/* Mascot accent filling the card's empty space */}
-          <BrainMascot
-            size={96}
-            mood={heroMood}
-            className="absolute right-3 sm:right-6 top-[42%] -translate-y-1/2 opacity-90 pointer-events-none select-none"
-          />
+          {/* Mascot accent filling the card's empty space. Only floated when there IS a
+              dose card to fill space around — in the "All caught up!" state the card is
+              short, and the mascot ended up hovering over the checkmark instead of
+              beside it. There it moves into the flex row (below). */}
+          {nextPendingEvent && (
+            <BrainMascot
+              size={96}
+              mood={heroMood}
+              className="absolute right-3 sm:right-6 top-[42%] -translate-y-1/2 opacity-90 pointer-events-none select-none"
+            />
+          )}
           <div>
             <div className="flex justify-between items-start gap-4">
               <div className="min-w-0 flex-1">
-                <p className={`text-[10px] font-bold uppercase tracking-widest ${
-                  isMissed ? 'text-danger' : onGradient ? 'text-white/90' : 'text-muted-foreground'
-                }`}>
+                <Eyebrow className={
+                  isMissed ? 'text-danger-strong' : onGradient ? 'text-white/90' : ''
+                }>
                   {isMissed ? 'Missed Medication' : 'Next Medication'}
-                </p>
+                </Eyebrow>
                 {nextPendingEvent ? (
                   <div className="mt-4 flex items-start gap-4">
                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-colors ${
@@ -1227,13 +1230,18 @@ export default function DashboardClientView({
                         {nextPendingEvent.medications.drug_name}
                       </h3>
                       <div className={`text-xs mt-1 space-y-1 font-sans ${onGradient ? 'text-white/85' : 'text-muted-foreground'}`}>
+                        {/* Was "1 tablet(s) - N/A" when no strength was recorded — the
+                            placeholder leaked straight onto the hero card. */}
                         <p>
                           Dosage: <b className={`font-mono ${onGradient ? 'text-white' : 'text-foreground'}`}>
-                            {nextPendingEvent.medications.dosage_amount 
-                              ? `${nextPendingEvent.medications.dosage_amount} ${nextPendingEvent.medications.unit_type?.toLowerCase() || 'unit'}(s)`
-                              : ''}
-                            {nextPendingEvent.medications.dosage_amount && nextPendingEvent.medications.dosage ? ' - ' : ''}
-                            {nextPendingEvent.medications.dosage || ''}
+                            {[
+                              nextPendingEvent.medications.dosage_amount
+                                ? `${nextPendingEvent.medications.dosage_amount} ${unitPhrase(nextPendingEvent.medications.unit_type, nextPendingEvent.medications.dosage_amount)}`
+                                : '',
+                              nextPendingEvent.medications.dosage && nextPendingEvent.medications.dosage !== 'N/A'
+                                ? nextPendingEvent.medications.dosage
+                                : '',
+                            ].filter(Boolean).join(' · ')}
                           </b>
                         </p>
                         {nextPendingEvent.medications.medication_reason && (
@@ -1245,10 +1253,15 @@ export default function DashboardClientView({
                     </div>
                   </div>
                 ) : (
-                  <div className="mt-4 flex items-center gap-3 text-success">
-                    <CheckCircle className="w-8 h-8 shrink-0" />
+                  <div className="mt-4 flex items-center gap-3">
+                    <BrainMascot
+                      size={72}
+                      mood={heroMood}
+                      className="shrink-0 pointer-events-none select-none"
+                    />
+                    <CheckCircle className="w-8 h-8 shrink-0 text-success" />
                     <div>
-                      <h3 className="text-lg font-black tracking-tight">All caught up!</h3>
+                      <h3 className="text-lg font-black tracking-tight text-success-strong">All caught up!</h3>
                       <p className="text-xs text-muted-foreground font-semibold mt-0.5">You have taken all scheduled medications for today.</p>
                     </div>
                   </div>
@@ -1257,17 +1270,23 @@ export default function DashboardClientView({
               
               {nextPendingEvent && (
                 <div className="flex flex-col items-end gap-1 shrink-0 font-mono text-right">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black border transition-colors ${
+                  {/* 9px was too small to clear 4.5:1 on a tint, and this is the one
+                      line that says how late you are. Solid fill when missed, and a
+                      readable size. */}
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-black border transition-colors ${
                     isMissed
-                      ? 'bg-danger/15 text-danger border-danger/25'
+                      /* Solid #FF3B30 with white text is only 3.55:1 — iOS system red
+                         is too light to carry white. An opaque card-coloured pill with
+                         the dark red ink clears 7:1 on any background this card takes. */
+                      ? 'bg-card text-danger-strong border-danger'
                       : onGradient
-                        ? 'bg-white/20 text-white border-white/30'
+                        ? 'bg-white/25 text-white border-white/40'
                         : 'bg-primary/15 text-primary border-primary/25'
                   }`}>
                     {mounted ? getCountdownText(nextPendingEvent.scheduled_for) : 'UPCOMING'}
                   </span>
                   <span className={`text-lg font-black mt-1 transition-colors ${
-                    isMissed ? 'text-danger' : onGradient ? 'text-white' : 'text-primary'
+                    isMissed ? 'text-danger-strong' : onGradient ? 'text-white' : 'text-primary'
                   }`} suppressHydrationWarning>
                     {mounted ? new Date(nextPendingEvent.scheduled_for).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
                   </span>
@@ -1299,14 +1318,14 @@ export default function DashboardClientView({
                   <button
                     onClick={() => handleElderlyTakeNow(nextPendingEvent, 'TAKEN')}
                     disabled={updatingId !== null}
-                    className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-success/20 backdrop-blur-md border border-success/40 text-success text-xs font-black rounded-full hover:bg-success/30 active:scale-[0.98] transition-all cursor-pointer shadow-sm disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 h-11 px-5 bg-success/20 backdrop-blur-md border border-success/40 text-success-strong text-xs font-black rounded-full hover:bg-success/30 active:scale-[0.98] transition-all cursor-pointer shadow-sm disabled:opacity-50"
                   >
                     <Check className="w-4 h-4" /> Take Now
                   </button>
                   <button
                     onClick={() => handleElderlyTakeNow(nextPendingEvent, 'SKIP')}
                     disabled={updatingId !== null}
-                    className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-white/55 backdrop-blur-md border border-white/70 text-muted-foreground text-xs font-bold rounded-full hover:bg-white/80 active:scale-[0.98] transition-all cursor-pointer shadow-sm disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 h-11 px-4 bg-white/70 backdrop-blur-md border border-white/80 text-foreground text-xs font-bold rounded-full hover:bg-white/80 active:scale-[0.98] transition-all cursor-pointer shadow-sm disabled:opacity-50"
                   >
                     <X className="w-4 h-4" /> Skip
                   </button>
@@ -1314,7 +1333,7 @@ export default function DashboardClientView({
                     <button
                       onClick={() => handleResolveAll('TAKEN')}
                       disabled={updatingId !== null}
-                      className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-primary text-primary-foreground text-xs font-black rounded-full hover:bg-primary/90 active:scale-[0.98] transition-all cursor-pointer shadow-sm disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-primary-strong text-primary-strong-foreground text-xs font-black rounded-full hover:bg-primary/90 active:scale-[0.98] transition-all cursor-pointer shadow-sm disabled:opacity-50"
                     >
                       <Check className="w-4 h-4" />
                       {updatingId === BATCH_SENTINEL ? 'Confirming…' : `Take all ${dueNowEvents.length} due now`}
@@ -1414,7 +1433,7 @@ export default function DashboardClientView({
                         <p className="text-[18px] font-black text-foreground">
                           {todayTotal > 0 ? Math.round((todayTaken / todayTotal) * 100) : 100}%
                         </p>
-                        <p className="text-[7px] font-black text-muted-foreground uppercase tracking-widest mt-0.5">
+                        <p className="text-[11px] font-black text-muted-foreground uppercase tracking-wider mt-0.5">
                           {todayTaken}/{todayTotal} TAKEN
                         </p>
                       </div>
@@ -1510,27 +1529,44 @@ export default function DashboardClientView({
             { label: 'Evening', icon: <Moon className="w-3.5 h-3.5 shrink-0" />, period: getPeriodStatus(17, 21) },
             { label: 'Night', icon: <Moon className="w-3.5 h-3.5 opacity-75 shrink-0" />, period: getPeriodStatus(21, 5) },
           ].map((item, idx) => {
-            let bgClass = 'bg-white/10 backdrop-blur-md text-white/70 border-white/20';
+            // These tiles used to be white text on `bg-white/20` over the pink gradient —
+            // a white veil over pink lands close enough to white that the label measured
+            // 1.77:1, i.e. barely visible. Lightening the tile and putting the navy ink
+            // ON it inverts the problem instead of stacking two pale layers.
+            let bgClass = 'bg-white/40 backdrop-blur-md text-foreground/75 border-white/40';
             let statusIcon = <Circle className="w-5 h-5 opacity-50 shrink-0" />;
+            let statusWord = 'Nothing due';
 
             if (item.period === 'taken') {
-              bgClass = 'bg-white/20 backdrop-blur-md text-white border-white/35';
-              statusIcon = <Check className="w-5 h-5 shrink-0" />;
+              bgClass = 'bg-white/90 backdrop-blur-md text-foreground border-white';
+              statusIcon = <Check className="w-5 h-5 shrink-0 text-success-strong" />;
+              statusWord = 'All taken';
             } else if (item.period === 'pending') {
-              bgClass = 'bg-white/20 backdrop-blur-md text-white border-white/35';
-              statusIcon = <Clock className="w-5 h-5 animate-pulse shrink-0" />;
+              bgClass = 'bg-white/90 backdrop-blur-md text-foreground border-white';
+              statusIcon = <Clock className="w-5 h-5 animate-pulse shrink-0 text-primary" />;
+              statusWord = 'Still due';
             } else if (item.period === 'missed') {
-              bgClass = 'bg-white/20 backdrop-blur-md text-white border-white/35';
-              statusIcon = <X className="w-5 h-5 shrink-0" />;
+              bgClass = 'bg-white/90 backdrop-blur-md text-foreground border-white';
+              statusIcon = <X className="w-5 h-5 shrink-0 text-danger-strong" />;
+              statusWord = 'Missed';
             }
 
             return (
-              <div key={idx} className={`p-2 rounded-2xl border flex flex-col items-center justify-center gap-2 min-h-[78px] ${bgClass}`}>
-                <span className="text-[9px] font-black font-mono tracking-tight flex flex-col items-center gap-1 w-full">
+              <div
+                key={idx}
+                className={`p-2 rounded-2xl border flex flex-col items-center justify-center gap-2 min-h-[78px] ${bgClass}`}
+                title={`${item.label}: ${statusWord}`}
+              >
+                {/* `truncate` clipped "Afternoon" to "Afternoo" in a 4-column grid on a
+                    375px screen. These are four fixed, known words — let them wrap
+                    rather than lose a letter. */}
+                <span className="text-[11px] font-black font-mono tracking-tight flex flex-col items-center gap-1 w-full">
                   {item.icon}
-                  <span className="truncate max-w-full">{item.label}</span>
+                  <span className="text-center leading-tight break-words max-w-full">{item.label}</span>
                 </span>
-                <span>{statusIcon}</span>
+                {/* The icon alone carried the state; screen readers got nothing. */}
+                <span aria-hidden="true">{statusIcon}</span>
+                <span className="sr-only">{statusWord}</span>
               </div>
             );
           })}
@@ -1548,9 +1584,12 @@ export default function DashboardClientView({
               <h2 className="text-xl font-black text-foreground tracking-tight">Today's Schedule</h2>
               <p className="text-xs text-muted-foreground font-semibold">Keep track of your medication requirements</p>
             </div>
+            {/* The dashboard's one solid-primary CTA. Refill and Open Hub used to be
+                equally loud (one of them in a one-off teal), so nothing read as the main
+                action. Both are secondary now. */}
             <Link
               href="/medications"
-              className="px-4 py-2 text-xs font-black rounded-full bg-primary text-primary-foreground hover:bg-primary-hover hover:scale-105 active:scale-95 transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+              className="h-11 px-4 text-xs font-black rounded-full bg-primary-strong text-primary-strong-foreground hover:bg-primary-strong-hover active:scale-[0.98] transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" /> Manage Inventory
             </Link>
@@ -1580,39 +1619,49 @@ export default function DashboardClientView({
               <p className="text-[11px] text-muted-foreground">Your last 7 days at a glance</p>
             </div>
 
-            {/* Weekly rings — center number = doses taken; teal = taken, amber = skipped, uncoloured = missed.
-                Laid out like the Olympic rings: 4 on top, 3 nestled below. */}
+            {/* Weekly rings, laid out like the Olympic rings: 4 on top, 3 below.
+                A missed dose and a day with nothing scheduled used to render as the SAME
+                grey track, so "you had no medications on Sunday" and "you missed every
+                dose on Sunday" looked identical. Missed now draws its own red arc; grey
+                is reserved for genuinely empty days. */}
             {(() => {
               const days = chartData.slice(-7);
               const renderRing = (d: { date: string; day?: number; Taken: number; Skipped: number; Missed: number }, idx: number) => {
                 const taken = d.Taken || 0;
                 const skipped = d.Skipped || 0;
-                const total = taken + skipped + (d.Missed || 0);
+                const missed = d.Missed || 0;
+                const total = taken + skipped + missed;
                 const C = 2 * Math.PI * 15.5;
                 const takenLen = total > 0 ? C * (taken / total) : 0;
                 const skippedLen = total > 0 ? C * (skipped / total) : 0;
+                const missedLen = total > 0 ? C * (missed / total) : 0;
+                const summary = total === 0
+                  ? `${d.date}: nothing scheduled`
+                  : `${d.date}: ${taken} taken, ${skipped} skipped, ${missed} missed`;
                 return (
-                  <div key={idx} className="flex flex-col items-center gap-1" title={`${d.date}: ${taken} taken, ${skipped} skipped, ${d.Missed || 0} missed`}>
+                  <div key={idx} className="flex flex-col items-center gap-1" title={summary}>
                     <div className="relative w-14 h-14">
-                      <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
-                        {/* Track = missed / no data (uncoloured) */}
+                      <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90" role="img" aria-label={summary}>
+                        {/* Track — nothing scheduled, or the remainder. Neutral, never a warning. */}
                         <circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--muted)" strokeWidth="3" />
-                        {/* Taken (green) */}
                         {takenLen > 0 && (
                           <circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--success)" strokeWidth="3"
                             strokeDasharray={`${takenLen} ${C - takenLen}`} strokeDashoffset={0} />
                         )}
-                        {/* Skipped (amber), placed right after the taken arc */}
                         {skippedLen > 0 && (
                           <circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--warning)" strokeWidth="3"
                             strokeDasharray={`${skippedLen} ${C - skippedLen}`} strokeDashoffset={-takenLen} />
                         )}
+                        {missedLen > 0 && (
+                          <circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--danger)" strokeWidth="3"
+                            strokeDasharray={`${missedLen} ${C - missedLen}`} strokeDashoffset={-(takenLen + skippedLen)} />
+                        )}
                       </svg>
                       <span className="absolute inset-0 flex items-center justify-center text-[11px] font-black text-foreground tabular-nums">
-                        {taken}/{total}
+                        {total === 0 ? '—' : `${taken}/${total}`}
                       </span>
                     </div>
-                    <span className="text-[10px] font-bold text-muted-foreground tabular-nums whitespace-nowrap">{d.date}</span>
+                    <span className="text-[11px] font-bold text-muted-foreground tabular-nums whitespace-nowrap">{d.date}</span>
                   </div>
                 );
               };
@@ -1623,6 +1672,21 @@ export default function DashboardClientView({
                   </div>
                   <div className="flex justify-center gap-3">
                     {days.slice(4).map((d, i) => renderRing(d, i + 4))}
+                  </div>
+                  {/* Color alone can't carry this — the audience includes people with
+                      age-related color vision changes. */}
+                  <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 mt-2">
+                    {([
+                      ['Taken', 'var(--success)'],
+                      ['Skipped', 'var(--warning)'],
+                      ['Missed', 'var(--danger)'],
+                      ['None due', 'var(--muted)'],
+                    ] as const).map(([label, color]) => (
+                      <span key={label} className="inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground">
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} aria-hidden="true" />
+                        {label}
+                      </span>
+                    ))}
                   </div>
                 </div>
               );
@@ -1637,7 +1701,7 @@ export default function DashboardClientView({
                 <p className="text-[11px] text-muted-foreground">Current tablet counts and alerts</p>
               </div>
               {lowStockCount > 0 && (
-                <span className="shrink-0 inline-flex items-center gap-1 bg-warning/10 border border-warning/30 text-warning text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full">
+                <span className="shrink-0 inline-flex items-center gap-1 bg-warning/10 border border-warning/30 text-warning-strong text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full">
                   <AlertTriangle className="w-3 h-3 shrink-0" /> {lowStockCount} low
                 </span>
               )}
@@ -1645,8 +1709,10 @@ export default function DashboardClientView({
 
             {lowStockCount > 0 ? (
               <div className="space-y-2">
-                <div className="bg-warning/10 border border-warning/35 p-3 rounded-xl flex items-center gap-2 text-warning-foreground text-xs font-semibold">
-                  <AlertCircle className="w-4 h-4 shrink-0 text-warning" />
+                {/* `text-warning-foreground` is white — invisible on this 10% tint.
+                    `-strong` is the readable-on-tint variant. */}
+                <div className="bg-warning/10 border border-warning/35 p-3 rounded-xl flex items-center gap-2 text-warning-strong text-xs font-semibold">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-warning-strong" />
                   <span>Refill recommended for:</span>
                 </div>
                 {lowStockMedicines.map((m, idx) => {
@@ -1660,13 +1726,13 @@ export default function DashboardClientView({
                           <span className="font-black text-foreground truncate">{m.drug_name}</span>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
-                          <span className="font-black text-danger bg-danger/10 px-2.5 py-1 rounded-lg border border-danger/20">
+                          <span className="font-black text-danger-strong bg-danger/10 px-2.5 py-1 rounded-lg border border-danger/20">
                             {m.tablet_count} left
                           </span>
                           {canRefill && (
                             <button
                               onClick={() => { setRefillOpenId(isOpen ? null : m.id); setRefillAmount(''); }}
-                              className="inline-flex items-center gap-1 font-black text-primary bg-primary/10 hover:bg-primary/15 border border-primary/20 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                              className="inline-flex items-center gap-1 font-black text-foreground bg-card hover:bg-muted border border-border h-11 px-3 rounded-xl transition-colors cursor-pointer"
                               aria-label={`Add stock for ${m.drug_name}`}
                             >
                               <Plus className="w-3 h-3" /> Refill
@@ -1690,7 +1756,7 @@ export default function DashboardClientView({
                           <button
                             onClick={() => submitRefill(m.id, m.current_stock)}
                             disabled={refillBusyId === m.id}
-                            className="shrink-0 font-black text-primary-foreground bg-primary hover:bg-primary-hover px-3 py-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                            className="shrink-0 font-black text-primary-strong-foreground bg-primary-strong hover:bg-primary-strong-hover px-3 py-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
                           >
                             {refillBusyId === m.id ? 'Adding…' : 'Add'}
                           </button>
@@ -1709,81 +1775,46 @@ export default function DashboardClientView({
             )}
           </div>
 
-          {/* Layer 5: Care Circle */}
-          <div className="relative overflow-hidden isolate bg-gradient-to-br from-[#F8839E] to-[#F26B8A] text-white border border-transparent rounded-3xl p-6 shadow-sm shadow-primary/20 space-y-5">
-            <div className="flex justify-between items-center">
+          {/* Layer 5: Care Circle.
+              This was a full-bleed saturated pink gradient sitting directly below plain
+              white cards — the loudest surface on the page attached to the least urgent
+              information, so the eye jumped past the inventory warnings to get to it.
+              Now a tinted surface: still clearly the Care Circle, no longer shouting.
+              It also dropped a one-off teal CTA (#5EEAD4) that matched nothing else. */}
+          <div className="relative overflow-hidden isolate bg-primary-soft border border-primary/20 rounded-3xl p-6 shadow-sm space-y-5">
+            <div className="flex justify-between items-center gap-3">
               <div>
-                <h3 className="font-black text-white text-sm">Care Circle</h3>
-                <p className="text-[11px] text-white/80">Manage sharing & family relationships</p>
+                <h3 className="font-black text-foreground text-sm">Care Circle</h3>
+                <p className="text-[11px] text-muted-foreground">Manage sharing &amp; family relationships</p>
               </div>
               <Link
                 href="/care-circle"
-                className="px-3 py-1.5 rounded-full bg-[#5EEAD4] border border-transparent hover:bg-[#2DD4BF] text-[#0F766E] transition-all text-[10px] font-bold shadow-sm"
+                className="shrink-0 inline-flex items-center h-11 px-4 rounded-full bg-card border border-border hover:bg-muted text-foreground transition-all text-xs font-bold shadow-sm"
               >
                 Open Hub
               </Link>
             </div>
-            
-            <div className="space-y-4">
-              {/* Sub-List 1: People I Care For */}
-              <div className="space-y-2">
-                <p className="text-[10px] uppercase font-bold text-white/80">People I Care For ({peopleICareFor.length})</p>
-                {peopleICareFor.length > 0 ? (
-                  <div className="space-y-2">
-                    {peopleICareFor.slice(0, 3).map((conn) => {
-                      const initials = conn.resolved_name?.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() || 'P';
-                      return (
-                        <div key={conn.connection_id} className="flex items-center justify-between p-3 rounded-2xl bg-white/15 backdrop-blur-md border border-white/25">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-[#CCFBF1] text-[#0D9488] flex items-center justify-center text-xs font-black">
-                              {initials}
-                            </div>
-                            <div>
-                              <p className="text-xs font-black text-white">{conn.resolved_name}</p>
-                              <p className="text-[9px] font-bold text-white/70 uppercase">{conn.relationship_type}</p>
-                            </div>
-                          </div>
-                          <Link
-                            href={`/care-circle/${conn.patient_telegram_id}`}
-                            className="px-2.5 py-1 rounded-full bg-white/20 hover:bg-white/30 text-[10px] font-bold text-white border border-white/30 transition-all"
-                          >
-                            Overview
-                          </Link>
-                        </div>
-                      );
-                    })}
-                    {peopleICareFor.length > 3 && (
-                      <p className="text-[10px] text-center text-white/70">
-                        + {peopleICareFor.length - 3} more. <Link href="/care-circle" className="text-white font-bold underline">View all</Link>
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-[10px] text-white/70 border border-dashed border-white/40 rounded-xl p-3 text-center">
-                    No active patients linked yet.
-                  </p>
-                )}
-              </div>
 
-              {/* Sub-List 2: People Caring For Me */}
+            <div className="space-y-4">
+              {/* Patient side first — same order as /care-circle. */}
               <div className="space-y-2">
-                <p className="text-[10px] uppercase font-bold text-white/80">People Caring For Me ({peopleCaringForMe.length})</p>
+                <Eyebrow>{CARE_LABELS.asPatient} ({peopleCaringForMe.length})</Eyebrow>
                 {peopleCaringForMe.length > 0 ? (
                   <div className="space-y-2">
                     {peopleCaringForMe.slice(0, 3).map((conn) => {
                       const initials = conn.resolved_name?.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() || 'C';
                       return (
-                        <div key={conn.connection_id} className="flex items-center justify-between p-3 rounded-2xl bg-white/15 backdrop-blur-md border border-white/25">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-[#CCFBF1] text-[#0D9488] flex items-center justify-center text-xs font-black">
+                        <div key={conn.connection_id} className="flex items-center justify-between gap-2 p-3 rounded-2xl bg-card border border-border">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-black">
                               {initials}
                             </div>
-                            <div>
-                              <p className="text-xs font-black text-white">{conn.resolved_name}</p>
-                              <p className="text-[9px] font-bold text-white/70 uppercase">{conn.relationship_type}</p>
+                            <div className="min-w-0">
+                              <p className="text-xs font-black text-foreground truncate">{conn.resolved_name}</p>
+                              <p className="text-[11px] font-bold text-muted-foreground uppercase">{conn.relationship_type}</p>
                             </div>
                           </div>
-                          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-white/20 text-white border border-white/30 uppercase">
+                          <span className="shrink-0 text-[11px] font-bold px-2 py-0.5 rounded-full bg-muted text-muted-foreground uppercase">
                             {conn.connection_status}
                           </span>
                         </div>
@@ -1791,13 +1822,60 @@ export default function DashboardClientView({
                     })}
                   </div>
                 ) : (
-                  <p className="text-[10px] text-white/70 border border-dashed border-white/40 rounded-xl p-3 text-center">
-                    No active caregivers linked yet.
-                  </p>
+                  /* Was 10px white-on-pink at 70% opacity — the least readable text on
+                     the dashboard — and it offered no way to fix the emptiness. */
+                  <EmptyState
+                    bare
+                    className="bg-card/60 border border-dashed border-border rounded-2xl"
+                    title="No caregivers yet"
+                    description="Invite someone who should know if you miss a dose."
+                    action={{ label: 'Invite someone', href: '/settings#care-circle' }}
+                  />
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Eyebrow>{CARE_LABELS.asCaregiver} ({peopleICareFor.length})</Eyebrow>
+                {peopleICareFor.length > 0 ? (
+                  <div className="space-y-2">
+                    {peopleICareFor.slice(0, 3).map((conn) => {
+                      const initials = conn.resolved_name?.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() || 'P';
+                      return (
+                        <div key={conn.connection_id} className="flex items-center justify-between gap-2 p-3 rounded-2xl bg-card border border-border">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-black">
+                              {initials}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-black text-foreground truncate">{conn.resolved_name}</p>
+                              <p className="text-[11px] font-bold text-muted-foreground uppercase">{conn.relationship_type}</p>
+                            </div>
+                          </div>
+                          <Link
+                            href={`/care-circle/${conn.patient_telegram_id}`}
+                            className="shrink-0 inline-flex items-center h-11 px-3 rounded-full bg-muted hover:bg-accent-surface text-xs font-bold text-foreground transition-all"
+                          >
+                            Overview
+                          </Link>
+                        </div>
+                      );
+                    })}
+                    {peopleICareFor.length > 3 && (
+                      <p className="text-[11px] text-center text-muted-foreground">
+                        + {peopleICareFor.length - 3} more. <Link href="/care-circle" className="text-primary font-bold underline">View all</Link>
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <EmptyState
+                    bare
+                    className="bg-card/60 border border-dashed border-border rounded-2xl"
+                    title="Not caring for anyone yet"
+                    description="Requests to become someone's caregiver show up here."
+                  />
                 )}
               </div>
             </div>
-            <PinkBubbles />
           </div>
 
         </div>

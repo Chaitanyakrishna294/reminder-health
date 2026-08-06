@@ -47,7 +47,7 @@ export default function CookieConsent() {
         </p>
         <button
           onClick={acknowledge}
-          className="shrink-0 rounded-xl bg-primary text-primary-foreground font-bold px-5 py-2 text-sm hover:bg-primary-hover transition-all cursor-pointer"
+          className="shrink-0 rounded-xl bg-primary-strong text-primary-strong-foreground font-bold px-5 py-2 text-sm hover:bg-primary-strong-hover transition-all cursor-pointer"
         >
           Got it
         </button>

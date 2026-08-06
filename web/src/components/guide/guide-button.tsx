@@ -18,7 +18,9 @@ export default function GuideButton({ tour, className = '', label = 'How this wo
       onClick={() => startTour(tour)}
       aria-label={label}
       title={label}
-      className={`inline-flex items-center justify-center rounded-full text-primary bg-primary/10 hover:bg-primary/20 border border-primary/20 transition-all cursor-pointer w-8 h-8 ${className}`}
+      /* `shrink-0`: inside a flex header this was being squeezed to 32px wide even
+         though it asks for 44. */
+      className={`inline-flex shrink-0 items-center justify-center rounded-full text-primary bg-primary/10 hover:bg-primary/20 border border-primary/20 transition-all cursor-pointer w-11 h-11 ${className}`}
     >
       <HelpCircle className="w-4 h-4" />
     </button>

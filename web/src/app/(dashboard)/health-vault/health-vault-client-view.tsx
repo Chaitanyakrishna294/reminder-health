@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { 
   FileText, 
   ClipboardList, 
-  Binary, 
+  ScanLine,
   FileHeart, 
   FolderHeart,
   Lock,
@@ -533,6 +533,10 @@ export default function HealthVaultClientView({
     ? categories 
     : defaultCategoryNames.map((name, idx) => ({ id: `default-${idx}`, name, is_default: true }));
 
+  /** "Lab Reports" → "lab report", for empty-folder prompts. */
+  const singularCategory = (name: string) =>
+    name.toLowerCase().replace(/ies$/, 'y').replace(/s$/, '');
+
   const getRecordCount = (category: Category) => {
     if (!category.health_records) return 0;
     if (Array.isArray(category.health_records)) {
@@ -541,15 +545,30 @@ export default function HealthVaultClientView({
     return (category.health_records as any)?.count || 0;
   };
 
+  // Every folder used to be the same pink icon, so at a glance the vault was four
+  // identical tiles and you had to read each label. A distinct hue per category makes
+  // them scannable. These are deliberately drawn from the neutral/brand family, NOT the
+  // status palette — a folder is not a warning. (`Binary` for scans was also just wrong;
+  // ScanLine actually looks like an imaging report.)
+  const CATEGORY_TINT: Record<string, string> = {
+    'prescriptions': 'bg-primary/10 text-primary',
+    'lab reports': 'bg-info/10 text-info',
+    'scans': 'bg-accent-surface text-accent-surface-foreground',
+    'discharge summaries': 'bg-muted text-foreground',
+  };
+
+  const getCategoryTint = (name: string) =>
+    CATEGORY_TINT[name.toLowerCase()] ?? 'bg-muted text-muted-foreground';
+
   const getCategoryIcon = (name: string, isElderlyMode: boolean) => {
-    const iconClass = isElderlyMode ? "w-10 h-10 text-primary shrink-0" : "w-6 h-6 text-primary shrink-0";
+    const iconClass = isElderlyMode ? "w-10 h-10 shrink-0" : "w-6 h-6 shrink-0";
     switch (name.toLowerCase()) {
       case 'prescriptions':
         return <FileText className={iconClass} />;
       case 'lab reports':
         return <ClipboardList className={iconClass} />;
       case 'scans':
-        return <Binary className={iconClass} />;
+        return <ScanLine className={iconClass} />;
       case 'discharge summaries':
         return <FileHeart className={iconClass} />;
       default:
@@ -614,8 +633,14 @@ export default function HealthVaultClientView({
     return null;
   };
 
+  // The two upload entry points call the same handler; the only difference is whether a
+  // folder is pre-chosen — which is exactly what the labels now say ("Upload Record" vs
+  // "Upload to {folder}"). The generic entry used to silently default to `categories[0]`,
+  // i.e. whichever folder sorted first alphabetically, and if the user had no real
+  // categories yet that was an unsaveable `default-` placeholder that only failed at the
+  // final Save. It now opens with nothing selected so the choice is deliberate.
   const openUploadModal = (categoryId: string = '') => {
-    setSelectedCategoryId(categoryId || (categories[0]?.id || ''));
+    setSelectedCategoryId(categoryId.startsWith('default-') ? '' : categoryId);
     setSelectedFile(null);
     setUploadError(null);
     setUploadSuccess(false);
@@ -755,8 +780,8 @@ export default function HealthVaultClientView({
             {userRole !== 'CAREGIVER' && (
               <button
                 onClick={() => openUploadModal()}
-                className={`font-black rounded bg-primary text-primary-foreground hover:bg-primary-hover transition-all cursor-pointer shadow-sm flex items-center justify-center ${
-                  isElderly ? 'px-6 py-3.5 text-lg' : 'px-4 py-2 text-xs'
+                className={`font-black rounded-xl bg-primary-strong text-primary-strong-foreground hover:bg-primary-strong-hover transition-all cursor-pointer shadow-sm flex items-center justify-center ${
+                  isElderly ? 'h-16 px-6 text-lg' : 'h-11 px-4 text-xs'
                 }`}
               >
                 <Upload className={`${isElderly ? 'w-5 h-5 mr-2' : 'w-4 h-4 mr-1'} shrink-0`} />
@@ -765,16 +790,36 @@ export default function HealthVaultClientView({
             )}
           </div>
 
-          {/* Info Header Banner */}
-          <div className={`flex items-start gap-3 bg-[#EAF3FF] text-primary border border-primary/20 rounded-3xl transition-all duration-300 ${
+          {/* Trust banner.
+              Two problems here. It wore the app's PINK — the alert/brand color — for a
+              message whose whole job is to calm you down; trust messaging reads as blue
+              or green, not as an alarm. And the copy was written for an engineer:
+              "Row-Level Security policies (RLS)", "private object containers". Someone
+              deciding whether to upload their discharge summary needs the promise, not
+              the mechanism. The mechanism is still here, one tap away, for whoever wants
+              it. */}
+          <div className={`bg-info-surface text-info-strong border border-info/25 rounded-3xl transition-all duration-300 ${
             isElderly ? 'p-6 border-2 text-lg' : 'p-4 text-xs'
           }`}>
-            <ShieldCheck className={`text-primary shrink-0 ${isElderly ? 'w-8 h-8' : 'w-5 h-5'}`} />
-            <div>
-              <h4 className="font-extrabold mb-0.5">Secure Vault Storage Active</h4>
-              <p className="opacity-90 font-medium">
-                Your records are protected with Row-Level Security policies (RLS). File transfers are fully encrypted, and payloads are stored inside private object containers.
-              </p>
+            <div className="flex items-start gap-3">
+              <ShieldCheck className={`text-info shrink-0 ${isElderly ? 'w-8 h-8' : 'w-5 h-5'}`} />
+              <div>
+                <h4 className="font-extrabold mb-0.5">Your records are private</h4>
+                <p className="font-medium">
+                  Only you — and anyone you invite through Care Circle — can open these files.
+                </p>
+                <details className="mt-2 group/sec">
+                  <summary className="cursor-pointer font-bold underline underline-offset-2 list-none marker:content-none">
+                    How this works
+                  </summary>
+                  <p className="mt-1.5 font-medium opacity-90">
+                    Files are uploaded over an encrypted connection and kept in private
+                    storage that is not reachable by a public link. Database rules check
+                    your identity on every read, so another account cannot list or open
+                    your records even if it guesses a file name.
+                  </p>
+                </details>
+              </div>
             </div>
           </div>
 
@@ -804,13 +849,22 @@ export default function HealthVaultClientView({
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
-                        {getCategoryIcon(category.name, isElderly)}
+                        <div className={`rounded-2xl flex items-center justify-center shrink-0 ${getCategoryTint(category.name)} ${
+                          isElderly ? 'w-16 h-16' : 'w-11 h-11'
+                        }`}>
+                          {getCategoryIcon(category.name, isElderly)}
+                        </div>
                         <div>
+                          {/* The count was printed twice — "Prescriptions (0)" and then
+                              "0 documents" right beneath it. Once, and when it's zero say
+                              what to do instead of restating the nothing. */}
                           <h4 className={`font-black text-foreground tracking-tight ${isElderly ? 'text-2xl' : 'text-sm'}`}>
-                            {category.name} ({count})
+                            {category.name}
                           </h4>
-                          <p className={`text-muted-foreground font-semibold ${isElderly ? 'text-base mt-1' : 'text-[11px]'}`}>
-                            {count} {count === 1 ? 'document' : 'documents'}
+                          <p className={`font-semibold ${count === 0 ? 'text-primary' : 'text-muted-foreground'} ${isElderly ? 'text-base mt-1' : 'text-[11px]'}`}>
+                            {count === 0
+                              ? `Upload your first ${singularCategory(category.name)}`
+                              : `${count} ${count === 1 ? 'document' : 'documents'}`}
                           </p>
                         </div>
                       </div>
@@ -822,12 +876,15 @@ export default function HealthVaultClientView({
                           e.stopPropagation();
                           openUploadModal(category.id);
                         }}
-                        className={`font-black rounded bg-muted text-foreground hover:bg-muted/80 transition-all border border-border text-center w-full flex items-center justify-center cursor-pointer ${
-                          isElderly ? 'py-3.5 text-base shadow-sm' : 'py-2 text-xs'
+                        className={`font-black rounded-xl bg-muted text-foreground hover:bg-muted/80 transition-all border border-border text-center w-full flex items-center justify-center cursor-pointer ${
+                          isElderly ? 'h-16 text-base shadow-sm' : 'h-11 text-xs'
                         }`}
                       >
                         <Upload className="w-3.5 h-3.5 mr-1.5 shrink-0" />
-                        <span>Add to this folder</span>
+                        {/* Was "Add to this folder" on every tile, identical to the page's
+                            "Upload Record" button but with a different destination and no
+                            way to tell which was which. Now it names the folder. */}
+                        <span className="truncate">Upload to {category.name}</span>
                       </button>
                     )}
                   </div>
@@ -872,7 +929,7 @@ export default function HealthVaultClientView({
             {userRole !== 'CAREGIVER' && !viewingTrash && (
               <button
                 onClick={() => openUploadModal(selectedCategory.id)}
-                className={`font-black rounded bg-primary text-primary-foreground hover:bg-primary-hover transition-all cursor-pointer shadow-sm flex items-center justify-center shrink-0 ${
+                className={`font-black rounded bg-primary-strong text-primary-strong-foreground hover:bg-primary-strong-hover transition-all cursor-pointer shadow-sm flex items-center justify-center shrink-0 ${
                   isElderly ? 'px-6 py-3.5 text-base' : 'px-4 py-2 text-xs'
                 }`}
               >
@@ -902,7 +959,7 @@ export default function HealthVaultClientView({
                 onClick={() => setViewingTrash(false)}
                 className={`font-black rounded-xl transition-all cursor-pointer ${
                   !viewingTrash 
-                    ? 'bg-primary text-primary-foreground shadow-sm' 
+                    ? 'bg-primary-strong text-primary-strong-foreground shadow-sm' 
                     : 'bg-muted text-muted-foreground hover:text-foreground'
                 } ${isElderly ? 'px-5 py-2.5 text-sm' : 'px-3 py-1.5 text-xs'}`}
               >
@@ -912,7 +969,7 @@ export default function HealthVaultClientView({
                 onClick={() => setViewingTrash(true)}
                 className={`font-black rounded-xl transition-all cursor-pointer flex items-center gap-1 ${
                   viewingTrash 
-                    ? 'bg-primary text-primary-foreground shadow-sm' 
+                    ? 'bg-primary-strong text-primary-strong-foreground shadow-sm' 
                     : 'bg-muted text-muted-foreground hover:text-foreground'
                 } ${isElderly ? 'px-5 py-2.5 text-sm' : 'px-3 py-1.5 text-xs'}`}
               >
@@ -990,7 +1047,7 @@ export default function HealthVaultClientView({
               {userRole !== 'CAREGIVER' && !viewingTrash && !searchQuery.trim() && (
                 <button
                   onClick={() => openUploadModal(selectedCategory.id)}
-                  className={`font-black rounded bg-primary text-primary-foreground hover:bg-primary-hover transition-all cursor-pointer shadow-sm flex items-center justify-center ${
+                  className={`font-black rounded bg-primary-strong text-primary-strong-foreground hover:bg-primary-strong-hover transition-all cursor-pointer shadow-sm flex items-center justify-center ${
                     isElderly ? 'px-5 py-3 text-base' : 'px-4 py-2 text-xs'
                   }`}
                 >
@@ -1005,7 +1062,7 @@ export default function HealthVaultClientView({
               {groupedTimeline.map((yearGroup) => (
                 <div key={yearGroup.year} className="relative">
                   {/* Year Node */}
-                  <div className={`absolute top-0.5 bg-primary text-primary-foreground font-black rounded-full border border-card shadow-sm flex items-center justify-center shrink-0 ${
+                  <div className={`absolute top-0.5 bg-primary-strong text-primary-strong-foreground font-black rounded-full border border-card shadow-sm flex items-center justify-center shrink-0 ${
                     isElderly 
                       ? 'w-20 h-9 -left-[46px] text-sm' 
                       : 'w-16 h-7 -left-[38px] text-[10px]'
@@ -1238,7 +1295,7 @@ export default function HealthVaultClientView({
               <button
                 onClick={handleSaveEdit}
                 disabled={isSavingEdit}
-                className="px-4 py-2 rounded-xl text-xs font-black bg-primary text-primary-foreground hover:bg-primary-hover flex items-center gap-1 cursor-pointer"
+                className="px-4 py-2 rounded-xl text-xs font-black bg-primary-strong text-primary-strong-foreground hover:bg-primary-strong-hover flex items-center gap-1 cursor-pointer"
               >
                 {isSavingEdit ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                 <span>Save Changes</span>
@@ -1294,7 +1351,7 @@ export default function HealthVaultClientView({
               <button
                 onClick={handlePermanentDelete}
                 disabled={isDeletingPermanently || deleteConfirmationText.trim().toUpperCase() !== 'DELETE'}
-                className="flex-1 px-4 py-2.5 rounded-xl text-xs font-black bg-danger text-danger-foreground hover:bg-danger/95 flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-2.5 rounded-xl text-xs font-black bg-danger-strong text-card hover:bg-danger/95 flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isDeletingPermanently ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                 <span>Delete Forever</span>
@@ -1547,7 +1604,7 @@ export default function HealthVaultClientView({
                         setUploadError(null);
                         setActiveStep((prev) => (prev + 1) as any);
                       }}
-                      className={`font-black rounded bg-primary text-primary-foreground hover:bg-primary-hover transition-all cursor-pointer flex items-center justify-center ${
+                      className={`font-black rounded bg-primary-strong text-primary-strong-foreground hover:bg-primary-strong-hover transition-all cursor-pointer flex items-center justify-center ${
                         isElderly ? 'px-5 py-3 text-base' : 'px-3.5 py-2 text-xs'
                       }`}
                     >
@@ -1558,7 +1615,7 @@ export default function HealthVaultClientView({
                     <button
                       onClick={handleUploadSave}
                       disabled={isUploading}
-                      className={`font-black rounded bg-primary text-primary-foreground hover:bg-primary-hover transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      className={`font-black rounded bg-primary-strong text-primary-strong-foreground hover:bg-primary-strong-hover transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                         isElderly ? 'px-6 py-3.5 text-base' : 'px-4 py-2.5 text-xs'
                       }`}
                     >
@@ -1604,7 +1661,7 @@ export default function HealthVaultClientView({
                   href={previewUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={`font-black rounded bg-primary text-primary-foreground hover:bg-primary-hover transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  className={`font-black rounded bg-primary-strong text-primary-strong-foreground hover:bg-primary-strong-hover transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                     isElderly ? 'px-5 py-2.5 text-sm' : 'px-3 py-1.5 text-xs'
                   }`}
                 >
@@ -1665,7 +1722,7 @@ export default function HealthVaultClientView({
                             href={previewUrl || undefined}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className={`font-black rounded bg-primary text-primary-foreground hover:bg-primary-hover transition-all cursor-pointer shadow-sm flex items-center justify-center ${
+                            className={`font-black rounded bg-primary-strong text-primary-strong-foreground hover:bg-primary-strong-hover transition-all cursor-pointer shadow-sm flex items-center justify-center ${
                               isElderly ? 'px-6 py-3.5 text-base' : 'px-4 py-2 text-xs'
                             }`}
                           >
@@ -1713,7 +1770,7 @@ export default function HealthVaultClientView({
                         href={previewUrl || undefined}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className={`font-black rounded bg-primary text-primary-foreground hover:bg-primary-hover transition-all cursor-pointer shadow-sm flex items-center justify-center ${
+                        className={`font-black rounded bg-primary-strong text-primary-strong-foreground hover:bg-primary-strong-hover transition-all cursor-pointer shadow-sm flex items-center justify-center ${
                           isElderly ? 'px-6 py-3.5 text-base' : 'px-4 py-2 text-xs'
                         }`}
                       >

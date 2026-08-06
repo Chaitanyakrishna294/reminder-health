@@ -356,7 +356,7 @@ export default function MedicalProfileClientView({ userId, fullName, email, init
       <button
         onClick={handleSave}
         disabled={saving || uploading}
-        className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-primary text-primary-foreground font-black hover:bg-primary-hover transition-all disabled:opacity-50 cursor-pointer"
+        className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-primary-strong text-primary-strong-foreground font-black hover:bg-primary-strong-hover transition-all disabled:opacity-50 cursor-pointer"
       >
         <Save className="w-5 h-5" />
         <span>{saving ? 'Saving…' : 'Save Medical Profile'}</span>

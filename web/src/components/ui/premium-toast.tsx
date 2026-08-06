@@ -25,7 +25,7 @@ interface PremiumToastProps {
  */
 export function PremiumToast({ toasts, onDismiss }: PremiumToastProps) {
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 sm:left-auto sm:translate-x-0 sm:right-6 z-50 flex flex-col gap-2.5 max-w-sm w-[calc(100%-2rem)] sm:w-full pointer-events-none">
+    <div className="floating-bottom fixed left-1/2 -translate-x-1/2 sm:left-auto sm:translate-x-0 sm:right-6 z-50 flex flex-col gap-2.5 max-w-sm w-[calc(100%-2rem)] sm:w-full pointer-events-none">
       {toasts.map((toast) => (
         <ToastCard key={toast.id} toast={toast} onDismiss={onDismiss} />
       ))}

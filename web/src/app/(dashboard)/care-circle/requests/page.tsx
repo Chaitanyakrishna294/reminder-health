@@ -266,13 +266,13 @@ export default function CareCircleRequestsPage() {
 
       {/* Status Messages */}
       {successMsg && (
-        <div className="bg-success/10 border border-success/30 text-success-foreground p-4 rounded-2xl flex items-start gap-2.5 animate-fade-in">
+        <div className="bg-success/10 border border-success/30 text-success-strong p-4 rounded-2xl flex items-start gap-2.5 animate-fade-in">
           <CheckCircle2 className="w-5 h-5 shrink-0 text-success mt-0.5" />
           <p className="font-bold text-xs">{successMsg}</p>
         </div>
       )}
       {errorMsg && (
-        <div className="bg-danger/10 border border-danger/30 text-danger-foreground p-4 rounded-2xl flex items-start gap-2.5 animate-fade-in">
+        <div className="bg-danger/10 border border-danger/30 text-danger-strong p-4 rounded-2xl flex items-start gap-2.5 animate-fade-in">
           <XCircle className="w-5 h-5 shrink-0 text-danger mt-0.5" />
           <p className="font-bold text-xs">{errorMsg}</p>
         </div>
@@ -351,7 +351,7 @@ export default function CareCircleRequestsPage() {
                       <button
                         onClick={() => handleAccept(request.id)}
                         disabled={isProcessing}
-                        className="flex-1 h-10 bg-primary text-primary-foreground font-black text-xs rounded-xl hover:bg-primary-hover transition-all shadow-sm cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+                        className="flex-1 h-10 bg-primary-strong text-primary-strong-foreground font-black text-xs rounded-xl hover:bg-primary-strong-hover transition-all shadow-sm cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
                       >
                         {isProcessing ? (
                           <Loader2 className="w-4 h-4 animate-spin" />

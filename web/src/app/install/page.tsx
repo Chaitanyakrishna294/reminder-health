@@ -101,7 +101,7 @@ export default function InstallPage() {
         {platform === 'promptable' && (
           <button
             onClick={handleInstall}
-            className="w-full flex items-center justify-center gap-2 rounded-2xl bg-primary text-primary-foreground font-black px-6 py-4 text-base hover:bg-primary-hover transition-all active:scale-[0.98] cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 rounded-2xl bg-primary-strong text-primary-strong-foreground font-black px-6 py-4 text-base hover:bg-primary-strong-hover transition-all active:scale-[0.98] cursor-pointer"
           >
             <Download className="w-5 h-5" /> Install App
           </button>

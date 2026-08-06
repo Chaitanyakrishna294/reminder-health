@@ -10,7 +10,9 @@ import { isPendingStatus } from '@/lib/schedule/dose-attention';
 import { useUiMode } from '@/context/ui-mode-context';
 import { Check, SkipForward, AlertCircle, Clock, AlertTriangle, Pill, CheckCircle, XCircle, X } from 'lucide-react';
 import { PremiumToast } from '@/components/ui/premium-toast';
-import { getSeverityTheme } from '@/lib/severity-theme';
+import { getSeverityTheme, getToneTheme } from '@/lib/severity-theme';
+import { TONE_VAR, priorityMeta, doseTone, doseLabel } from '@/lib/design/semantics';
+import { Badge } from '@/components/ui/badge';
 
 export interface ReminderEvent {
   id: number;
@@ -39,9 +41,11 @@ interface TodaysScheduleProps {
 
 // 270° SVG Severity Arc surrounding the timeline status badge
 const SeverityArcBadge = React.memo(({ priority, status }: { priority: string; status: string }) => {
-  let color = '#4F8EF7'; // Normal = Blue
-  if (priority === 'critical') color = '#ff3b30'; // Critical = Red
-  else if (priority === 'important') color = '#ff9500'; // Important = Amber
+  // This arc used to paint routine doses BLUE, while the wizard showed them green, the
+  // medication list showed them pink and the planner legend showed them pink again —
+  // four answers for one priority. One lookup now.
+  const color = TONE_VAR[priorityMeta(priority).tone];
+  const tone = doseTone(status);
 
   const radius = 20;
   const strokeWidth = 3;
@@ -57,7 +61,7 @@ const SeverityArcBadge = React.memo(({ priority, status }: { priority: string; s
           cy="32"
           r={radius}
           fill="none"
-          stroke="#E2E8F0"
+          stroke="var(--border)"
           strokeWidth={strokeWidth}
           strokeDasharray={`${arcLength} ${circumference - arcLength}`}
           strokeLinecap="round"
@@ -75,21 +79,13 @@ const SeverityArcBadge = React.memo(({ priority, status }: { priority: string; s
         />
       </svg>
       {/* Inner Status Icon */}
-      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-        status === 'TAKEN' || status === 'RESOLVED_BY_CG'
-          ? 'bg-success/10 text-success'
-          : status === 'SKIPPED'
-            ? 'bg-warning/10 text-warning'
-            : status === 'MISSED' || status === 'ESCALATED_TO_CG'
-              ? 'bg-danger/10 text-danger'
-              : 'bg-primary/10 text-primary'
-      }`}>
+      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${getToneTheme(tone).tile}`}>
         {status === 'TAKEN' || status === 'RESOLVED_BY_CG' ? (
           <Check className="w-5 h-5" />
         ) : status === 'SKIPPED' ? (
           <SkipForward className="w-5 h-5" />
         ) : status === 'MISSED' || status === 'ESCALATED_TO_CG' ? (
-          <AlertCircle className="w-5 h-5 text-danger" />
+          <AlertCircle className="w-5 h-5" />
         ) : (
           <Clock className="w-5 h-5" />
         )}
@@ -227,57 +223,34 @@ export default function TodaysSchedule({
       <button
         onClick={() => handleCorrect(event, isTaken ? 'TAKEN' : 'SKIPPED')}
         disabled={updatingId === event.id}
-        className="text-[10px] text-muted-foreground hover:text-primary underline font-semibold cursor-pointer disabled:opacity-50"
+        className="min-h-11 text-xs text-foreground/80 hover:text-primary underline font-semibold cursor-pointer disabled:opacity-50"
       >
         {updatingId === event.id ? 'Changing…' : `Change to ${isTaken ? 'Skipped' : 'Taken'}`}
       </button>
     );
   };
 
-  const getStatusBadge = (status: string) => {
-    const sizeClasses = isElderly 
-      ? "px-4 py-1.5 text-lg rounded-xl border-2" 
-      : "px-2 py-0.5 text-xs rounded-full";
-    switch (status) {
-      case 'TAKEN':
-      case 'RESOLVED_BY_CG':
-        return (
-          <span className={`inline-flex items-center font-bold bg-success/15 text-success border-success/35 ${sizeClasses}`}>
-            <Check className="w-3 h-3 mr-1" /> Taken
-          </span>
-        );
-      case 'SKIPPED':
-        return (
-          <span className={`inline-flex items-center font-bold bg-warning/15 text-warning border-warning/35 ${sizeClasses}`}>
-            <SkipForward className="w-3 h-3 mr-1" /> Skipped
-          </span>
-        );
-      case 'MISSED':
-        return (
-          <span className={`inline-flex items-center font-bold bg-danger/15 text-danger border-danger/35 ${sizeClasses}`}>
-            <XCircle className="w-3 h-3 mr-1" /> Missed
-          </span>
-        );
-      case 'SNOOZED':
-        return (
-          <span className={`inline-flex items-center font-bold bg-primary/10 text-primary border-primary/25 ${sizeClasses}`}>
-            <Clock className="w-3 h-3 mr-1" /> Snoozed
-          </span>
-        );
-      case 'ESCALATED_TO_CG':
-        return (
-          <span className={`inline-flex items-center font-bold bg-danger/15 text-danger animate-pulse border-danger/35 ${sizeClasses}`}>
-            <AlertTriangle className="w-3 h-3 mr-1" /> Escalated
-          </span>
-        );
-      default:
-        return (
-          <span className={`inline-flex items-center font-bold bg-muted text-muted-foreground border-muted/20 ${sizeClasses}`}>
-            <Clock className="w-3 h-3 mr-1" /> Pending
-          </span>
-        );
-    }
+  // Every branch here used to emit `border-<tone>/35` with no `border` WIDTH class in
+  // normal mode, so the border color was inert and the pill had no edge unless elderly
+  // mode happened to add `border-2`. <Badge> owns that now, along with the tone lookup.
+  const STATUS_ICON: Record<string, React.ReactNode> = {
+    TAKEN: <Check className="w-3 h-3" />,
+    RESOLVED_BY_CG: <Check className="w-3 h-3" />,
+    SKIPPED: <SkipForward className="w-3 h-3" />,
+    MISSED: <XCircle className="w-3 h-3" />,
+    SNOOZED: <Clock className="w-3 h-3" />,
+    ESCALATED_TO_CG: <AlertTriangle className="w-3 h-3" />,
   };
+
+  const getStatusBadge = (status: string) => (
+    <Badge
+      tone={doseTone(status)}
+      className={status === 'ESCALATED_TO_CG' ? 'animate-pulse' : ''}
+    >
+      {STATUS_ICON[status] ?? <Clock className="w-3 h-3" />}
+      {status === 'ESCALATED_TO_CG' ? 'Escalated' : doseLabel(status)}
+    </Badge>
+  );
 
   // Pending vs attention is single-sourced in lib/schedule/dose-attention.ts.
   // Each pending dose keeps its own Take/Skip here (this is where the patient
@@ -423,7 +396,11 @@ export default function TodaysSchedule({
         key={event.id}
         className={`rounded-2xl border px-4 py-3 flex items-center justify-between gap-3 shadow-sm hover:shadow-md transition-all duration-200 ${borderClass}`}
       >
-        {/* Severity dot + name + time */}
+        {/* Severity dot, then name over time.
+            Name and time used to sit side by side on one line with the action buttons,
+            which left the NAME 56px on a 375px screen — "TEST Med A" needs 84px, so the
+            one thing the row exists to identify was the thing being cut off. Stacking
+            them gives the name the full column. */}
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <span
             className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${sevColor}`}
@@ -432,10 +409,12 @@ export default function TodaysSchedule({
           >
             {statusIcon}
           </span>
-          <span className="font-bold text-foreground text-sm truncate">{event.medications.drug_name}</span>
-          <span className="text-xs text-muted-foreground font-semibold shrink-0 tabular-nums" suppressHydrationWarning>
-            {timeStr}
-          </span>
+          <div className="min-w-0 flex-1">
+            <p className="font-bold text-foreground text-sm truncate">{event.medications.drug_name}</p>
+            <p className="text-xs text-muted-foreground font-semibold tabular-nums" suppressHydrationWarning>
+              {timeStr}
+            </p>
+          </div>
         </div>
 
         {/* Resolve toggle — small icon + word */}
