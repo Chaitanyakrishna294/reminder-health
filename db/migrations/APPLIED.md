@@ -62,6 +62,7 @@ maintainer applies it in the Supabase SQL editor (project `jaflclnakwtikqbfhfdk`
 | 50 | `migration_notifications_no_client_insert_2026_07.sql` | 2026-07-26 |
 | 51 | `migration_are_profiles_connected_dual_read_2026_07.sql` | 2026-07-26 (validated: dual-read + SECURITY DEFINER confirmed) |
 | 52 | `migration_security_lockdown_2026_07_29.sql` | 2026-08-06 (validated: anon call to `try_acquire_scheduler_lock` / `release_scheduler_lock` now returns 42501 permission denied; has rollback + validation files) |
+| 53 | `migration_refill_reminder.sql` | pending — refill reminder: low_stock_notified_at, LOW_STOCK type, rearm trigger |
 
 ## PENDING (written, not yet applied)
 
@@ -119,3 +120,4 @@ relying on them.
 | `get_policies_debug` | `migration_security_fix_rls.sql` |
 | `guard_caregiver_info_client_writes` | `migration_security_lockdown_2026_07_29.sql` (applied 2026-08-06) |
 | `deactivate_legacy_caregiver_link_on_revoke` | `migration_security_lockdown_2026_07_29.sql` (applied 2026-08-06) |
+| `rearm_low_stock_notice` | `migration_refill_reminder.sql` |
