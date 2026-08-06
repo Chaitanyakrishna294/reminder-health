@@ -540,7 +540,7 @@ export default function SettingsClientView({
                 onChange={(e) => setCgIdInput(e.target.value)}
                 disabled={processing}
                 maxLength={8}
-                className={`flex-1 bg-white border border-border rounded-xl focus:outline-none focus:border-primary font-mono uppercase font-black text-center ${
+                className={`w-full sm:flex-1 shrink-0 bg-white border border-border rounded-xl focus:outline-none focus:border-primary font-mono uppercase font-black text-center ${
                   isElderly ? 'h-16 px-4 text-2xl border-2' : 'h-11 px-3 text-sm'
                 }`}
               />

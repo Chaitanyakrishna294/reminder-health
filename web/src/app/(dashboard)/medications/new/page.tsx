@@ -294,7 +294,7 @@ export default function NewMedicationPage() {
                           isCompleted
                             ? 'bg-primary-strong text-primary-strong-foreground'
                             : isCurrent
-                              ? 'bg-gradient-to-b from-[#F8839E] to-[#F26B8A] text-white'
+                              ? 'bg-gradient-to-b from-[#CC3D64] to-[#B52A52] text-white'
                               : 'bg-[#F2F2F7] text-muted-foreground group-hover/step:bg-[#E5E5EA]'
                         }`}
                         style={isCurrent ? { boxShadow: '0 6px 16px rgba(242,107,138,0.40)' } : undefined}

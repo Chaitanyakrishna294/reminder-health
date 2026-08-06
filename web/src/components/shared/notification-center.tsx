@@ -59,7 +59,7 @@ export default function NotificationCenter({ userId }: NotificationCenterProps) 
       {/* Bell Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground focus:outline-none transition-colors cursor-pointer flex items-center justify-center"
+        className="relative w-11 h-11 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground focus:outline-none transition-colors cursor-pointer flex items-center justify-center"
         aria-label="View notifications"
       >
         <Bell className="w-5 h-5" />

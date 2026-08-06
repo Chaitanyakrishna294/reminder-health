@@ -133,7 +133,7 @@ function DoseCard({
       {/* `dosage` is the free-text strength and is literally "N/A" when unset — the
           planner was printing that placeholder next to every such dose. */}
       {med.dosage && med.dosage !== 'N/A' && (
-        <span className="shrink-0 text-[10px] font-medium text-muted-foreground">{med.dosage}</span>
+        <span className="shrink-0 text-[11px] font-medium text-muted-foreground">{med.dosage}</span>
       )}
     </div>
   );
@@ -143,12 +143,12 @@ function DoseCard({
       {/* "skip"/"adj" at 8px were closer to noise than labels. Spelled out, at a size
           that survives a phone at arm's length. */}
       {med.isSkipped && (
-        <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 bg-danger/10 text-danger-strong">Skipped</span>
+        <span className="shrink-0 text-[11px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 bg-danger/10 text-danger-strong">Skipped</span>
       )}
       {med.isOverridden && !med.isSkipped && (
-        <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 bg-warning/10 text-warning-strong">Moved</span>
+        <span className="shrink-0 text-[11px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 bg-warning/10 text-warning-strong">Moved</span>
       )}
-      <span className={'shrink-0 inline-flex items-center gap-0.5 whitespace-nowrap text-[10px] font-bold font-mono px-2 py-0.5 rounded-full ' + (isDraggingThis ? 'text-primary bg-primary/15' : 'text-primary bg-primary/10')}>
+      <span className={'shrink-0 inline-flex items-center gap-0.5 whitespace-nowrap text-[11px] font-bold font-mono px-2 py-0.5 rounded-full ' + (isDraggingThis ? 'text-primary bg-primary/15' : 'text-primary bg-primary/10')}>
         <Clock className="w-2.5 h-2.5" strokeWidth={2.5} />{displayTime}
       </span>
     </>
@@ -594,7 +594,7 @@ export default function SchedulePlannerPage() {
           <h1 className="text-[26px] font-bold tracking-tight text-foreground flex items-center gap-2">
             <span className="whitespace-nowrap">Schedule</span>
             {isReadOnly && (
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-[#F2F2F7] text-muted-foreground uppercase tracking-wide shrink-0">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#F2F2F7] text-muted-foreground uppercase tracking-wide shrink-0">
                 Read Only
               </span>
             )}
@@ -612,7 +612,7 @@ export default function SchedulePlannerPage() {
         >
           <Clock className="w-4 h-4 shrink-0 text-primary" strokeWidth={2.5} />
           <div className="leading-tight">
-            <p className="text-[10px] uppercase tracking-widest font-black text-muted-foreground">
+            <p className="text-[11px] uppercase tracking-widest font-black text-muted-foreground">
               {isToday ? 'Next dose' : 'First dose'}
             </p>
             {nextDose ? (
@@ -684,7 +684,7 @@ export default function SchedulePlannerPage() {
                 className={
                   'group relative cursor-pointer rounded-[7px] ' +
                   (isSel
-                    ? 'bg-gradient-to-b from-[#F8839E] to-[#F26B8A] text-white z-10'
+                    ? 'bg-gradient-to-b from-[#CC3D64] to-[#B52A52] text-white z-10'
                     : isTod
                       ? 'bg-primary-soft text-foreground'
                       : 'bg-[#F2F2F5] text-foreground hover:bg-[#EAEAEF]')
@@ -712,7 +712,7 @@ export default function SchedulePlannerPage() {
                   }}
                 >
                   <span
-                    className={'uppercase font-bold tracking-wide whitespace-nowrap ' + (isSel ? 'text-[11px] text-white/80' : isTod ? 'text-[9px] sm:text-[10px] text-primary' : 'text-[9px] sm:text-[10px] text-muted-foreground')}
+                    className={'uppercase font-bold tracking-wide whitespace-nowrap ' + (isSel ? 'text-[11px] text-white/80' : isTod ? 'text-[11px] text-primary' : 'text-[11px] text-muted-foreground')}
                     style={{ transition: 'color 650ms cubic-bezier(0.16, 1, 0.3, 1)' }}
                   >
                     {date.toLocaleDateString([], { weekday: 'short' })}
@@ -722,7 +722,7 @@ export default function SchedulePlannerPage() {
                   </span>
                   {/* Dose count along the bottom edge of the expanded tab */}
                   {isSel && (
-                    <span className="mt-0.5 text-[9px] font-bold leading-none text-white/85 whitespace-nowrap animate-fade-in">
+                    <span className="mt-0.5 text-[11px] font-bold leading-none text-white/85 whitespace-nowrap animate-fade-in">
                       {load > 0 ? `${load} dose${load > 1 ? 's' : ''}` : 'clear'}
                     </span>
                   )}
@@ -751,7 +751,7 @@ export default function SchedulePlannerPage() {
                 <ChevronRight className="w-3.5 h-3.5" strokeWidth={2.5} />
               </button>
             </div>
-            <div className="grid grid-cols-7 gap-1 text-center text-[9px] font-semibold text-muted-foreground mb-1">
+            <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold text-muted-foreground mb-1">
               {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
                 <div key={i}>{d}</div>
               ))}
@@ -809,7 +809,7 @@ export default function SchedulePlannerPage() {
                 >
                   <Minus className="w-3 h-3" strokeWidth={2.5} />
                 </button>
-                <span className="text-[10px] font-bold text-foreground w-8 text-center tabular-nums">{Math.round(zoom * 100)}%</span>
+                <span className="text-[11px] font-bold text-foreground w-8 text-center tabular-nums">{Math.round(zoom * 100)}%</span>
                 <button
                   onClick={() => setZoom(z => Math.min(3, +(z + 0.25).toFixed(2)))}
                   className="w-11 h-11 rounded-full flex items-center justify-center hover:bg-white text-muted-foreground hover:text-foreground transition-all cursor-pointer"
@@ -855,7 +855,7 @@ export default function SchedulePlannerPage() {
                       style={{ top: band.from * hourHeight, height: (band.to - band.from) * hourHeight, background: band.color }}
                     >
                       {band.showLabel && (
-                        <span className="ml-14 mt-1 inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                        <span className="ml-14 mt-1 inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-wider text-muted-foreground">
                           <BandIcon className="w-3 h-3" /> {band.label}
                         </span>
                       )}
@@ -866,7 +866,7 @@ export default function SchedulePlannerPage() {
                 {/* Hour lines */}
                 {Array.from({ length: 24 }).map((_, h) => (
                   <div key={h} className="absolute left-0 right-0 border-t border-border/50" style={{ top: h * hourHeight }}>
-                    <span className="absolute -top-2 left-0 w-12 text-right pr-2 text-[9px] font-bold text-muted-foreground tabular-nums">
+                    <span className="absolute -top-2 left-0 w-12 text-right pr-2 text-[11px] font-bold text-muted-foreground tabular-nums">
                       {hourLabel(h)}
                     </span>
                   </div>
@@ -878,7 +878,7 @@ export default function SchedulePlannerPage() {
                     <div className="relative flex items-center">
                       <span className="absolute -left-1 w-2.5 h-2.5 rounded-full bg-danger ring-2 ring-white" />
                       <div className="w-full border-t-2 border-danger/70 border-dashed" />
-                      <span className="absolute right-0 -top-4 text-[10px] font-black text-danger-strong bg-card border border-danger px-2 py-0.5 rounded-full">NOW</span>
+                      <span className="absolute right-0 -top-4 text-[11px] font-black text-danger-strong bg-card border border-danger px-2 py-0.5 rounded-full">NOW</span>
                     </div>
                   </div>
                 )}
@@ -936,13 +936,13 @@ export default function SchedulePlannerPage() {
               <p className="text-2xl font-bold text-foreground leading-none">{activeDoses.length}</p>
               {/* Was a flat "DOSES TODAY" — plural for a count of 1, and still "today"
                   while you were looking at next Thursday. */}
-              <p className="text-[10px] font-semibold text-muted-foreground mt-1 uppercase tracking-wide">
+              <p className="text-[11px] font-semibold text-muted-foreground mt-1 uppercase tracking-wide">
                 {activeDoses.length === 1 ? 'Dose' : 'Doses'} {isToday ? 'today' : 'that day'}
               </p>
             </div>
             <div className="bg-white rounded-[22px] p-4" style={{ boxShadow: CARD_SHADOW }}>
               <p className="text-2xl font-bold leading-none" style={{ color: criticalCount > 0 ? 'var(--danger-strong)' : 'var(--foreground)' }}>{criticalCount}</p>
-              <p className="text-[10px] font-semibold text-muted-foreground mt-1 uppercase tracking-wide">Critical</p>
+              <p className="text-[11px] font-semibold text-muted-foreground mt-1 uppercase tracking-wide">Critical</p>
             </div>
           </div>
 
@@ -998,7 +998,7 @@ export default function SchedulePlannerPage() {
           )}
 
           <div className="bg-[#F2F2F7] rounded-[22px] p-4">
-            <p className="text-[10px] font-medium text-muted-foreground leading-relaxed">
+            <p className="text-[11px] font-medium text-muted-foreground leading-relaxed">
               Adjusting a time or skipping a dose here only affects <b className="text-foreground font-semibold">{selectedDateLong}</b>. Your recurring routine stays exactly as it is.
             </p>
           </div>
@@ -1011,7 +1011,7 @@ export default function SchedulePlannerPage() {
           <div className="bg-white rounded-[22px] max-w-md w-full p-6 space-y-5" style={{ boxShadow: '0 8px 40px rgba(16, 28, 90, 0.18)' }}>
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-[10px] uppercase tracking-widest font-semibold text-muted-foreground">Adjust dose</p>
+                <p className="text-[11px] uppercase tracking-widest font-semibold text-muted-foreground">Adjust dose</p>
                 <h3 className="text-base font-bold tracking-tight text-foreground mt-0.5">{selectedMedForOverride.drug_name}</h3>
                 <p className="text-[11px] font-semibold text-primary mt-0.5">{selectedDateLong}</p>
               </div>
@@ -1037,7 +1037,7 @@ export default function SchedulePlannerPage() {
 
             {!skipForToday && (
               <label className="block">
-                <span className="text-[10px] uppercase font-black text-muted-foreground">New time</span>
+                <span className="text-[11px] uppercase font-black text-muted-foreground">New time</span>
                 <input
                   type="time"
                   value={newOverrideTime}

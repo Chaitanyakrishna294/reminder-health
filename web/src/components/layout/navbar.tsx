@@ -72,7 +72,7 @@ export default function Navbar({ user }: NavbarProps) {
               onClick={toggleTheme}
               aria-label={theme === 'dark' ? 'Switch to Light mode' : 'Switch to Dark mode'}
               title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
-              className={`flex items-center justify-center rounded-full transition-all duration-200 border cursor-pointer hover:scale-[1.05] active:scale-[0.95] bg-muted hover:bg-muted/80 border-border text-foreground/80 hover:text-foreground ${isElderly ? 'w-12 h-12' : 'w-9 h-9'
+              className={`flex items-center justify-center rounded-full transition-all duration-200 border cursor-pointer hover:scale-[1.05] active:scale-[0.95] bg-muted hover:bg-muted/80 border-border text-foreground/80 hover:text-foreground ${isElderly ? 'w-14 h-14' : 'w-11 h-11'
                 }`}
             >
               {theme === 'dark'
@@ -87,7 +87,7 @@ export default function Navbar({ user }: NavbarProps) {
               title={isElderly ? 'Switch to Normal view' : 'Switch to Elderly view'}
               className={`flex items-center justify-center rounded-full transition-all duration-200 border cursor-pointer hover:scale-[1.05] active:scale-[0.95] ${isElderly
                 ? 'bg-warning/20 hover:bg-warning/35 border-warning/50 text-warning-strong w-12 h-12 shadow-sm'
-                : 'bg-muted hover:bg-muted/80 border-border text-foreground/80 hover:text-foreground w-9 h-9'
+                : 'bg-muted hover:bg-muted/80 border-border text-foreground/80 hover:text-foreground w-11 h-11'
                 }`}
             >
               <Glasses className={isElderly ? 'w-6 h-6' : 'w-[18px] h-[18px]'} />
@@ -99,7 +99,7 @@ export default function Navbar({ user }: NavbarProps) {
                 onClick={() => setUserDropdownOpen(!userDropdownOpen)}
                 className="flex items-center space-x-2 focus:outline-none cursor-pointer font-mono"
               >
-                <div className={`rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold border border-primary/20 transition-all overflow-hidden ${isElderly ? 'w-10 h-10 text-base' : 'w-8 h-8 text-sm'
+                <div className={`rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold border border-primary/20 transition-all overflow-hidden ${isElderly ? 'w-14 h-14 text-base' : 'w-11 h-11 text-sm'
                   }`}>
                   {user.avatarUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element

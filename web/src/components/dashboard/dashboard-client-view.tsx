@@ -1234,7 +1234,7 @@ export default function DashboardClientView({
           isMissed
             ? 'border-danger/50 shadow-danger/5 shadow-md bg-danger/[0.02]'
             : nextPendingEvent
-              ? 'border-transparent shadow-md shadow-primary/20 bg-gradient-to-br from-[#F8839E] to-[#F26B8A] text-white'
+              ? 'border-transparent shadow-md shadow-primary/20 bg-gradient-to-br from-[#CC3D64] to-[#B52A52] text-white'
               : 'bg-card border-border'
         }`}>
           {nextPendingEvent && !isMissed && <PinkBubbles />}
@@ -1560,7 +1560,7 @@ export default function DashboardClientView({
       </div>
 
       {/* Daily Compliance Timeline Card */}
-      <div className="relative overflow-hidden isolate bg-gradient-to-br from-[#F8839E] to-[#F26B8A] text-white border border-transparent rounded-3xl p-5 shadow-sm shadow-primary/20 space-y-4">
+      <div className="relative overflow-hidden isolate bg-gradient-to-br from-[#CC3D64] to-[#B52A52] text-white border border-transparent rounded-3xl p-5 shadow-sm shadow-primary/20 space-y-4">
         <h3 className="font-black text-white text-sm flex items-center gap-1.5">
           <Clock className="w-4 h-4 text-white" /> Daily Compliance Timeline
         </h3>
@@ -1576,20 +1576,20 @@ export default function DashboardClientView({
             // a white veil over pink lands close enough to white that the label measured
             // 1.77:1, i.e. barely visible. Lightening the tile and putting the navy ink
             // ON it inverts the problem instead of stacking two pale layers.
-            let bgClass = 'bg-white/40 backdrop-blur-md text-foreground/75 border-white/40';
+            let bgClass = 'bg-card backdrop-blur-md text-muted-foreground border-border';
             let statusIcon = <Circle className="w-5 h-5 opacity-50 shrink-0" />;
             let statusWord = 'Nothing due';
 
             if (item.period === 'taken') {
-              bgClass = 'bg-white/90 backdrop-blur-md text-foreground border-white';
+              bgClass = 'bg-card backdrop-blur-md text-foreground border-card';
               statusIcon = <Check className="w-5 h-5 shrink-0 text-success-strong" />;
               statusWord = 'All taken';
             } else if (item.period === 'pending') {
-              bgClass = 'bg-white/90 backdrop-blur-md text-foreground border-white';
+              bgClass = 'bg-card backdrop-blur-md text-foreground border-card';
               statusIcon = <Clock className="w-5 h-5 animate-pulse shrink-0 text-primary" />;
               statusWord = 'Still due';
             } else if (item.period === 'missed') {
-              bgClass = 'bg-white/90 backdrop-blur-md text-foreground border-white';
+              bgClass = 'bg-card backdrop-blur-md text-foreground border-card';
               statusIcon = <X className="w-5 h-5 shrink-0 text-danger-strong" />;
               statusWord = 'Missed';
             }
