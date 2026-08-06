@@ -19,6 +19,23 @@ const resolveProfileId = async (telegramChatId) => {
   return data ? data.id : null;
 };
 
+// The bot runs with the service_role key (RLS bypassed), and callback_data arrives from
+// the Telegram client so it can be forged. Every caregiver-side dose action must therefore
+// verify, at tap time, that an ACCEPTED active link exists between the tapping chat and the
+// medication's patient. Uses the unified compatibility view (modern caregiver_connections
+// unioned with legacy caregiver_info). Fails closed on query errors.
+const hasActiveCaregiverLink = async (caregiverChatId, patientTelegramId) => {
+  const { data, error } = await supabase
+    .from('active_caregiver_links')
+    .select('connection_id')
+    .eq('caregiver_chat_id', String(caregiverChatId))
+    .eq('patient_telegram_id', String(patientTelegramId))
+    .eq('is_active', true)
+    .eq('connection_status', 'ACCEPTED')
+    .limit(1);
+  return !error && !!data && data.length > 0;
+};
+
 const calculateStreak = (logs) => {
   if (!logs || logs.length === 0) return 0;
 
@@ -868,10 +885,21 @@ const initCommands = () => {
              updateData = { current_stock: count };
            }
            
-           const { error } = await supabase.from('medications').update(updateData).eq('id', state.medId);
-           if (!error) {
+           // Ownership enforced in the filter itself (service_role bypasses RLS):
+           // only rows belonging to this chat can be updated.
+           const { data: updated, error } = await supabase
+             .from('medications')
+             .update(updateData)
+             .eq('id', state.medId)
+             .eq('telegram_id', chatId.toString())
+             .select('id');
+           if (!error && updated && updated.length > 0) {
               console.log(`[Manage] User ${chatId} updated med ${state.medId}: ${state.field} -> ${text}`);
               await bot.sendMessage(chatId, `✅ Successfully updated ${state.field}!`);
+              delete userStates[chatId];
+           } else if (!error) {
+              // Zero rows updated: this medication does not belong to this chat.
+              await bot.sendMessage(chatId, `❌ Not authorized to edit this medication.`);
               delete userStates[chatId];
            } else {
               await bot.sendMessage(chatId, `❌ Update failed.`);
@@ -897,11 +925,21 @@ const initCommands = () => {
            const updatePayload = { reminder_times: state.times, next_reminder_at: nextReminderAt.toISOString() };
            if (state.frequency) updatePayload.frequency = state.frequency;
            
-           const { error } = await supabase.from('medications').update(updatePayload).eq('id', state.medId);
-           
-           if (!error) {
+           // Ownership enforced in the filter itself (service_role bypasses RLS).
+           const { data: updated, error } = await supabase
+             .from('medications')
+             .update(updatePayload)
+             .eq('id', state.medId)
+             .eq('telegram_id', chatId.toString())
+             .select('id');
+
+           if (!error && updated && updated.length > 0) {
               console.log(`[Manage] User ${chatId} updated timings/freq for med ${state.medId}: ${state.times.join(', ')}`);
               await bot.sendMessage(chatId, `✅ Timings updated successfully! Next reminder: ${nextReminderAt.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
+              delete userStates[chatId];
+           } else if (!error) {
+              // Zero rows updated: this medication does not belong to this chat.
+              await bot.sendMessage(chatId, `❌ Not authorized to edit this medication.`);
               delete userStates[chatId];
            } else {
               await bot.sendMessage(chatId, `❌ Update failed.`);
@@ -916,13 +954,15 @@ const initCommands = () => {
             return;
           }
 
-          // Fetch current stock
+          // Fetch current stock — ownership enforced in the filter itself
+          // (service_role bypasses RLS), so a forged med id resolves to nothing.
           const { data: medData, error: medErr } = await supabase
             .from('medications')
             .select('current_stock, tablet_count, drug_name')
             .eq('id', state.medId)
+            .eq('telegram_id', chatId.toString())
             .single();
-            
+
           if (medErr || !medData) {
             await sendMainMenu(chatId, '❌ Error finding this medication.');
             delete userStates[chatId];
@@ -931,17 +971,19 @@ const initCommands = () => {
 
           const currentStockVal = medData.current_stock !== null ? Number(medData.current_stock) : (medData.tablet_count || 0);
           const newTotal = currentStockVal + addedCount;
-          
-          const { error: updateErr } = await supabase
+
+          const { data: updated, error: updateErr } = await supabase
             .from('medications')
-            .update({ 
+            .update({
               current_stock: newTotal,
               low_stock_alert_enabled: true,
               refill_confirmed: true
             })
-            .eq('id', state.medId);
+            .eq('id', state.medId)
+            .eq('telegram_id', chatId.toString())
+            .select('id');
 
-          if (updateErr) {
+          if (updateErr || !updated || updated.length === 0) {
             await sendMainMenu(chatId, '❌ Failed to update tablet count.');
           } else {
             console.log(`[Stock Tracking] ${medData.drug_name} refilled. Added: ${addedCount}. New Total: ${newTotal}`);
@@ -1116,7 +1158,12 @@ const initCommands = () => {
       if (data === CALLBACK_ACTIONS.ADD_CONFIRM) {
         const state = userStates[chatId];
         if (!state || state.step !== 'confirm_add') return bot.answerCallbackQuery(query.id, {text: 'Flow expired', show_alert: true});
-        
+
+        // Consume the state synchronously BEFORE the first await: two fast taps would
+        // otherwise both pass the check above and both insert (duplicate medication =>
+        // double reminders + doubled stock burn). The second tap now hits "Flow expired".
+        delete userStates[chatId];
+
         await bot.editMessageText(query.message.text + '\n\n[✅ Confirmed]', { chat_id: chatId, message_id: messageId, reply_markup: { inline_keyboard: [] } });
         await bot.sendMessage(chatId, 'Saving your medication...');
 
@@ -1139,11 +1186,20 @@ const initCommands = () => {
 
         if (error) {
           console.error('Supabase Insert Error:', error);
-          await sendMainMenu(chatId, '❌ Sorry, an error occurred while saving your medication.');
+          // Restore the consumed state (step is still 'confirm_add') and re-offer the
+          // buttons so the user can retry without re-entering the whole wizard.
+          userStates[chatId] = state;
+          await bot.sendMessage(chatId, '❌ Sorry, an error occurred while saving your medication. Tap ✅ Confirm to try again.', {
+            reply_markup: {
+              inline_keyboard: [[
+                { text: '✅ Confirm', callback_data: CALLBACK_ACTIONS.ADD_CONFIRM },
+                { text: '✏️ Edit', callback_data: CALLBACK_ACTIONS.ADD_EDIT }
+              ]]
+            }
+          });
         } else {
           await sendMainMenu(chatId, `✅ Successfully added ${state.drug_name}!\n\nYour next reminder is scheduled for: ${nextReminderAt.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
         }
-        delete userStates[chatId];
         return bot.answerCallbackQuery(query.id);
       }
 
@@ -1175,9 +1231,18 @@ const initCommands = () => {
 
       if (data.startsWith(CALLBACK_ACTIONS.MED_DEL_CONFIRM)) {
         const [, medId] = data.split(':');
-        const { error } = await supabase.from('medications').update({ active: false }).eq('id', medId);
+        // Ownership enforced in the filter itself (service_role bypasses RLS):
+        // a forged med id belonging to someone else matches zero rows.
+        const { data: deleted, error } = await supabase
+          .from('medications')
+          .update({ active: false })
+          .eq('id', medId)
+          .eq('telegram_id', String(chatId))
+          .select('id');
         if (error) {
            await bot.answerCallbackQuery(query.id, { text: '❌ Error deleting.', show_alert: true });
+        } else if (!deleted || deleted.length === 0) {
+           await bot.answerCallbackQuery(query.id, { text: '❌ Not authorized.', show_alert: true });
         } else {
            console.log(`[Manage] Soft deleted med ID ${medId} for user ${chatId}`);
            await bot.editMessageText(query.message.text.split('\n\n⚠️')[0] + '\n\n[🗑 Deleted]', { chat_id: chatId, message_id: messageId, reply_markup: {inline_keyboard:[]} });
@@ -1219,13 +1284,22 @@ const initCommands = () => {
         if (field === 'dosage') prompt = 'Enter the new dosage (e.g., 500mg):';
         if (field === 'stock') prompt = 'Enter the new tablet count:';
         if (field === 'timings') {
-           const { data: medData } = await supabase.from('medications').select('frequency').eq('id', medId).single();
+           // Ownership enforced in the filter itself (service_role bypasses RLS).
+           const { data: medData } = await supabase
+             .from('medications')
+             .select('frequency')
+             .eq('id', medId)
+             .eq('telegram_id', chatId.toString())
+             .single();
            if (medData) {
              let exp = 1;
              if (medData.frequency === FREQUENCIES.twice_daily) exp = 2;
              if (medData.frequency === FREQUENCIES.thrice_daily) exp = 3;
              userStates[chatId] = { step: 'edit_timings_flow', medId, expectedTimes: exp, times: [] };
              prompt = `Editing timings. What is the FIRST time? (HH:MM)`;
+           } else {
+             delete userStates[chatId];
+             return bot.answerCallbackQuery(query.id, { text: '❌ Not authorized.', show_alert: true });
            }
         }
         if (field === 'frequency') {
@@ -1327,10 +1401,18 @@ const initCommands = () => {
          await bot.answerCallbackQuery(query.id);
          const [, priority, medId] = data.split(':');
          
-         const { error } = await supabase.from('medications').update({ priority_level: priority }).eq('id', medId);
-         if (!error) {
+         // Ownership enforced in the filter itself (service_role bypasses RLS).
+         const { data: updated, error } = await supabase
+           .from('medications')
+           .update({ priority_level: priority })
+           .eq('id', medId)
+           .eq('telegram_id', String(chatId))
+           .select('id');
+         if (!error && updated && updated.length > 0) {
             console.log(`[Manage] User ${chatId} updated priority for med ${medId} to ${priority}`);
             await bot.sendMessage(chatId, `✅ Successfully updated priority to ${priority.toUpperCase()}!`);
+         } else if (!error) {
+            await bot.sendMessage(chatId, `❌ Not authorized to edit this medication.`);
          } else {
             await bot.sendMessage(chatId, `❌ Update failed.`);
          }
@@ -1349,11 +1431,19 @@ const initCommands = () => {
 
       if (data.startsWith(CALLBACK_ACTIONS.REFILL_STOP)) {
         const [, medId] = data.split(':');
-        
-        const { error } = await supabase.from('medications').update({ low_stock_alert_enabled: false }).eq('id', medId);
-        
+
+        // Ownership enforced in the filter itself (service_role bypasses RLS).
+        const { data: updated, error } = await supabase
+          .from('medications')
+          .update({ low_stock_alert_enabled: false })
+          .eq('id', medId)
+          .eq('telegram_id', String(chatId))
+          .select('id');
+
         if (error) {
           await bot.answerCallbackQuery(query.id, { text: '❌ Failed to update.', show_alert: true });
+        } else if (!updated || updated.length === 0) {
+          await bot.answerCallbackQuery(query.id, { text: '❌ Not authorized.', show_alert: true });
         } else {
           await bot.editMessageText(query.message.text + '\n\n[❌ Alerts Stopped]', { chat_id: chatId, message_id: messageId, reply_markup: { inline_keyboard: [] } });
           await bot.answerCallbackQuery(query.id, { text: 'Refill reminders stopped.' });
@@ -1369,6 +1459,32 @@ const initCommands = () => {
 
       if (!isPatientAction && !isCaregiverAction) return;
 
+      // Authorization gate. callback_data is forgeable client input and the bot runs as
+      // service_role (RLS bypassed), so ownership must be checked here before ANY write.
+      // Fetch the medication first: it names the patient this dose belongs to.
+      const { data: medData, error: getMedErr } = await supabase
+        .from('medications')
+        .select('*')
+        .eq('id', medId)
+        .maybeSingle();
+
+      if (getMedErr || !medData) {
+        await bot.answerCallbackQuery(query.id, { text: '❌ Medication not found.', show_alert: true });
+        return;
+      }
+
+      if (isPatientAction && String(medData.telegram_id) !== String(chatId)) {
+        // Patient dose buttons only act on the tapper's own medications.
+        await bot.answerCallbackQuery(query.id, { text: '❌ Not authorized.', show_alert: true });
+        return;
+      }
+
+      if (isCaregiverAction && !(await hasActiveCaregiverLink(chatId, medData.telegram_id))) {
+        // Caregiver buttons require an ACCEPTED active link to this patient AT TAP TIME.
+        await bot.answerCallbackQuery(query.id, { text: '❌ Not authorized.', show_alert: true });
+        return;
+      }
+
       let responseType = '';
       if (action === CALLBACK_ACTIONS.TAKEN || action === CALLBACK_ACTIONS.CG_TAKEN) {
         responseType = 'TAKEN';
@@ -1378,11 +1494,13 @@ const initCommands = () => {
 
       const formattedScheduledTime = new Date(parseInt(scheduledTime)).toISOString();
 
-      // Fetch the active event from reminder_events
+      // Fetch the active event from reminder_events, constrained to the verified patient's
+      // telegram_id so a forged event id can't be crossed with a different medication.
       const { data: activeEvents, error: getErr } = await supabase
         .from('reminder_events')
         .select('*')
         .eq('medication_id', medId)
+        .eq('telegram_id', medData.telegram_id)
         .eq('scheduled_for', formattedScheduledTime)
         .in('reminder_status', ['SENT', 'DISPLAYED', 'OPENED', 'GENTLE_REMINDER', 'ESCALATED', 'CAREGIVER_ACKNOWLEDGED', 'SNOOZED']);
 
@@ -1509,18 +1627,11 @@ const initCommands = () => {
 
       console.log(`[Workflow State Change] Callback resolved event ID ${event.id} status: ${resolvedStatus} by ${resolvedBy}`);
 
-      // Fetch the medication configuration record to retrieve patient details and stock count
-      const { data: medData, error: getMedErr } = await supabase
-        .from('medications')
-        .select('*')
-        .eq('id', medId)
-        .single();
+      // medData was fetched and authorized at the top of this handler; reuse it here for
+      // patient details and stock count.
 
-      if (getMedErr || !medData) {
-        throw new Error('Medication record not found for logging.');
-      }
-
-      // Update old scheduling columns on medications table for backward compatibility
+      // Update old scheduling columns on medications table for backward compatibility.
+      // Constrained to the verified owner so the filter itself enforces ownership.
       await supabase
         .from('medications')
         .update({
@@ -1528,7 +1639,8 @@ const initCommands = () => {
           retry_reminder_at: null,
           last_reminder_scheduled_at: null
         })
-        .eq('id', medId);
+        .eq('id', medId)
+        .eq('telegram_id', medData.telegram_id);
 
       // Check if log already exists to prevent duplicate logging (e.g. from patient/caregiver collision)
       const { data: existingLogs, error: checkLogErr } = await supabase
