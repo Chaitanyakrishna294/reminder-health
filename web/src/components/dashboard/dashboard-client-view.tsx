@@ -19,6 +19,8 @@ import moment from 'moment-timezone';
 import { type OverrideEntry, findOverride, toOverrideDateStr } from '@/lib/schedule/dose-engine';
 import { isPendingStatus, isAttentionStatus, isEscalatedStatus, partitionDoseAttention, buildGateQueue } from '@/lib/schedule/dose-attention';
 import MissedDoseStrip from '@/components/dashboard/missed-dose-strip';
+import RefillStrip from '@/components/dashboard/refill-strip';
+import type { LowStockMed } from '@/lib/medications/stock';
 import MedicationSlider from '@/components/dashboard/medication-slider';
 import { getUnitIcon, getCountdownText, PinkBubbles } from '@/components/dashboard/dashboard-helpers';
 
@@ -78,7 +80,8 @@ interface DashboardClientViewProps {
   myTelegramChatId: string;
   targetTelegramChatId?: string;
   chartData: any[];
-  lowStockMedicines: { id: number; drug_name: string; tablet_count: number; current_stock?: number | null }[];
+  lowStockMedicines: LowStockMed[];
+  canEditStock: boolean;
   hasPatientLinked: boolean;
   caregiverId?: string;
   lastTaken: { drug_name: string; time: string } | null;
@@ -104,6 +107,7 @@ export default function DashboardClientView({
   targetTelegramChatId,
   chartData,
   lowStockMedicines,
+  canEditStock,
   hasPatientLinked,
   caregiverId,
   lastTaken,
@@ -513,6 +517,11 @@ export default function DashboardClientView({
     />
   ) : null;
 
+  // Below the missed strip: a missed dose outranks a refill.
+  const refillStrip = (mounted && lowStockMedicines.length > 0) ? (
+    <RefillStrip meds={lowStockMedicines} canEdit={canEditStock} />
+  ) : null;
+
   // "Request Caregiver Contact" (elderly mode): notifies every linked caregiver
   // via the in-app notification bell. Honest feedback either way.
   const [contactRequestSending, setContactRequestSending] = useState(false);
@@ -709,6 +718,7 @@ export default function DashboardClientView({
             too just stacked two paddings. */}
         <div className="space-y-8 w-full max-w-4xl mx-auto transition-colors duration-500">
           {missedStrip}
+          {refillStrip}
           {/* Gravity State Dimmer Backdrop (Disabled) */}
 
           {/* Push Banner */}
@@ -916,7 +926,7 @@ export default function DashboardClientView({
                 {lowStockMedicines.map((m, idx) => (
                   <div key={idx} className="bg-card p-4 rounded-xl border border-border flex justify-between items-center">
                     <span className="text-2xl font-black">{m.drug_name}</span>
-                    <span className="text-2xl font-black text-danger">{m.tablet_count} left</span>
+                    <span className="text-2xl font-black text-danger">{m.stock} left</span>
                   </div>
                 ))}
               </div>
@@ -944,6 +954,7 @@ export default function DashboardClientView({
       {viewMode !== 'PATIENT_MONITOR' && <GuideAutoStart tour="dashboard" />}
       <div className={`space-y-8 w-full transition-all duration-500 relative ${isGravityState ? 'gravity-active' : ''}`}>
       {missedStrip}
+      {refillStrip}
 
       {/* Push Banner */}
       {showPushBanner && (
@@ -1721,7 +1732,7 @@ export default function DashboardClientView({
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className="font-black text-danger-strong bg-danger/10 px-2.5 py-1 rounded-lg border border-danger/20">
-                            {m.tablet_count} left
+                            {m.stock} left
                           </span>
                           {canRefill && (
                             <button
@@ -1743,12 +1754,12 @@ export default function DashboardClientView({
                             autoFocus
                             value={refillAmount}
                             onChange={(e) => setRefillAmount(e.target.value)}
-                            onKeyDown={(e) => { if (e.key === 'Enter') submitRefill(m.id, m.current_stock); }}
+                            onKeyDown={(e) => { if (e.key === 'Enter') submitRefill(m.id, m.stock); }}
                             placeholder="Units to add"
                             className="flex-1 min-w-0 bg-card border border-input rounded-lg px-3 py-1.5 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                           />
                           <button
-                            onClick={() => submitRefill(m.id, m.current_stock)}
+                            onClick={() => submitRefill(m.id, m.stock)}
                             disabled={refillBusyId === m.id}
                             className="shrink-0 font-black text-primary-strong-foreground bg-primary-strong hover:bg-primary-strong-hover px-3 py-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
                           >

@@ -13,6 +13,7 @@ import GuideAutoStart from '@/components/guide/guide-auto-start';
 import { getUnitIcon } from '@/components/ui/custom-icons';
 import { priorityMeta } from '@/lib/design/semantics';
 import { unitPhrase } from '@/components/medications/medication-form-options';
+import { isLowStock as lowStockOf } from '@/lib/medications/stock';
 import { EmptyState } from '@/components/ui/empty-state';
 import { iconButtonClasses } from '@/components/ui/button';
 
@@ -31,6 +32,7 @@ export interface Medication {
   dosage_amount?: number;
   current_stock?: number | null;
   stock_threshold?: number | null;
+  low_stock_alert_enabled?: boolean | null;
   medication_reason?: string | null;
   timezone?: string | null;
   catalog_id?: number | null;
@@ -138,7 +140,7 @@ export default function MedicationList({
 
         const { data, error } = await supabase
           .from('medications')
-          .select('id, telegram_id, drug_name, dosage, frequency, reminder_times, tablet_count, priority_level, next_reminder_at, active, unit_type, dosage_amount, current_stock, stock_threshold, medication_reason, catalog_id, linked_brand_name, linked_composition, linked_manufacturer, linked_snapshot_date, linked_is_discontinued')
+          .select('id, telegram_id, drug_name, dosage, frequency, reminder_times, tablet_count, priority_level, next_reminder_at, active, unit_type, dosage_amount, current_stock, stock_threshold, low_stock_alert_enabled, medication_reason, catalog_id, linked_brand_name, linked_composition, linked_manufacturer, linked_snapshot_date, linked_is_discontinued')
           .eq('telegram_id', queryId);
 
         if (!error && data) {
@@ -333,11 +335,7 @@ export default function MedicationList({
         <div className="grid grid-cols-1 gap-4">
           {visibleMeds.map((med, idx) => {
             const isLoading = loadingId === med.id;
-            const isLowStock = med.current_stock !== null
-              && med.current_stock !== undefined
-              && med.stock_threshold !== null
-              && med.stock_threshold !== undefined
-              && Number(med.current_stock) <= Number(med.stock_threshold);
+            const isLowStock = lowStockOf(med).low;
             const t = cardTheme(med);
             const stockColor = isLowStock ? 'var(--danger-strong)' : t.color;
 
