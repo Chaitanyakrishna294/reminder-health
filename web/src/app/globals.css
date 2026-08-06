@@ -46,6 +46,12 @@
   --auth-radial: radial-gradient(120% 80% at 50% 0%, #FDEEF2 0%, #F8F9FB 62%, #EAF3FF 100%);
 }
 
+/* Tailwind v4's `dark:` variant defaults to the OS prefers-color-scheme, but this
+   app themes itself with a `.dark` class driven by the in-app toggle. Without this
+   declaration the two disagree: `dark:` utilities fired on an OS setting the user
+   never chose, while the tokens below followed the toggle. Bind them together. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ── Dark theme (toggle-driven via .dark class on <html>) ── */
 :root.dark {
   --background: #0F1C5A;
