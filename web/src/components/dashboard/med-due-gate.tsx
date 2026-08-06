@@ -187,9 +187,10 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
 
   // Theme-aware page gradient. The text inside uses semantic tokens that flip
   // to near-white in dark mode, so the background MUST flip with the app theme
-  // too. This must key off the app's .dark class (via useTheme), NOT Tailwind's
-  // `dark:` variant — globals.css defines no `@custom-variant dark`, so `dark:`
-  // tracks the OS prefers-color-scheme, which the in-app toggle can disagree with.
+  // too. Keyed off the app's .dark class via useTheme because this is a computed
+  // multi-stop gradient passed as an inline style — there's no utility class to
+  // hang a `dark:` variant on. (`dark:` itself is safe to use elsewhere: the
+  // `@custom-variant dark` in globals.css binds it to the same .dark class.)
   const gateBackground =
     theme === 'dark'
       ? missedMode
