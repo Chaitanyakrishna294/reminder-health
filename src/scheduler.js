@@ -6,7 +6,7 @@ const { bot } = require('./bot');
 const { supabase } = require('./db');
 const { delay, calculateNextReminder, escapeHTML } = require('./utils');
 const { CALLBACK_ACTIONS } = require('./constants');
-const { buildDoseKeyboard, buildTakePromptMessage, daysOfStockLeft } = require('./reminders');
+const { buildDoseKeyboard, buildTakePromptMessage, daysOfStockLeft, isLowStock } = require('./reminders');
 
 // Unique id for this process, used to claim the cross-instance minute-tick lease
 // so two overlapping instances (deploy/restart) can't double-escalate reminders.
@@ -684,16 +684,27 @@ const initScheduler = () => {
     timezone: "Asia/Kolkata"
   });
 
-  // 3. Daily Low Stock Alert - Every day at 9:00 AM Asia/Kolkata
+  // 3. Daily Refill Reminder - Every day at 9:00 AM Asia/Kolkata
+  //
+  // Fires on isLowStock(): stock <= stock_threshold (the value the user actually set
+  // in the wizard, which before this drove no alert at all), with daysOfStockLeft <= 3
+  // as a backup. Sends once per crossing — low_stock_notified_at is stamped here and
+  // cleared by the rearm_low_stock_notice() DB trigger on any restock, so a generous
+  // threshold does not become a daily nag.
+  //
+  // Three channels: Telegram (as before), web push, and an in-app bell row. Push and
+  // the bell matter most for web-only accounts (synthetic WEB-* ids), which bot
+  // .sendMessage() no-ops for — those users previously got no refill warning at all.
   cron.schedule('0 9 * * *', async () => {
     try {
       console.log('📦 Checking for low stock medications...');
-      
+
       const { data: activeMeds, error } = await supabase
         .from('medications')
         .select('*')
         .eq('active', true)
-        .eq('low_stock_alert_enabled', true);
+        .eq('low_stock_alert_enabled', true)
+        .is('low_stock_notified_at', null);
 
       if (error) {
         console.error('Error fetching medications for low stock check:', error);
@@ -703,29 +714,79 @@ const initScheduler = () => {
       if (!activeMeds || activeMeds.length === 0) return;
 
       for (const med of activeMeds) {
-        const daysRemaining = daysOfStockLeft(med);
-        if (daysRemaining === null) continue;
+        const status = isLowStock(med);
+        if (!status.low) continue;
 
-        if (daysRemaining <= 3) {
-          const stockLeft = med.current_stock ?? med.tablet_count;
-          const message = `⚠️ Your medication stock for <b>${escapeHTML(med.drug_name)}</b> is running low.\n\nOnly ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining (${stockLeft} left).\n\nPlease refill your medicine soon.`;
-          
-          const inlineKeyboard = {
-            inline_keyboard: [
-              [
-                { text: '✅ Bought', callback_data: `${CALLBACK_ACTIONS.REFILL_BOUGHT}:${med.id}` },
-                { text: '❌ Stop Reminders', callback_data: `${CALLBACK_ACTIONS.REFILL_STOP}:${med.id}` }
-              ]
+        const unit = (med.unit_type || 'unit').toLowerCase();
+        const reasonLine = status.reason === 'threshold'
+          ? `You asked to be warned at ${status.threshold}.`
+          : `About ${status.daysLeft} day${status.daysLeft === 1 ? '' : 's'} left.`;
+        const headline = status.stock === 0
+          ? `You have run out of ${med.drug_name}.`
+          : `Your stock of ${med.drug_name} is running low.`;
+
+        const message =
+          `⚠️ ${escapeHTML(headline)}\n\n` +
+          `${status.stock} ${escapeHTML(unit)}${status.stock === 1 ? '' : 's'} remaining. ${escapeHTML(reasonLine)}\n\n` +
+          `Please refill soon.`;
+
+        const inlineKeyboard = {
+          inline_keyboard: [
+            [
+              { text: '✅ Bought', callback_data: `${CALLBACK_ACTIONS.REFILL_BOUGHT}:${med.id}` },
+              { text: '❌ Stop Reminders', callback_data: `${CALLBACK_ACTIONS.REFILL_STOP}:${med.id}` }
             ]
-          };
+          ]
+        };
 
-          try {
-            await bot.sendMessage(med.telegram_id, message, { parse_mode: 'HTML', reply_markup: inlineKeyboard });
-            await delay(200);
-          } catch (err) {
-            console.error(`Failed to send low stock alert for med ${med.id}:`, err);
-          }
+        // Each channel swallows its own failure: a dead Telegram chat must not stop
+        // the push, and neither must stop the row that puts this in the bell feed.
+        try {
+          await bot.sendMessage(med.telegram_id, message, { parse_mode: 'HTML', reply_markup: inlineKeyboard });
+        } catch (err) {
+          console.error(`Low stock Telegram send failed for med ${med.id}:`, err.message);
         }
+
+        try {
+          await sendBrowserPush(med.telegram_id, {
+            title: status.stock === 0 ? `Out of ${med.drug_name}` : `${med.drug_name} is running low`,
+            body: `${status.stock} ${unit}${status.stock === 1 ? '' : 's'} left. ${reasonLine}`,
+          });
+        } catch (err) {
+          console.error(`Low stock push failed for med ${med.id}:`, err.message);
+        }
+
+        try {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('telegram_chat_id', med.telegram_id)
+            .maybeSingle();
+
+          if (profile) {
+            await supabase.from('notifications').insert([{
+              user_id: profile.id,
+              title: status.stock === 0 ? `Out of ${med.drug_name}` : `${med.drug_name} is running low`,
+              message: `${status.stock} ${unit}${status.stock === 1 ? '' : 's'} left. ${reasonLine}`,
+              type: 'LOW_STOCK',
+            }]);
+          }
+        } catch (err) {
+          console.error(`Low stock bell row failed for med ${med.id}:`, err.message);
+        }
+
+        // Stamp last: if this fails the user gets a duplicate tomorrow, which is a
+        // far better failure than never hearing at all.
+        try {
+          await supabase
+            .from('medications')
+            .update({ low_stock_notified_at: new Date().toISOString() })
+            .eq('id', med.id);
+        } catch (err) {
+          console.error(`Low stock stamp failed for med ${med.id}:`, err.message);
+        }
+
+        await delay(200);
       }
     } catch (err) {
       console.error('Low stock alert error:', err);
