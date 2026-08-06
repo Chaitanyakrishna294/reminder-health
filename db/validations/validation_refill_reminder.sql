@@ -53,3 +53,26 @@ BEGIN
   UPDATE public.medications SET current_stock = v_stock WHERE id = v_id;
   RAISE NOTICE 'PASS behavioural re-arm check';
 END $$;
+
+-- Behavioural: NULL -> number (inventory tracking toggled off then back on) must
+-- also re-arm, not just number -> bigger number.
+DO $$
+DECLARE v_id bigint; v_stock numeric; v_flag timestamptz;
+BEGIN
+  SELECT id, current_stock INTO v_id, v_stock
+  FROM public.medications WHERE current_stock IS NOT NULL LIMIT 1;
+  IF v_id IS NULL THEN
+    RAISE NOTICE 'SKIP behavioural check: no medication with stock tracking';
+    RETURN;
+  END IF;
+
+  UPDATE public.medications SET low_stock_notified_at = now(), current_stock = NULL WHERE id = v_id;
+  SELECT low_stock_notified_at INTO v_flag FROM public.medications WHERE id = v_id;
+  IF v_flag IS NULL THEN RAISE EXCEPTION 'FAIL: flag cleared by clearing stock to NULL'; END IF;
+
+  UPDATE public.medications SET current_stock = v_stock WHERE id = v_id;
+  SELECT low_stock_notified_at INTO v_flag FROM public.medications WHERE id = v_id;
+  IF v_flag IS NOT NULL THEN RAISE EXCEPTION 'FAIL: flag survived a NULL -> number stock transition'; END IF;
+
+  RAISE NOTICE 'PASS behavioural NULL -> number re-arm check';
+END $$;

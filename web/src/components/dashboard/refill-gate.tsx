@@ -15,7 +15,7 @@
 // "Remind me tomorrow" is one snooze for all of them, not one per medication —
 // per-med snoozes would re-gate the user the moment a second medication went low.
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useUiMode } from '@/context/ui-mode-context';
@@ -40,6 +40,57 @@ export default function RefillGate({ meds, canEdit, onSnooze }: RefillGateProps)
   const [busyId, setBusyId] = useState<number | null>(null);
   const [doneIds, setDoneIds] = useState<number[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  // Modal focus management: this is an aria-modal dialog, but a keyboard user could
+  // otherwise Tab straight past it into the dashboard behind. Mirrors MedDueGate's
+  // approach (focus on mount, trap Tab within the container, restore focus on
+  // unmount) minus its dose-specific one-at-a-time logic, which doesn't apply here.
+  const containerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    container.focus();
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      const gate = containerRef.current;
+      if (!gate) return;
+      const focusables = Array.from(
+        gate.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        )
+      );
+      if (focusables.length === 0) {
+        e.preventDefault();
+        gate.focus();
+        return;
+      }
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement;
+      // Focus escaped (e.g. the focused button became disabled) — pull it back.
+      if (!(active instanceof HTMLElement) || !gate.contains(active)) {
+        e.preventDefault();
+        first.focus();
+        return;
+      }
+      if (e.shiftKey) {
+        if (active === first || active === gate) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else if (active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown, true);
+      if (previouslyFocused && previouslyFocused.isConnected) previouslyFocused.focus();
+    };
+  }, []);
 
   const submit = async (med: LowStockMed) => {
     setBusyId(med.id);
@@ -74,10 +125,12 @@ export default function RefillGate({ meds, canEdit, onSnooze }: RefillGateProps)
 
   return (
     <div
+      ref={containerRef}
+      tabIndex={-1}
       role="dialog"
       aria-modal="true"
       aria-label="Medications needing a refill"
-      className="fixed inset-0 z-[110] overflow-y-auto bg-background flex flex-col items-center justify-center px-4 py-10"
+      className="fixed inset-0 z-[110] overflow-y-auto bg-background flex flex-col items-center justify-center px-4 py-10 outline-none"
     >
       <div className="w-full max-w-md space-y-5">
         <div className="text-center space-y-1">

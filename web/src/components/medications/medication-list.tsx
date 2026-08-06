@@ -98,6 +98,12 @@ export default function MedicationList({
 
   // Refill: add the entered amount to current_stock (source of truth; a DB trigger
   // syncs tablet_count). Mirrors the Telegram /refill flow.
+  //
+  // current_stock ?? tablet_count: for a legacy medication current_stock is NULL and
+  // tablet_count holds the real count. addStock treats a null/undefined base as 0,
+  // so passing the raw field would silently drop the existing stock on refill
+  // (e.g. 20 + 30 -> 30, not 50). The predicate, strip, gate and bot all use this
+  // same fallback; this is the last write path that didn't.
   const confirmAddStock = async () => {
     if (!stockModalMed) return;
     const med = stockModalMed;
@@ -106,7 +112,7 @@ export default function MedicationList({
     setStockError('');
     try {
       const { newStock } = await addStock({
-        supabase, medicationId: med.id, currentStock: med.current_stock, amount,
+        supabase, medicationId: med.id, currentStock: med.current_stock ?? med.tablet_count, amount,
       });
       setMeds(prev => prev.map(m => (m.id === med.id ? { ...m, current_stock: newStock } : m)));
       setStockModalMed(null);
@@ -338,6 +344,11 @@ export default function MedicationList({
             const isLowStock = lowStockOf(med).low;
             const t = cardTheme(med);
             const stockColor = isLowStock ? 'var(--warning-strong)' : t.color;
+            // Same current_stock ?? tablet_count fallback the predicate uses, so a
+            // legacy medication (current_stock NULL, tablet_count holds the real
+            // count) doesn't render "Stock not tracked" while the dashboard strip
+            // and Low stock badge above say it's low.
+            const displayStock = med.current_stock ?? med.tablet_count ?? null;
 
             return (
               <div
@@ -439,13 +450,13 @@ export default function MedicationList({
                         already reads as remaining, and the Low stock line below says
                         the state outright. */}
                     <div data-tour={idx === 0 ? 'med-stock' : undefined} className="shrink-0 text-right max-w-[76px]">
-                      {med.current_stock !== null && med.current_stock !== undefined ? (
+                      {displayStock !== null ? (
                         <>
                           <p
                             className={`font-bold tabular-nums leading-none ${isElderly ? 'text-4xl' : 'text-[32px]'}`}
                             style={{ color: stockColor }}
                           >
-                            {med.current_stock}
+                            {displayStock}
                           </p>
                           {/* A bare "4" told you nothing — 4 tablets or 4 ml? And the
                               label flipped between "Low" and "left" for the same slot.
@@ -455,7 +466,7 @@ export default function MedicationList({
                               the longest unit ("inhalations") 2px past the column and
                               clipped its last letter. */}
                           <p className="font-semibold text-[11px] uppercase mt-1 leading-tight text-muted-foreground">
-                            {unitPhrase(med.unit_type, Number(med.current_stock))}
+                            {unitPhrase(med.unit_type, Number(displayStock))}
                           </p>
                           {isLowStock && (
                             <p className="font-black text-[11px] uppercase tracking-wide mt-0.5 leading-tight text-warning-strong">
@@ -589,10 +600,10 @@ export default function MedicationList({
                 placeholder="0"
                 className="mt-1.5 w-full px-4 py-3 bg-[#F2F2F7] rounded-2xl text-sm font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
               />
-              {stockModalMed.current_stock !== null && stockModalMed.current_stock !== undefined && (
+              {(stockModalMed.current_stock ?? stockModalMed.tablet_count ?? null) !== null && (
                 <span className="block mt-1.5 text-[11px] font-medium text-muted-foreground">
-                  Current: {stockModalMed.current_stock}
-                  {stockInput && Number(stockInput) > 0 ? ` → ${Number(stockModalMed.current_stock) + Number(stockInput)}` : ''}
+                  Current: {stockModalMed.current_stock ?? stockModalMed.tablet_count}
+                  {stockInput && Number(stockInput) > 0 ? ` → ${Number(stockModalMed.current_stock ?? stockModalMed.tablet_count) + Number(stockInput)}` : ''}
                 </span>
               )}
             </label>

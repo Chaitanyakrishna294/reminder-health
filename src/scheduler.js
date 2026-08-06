@@ -757,31 +757,41 @@ const initScheduler = () => {
         }
 
         try {
-          const { data: profile } = await supabase
+          const { data: profile, error: profileErr } = await supabase
             .from('profiles')
             .select('id')
             .eq('telegram_chat_id', med.telegram_id)
             .maybeSingle();
 
-          if (profile) {
-            await supabase.from('notifications').insert([{
+          if (profileErr) {
+            console.error(`Low stock profile lookup failed for med ${med.id}:`, profileErr.message);
+          } else if (profile) {
+            const { error: notifErr } = await supabase.from('notifications').insert([{
               user_id: profile.id,
               title: status.stock === 0 ? `Out of ${med.drug_name}` : `${med.drug_name} is running low`,
               message: `${status.stock} ${unit}${status.stock === 1 ? '' : 's'} left. ${reasonLine}`,
               type: 'LOW_STOCK',
             }]);
+            if (notifErr) {
+              console.error(`Low stock bell row failed for med ${med.id}:`, notifErr.message);
+            }
           }
         } catch (err) {
           console.error(`Low stock bell row failed for med ${med.id}:`, err.message);
         }
 
         // Stamp last: if this fails the user gets a duplicate tomorrow, which is a
-        // far better failure than never hearing at all.
+        // far better failure than never hearing at all — but it must still be logged,
+        // since supabase-js resolves (not rejects) on a Postgres error and a silent
+        // failure here means the daily nag this design exists to prevent, forever.
         try {
-          await supabase
+          const { error: stampErr } = await supabase
             .from('medications')
             .update({ low_stock_notified_at: new Date().toISOString() })
             .eq('id', med.id);
+          if (stampErr) {
+            console.error(`Low stock stamp failed for med ${med.id}:`, stampErr.message);
+          }
         } catch (err) {
           console.error(`Low stock stamp failed for med ${med.id}:`, err.message);
         }
@@ -949,15 +959,17 @@ const initScheduler = () => {
         return;
       }
 
+      // isLowStock() (not a bare daysOfStockLeft <= 3 check) so this summary agrees
+      // with the 09:00 cron: it honors stock_threshold and low_stock_alert_enabled,
+      // instead of telling a caregiver their patient is fine on the same day the
+      // patient was warned, or flagging a medication whose alerts were turned off.
       const lowStockByPatient = new Map();
       patientIds.forEach(id => lowStockByPatient.set(id, []));
       (allMeds || []).forEach(med => {
-        const daysRemaining = daysOfStockLeft(med);
-        if (daysRemaining === null) return;
-        if (daysRemaining <= 3) {
-          const arr = lowStockByPatient.get(med.telegram_id);
-          if (arr) arr.push({ drug_name: med.drug_name, daysRemaining });
-        }
+        const status = isLowStock(med);
+        if (!status.low) return;
+        const arr = lowStockByPatient.get(med.telegram_id);
+        if (arr) arr.push({ drug_name: med.drug_name, status });
       });
 
       // Resolve each patient's display name at most once.
@@ -992,7 +1004,10 @@ const initScheduler = () => {
         if (lowStockMeds.length > 0) {
           summaryMessage += `\n⚠️ <b>Low Stock Alert:</b>\n`;
           lowStockMeds.forEach(med => {
-            summaryMessage += `• ${escapeHTML(med.drug_name)} (Only ${med.daysRemaining} days remaining)\n`;
+            const reasonText = med.status.reason === 'threshold'
+              ? `patient asked to be warned at ${med.status.threshold}`
+              : `only ${med.status.daysLeft} day${med.status.daysLeft === 1 ? '' : 's'} remaining`;
+            summaryMessage += `• ${escapeHTML(med.drug_name)} (${reasonText})\n`;
           });
         }
 

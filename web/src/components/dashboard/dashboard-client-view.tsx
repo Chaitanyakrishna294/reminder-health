@@ -125,21 +125,28 @@ export default function DashboardClientView({
   // Doses the user chose "remind me later" on → suppressed until this epoch ms.
   // (The 60s `currentTime` clock below re-renders, so the gate re-evaluates live.)
   const [snoozedUntil, setSnoozedUntil] = useState<Record<number, number>>({});
-  // Refill gate snooze — one timestamp for ALL low medications, not one per med.
-  // Mirrors the medGateSnoozes localStorage pattern; per-device by design, same
-  // limitation MedDueGate already has.
+  // Refill gate snooze — one timestamp for ALL of the viewed patient's low
+  // medications, not one per med. Mirrors the medGateSnoozes localStorage pattern;
+  // per-device by design, same limitation MedDueGate already has.
+  //
+  // Keyed per patient (targetTelegramChatId): a caregiver monitoring two patients
+  // must be able to snooze one patient's gate without silencing the other's, and a
+  // caregiver's own medications (myTelegramChatId) must not be silenced by
+  // snoozing a monitored patient's gate. An unqualified key would leak across both.
+  const refillSnoozeKey = `refillGateSnoozedUntil:${targetTelegramChatId ?? myTelegramChatId}`;
   const [refillSnoozedUntil, setRefillSnoozedUntil] = useState(0);
   useEffect(() => {
     try {
-      setRefillSnoozedUntil(Number(localStorage.getItem('refillGateSnoozedUntil')) || 0);
+      setRefillSnoozedUntil(Number(localStorage.getItem(refillSnoozeKey)) || 0);
     } catch { /* ignore */ }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refillSnoozeKey]);
 
   const handleRefillSnooze = () => {
     const midnight = new Date();
     midnight.setHours(24, 0, 0, 0); // next local midnight
     const until = midnight.getTime();
-    try { localStorage.setItem('refillGateSnoozedUntil', String(until)); } catch { /* ignore */ }
+    try { localStorage.setItem(refillSnoozeKey, String(until)); } catch { /* ignore */ }
     setRefillSnoozedUntil(until);
   };
   // Doses the resolve RPC can NEVER save (planner-shifted virtual dose, deactivated

@@ -45,21 +45,31 @@ elderly users) and the family/caregivers who support them.
 
 ### 3.1 Color palette (exact tokens — from `globals.css`, exposed as CSS vars + Tailwind colors)
 
+> **The colour-to-MEANING map and the "no new hex literals" rule live in
+> [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md).** This table is just the values.
+
 | Token | Hex | Use |
 |---|---|---|
-| `--background` | `#F8F9FB` | App background (very light blue-gray) |
+| `--background` | `#F6F2F5` | App background (very light warm gray) |
 | `--foreground` | `#0F1C5A` | Primary text / ink (deep navy) |
 | `--card` | `#FFFFFF` | Card surfaces |
-| `--primary` | `#F26B8A` | **Mind Pink** — brand accent, primary buttons |
+| `--primary` | `#F26B8A` | **Mind Pink** — brand accent, the one primary CTA per screen |
 | `--primary-hover` | `#ED5276` | Pressed/hover pink |
 | `--primary-soft` | `#FDEEF2` | Tinted pink surface (soft fills, gate background) |
-| `--success` | `#34C759` | Taken / on-track (green) |
-| `--warning` | `#FF9500` | Skipped / caution (orange) |
-| `--danger` | `#FF3B30` | Missed / destructive (red) |
-| `--muted` | `#EEF4FB` | Secondary background |
+| `--success` | `#34C759` | Taken / on-track / routine priority (green) |
+| `--warning` | `#FF9500` | Skipped / low stock / important priority (orange) |
+| `--danger` | `#FF3B30` | Missed / destructive / critical priority (red) |
+| `--info` | `#2563EB` | Trust, security, explanatory copy, snoozed (blue) |
+| `--info-surface` | `#EAF3FF` | Tinted info surface |
+| `--muted` | `#EEF4FB` | Secondary background; also "nothing scheduled" |
 | `--muted-foreground` | `#64748B` | Muted/secondary text |
 | `--accent-surface` | `#EAF3FF` | Accent surface (light blue) |
 | `--border` | `rgba(15,23,42,0.07)` | Soft card borders |
+
+**Text on a tinted status surface** (`bg-warning/10` and friends) must use the `-strong`
+variants — `--success-strong` `#1B7A3A`, `--warning-strong` `#8A4B00`,
+`--danger-strong` `#B3261E`, `--info-strong` `#1D4ED8` (lighter equivalents in dark mode).
+The `-foreground` tokens are white: correct on a solid fill, invisible on a tint.
 
 - **Body background** has a whisper-subtle radial tint: pink (`rgba(242,107,138,0.05)`) top-right +
   blue (`rgba(91,141,239,0.05)`) top-left over `#F8F9FB`.
