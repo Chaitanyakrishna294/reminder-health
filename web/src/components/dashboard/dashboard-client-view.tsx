@@ -20,6 +20,7 @@ import { type OverrideEntry, findOverride, toOverrideDateStr } from '@/lib/sched
 import { isPendingStatus, isAttentionStatus, isEscalatedStatus, partitionDoseAttention, buildGateQueue } from '@/lib/schedule/dose-attention';
 import MissedDoseStrip from '@/components/dashboard/missed-dose-strip';
 import RefillStrip from '@/components/dashboard/refill-strip';
+import RefillGate from '@/components/dashboard/refill-gate';
 import type { LowStockMed } from '@/lib/medications/stock';
 import MedicationSlider from '@/components/dashboard/medication-slider';
 import { getUnitIcon, getCountdownText, PinkBubbles } from '@/components/dashboard/dashboard-helpers';
@@ -124,6 +125,23 @@ export default function DashboardClientView({
   // Doses the user chose "remind me later" on → suppressed until this epoch ms.
   // (The 60s `currentTime` clock below re-renders, so the gate re-evaluates live.)
   const [snoozedUntil, setSnoozedUntil] = useState<Record<number, number>>({});
+  // Refill gate snooze — one timestamp for ALL low medications, not one per med.
+  // Mirrors the medGateSnoozes localStorage pattern; per-device by design, same
+  // limitation MedDueGate already has.
+  const [refillSnoozedUntil, setRefillSnoozedUntil] = useState(0);
+  useEffect(() => {
+    try {
+      setRefillSnoozedUntil(Number(localStorage.getItem('refillGateSnoozedUntil')) || 0);
+    } catch { /* ignore */ }
+  }, []);
+
+  const handleRefillSnooze = () => {
+    const midnight = new Date();
+    midnight.setHours(24, 0, 0, 0); // next local midnight
+    const until = midnight.getTime();
+    try { localStorage.setItem('refillGateSnoozedUntil', String(until)); } catch { /* ignore */ }
+    setRefillSnoozedUntil(until);
+  };
   // Doses the resolve RPC can NEVER save (planner-shifted virtual dose, deactivated
   // med, no permission). Session-local: the gate stops re-asking them and the missed
   // strip renders them info-only, instead of an all-day "try again" loop.
@@ -522,6 +540,17 @@ export default function DashboardClientView({
     <RefillStrip meds={lowStockMedicines} canEdit={canEditStock} />
   ) : null;
 
+  // Refill gate — only once the dose queue is empty. A dose due now is time-critical
+  // and outranks a refill; two stacked full-screen gates teach people to tap past both.
+  const refillGate = (
+    mounted &&
+    dueQueue.length === 0 &&
+    lowStockMedicines.length > 0 &&
+    refillSnoozedUntil <= Date.now()
+  ) ? (
+    <RefillGate meds={lowStockMedicines} canEdit={canEditStock} onSnooze={handleRefillSnooze} />
+  ) : null;
+
   // "Request Caregiver Contact" (elderly mode): notifies every linked caregiver
   // via the in-app notification bell. Honest feedback either way.
   const [contactRequestSending, setContactRequestSending] = useState(false);
@@ -713,6 +742,7 @@ export default function DashboardClientView({
     return (
       <>
         {dueGate}
+        {refillGate}
         {viewMode !== 'PATIENT_MONITOR' && <GuideAutoStart tour="dashboard" />}
         {/* Dock clearance is owned by <main> in dashboard-main-layout; adding it here
             too just stacked two paddings. */}
@@ -951,6 +981,7 @@ export default function DashboardClientView({
   return (
     <>
       {dueGate}
+      {refillGate}
       {viewMode !== 'PATIENT_MONITOR' && <GuideAutoStart tour="dashboard" />}
       <div className={`space-y-8 w-full transition-all duration-500 relative ${isGravityState ? 'gravity-active' : ''}`}>
       {missedStrip}
