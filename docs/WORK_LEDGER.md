@@ -185,7 +185,10 @@ agent-audited 2026-07-25; `docs/DATABASE_SCHEMA.md` is badly stale (§9).
 `connect_code` RM+6) · `medications` (**no CREATE TABLE in repo** — pre-repo bot table, only ALTERed;
 stock cols BOTH `tablet_count` and `current_stock`, see §8) · `reminder_events` (per-dose state
 machine; UNIQUE(medication_id, scheduled_for); statuses SENT/DISPLAYED/OPENED/GENTLE_REMINDER/
-ESCALATED/CAREGIVER_ACKNOWLEDGED/PENDING_REVIEW/UNCONFIRMED/TAKEN/SKIPPED/SNOOZED) ·
+ESCALATED/CAREGIVER_ACKNOWLEDGED/PENDING_REVIEW/UNCONFIRMED/TAKEN/SKIPPED/SNOOZED;
+`last_prompted_at` = escalation-anchor override, stamped ONLY at snooze re-fire via a separate
+best-effort write; initial-send anchor = `created_at` DB default, never named in the INSERT;
+ladder clamps the anchor to `created_at`+30m — migration pending 2026-08-06, see APPLIED.md) ·
 `reminder_logs` (adherence history; also no CREATE TABLE) · `notifications` (uuid PK, bell feed).
 
 **Care circle:** `caregiver_connections` (modern many-to-many + 6 `can_*` permission flags,

@@ -65,7 +65,9 @@ maintainer applies it in the Supabase SQL editor (project `jaflclnakwtikqbfhfdk`
 
 ## PENDING (written, not yet applied)
 
-_None._
+| # | File | Date |
+|---|---|---|
+| — | `migration_escalation_anchor_2026_08_06.sql` | **NOT YET APPLIED** (written 2026-08-06; anchors the escalation ladder to the last real prompt — `last_prompted_at` if snooze-re-fired, else `created_at` — clamped to `created_at`+30m; apply-first is recommended but EITHER order is safe: the send paths never name the column on INSERT and the snooze-re-fire stamp is a separate best-effort write; on apply, move this row up and repoint the `scan_and_escalate_overdue_reminders` row in the function map below to this file; has rollback + validation files) |
 
 > Lockdown note: if `try_acquire_scheduler_lock`, `release_scheduler_lock`,
 > `close_daily_medications`, or `scan_and_escalate_overdue_reminders` is ever

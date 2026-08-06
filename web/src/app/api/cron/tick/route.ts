@@ -104,10 +104,29 @@ export async function GET(request: Request) {
           retry_count: 0,
           snooze_count: 0,
           retry_reminder_at: null,
+          // DO NOT add last_prompted_at here (mirrors src/scheduler.js). created_at
+          // DEFAULT now() is stamped by the DB on this same INSERT, and the anchor in
+          // scan_and_escalate_overdue_reminders COALESCEs to created_at — identical
+          // result. Naming the column would couple this insert to the hand-applied
+          // migration_escalation_anchor_2026_08_06.sql and make every failover send
+          // fail (PGRST204) if code ships first. Only the snooze re-fire below stamps
+          // it (there created_at cannot move).
         }])
         .select();
 
-      // On duplicate (23505) or success, advance next_reminder_at so it doesn't re-fire.
+      // Check the insert result BEFORE advancing next_reminder_at. A genuine
+      // failure (not the 23505 duplicate) must NOT advance: advancing would
+      // permanently drop this dose — nothing would ever retry it. Leaving
+      // next_reminder_at due lets the next failover tick retry.
+      if (eventErr && eventErr.code !== '23505') {
+        console.error(
+          `[CronTick] reminder_events insert failed for med ${med.id} (scheduled_for=${scheduledFor}); NOT advancing next_reminder_at so the next tick retries:`,
+          eventErr,
+        );
+        continue;
+      }
+
+      // Success or duplicate (23505): advance next_reminder_at so it doesn't re-fire.
       const nextReminder = calculateNextReminder(med.reminder_times, med.timezone);
       await supabase
         .from('medications')
@@ -200,13 +219,38 @@ export async function GET(request: Request) {
     for (const ev of expired || []) {
       const med = ev.medications;
       if (!med || !med.active) continue;
+      // Status flip FIRST, deliberately WITHOUT the anchor stamp (mirrors
+      // src/scheduler.js): this statement must never depend on the hand-applied
+      // migration_escalation_anchor_2026_08_06.sql, or a missing column would
+      // strand snoozed doses in SNOOZED forever. CAS guard on reminder_status
+      // stays: only one process wins the SNOOZED->SENT transition.
       const { data: updated } = await supabase
         .from('reminder_events')
-        .update({ reminder_status: 'SENT', retry_reminder_at: null })
+        .update({
+          reminder_status: 'SENT',
+          retry_reminder_at: null,
+        })
         .eq('id', ev.id)
         .eq('reminder_status', 'SNOOZED')
         .select();
       if (!updated || updated.length === 0) continue;
+
+      // Best-effort anchor re-arm in a SEPARATE statement so its failure can never
+      // block the re-fire: the ladder countdown restarts from this re-prompt, so the
+      // patient isn't hit with a redundant GENTLE_REMINDER one tick later (created_at
+      // can't serve — this UPDATE keeps the same row). Gentle re-sends themselves
+      // deliberately never move this anchor. On failure (e.g. column missing) the
+      // dose still re-fires; only anchor precision degrades to created_at.
+      const { error: anchorErr } = await supabase
+        .from('reminder_events')
+        .update({ last_prompted_at: now.toISOString() })
+        .eq('id', ev.id);
+      if (anchorErr) {
+        console.error(
+          `[CronTick] Non-fatal: failed to stamp last_prompted_at for event ${ev.id} (anchor falls back to created_at; apply db/migrations/migration_escalation_anchor_2026_08_06.sql):`,
+          anchorErr,
+        );
+      }
       await sendTelegramMessage(
         med.telegram_id,
         `💊 Time to take <b>${escapeTelegramHTML(med.drug_name)}</b>${med.dosage ? ` (${escapeTelegramHTML(med.dosage)})` : ''}`,

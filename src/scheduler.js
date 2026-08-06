@@ -142,6 +142,26 @@ const verifySchedulerDependencies = async () => {
     p_lock_name: 'startup_self_check',
     p_holder: SCHEDULER_INSTANCE_ID
   });
+
+  // Probe the escalation-anchor column (migration_escalation_anchor_2026_08_06.sql).
+  // DIAGNOSTIC ONLY — do not crash or block reminders: the insert path never names
+  // the column, and the snooze re-fire stamps it best-effort, so a missing column
+  // only degrades anchor precision (falls back to created_at). But surface it
+  // loudly so "deploy code" and "apply migration" stay coupled.
+  const { error: anchorProbeErr } = await supabase
+    .from('reminder_events')
+    .select('last_prompted_at')
+    .limit(1);
+  if (anchorProbeErr) {
+    console.error(
+      '[Scheduler] FATAL-CONFIG: reminder_events.last_prompted_at is missing or unreadable — ' +
+      'escalation-ladder anchoring degrades to created_at and snooze re-fires cannot re-arm the anchor. ' +
+      'Reminders and escalations CONTINUE to run. ' +
+      'Apply db/migrations/migration_escalation_anchor_2026_08_06.sql to restore full anchor semantics.',
+      anchorProbeErr
+    );
+  }
+
   console.log('[Scheduler] Dependency self-check passed (scheduler-lock RPCs present).');
   return true;
 };
@@ -275,6 +295,20 @@ const initScheduler = () => {
               retry_count: 0,
               snooze_count: 0,
               retry_reminder_at: null
+              // DO NOT add last_prompted_at here. The DB already stamps
+              // created_at DEFAULT now() on this same INSERT, and the escalation
+              // anchor in scan_and_escalate_overdue_reminders is
+              //   GREATEST(scheduled_for, COALESCE(last_prompted_at, created_at, scheduled_for))
+              // so for the initial send the anchor is IDENTICAL with or without
+              // the column — stamping it would be pure redundancy. Worse, naming
+              // it hard-couples this hottest write path to the hand-applied
+              // migration_escalation_anchor_2026_08_06.sql: if this code ships
+              // first, PostgREST rejects EVERY reminder insert (PGRST204 unknown
+              // column), which is not 23505, so next_reminder_at never advances
+              // and every med re-enters the scan each tick failing identically —
+              // zero reminders, zero escalations, while the heartbeat still looks
+              // healthy. Only the snooze re-fire below stamps the column, where
+              // created_at genuinely cannot serve (in-place UPDATE).
             };
             console.log('[Scheduler] reminder_event payload:', payload);
 
@@ -370,6 +404,11 @@ const initScheduler = () => {
           
           if (transition.new_status === 'GENTLE_REMINDER') {
             console.log(`[Workflow State Change] Event ID ${transition.event_id} transitioned to GENTLE_REMINDER. Sending re-engagement reminder.`);
+            // Deliberately NO last_prompted_at update here: gentle re-sends ARE the
+            // escalation ladder. If each rung re-armed the anchor, ESCALATED and
+            // PENDING_REVIEW could never be reached. Only a snooze re-fire writes
+            // the column (the initial send's anchor is created_at, stamped by the
+            // DB default on insert).
             
             // Fetch the event to get correct snooze count
             const { data: eventRow } = await supabase
@@ -483,6 +522,12 @@ const initScheduler = () => {
           if (!med || !med.active) continue;
 
           try {
+            // Status flip FIRST, and deliberately WITHOUT the anchor stamp: this
+            // statement must never depend on the hand-applied
+            // migration_escalation_anchor_2026_08_06.sql, or a missing column would
+            // strand every snoozed dose in SNOOZED forever (never re-fires, never
+            // escalates). The CAS guard on reminder_status stays: only one process
+            // wins the SNOOZED->SENT transition.
             const { data: updateData, error: updateErr } = await supabase
               .from('reminder_events')
               .update({
@@ -494,6 +539,27 @@ const initScheduler = () => {
               .select();
 
             if (updateErr || !updateData || updateData.length === 0) continue;
+
+            // Best-effort anchor re-arm, in a SEPARATE statement so its failure can
+            // never block the re-fire above. WHY stamp at all: the patient asked for
+            // quiet time and is being re-prompted NOW; without this the SQL ladder
+            // measures from created_at — for a 10-minute snooze that already sits at
+            // the critical gentle threshold, so the next scan would fire a redundant
+            // GENTLE_REMINDER one tick after this re-fire. created_at can't serve:
+            // this UPDATE keeps the same row, so created_at never moves. If the
+            // column is missing (migration not applied), we log and move on — the
+            // dose still re-fires, only anchor precision degrades.
+            const { error: anchorErr } = await supabase
+              .from('reminder_events')
+              .update({ last_prompted_at: new Date().toISOString() })
+              .eq('id', event.id);
+            if (anchorErr) {
+              console.error(
+                `[Scheduler] Non-fatal: failed to stamp last_prompted_at for Event ID ${event.id} ` +
+                '(anchor falls back to created_at; apply db/migrations/migration_escalation_anchor_2026_08_06.sql):',
+                anchorErr
+              );
+            }
 
             console.log(`[Workflow State Change] Snooze expired for Event ID ${event.id}. Transitioned status from SNOOZED to SENT`);
             const scheduledTimeMs = new Date(event.scheduled_for).getTime();
