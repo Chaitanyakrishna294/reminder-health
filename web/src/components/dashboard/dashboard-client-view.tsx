@@ -1806,7 +1806,7 @@ export default function DashboardClientView({
               <div className="bg-success/5 border border-success/20 p-4 rounded-2xl text-center text-xs space-y-1">
                 <Package className="w-8 h-8 text-success mx-auto mb-2" />
                 <p className="font-black text-success mt-1">Inventory Balanced</p>
-                <p className="text-[10px] text-muted-foreground font-semibold">All medication stock levels are sufficient.</p>
+                <p className="text-[11px] text-muted-foreground font-semibold">All medication stock levels are sufficient.</p>
               </div>
             )}
           </div>
