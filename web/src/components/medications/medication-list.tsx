@@ -337,7 +337,7 @@ export default function MedicationList({
             const isLoading = loadingId === med.id;
             const isLowStock = lowStockOf(med).low;
             const t = cardTheme(med);
-            const stockColor = isLowStock ? 'var(--danger-strong)' : t.color;
+            const stockColor = isLowStock ? 'var(--warning-strong)' : t.color;
 
             return (
               <div
@@ -458,7 +458,7 @@ export default function MedicationList({
                             {unitPhrase(med.unit_type, Number(med.current_stock))}
                           </p>
                           {isLowStock && (
-                            <p className="font-black text-[11px] uppercase tracking-wide mt-0.5 leading-tight text-danger-strong">
+                            <p className="font-black text-[11px] uppercase tracking-wide mt-0.5 leading-tight text-warning-strong">
                               Low stock
                             </p>
                           )}
