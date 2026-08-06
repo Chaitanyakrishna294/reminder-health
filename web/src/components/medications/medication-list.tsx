@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { addStock } from '@/lib/medications/add-stock';
 import { calculateNextReminder } from '@/lib/medication-utils';
 import { useUiMode } from '@/context/ui-mode-context';
 import { Plus, Package, Clock, Pause, Play, SquarePen, Trash2, Pill, X, ChevronDown } from 'lucide-react';
@@ -99,24 +100,17 @@ export default function MedicationList({
     if (!stockModalMed) return;
     const med = stockModalMed;
     const amount = Number(stockInput);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      setStockError('Please enter a positive number.');
-      return;
-    }
     setStockBusyId(med.id);
     setStockError('');
     try {
-      const newStock = Number(med.current_stock || 0) + amount;
-      const { error } = await supabase
-        .from('medications')
-        .update({ current_stock: newStock })
-        .eq('id', med.id);
-      if (error) throw error;
-      setMeds(prev => prev.map(m => m.id === med.id ? { ...m, current_stock: newStock } : m));
+      const { newStock } = await addStock({
+        supabase, medicationId: med.id, currentStock: med.current_stock, amount,
+      });
+      setMeds(prev => prev.map(m => (m.id === med.id ? { ...m, current_stock: newStock } : m)));
       setStockModalMed(null);
-    } catch (err: any) {
-      console.error('[Medications] add stock failed:', err);
-      setStockError('Could not update stock. Please try again.');
+      setStockInput('');
+    } catch (err) {
+      setStockError(err instanceof Error ? err.message : 'Could not update stock.');
     } finally {
       setStockBusyId(null);
     }

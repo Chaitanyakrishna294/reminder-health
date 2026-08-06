@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useUiMode } from '@/context/ui-mode-context';
 import TodaysSchedule, { ReminderEvent } from '@/components/dashboard/todays-schedule';
 import MedicationReviewQueue from '@/components/dashboard/medication-review-queue';
+import { addStock } from '@/lib/medications/add-stock';
 import { registerPush } from '@/lib/push/register-push';
 import { resolveReminderEvent } from '@/lib/reminder-events';
 import { PremiumToast } from '@/components/ui/premium-toast';
@@ -540,22 +541,15 @@ export default function DashboardClientView({
   const [refillBusyId, setRefillBusyId] = useState<number | null>(null);
   const submitRefill = async (medId: number, currentStock: number | null | undefined) => {
     const amount = Number(refillAmount);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      showToast('Enter an amount', 'Type how many units you added.', 'error');
-      return;
-    }
     setRefillBusyId(medId);
     try {
-      const newStock = Number(currentStock || 0) + amount;
-      const { error } = await supabase.from('medications').update({ current_stock: newStock }).eq('id', medId);
-      if (error) throw error;
-      showToast('Stock updated', `Added ${amount} to your inventory.`, 'success');
+      const { newStock } = await addStock({ supabase, medicationId: medId, currentStock, amount });
+      showToast('Stock updated', `Added ${amount}. Now ${newStock}.`, 'success');
       setRefillOpenId(null);
       setRefillAmount('');
       router.refresh();
     } catch (err) {
-      console.error('[Dashboard Refill] failed:', err);
-      showToast('Error', 'Could not update stock. Please try again.', 'error');
+      showToast('Could not update stock', err instanceof Error ? err.message : 'Please try again.', 'error');
     } finally {
       setRefillBusyId(null);
     }
