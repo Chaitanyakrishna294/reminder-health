@@ -64,7 +64,14 @@ maintainer applies it in the Supabase SQL editor (project `jaflclnakwtikqbfhfdk`
 
 ## PENDING (written, not yet applied)
 
-None.
+| # | File | Date |
+|---|---|---|
+| — | `migration_security_lockdown_2026_07_29.sql` | **NOT YET APPLIED** (written 2026-08-06; has rollback + validation files) |
+
+> Lockdown note: if `try_acquire_scheduler_lock`, `release_scheduler_lock`,
+> `close_daily_medications`, or `scan_and_escalate_overdue_reminders` is ever
+> redefined via `DROP FUNCTION` + `CREATE`, its ACL resets to PUBLIC EXECUTE —
+> re-run section A of the lockdown migration afterwards.
 
 ## Current function definitions (latest file wins)
 
@@ -109,3 +116,5 @@ relying on them.
 | `update_caregiver_connection_updated_at` | `migration_caregiver_decoupling_phase_a.sql` |
 | `clean_old_chat_messages` | `migration_caregiver_accept.sql` |
 | `get_policies_debug` | `migration_security_fix_rls.sql` |
+| `guard_caregiver_info_client_writes` | `migration_security_lockdown_2026_07_29.sql` (pending) |
+| `deactivate_legacy_caregiver_link_on_revoke` | `migration_security_lockdown_2026_07_29.sql` (pending) |
