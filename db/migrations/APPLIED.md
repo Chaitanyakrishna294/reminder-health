@@ -110,7 +110,7 @@ relying on them.
 | `handle_new_user_health_categories` | `migration_health_vault_combined.sql` |
 | `cleanup_expired_trash` | `migration_health_vault_stabilization.sql` |
 | `cleanup_expired_link_codes` | `migration_arch_hardening_2026_06.sql` |
-| `sync_medication_stock_fields` | `migration_medication_enhancements.sql` |
+| `sync_medication_stock_fields` / `handle_medication_low_stock_trigger` | `migration_medication_enhancements.sql` |
 | `expire_stale_connection_requests` / `cleanup_resolved_request_notifications` | `migration_5.6c.1_expiration_and_primary.sql` |
 | `handle_profile_telegram_chat_id_update` | `migration_optional_telegram.sql` |
 | `handle_health_records_storage_path` | `migration_5.6e_vault_permissions.sql` |
