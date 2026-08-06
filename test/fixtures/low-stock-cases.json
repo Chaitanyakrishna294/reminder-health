@@ -1,0 +1,80 @@
+{
+  "comment": "Read by BOTH test/reminders.test.js (bot) and web/src/lib/medications/stock.test.ts (web). If the two implementations of isLowStock ever disagree, one of those runs fails. Do not add a case to one test without adding it here.",
+  "cases": [
+    {
+      "name": "tracking disabled -> never low",
+      "med": { "active": true, "low_stock_alert_enabled": false, "current_stock": 1, "stock_threshold": 4, "frequency": "once_daily", "dosage_amount": 1 },
+      "expected": { "low": false, "reason": null }
+    },
+    {
+      "name": "no stock recorded -> never low",
+      "med": { "active": true, "low_stock_alert_enabled": true, "current_stock": null, "tablet_count": null, "stock_threshold": 4, "frequency": "once_daily", "dosage_amount": 1 },
+      "expected": { "low": false, "reason": null }
+    },
+    {
+      "name": "paused medication -> never low",
+      "med": { "active": false, "low_stock_alert_enabled": true, "current_stock": 1, "stock_threshold": 4, "frequency": "once_daily", "dosage_amount": 1 },
+      "expected": { "low": false, "reason": null }
+    },
+    {
+      "name": "stock exactly equals threshold -> low (inclusive)",
+      "med": { "active": true, "low_stock_alert_enabled": true, "current_stock": 4, "stock_threshold": 4, "frequency": "once_daily", "dosage_amount": 1 },
+      "expected": { "low": true, "reason": "threshold" }
+    },
+    {
+      "name": "stock below threshold -> low",
+      "med": { "active": true, "low_stock_alert_enabled": true, "current_stock": 2, "stock_threshold": 4, "frequency": "once_daily", "dosage_amount": 1 },
+      "expected": { "low": true, "reason": "threshold" }
+    },
+    {
+      "name": "stock zero -> low via threshold",
+      "med": { "active": true, "low_stock_alert_enabled": true, "current_stock": 0, "stock_threshold": 4, "frequency": "once_daily", "dosage_amount": 1 },
+      "expected": { "low": true, "reason": "threshold" }
+    },
+    {
+      "name": "above threshold but 3 days left -> low via days backup",
+      "med": { "active": true, "low_stock_alert_enabled": true, "current_stock": 3, "stock_threshold": 2, "frequency": "once_daily", "dosage_amount": 1 },
+      "expected": { "low": true, "reason": "days" }
+    },
+    {
+      "name": "above threshold and plenty of days -> not low",
+      "med": { "active": true, "low_stock_alert_enabled": true, "current_stock": 30, "stock_threshold": 4, "frequency": "once_daily", "dosage_amount": 1 },
+      "expected": { "low": false, "reason": null }
+    },
+    {
+      "name": "null threshold falls through to days backup -> low",
+      "med": { "active": true, "low_stock_alert_enabled": true, "current_stock": 2, "stock_threshold": null, "frequency": "once_daily", "dosage_amount": 1 },
+      "expected": { "low": true, "reason": "days" }
+    },
+    {
+      "name": "null threshold with plenty of stock -> not low",
+      "med": { "active": true, "low_stock_alert_enabled": true, "current_stock": 20, "stock_threshold": null, "frequency": "once_daily", "dosage_amount": 1 },
+      "expected": { "low": false, "reason": null }
+    },
+    {
+      "name": "threshold zero, one left -> days backup catches it",
+      "med": { "active": true, "low_stock_alert_enabled": true, "current_stock": 1, "stock_threshold": 0, "frequency": "once_daily", "dosage_amount": 1 },
+      "expected": { "low": true, "reason": "days" }
+    },
+    {
+      "name": "threshold zero, empty -> low via threshold",
+      "med": { "active": true, "low_stock_alert_enabled": true, "current_stock": 0, "stock_threshold": 0, "frequency": "once_daily", "dosage_amount": 1 },
+      "expected": { "low": true, "reason": "threshold" }
+    },
+    {
+      "name": "burn rate includes dosage_amount: 2 tablets twice daily = 4/day",
+      "med": { "active": true, "low_stock_alert_enabled": true, "current_stock": 10, "stock_threshold": 2, "frequency": "twice_daily", "dosage_amount": 2 },
+      "expected": { "low": true, "reason": "days" }
+    },
+    {
+      "name": "tablet_count is used when current_stock is null",
+      "med": { "active": true, "low_stock_alert_enabled": true, "current_stock": null, "tablet_count": 3, "stock_threshold": 4, "frequency": "once_daily", "dosage_amount": 1 },
+      "expected": { "low": true, "reason": "threshold" }
+    },
+    {
+      "name": "active undefined (column not selected) is treated as active",
+      "med": { "low_stock_alert_enabled": true, "current_stock": 1, "stock_threshold": 4, "frequency": "once_daily", "dosage_amount": 1 },
+      "expected": { "low": true, "reason": "threshold" }
+    }
+  ]
+}

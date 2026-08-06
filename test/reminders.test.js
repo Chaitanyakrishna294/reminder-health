@@ -1,7 +1,13 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { dosesPerDay, buildDoseKeyboard, buildTakePromptMessage, daysOfStockLeft } = require('../src/reminders');
+const { dosesPerDay, buildDoseKeyboard, buildTakePromptMessage, daysOfStockLeft, isLowStock, LOW_STOCK_DAYS } = require('../src/reminders');
 const { CALLBACK_ACTIONS, MAX_SNOOZES } = require('../src/constants');
+const { readFileSync } = require('node:fs');
+const path = require('node:path');
+
+const lowStockFixture = JSON.parse(
+  readFileSync(path.join(__dirname, 'fixtures', 'low-stock-cases.json'), 'utf8')
+);
 
 // These functions were extracted verbatim from scheduler.js's inline copies.
 // The asserts below are characterization tests: they lock the *exact* prior
@@ -63,4 +69,29 @@ test('buildTakePromptMessage appends and HTML-escapes the dosage', () => {
     buildTakePromptMessage('A & B', '<x>'),
     '💊 Time to take <b>A &amp; B</b> (&lt;x&gt;)'
   );
+});
+
+test('LOW_STOCK_DAYS is the documented 3-day backup window', () => {
+  assert.strictEqual(LOW_STOCK_DAYS, 3);
+});
+
+// The same fixture is run through the web mirror in
+// web/src/lib/medications/stock.test.ts. If these two ever disagree, one of
+// the runs fails — which is the entire point of sharing the file.
+test('isLowStock matches the shared fixture', () => {
+  for (const c of lowStockFixture.cases) {
+    const actual = isLowStock(c.med);
+    assert.strictEqual(actual.low, c.expected.low, `low mismatch: ${c.name}`);
+    assert.strictEqual(actual.reason, c.expected.reason, `reason mismatch: ${c.name}`);
+  }
+});
+
+test('isLowStock reports the numbers the copy needs', () => {
+  const r = isLowStock({
+    active: true, low_stock_alert_enabled: true,
+    current_stock: 4, stock_threshold: 4, frequency: 'once_daily', dosage_amount: 1,
+  });
+  assert.strictEqual(r.stock, 4);
+  assert.strictEqual(r.threshold, 4);
+  assert.strictEqual(r.daysLeft, 4);
 });
