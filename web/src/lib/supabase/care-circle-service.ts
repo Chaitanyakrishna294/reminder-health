@@ -1,6 +1,7 @@
 import { cache } from 'react';
 import { createClient } from './server';
 import moment from 'moment-timezone';
+import { isAttentionStatus, isPendingStatus, isEscalatedStatus } from '@/lib/schedule/dose-attention';
 
 export interface CareCircleConnection {
   connection_id: string;
@@ -152,21 +153,27 @@ export const getPatientHealthMetrics = async (patientChatId: string): Promise<Pa
   });
   if (minStockDaysRemaining === 999) minStockDaysRemaining = 0;
 
-  // Count missed doses today
-  const missedDosesCountToday = todayEvents.filter(e => e.reminder_status === 'MISSED' || e.reminder_status === 'SKIPPED').length;
+  // Count missed doses today: the attention backlog (PENDING_REVIEW /
+  // UNCONFIRMED, plus the legacy MISSED name) + doses explicitly skipped.
+  const missedDosesCountToday = todayEvents.filter(
+    e => isAttentionStatus(e.reminder_status) || e.reminder_status === 'SKIPPED'
+  ).length;
 
-  // Resolve Next Scheduled Dose time
+  // Resolve Next Scheduled Dose time: earliest still-unresolved (pending) dose today
   let nextScheduledDoseTime: string | null = null;
   const futureEvents = todayEvents
-    .filter(e => e.reminder_status === 'REMINDED' || e.reminder_status === 'SNOOZED')
+    .filter(e => isPendingStatus(e.reminder_status))
     .sort((a, b) => new Date(a.scheduled_for).getTime() - new Date(b.scheduled_for).getTime());
   if (futureEvents.length > 0) {
     nextScheduledDoseTime = moment(futureEvents[0].scheduled_for).tz('Asia/Kolkata').format('h:mm A');
   }
 
-  // Determine compliance status
+  // Determine compliance status: 'missed' when a dose needs attention
+  // (missed backlog) or is in live caregiver escalation
   let complianceStatus: 'stable' | 'scheduled' | 'missed' = 'stable';
-  const hasMissed = todayEvents.some(e => e.reminder_status === 'MISSED' || e.reminder_status === 'ESCALATED_TO_CG');
+  const hasMissed = todayEvents.some(
+    e => isAttentionStatus(e.reminder_status) || isEscalatedStatus(e.reminder_status)
+  );
   if (hasMissed) {
     complianceStatus = 'missed';
   } else if (futureEvents.length > 0) {

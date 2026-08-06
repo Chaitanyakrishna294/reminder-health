@@ -5,6 +5,7 @@ import Link, { useLinkStatus } from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useUiMode } from '@/context/ui-mode-context';
 import { createClient } from '@/lib/supabase/client';
+import { ESCALATION_STATUSES } from '@/lib/schedule/dose-attention';
 import { 
   LayoutDashboard, 
   Pill, 
@@ -74,11 +75,18 @@ export default function DashboardMainLayout({
   React.useEffect(() => {
     async function checkEscalations() {
       if (viewMode === 'PATIENT_MONITOR' && patientChatId) {
+        // Live escalation = one of today's doses the scheduler escalated to the
+        // caregiver (ESCALATED / CAREGIVER_ACKNOWLEDGED) and still unresolved.
+        // Day-bounded so a stale acknowledged dose from a previous day can
+        // never wedge the alarm on.
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
         const { data: events } = await supabase
           .from('reminder_events')
           .select('id')
           .eq('telegram_id', patientChatId)
-          .eq('reminder_status', 'ESCALATED_TO_CG')
+          .in('reminder_status', [...ESCALATION_STATUSES])
+          .gte('scheduled_for', startOfToday.toISOString())
           .limit(1);
 
         setHasEscalation(!!events && events.length > 0);

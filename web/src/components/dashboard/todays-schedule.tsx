@@ -6,6 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { resolveReminderEvent, correctReminderEvent } from '@/lib/reminder-events';
+import { isPendingStatus } from '@/lib/schedule/dose-attention';
 import { useUiMode } from '@/context/ui-mode-context';
 import { Check, SkipForward, AlertCircle, Clock, AlertTriangle, Pill, CheckCircle, XCircle, X } from 'lucide-react';
 import { PremiumToast } from '@/components/ui/premium-toast';
@@ -278,17 +279,10 @@ export default function TodaysSchedule({
     }
   };
 
-  const isPendingState = (status: string) => {
-    return [
-      // Client-side virtual / legacy states
-      'PENDING_PATIENT', 'RETRYING_PATIENT', 'SNOOZED', 'ESCALATED_TO_CG', 'FUTURE_SCHEDULED',
-      // Real reminder_events statuses for a fired-but-unresolved dose, so each due dose keeps
-      // its own Take/Skip here (this is where the patient resolves doses individually —
-      // e.g. take 2 of 5 and skip the other 3).
-      'SENT', 'DISPLAYED', 'OPENED', 'GENTLE_REMINDER', 'REMINDED', 'RETRYING',
-      'ESCALATED', 'CAREGIVER_ACKNOWLEDGED',
-    ].includes(status);
-  };
+  // Pending vs attention is single-sourced in lib/schedule/dose-attention.ts.
+  // Each pending dose keeps its own Take/Skip here (this is where the patient
+  // resolves doses individually — e.g. take 2 of 5 and skip the other 3).
+  const isPendingState = isPendingStatus;
 
   if (isElderly) {
     const completedEvents = events.filter(e => ['TAKEN', 'RESOLVED_BY_CG', 'SKIPPED', 'MISSED'].includes(e.reminder_status));

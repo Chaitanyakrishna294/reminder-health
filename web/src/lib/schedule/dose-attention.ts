@@ -22,8 +22,19 @@ export const PENDING_STATUSES: readonly string[] = [
   'ESCALATED', 'CAREGIVER_ACKNOWLEDGED',
 ];
 
+/**
+ * A dose in the live caregiver-escalation stage: the scheduler alerted the
+ * caregiver (ESCALATED) and they may have acknowledged (CAREGIVER_ACKNOWLEDGED),
+ * but the dose is still unresolved. Subset of PENDING_STATUSES (plus the legacy
+ * pre-5.7B name) — an orthogonal severity flavor for escalation badges/alarms.
+ */
+export const ESCALATION_STATUSES: readonly string[] = [
+  'ESCALATED', 'CAREGIVER_ACKNOWLEDGED', 'ESCALATED_TO_CG',
+];
+
 export const isAttentionStatus = (status: string): boolean => ATTENTION_STATUSES.includes(status);
 export const isPendingStatus = (status: string): boolean => PENDING_STATUSES.includes(status);
+export const isEscalatedStatus = (status: string): boolean => ESCALATION_STATUSES.includes(status);
 
 /**
  * Split events into the missed backlog and the normal pending set, each

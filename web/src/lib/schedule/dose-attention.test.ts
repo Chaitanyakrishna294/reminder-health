@@ -5,6 +5,8 @@ import assert from 'node:assert';
 import {
   isAttentionStatus,
   isPendingStatus,
+  isEscalatedStatus,
+  ESCALATION_STATUSES,
   partitionDoseAttention,
   buildGateQueue,
 } from './dose-attention.ts';
@@ -31,6 +33,20 @@ for (const s of ['FUTURE_SCHEDULED', 'SENT', 'GENTLE_REMINDER', 'ESCALATED', 'SN
 for (const s of ['TAKEN', 'SKIPPED', 'RESOLVED_BY_CG']) {
   assert.equal(isAttentionStatus(s), false);
   assert.equal(isPendingStatus(s), false);
+}
+
+// ── Escalation flavor ──
+// Escalated = caregiver-alerted (and possibly acknowledged) but unresolved.
+// Every escalation status is still pending (unresolved), never attention.
+assert.deepEqual([...ESCALATION_STATUSES], ['ESCALATED', 'CAREGIVER_ACKNOWLEDGED', 'ESCALATED_TO_CG']);
+for (const s of ESCALATION_STATUSES) {
+  assert.equal(isEscalatedStatus(s), true, `${s} should be escalated`);
+  assert.equal(isPendingStatus(s), true, `${s} should still be pending`);
+  assert.equal(isAttentionStatus(s), false, `${s} must NOT be attention`);
+}
+// Pre-escalation, attention, and resolved statuses never read as escalated.
+for (const s of ['SENT', 'GENTLE_REMINDER', 'SNOOZED', 'PENDING_REVIEW', 'UNCONFIRMED', 'MISSED', 'TAKEN', 'SKIPPED']) {
+  assert.equal(isEscalatedStatus(s), false, `${s} must NOT be escalated`);
 }
 
 // ── partitionDoseAttention: buckets + ascending sort, resolved dropped ──

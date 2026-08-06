@@ -16,7 +16,7 @@ import GuideButton from '@/components/guide/guide-button';
 import GuideAutoStart from '@/components/guide/guide-auto-start';
 import moment from 'moment-timezone';
 import { type OverrideEntry, findOverride, toOverrideDateStr } from '@/lib/schedule/dose-engine';
-import { isPendingStatus, isAttentionStatus, partitionDoseAttention, buildGateQueue } from '@/lib/schedule/dose-attention';
+import { isPendingStatus, isAttentionStatus, isEscalatedStatus, partitionDoseAttention, buildGateQueue } from '@/lib/schedule/dose-attention';
 import MissedDoseStrip from '@/components/dashboard/missed-dose-strip';
 import MedicationSlider from '@/components/dashboard/medication-slider';
 import { getUnitIcon, getCountdownText, PinkBubbles } from '@/components/dashboard/dashboard-helpers';
@@ -676,11 +676,15 @@ export default function DashboardClientView({
     });
 
     if (periodEvents.length === 0) return 'empty';
-    
-    const hasActiveAlarm = periodEvents.some(e => ['MISSED', 'ESCALATED_TO_CG'].includes(e.reminder_status));
+
+    // Alarm = missed backlog (MISSED / PENDING_REVIEW / UNCONFIRMED) or live
+    // caregiver escalation. Checked first: escalated doses are also "pending".
+    const hasActiveAlarm = periodEvents.some(e => isAttentionStatus(e.reminder_status) || isEscalatedStatus(e.reminder_status));
     if (hasActiveAlarm) return 'missed';
-    
-    const hasPending = periodEvents.some(e => ['PENDING_PATIENT', 'RETRYING_PATIENT', 'SNOOZED', 'FUTURE_SCHEDULED'].includes(e.reminder_status));
+
+    // Pending = shared dose-attention set (virtual FUTURE_SCHEDULED plus the
+    // real fired-but-unresolved statuses: SENT/DISPLAYED/OPENED/GENTLE_REMINDER/…).
+    const hasPending = periodEvents.some(e => isPendingState(e.reminder_status));
     const allTaken = periodEvents.every(e => ['TAKEN', 'RESOLVED_BY_CG'].includes(e.reminder_status));
     
     if (allTaken) return 'taken';
