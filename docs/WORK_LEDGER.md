@@ -243,6 +243,17 @@ Bot uses service_role, so RLS tightening can only break the web app, never the b
 | `VOICE_CALLS_ENABLED` `PUBLIC_WEBHOOK_BASE_URL` `EXOTEL_*` `VOICE_DAILY_CALL_CAP` `VOICE_MONTHLY_CALL_QUOTA` | **both** Render & Vercel identically | Voice stack (dormant) |
 | `SMS_PROVIDER` `MSG91_*` `EXOTEL_SMS_SENDER` `RAZORPAY_*` | Vercel | SMS/billing (dormant) |
 
+**"Vercel" above means a specific environment, not all three.** Vercel scopes each var to
+Production / Preview / Development independently, so a var can be live in prod and absent in
+preview. `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` must be present in
+**Preview** too: the auth pages (`/login`, `/forgot-password`, …) are statically prerendered at
+build time and construct a Supabase client while doing so, so a missing key fails the *build*, not
+just runtime — `@supabase/ssr: Your project's URL and API key are required to create a Supabase
+client!` → `Export encountered an error on /(auth)/forgot-password/page`. Preview was missing the
+anon key from 61d ago until 2026-08-06, so every PR showed a red ✗ while prod stayed green; added
+via `vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY preview`. Check with `vercel env ls` (the
+`environments` column) before assuming a var is everywhere.
+
 ---
 
 ## 7. Feature flags & dormant surfaces
