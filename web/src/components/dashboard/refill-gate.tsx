@@ -64,6 +64,14 @@ export default function RefillGate({ meds, canEdit, onSnooze }: RefillGateProps)
 
   const remaining = meds.filter((m) => !doneIds.includes(m.id));
 
+  // Unmount the moment the last one is topped up, rather than waiting for
+  // router.refresh() to round-trip and drop it from the parent's props. Without this,
+  // the most ordinary exit from the gate — refilling your only low medication — flashes
+  // a full-screen dialog reading "0 medications are running low" with an empty list.
+  // Both siblings guard the same way (RefillStrip on `meds.length === 0`, MedDueGate on
+  // a missing event).
+  if (remaining.length === 0) return null;
+
   return (
     <div
       role="dialog"
