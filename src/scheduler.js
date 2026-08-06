@@ -207,6 +207,23 @@ const initScheduler = () => {
         for (const med of dueMedications) {
           console.log(`[Scheduler] Processing reminder configuration for Med ID: ${med.id}`);
 
+          // Data guard: calculateNextReminder throws on an empty/null reminder_times
+          // array, so a row like this can never advance next_reminder_at and would be
+          // re-selected every tick forever. Pull it out of the due-scan by clearing
+          // next_reminder_at and skip it BEFORE any send. The medication stays active
+          // (deactivating it silently is the maintainer's call, not ours).
+          if (!Array.isArray(med.reminder_times) || med.reminder_times.length === 0) {
+            console.error(`[Scheduler] DATA PROBLEM: Med ID ${med.id} (Telegram ${med.telegram_id}) has no usable reminder_times (${JSON.stringify(med.reminder_times)}). Skipping and clearing next_reminder_at so it stops re-firing every tick — fix the row's reminder_times to resume reminders.`);
+            const { error: clearErr } = await supabase
+              .from('medications')
+              .update({ next_reminder_at: null })
+              .eq('id', med.id);
+            if (clearErr) {
+              console.error(`[Scheduler] Failed to clear next_reminder_at for Med ID ${med.id}:`, clearErr);
+            }
+            continue;
+          }
+
           // Prevent duplicate reminders within 60 seconds in case JS loop is faster than DB query
           if (med.last_sent_at) {
             const lastSent = new Date(med.last_sent_at);
@@ -331,25 +348,11 @@ const initScheduler = () => {
             await delay(200);
 
           } catch (sendErr) {
-            console.error(`[Scheduler] Failed to send reminder to ${med.telegram_id}:`, sendErr);
-            
-            // Retry once logic
-            try {
-              await delay(1000);
-              await bot.sendMessage(med.telegram_id, message, { parse_mode: 'HTML', reply_markup: inlineKeyboard });
-              const nextReminder = calculateNextReminder(med.reminder_times, med.timezone);
-              await supabase
-                .from('medications')
-                .update({
-                  next_reminder_at: nextReminder.toISOString(),
-                  last_reminder_scheduled_at: med.next_reminder_at,
-                  retry_reminder_at: null,
-                  retry_count: 0
-                })
-                .eq('id', med.id);
-            } catch (retryErr) {
-              console.error(`[Scheduler] Retry failed for ${med.telegram_id}:`, retryErr);
-            }
+            // No JS re-send here — retry timing is owned by scan_and_escalate_overdue_reminders
+            // in SQL. The Telegram send above already swallows its own errors, so reaching this
+            // catch means the reminder may have gone out; re-sending would duplicate it.
+            // Log with context and move on to the next medication.
+            console.error(`[Scheduler] Failed to process reminder for Med ID ${med.id} (Telegram ${med.telegram_id}):`, sendErr.message || sendErr);
           }
         }
       }
