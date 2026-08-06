@@ -1,6 +1,6 @@
-# Migration ledger
+﻿# Migration ledger
 
-There is no runner and no schema-version table — this file is the record.
+There is no runner and no schema-version table â€” this file is the record.
 **Convention going forward:** name new files `migration_<slug>_YYYY_MM.sql`, write
 idempotent SQL, and append a line to the "Applied order" list below when the
 maintainer applies it in the Supabase SQL editor (project `jaflclnakwtikqbfhfdk`).
@@ -9,7 +9,7 @@ maintainer applies it in the Supabase SQL editor (project `jaflclnakwtikqbfhfdk`
 
 | # | File | Date |
 |---|---|---|
-| 0 | `00_baseline_pre_repo_tables.sql` | fresh envs only — **never on prod** |
+| 0 | `00_baseline_pre_repo_tables.sql` | fresh envs only â€” **never on prod** |
 | 1 | `setup_db.sql` | 2026-06-06 |
 | 2 | `migration.sql` | 2026-05-26 (content predates setup_db; applied around it) |
 | 3 | `migration_push_notifications.sql` | 2026-06-06 |
@@ -22,8 +22,8 @@ maintainer applies it in the Supabase SQL editor (project `jaflclnakwtikqbfhfdk`
 | 10 | `migration_add_resolve_reminder_event_rpc.sql` | 2026-06-07 |
 | 11 | `migration_remove_client_reminder_writes.sql` | 2026-06-07 |
 | 12 | `migration_push_reliability_diagnostics.sql` | 2026-06-11 |
-| 13 | ~~`migration_health_records_upload.sql`~~ | superseded by health_vault_combined — skip on fresh envs |
-| 14 | ~~`migration_health_vault_foundation.sql`~~ | superseded by health_vault_combined — skip on fresh envs |
+| 13 | ~~`migration_health_records_upload.sql`~~ | superseded by health_vault_combined â€” skip on fresh envs |
+| 14 | ~~`migration_health_vault_foundation.sql`~~ | superseded by health_vault_combined â€” skip on fresh envs |
 | 15 | `migration_health_vault_combined.sql` | 2026-06-11 |
 | 16 | `migration_health_records_index.sql` | 2026-06-11 |
 | 17 | `migration_health_vault_stabilization.sql` | 2026-06-11 |
@@ -50,7 +50,7 @@ maintainer applies it in the Supabase SQL editor (project `jaflclnakwtikqbfhfdk`
 | 38 | `migration_medical_profiles.sql` | 2026-06-15 |
 | 39 | `migration_carecircle_universal_connect.sql` | 2026-06-19 |
 | 40 | `migration_dose_correction.sql` | 2026-06-19 |
-| 41 | `migration_add_voice_calls_p0.sql` | 2026-06-27 (header's "NOT YET APPLIED" is stale — it IS live) |
+| 41 | `migration_add_voice_calls_p0.sql` | 2026-06-27 (header's "NOT YET APPLIED" is stale â€” it IS live) |
 | 42 | `migration_add_phone_verifications_p1b.sql` | 2026-06-27 |
 | 43 | `migration_enable_rls_locks_ratelimits.sql` | 2026-06-28 |
 | 44 | `migration_profiles_phone_number.sql` | 2026-07-06 |
@@ -61,23 +61,22 @@ maintainer applies it in the Supabase SQL editor (project `jaflclnakwtikqbfhfdk`
 | 49 | `migration_push_logs_rls_2026_07.sql` | 2026-07-26 |
 | 50 | `migration_notifications_no_client_insert_2026_07.sql` | 2026-07-26 |
 | 51 | `migration_are_profiles_connected_dual_read_2026_07.sql` | 2026-07-26 (validated: dual-read + SECURITY DEFINER confirmed) |
+| 52 | `migration_security_lockdown_2026_07_29.sql` | 2026-08-06 (validated: anon call to `try_acquire_scheduler_lock` / `release_scheduler_lock` now returns 42501 permission denied; has rollback + validation files) |
 
 ## PENDING (written, not yet applied)
 
-| # | File | Date |
-|---|---|---|
-| — | `migration_security_lockdown_2026_07_29.sql` | **NOT YET APPLIED** (written 2026-08-06; has rollback + validation files) |
+_None._
 
 > Lockdown note: if `try_acquire_scheduler_lock`, `release_scheduler_lock`,
 > `close_daily_medications`, or `scan_and_escalate_overdue_reminders` is ever
-> redefined via `DROP FUNCTION` + `CREATE`, its ACL resets to PUBLIC EXECUTE —
+> redefined via `DROP FUNCTION` + `CREATE`, its ACL resets to PUBLIC EXECUTE â€”
 > re-run section A of the lockdown migration afterwards.
 
 ## Current function definitions (latest file wins)
 
 Functions are redefined wholesale across migrations; when editing one, start from
-the file listed here, not the first grep hit. Entries marked ⚠ are same-commit
-ties — confirm with `SELECT pg_get_functiondef('public.<fn>'::regproc);` before
+the file listed here, not the first grep hit. Entries marked âš  are same-commit
+ties â€” confirm with `SELECT pg_get_functiondef('public.<fn>'::regproc);` before
 relying on them.
 
 | Function | Current definition in |
@@ -85,7 +84,7 @@ relying on them.
 | `resolve_reminder_event` | `migration_fix_resolve_invalid_scheduled_time.sql` |
 | `correct_reminder_event` | `migration_dose_correction.sql` |
 | `validate_reminder_event_status_transition` | `migration_dose_correction.sql` |
-| `handle_reminder_event_state_change` | `migration_carecircle_rca_fixes.sql` ⚠ (vs remove_role_onboarding) |
+| `handle_reminder_event_state_change` | `migration_carecircle_rca_fixes.sql` âš  (vs remove_role_onboarding) |
 | `scan_and_escalate_overdue_reminders` | `migration_5.7b_escalation_outcomes_logic.sql` |
 | `close_daily_medications` | `migration_arch_hardening_2026_06.sql` |
 | `handle_reminder_event_taken_stock_reduction` | `migration_arch_hardening_2026_06.sql` |
@@ -100,7 +99,7 @@ relying on them.
 | `ensure_my_profile` | `migration_carecircle_universal_connect.sql` |
 | `gen_connect_code` / `lookup_profile_by_connect_code` | `migration_carecircle_universal_connect.sql` |
 | `lookup_caregiver_by_code` | `migration_carecircle_lookup_rpc.sql` |
-| `are_profiles_connected` | `migration_are_profiles_connected_dual_read_2026_07.sql` (pending; else `migration_security_fix_rls.sql`) |
+| `are_profiles_connected` | `migration_are_profiles_connected_dual_read_2026_07.sql` (applied 2026-07-26, entry #51 — supersedes `migration_security_fix_rls.sql`) |
 | `get_my_telegram_chat_id` | `migration_security_fix_rls.sql` |
 | `redeem_link_code` | `migration_link_codes_hardening_2026_07.sql` |
 | `delete_my_account` / `check_rate_limit` / `cleanup_rate_limits` | `migration_compliance_2026_06.sql` |
@@ -116,5 +115,5 @@ relying on them.
 | `update_caregiver_connection_updated_at` | `migration_caregiver_decoupling_phase_a.sql` |
 | `clean_old_chat_messages` | `migration_caregiver_accept.sql` |
 | `get_policies_debug` | `migration_security_fix_rls.sql` |
-| `guard_caregiver_info_client_writes` | `migration_security_lockdown_2026_07_29.sql` (pending) |
-| `deactivate_legacy_caregiver_link_on_revoke` | `migration_security_lockdown_2026_07_29.sql` (pending) |
+| `guard_caregiver_info_client_writes` | `migration_security_lockdown_2026_07_29.sql` (applied 2026-08-06) |
+| `deactivate_legacy_caregiver_link_on_revoke` | `migration_security_lockdown_2026_07_29.sql` (applied 2026-08-06) |
