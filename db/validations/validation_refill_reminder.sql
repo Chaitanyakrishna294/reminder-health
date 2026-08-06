@@ -24,6 +24,12 @@ SELECT 'rearm trigger installed' AS check,
          WHERE tgname = 'trigger_rearm_low_stock_notice' AND NOT tgisinternal
        ) THEN 'PASS' ELSE 'FAIL' END AS result;
 
+SELECT 'legacy low-stock trigger dropped' AS check,
+       CASE WHEN NOT EXISTS (
+         SELECT 1 FROM pg_trigger
+         WHERE tgname = 'trigger_medication_low_stock' AND NOT tgisinternal
+       ) THEN 'PASS' ELSE 'FAIL' END AS result;
+
 -- Behavioural: stamping the flag must NOT clear it; raising stock MUST.
 DO $$
 DECLARE v_id bigint; v_stock numeric; v_flag timestamptz;

@@ -4,7 +4,8 @@
 --
 -- 1. medications.low_stock_notified_at  — one alert per crossing, not one a day
 -- 2. notifications 'LOW_STOCK' type     — the in-app bell row
--- 3. rearm_low_stock_notice()           — clears the flag when stock goes back up
+-- 3. Drop legacy trigger_medication_low_stock — the cron now owns this alone
+-- 4. rearm_low_stock_notice()           — clears the flag when stock goes back up
 -- Idempotent; safe to re-run.
 -- ============================================================================
 
@@ -40,7 +41,29 @@ CHECK (type IN (
 ));
 
 -- ----------------------------------------------------------------------------
--- 3. Re-arm on restock
+-- 3. Drop the legacy low-stock trigger
+--
+-- migration_medication_enhancements.sql (entry 19, 2026-06-12) installed a
+-- fourth, undocumented definition of "low stock": trigger_medication_low_stock
+-- fired AFTER INSERT OR UPDATE ON medications whenever current_stock crossed
+-- at-or-below stock_threshold, and wrote a notifications row typed 'ESCALATED'
+-- titled 'Low Stock Alert'. The 09:00 cron this migration builds toward is now
+-- the single owner of every low-stock channel — Telegram, web push, and this
+-- same in-app bell — so the trigger is redundant at best and actively wrong at
+-- worst: 'ESCALATED' renders as a pulsing danger-red alert in
+-- notification-center.tsx, a treatment the design system reserves for a missed
+-- dose, not a low-stock warning (which should read 'warning' amber). The
+-- instant-on-write feel the trigger provided is already covered by the
+-- dashboard strip and med-due gate, which both read live stock on app open.
+--
+-- This supersedes migration_medication_enhancements.sql rather than editing
+-- it — see this repo's "latest file wins" convention in APPLIED.md.
+-- ----------------------------------------------------------------------------
+DROP TRIGGER IF EXISTS trigger_medication_low_stock ON public.medications;
+DROP FUNCTION IF EXISTS public.handle_medication_low_stock_trigger();
+
+-- ----------------------------------------------------------------------------
+-- 4. Re-arm on restock
 --
 -- Deliberately "stock increased", NOT "crossed back above stock_threshold". An
 -- alert raised by the 3-days-left backup has no threshold to cross back over, and

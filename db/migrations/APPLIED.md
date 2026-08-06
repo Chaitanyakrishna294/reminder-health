@@ -62,13 +62,13 @@ maintainer applies it in the Supabase SQL editor (project `jaflclnakwtikqbfhfdk`
 | 50 | `migration_notifications_no_client_insert_2026_07.sql` | 2026-07-26 |
 | 51 | `migration_are_profiles_connected_dual_read_2026_07.sql` | 2026-07-26 (validated: dual-read + SECURITY DEFINER confirmed) |
 | 52 | `migration_security_lockdown_2026_07_29.sql` | 2026-08-06 (validated: anon call to `try_acquire_scheduler_lock` / `release_scheduler_lock` now returns 42501 permission denied; has rollback + validation files) |
-| 53 | `migration_refill_reminder.sql` | pending — refill reminder: low_stock_notified_at, LOW_STOCK type, rearm trigger |
 
 ## PENDING (written, not yet applied)
 
 | # | File | Date |
 |---|---|---|
 | — | `migration_escalation_anchor_2026_08_06.sql` | **NOT YET APPLIED** (written 2026-08-06; anchors the escalation ladder to the last real prompt — `last_prompted_at` if snooze-re-fired, else `created_at` — clamped to `created_at`+30m; apply-first is recommended but EITHER order is safe: the send paths never name the column on INSERT and the snooze-re-fire stamp is a separate best-effort write; on apply, move this row up and repoint the `scan_and_escalate_overdue_reminders` row in the function map below to this file; has rollback + validation files) |
+| — | `migration_refill_reminder.sql` | **NOT YET APPLIED** (written 2026-08-06; adds `medications.low_stock_notified_at`, the `LOW_STOCK` notifications type, and `rearm_low_stock_notice()` / `trigger_rearm_low_stock_notice`; also drops the legacy `trigger_medication_low_stock` / `handle_medication_low_stock_trigger()` installed by entry 19 — the 09:00 low-stock cron becomes the single owner of every low-stock channel; on apply, move this row up and update the function map below (add `rearm_low_stock_notice`, remove `handle_medication_low_stock_trigger`); has rollback + validation files) |
 
 > Lockdown note: if `try_acquire_scheduler_lock`, `release_scheduler_lock`,
 > `close_daily_medications`, or `scan_and_escalate_overdue_reminders` is ever
@@ -110,7 +110,7 @@ relying on them.
 | `handle_new_user_health_categories` | `migration_health_vault_combined.sql` |
 | `cleanup_expired_trash` | `migration_health_vault_stabilization.sql` |
 | `cleanup_expired_link_codes` | `migration_arch_hardening_2026_06.sql` |
-| `sync_medication_stock_fields` / `handle_medication_low_stock_trigger` | `migration_medication_enhancements.sql` |
+| `sync_medication_stock_fields` | `migration_medication_enhancements.sql` |
 | `expire_stale_connection_requests` / `cleanup_resolved_request_notifications` | `migration_5.6c.1_expiration_and_primary.sql` |
 | `handle_profile_telegram_chat_id_update` | `migration_optional_telegram.sql` |
 | `handle_health_records_storage_path` | `migration_5.6e_vault_permissions.sql` |
