@@ -1,233 +1,101 @@
-# Re-MIND-eЯ 💊 (V.o1)
+# Re-MIND-eЯ
 
-Re-MIND-eЯ is a Telegram-based healthcare reminder bot developed as Version 1 (MVP) to help users remember and track their medications easily.
+Re-MIND-eЯ is a medication-reminder system for Indian patients and their caregivers,
+built for elderly and non-technical users. It started as a Telegram-only bot and has
+grown into three surfaces sharing one Supabase Postgres database:
 
-The project mainly focuses on elderly and non-technical users by providing a simple, button-based medication reminder system through Telegram.
+| Surface | Where | What |
+|---|---|---|
+| Telegram bot + schedulers | `index.js`, `src/` — Node worker on Render | Button-driven bot, reminder engine, escalation and summary jobs |
+| Web app (PWA) | `web/` — Next.js 16 App Router on Vercel | Dashboard, caregiver console, health vault, web push, installable PWA |
+| Database | `db/migrations/` — Supabase Postgres | Dose state machines as SQL RPCs + triggers + pg_cron; RLS for the web, service role for the worker |
 
-This version includes:
+## What it does
 
-* medication reminders
-* adherence tracking
-* tablet stock management
-* refill alerts
-* simple user-friendly interaction
+**For patients**
 
----
+- Medication reminders over Telegram and browser push, driven by a minute-tick scheduler
+- Simple button responses: Taken / Skip / Snooze (10 min, up to 3 times)
+- A "Did you take it?" gate and a pinned missed-dose strip on the web dashboard, so
+  missed doses cannot be overlooked — plus adherence stats and daily logs
+- Tablet stock tracking with low-stock refill alerts
+- Morning schedule summaries and weekly adherence reports over Telegram
+- Health vault (documents), medical profile, and an emergency card
+- Elderly mode (larger type and touch targets), light/dark theme, guided tours
+- Optional linking of a medication nickname to a real Indian drug from a 254k-entry
+  catalog — always chosen by a human, never auto-matched (patient safety rule)
 
-# Features in Version 1
+**For caregivers**
 
-* Add medications
-* Daily medicine reminders
-* Multiple reminder timings
-* Medication adherence tracking
-* Tablet stock tracking
-* Low stock refill alerts
-* Snooze reminders
-* Skip reminders
-* Elderly-friendly button interface
-* Medication logs
-* Adherence statistics
+- A care circle linking caregivers to patients with per-permission flags
+- Escalation when a dose stays unanswered: gentle re-reminder, then caregiver alerts
+- Monitoring view of a patient's dashboard, including resolving missed doses
+- An evening summary of each patient's day, delivered over Telegram
 
----
+**Reliability**
 
-# Technologies Used
+- The dose lifecycle (SENT → … → TAKEN/SKIPPED/UNCONFIRMED) lives in SQL RPCs, so
+  bot, web, and cron all share one state machine and one dose ledger
+- The worker heartbeats every minute; if it goes quiet, a Vercel cron takes over the
+  reminder tick and sends push (and Telegram, when a bot token is configured on Vercel)
 
-## Backend
+## Repository layout
 
-* Node.js
-* Express.js
-* dotenv
-
-## Telegram Bot
-
-* node-telegram-bot-api
-
-## Database
-
-* Supabase PostgreSQL
-* @supabase/supabase-js
-
-## Scheduler
-
-* node-cron
-
-## Hosting
-
-* Render Free Tier
-
----
-
-# Project Structure
-
-```bash id="9xwghp"
-reminder-health-bot/
-│
-├── index.js
-├── package.json
-├── package-lock.json
-├── .env
-├── .env.example
-├── .gitignore
-│
-└── src/
-    ├── bot.js
-    ├── commands.js
-    ├── scheduler.js
-    ├── db.js
-    ├── constants.js
-    ├── utils.js
+```
+index.js            Worker entry: Express health probe + boots bot/schedulers
+src/                Telegram bot, reminder scheduler, summary crons
+web/                Next.js app (own package.json)
+db/migrations/      Hand-applied SQL (see below); rollbacks/ and validations/ alongside
+db/scripts/         One-off medication-catalog CSV importer
+test/               Worker tests (node:test)
+docs/               Project docs — start with docs/WORK_LEDGER.md
 ```
 
----
+**Docs:** [`docs/WORK_LEDGER.md`](docs/WORK_LEDGER.md) is the canonical codebase map —
+files, routes, tables, RPCs, env vars, and "how to add X" recipes. Read it before
+searching the repo; several older docs in `docs/` are stale and it says which.
 
-# Environment Variables
+## Running locally
 
-Create a `.env` file and add:
+Prereqs: Node.js, a Supabase project, and a Telegram bot token from @BotFather.
 
-```env id="c4kq6u"
-TELEGRAM_BOT_TOKEN=your_bot_token
-SUPABASE_URL=your_supabase_url
-SUPABASE_KEY=your_supabase_key
-PORT=3000
-```
+**Database** — migrations are not applied by any runner. Apply the SQL in
+`db/migrations/` manually in the Supabase SQL editor, starting with
+`00_baseline_pre_repo_tables.sql` for a fresh environment.
 
----
+**Worker (bot + schedulers)**
 
-# Installation
-
-## Clone Repository
-
-```bash id="kk67qg"
-git clone https://github.com/yourusername/reminder-health-bot.git
-```
-
-## Navigate to Project Folder
-
-```bash id="qon30k"
-cd reminder-health-bot
-```
-
-## Install Dependencies
-
-```bash id="bndu3m"
+```bash
 npm install
+cp .env.example .env   # fill in TELEGRAM_BOT_TOKEN, SUPABASE_URL, SUPABASE_KEY, …
+npm start              # node index.js
+npm test               # node --test "test/**/*.test.js"
 ```
 
-## Run the Project
+**Web app**
 
-```bash id="rkl31y"
-node index.js
-```
-
----
-
-# Telegram Commands
-
-```txt id="m2t8jh"
-/start   - Start the bot
-/addmed  - Add medication
-/mylog   - View medication logs
-/stats   - View adherence statistics
-```
-
----
-
-# Database Tables
-
-## medications
-
-Stores:
-
-* medicine name
-* dosage
-* reminder timings
-* tablet count
-* next reminder time
-
-## reminder_logs
-
-Stores:
-
-* reminder responses
-* medication history
-* adherence logs
-
----
-
-# Reminder Workflow
-
-1. Scheduler runs every minute
-2. Checks due reminders
-3. Sends reminder notification
-4. User selects:
-
-   * ✅ TAKEN
-   * ⏰ Snooze
-   * ⏭ SKIP
-5. Logs are saved in database
-6. Next reminder is updated automatically
-
----
-
-# Low Stock Alert
-
-When tablet count becomes low, the bot sends a refill alert.
-
-Example:
-
-```txt id="40tws7"
-⚠️ Your medication stock is running low.
-Only 5 tablets remaining.
-```
-
----
-
-# Deployment
-
-The project is deployed using Render Free Tier.
-
-## Render Settings
-
-Build Command:
-
-```bash id="g79dzu"
+```bash
+cd web
 npm install
+# put NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY,
+# SUPABASE_SERVICE_ROLE_KEY (and the VAPID keys for push) in web/.env.local
+npm run dev -- --port 3001
 ```
 
-Start Command:
+`.env.example` documents every variable, including the dormant voice/SMS/billing
+stack (all inert unless explicitly enabled).
 
-```bash id="x1zglk"
-node index.js
-```
+Web schedule-lib tests are bare node scripts:
+`node --experimental-strip-types web/src/lib/schedule/dose-engine.test.ts` (same for
+`dose-attention.test.ts`).
 
----
+## Tech
 
-# Important Notes
+Node.js, node-telegram-bot-api, node-cron, Express, moment-timezone (deliberately —
+the bot and web must share identical DST math), Next.js 16, React 19, TypeScript,
+Tailwind v4, Supabase (Postgres, Auth, Storage, Realtime), web-push.
 
-* `.env` file should never be uploaded to GitHub
-* Use `.gitignore` to protect secret keys
-* UptimeRobot is recommended to keep Render awake
-
----
-
-# Future Improvements (Version 2)
-
-* Caregiver monitoring
-* Missed dose detection
-* Daily adherence reports
-* Web dashboard
-* Advanced analytics
-* Notification improvements
-
----
-
-# Conclusion
-
-Re-MIND-eЯ Version 1 is a beginner-friendly healthcare reminder system designed to improve medication adherence using a simple Telegram-based interface for elderly and non-technical users.
-
----
-
-# License
+## License
 
 This project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0) - see the [LICENSE](LICENSE) file for details.
 

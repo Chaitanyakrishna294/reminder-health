@@ -21,7 +21,8 @@ Postgres (Supabase)           state machines live in SQL: RPCs + triggers + pg_c
 
 Failover: the bot upserts `scheduler_heartbeat` every minute-tick; `web/src/app/api/cron/tick`
 (Vercel cron, `CRON_SECRET` bearer) is a no-op while the heartbeat is fresh (<180s), else acquires
-the same `minute_tick` lease and sends **push only** (never Telegram).
+the same `minute_tick` lease and sends **push + Telegram** (Telegram via `lib/telegram.ts`, needs
+`TELEGRAM_BOT_TOKEN` on Vercel — set 07-26; degrades to push-only without it).
 
 Deploy: web → `npx vercel deploy --prod --yes` **from repo root** (project `reminder-health`;
 `web/.vercel` points at the wrong project). Worker → Render auto-deploy from git.
@@ -43,7 +44,7 @@ either to Intl (DST math must match or reminders fire at wrong times).
 | `web/` | Next.js app (own package.json; Tailwind v4, config-free) |
 | `db/migrations|rollbacks|validations` | Hand-applied SQL — **`db/migrations/APPLIED.md` is the order ledger + current-function map**; `00_baseline_pre_repo_tables.sql` bootstraps fresh envs |
 | `db/scripts/import-medication-catalog.js` | One-off CSV→`medication_catalog` loader (delete-then-insert) |
-| `dataset/A_Z_medicines_dataset_of_India.csv` | 254k-row catalog source |
+| `dataset/A_Z_medicines_dataset_of_India.csv` | 254k-row catalog source — **local-only, gitignored** since 07-27 (already imported into `medication_catalog`) |
 | `test/` | Worker tests: `npm test` → `node --test "test/**/*.test.js"` |
 | `scratch/` | ~60 unversioned ad-hoc probe/repair scripts; not runtime, not tests |
 | `docs/` | See §9 — most are stale; this ledger + KNOWN_ISSUES + ARCHITECTURE_DECISIONS + PROJECT.md are the live ones |
@@ -62,8 +63,8 @@ either to Intl (DST math must match or reminders fire at wrong times).
 | `src/utils.js` | Time math: `calculateNextReminder` (L30), `isValidTime`, `escapeHTML` (snooze counts live in `reminder_events.snooze_count`, DB-authoritative) | — |
 | `src/reminders.js` | Pure builders + stock math (`buildDoseKeyboard`, `buildTakePromptMessage`, `dosesPerDay`, `daysOfStockLeft`) — characterization-tested | — |
 | `src/plan.js` | `getActivePlan`/`isCarePlus` from `subscriptions` (mirrors `web/src/lib/plan.ts`) | — |
-| `src/scheduler.js` (892 loc) | Medication engine: 5 crons + `sendBrowserPush` (L32) | `initScheduler` (L149) |
-| `src/commands.js` (1612 loc) | All Telegram UX: menu dispatch (L677), FSM (`userStates`), callback router (L967), dose-response handler (L1367) | `initCommands` (L619) |
+| `src/scheduler.js` (889 loc) | Medication engine: 5 crons + `sendBrowserPush` (L32) | `initScheduler` (L149) |
+| `src/commands.js` (1716 loc) | All Telegram UX: menu dispatch (L690), FSM (`userStates`), callback router (L1005), dose-response handler (L1454); every callback mutation is ownership-checked (`telegram_id` filter, or ACCEPTED active caregiver link for CG actions — callback_data is forgeable) | `initCommands` (L632) |
 | `src/voice-scheduler.js` | Isolated Care+ voice tick; **no cron registered unless `VOICE_CALLS_ENABLED=true`** | `initVoiceScheduler` |
 | `src/voice/exotel.js` | Raw-fetch Exotel outbound adapter | `placeCall`, `isConfigured` |
 
@@ -72,7 +73,9 @@ either to Intl (DST math must match or reminders fire at wrong times).
 separate cron + separate lock (`voice_minute_tick`).
 
 **Minute tick order:** acquire `minute_tick` lease (120s TTL, released in `finally`) → heartbeat
-upsert → due-dose scan (`next_reminder_at <= now`, 60s resend guard) → per-med send (OCC on
+upsert → due-dose scan (`next_reminder_at <= now`, 60s resend guard; rows with no usable
+`reminder_times` are pulled from the scan — `next_reminder_at` cleared, logged loudly) →
+per-med send (OCC on
 `last_sent_at`; `reminder_events` unique insert = idempotency; Telegram + `sendBrowserPush`;
 advance `next_reminder_at`; 200ms delay between sends) → `scan_and_escalate_overdue_reminders`
 RPC → react to transitions (GENTLE_REMINDER re-send / ESCALATED → caregiver alerts / PENDING_REVIEW
@@ -80,10 +83,10 @@ silent) → snoozed re-fire (CAS on status) → `close_daily_medications` RPC.
 **State machine lives in SQL**; JS only messages.
 
 **Recipes**
-- *New bot command:* label in `constants.js` `MAIN_MENU` (+`CALLBACK_ACTIONS` if inline) → keyboard row in `commands.js` `mainMenuKeyboard` (~L82) → `handleX` in the Action Handlers block (try/catch, `escapeHTML` all DB strings, HTML parse mode) → dispatch line at L677-684. Slash-only commands: `bot.onText` inside `initCommands`. Multi-step: add to `STATES`, branch in the `on('message')` FSM, always `delete userStates[chatId]` when done. Callback data format `ACTION:arg1:arg2`; specific handlers must `return` before the L1367 catch-all; always `answerCallbackQuery`.
+- *New bot command:* label in `constants.js` `MAIN_MENU` (+`CALLBACK_ACTIONS` if inline) → keyboard row in `commands.js` `mainMenuKeyboard` (~L96) → `handleX` in the Action Handlers block (try/catch, `escapeHTML` all DB strings, HTML parse mode) → dispatch line at L690-697. Slash-only commands: `bot.onText` inside `initCommands`. Multi-step: add to `STATES`, branch in the `on('message')` FSM, always `delete userStates[chatId]` when done. Callback data format `ACTION:arg1:arg2`; specific handlers must `return` before the L1454 catch-all; always `answerCallbackQuery`.
 - *New scheduled job:* another `cron.schedule` in `initScheduler`; batch with `.in('telegram_id', ids)` (no N+1), `delay(200)` between sends.
-- *New reminder-lifecycle state:* migration altering `scan_and_escalate_overdue_reminders` (+rollback +validation) → new branch in scheduler transition loop (L370-464) → add status to live-status array `commands.js:1389` → extend `verifySchedulerDependencies` if a new RPC.
-- *New notification channel:* mirror `sendBrowserPush` — standalone fn that swallows its own errors, called after `bot.sendMessage` at the 4 send sites (L307/392/448/509).
+- *New reminder-lifecycle state:* migration altering `scan_and_escalate_overdue_reminders` (+rollback +validation) → new branch in scheduler transition loop (L368-462) → add status to live-status array `commands.js:1505` → extend `verifySchedulerDependencies` if a new RPC.
+- *New notification channel:* mirror `sendBrowserPush` — standalone fn that swallows its own errors, called after `bot.sendMessage` at the 4 send sites (L319/390/446/507).
 - *Anything paid/risky:* copy `voice-scheduler.js` — separate file/cron/lock, `if (!ENABLED) return` before registering, so default-off costs nothing.
 - *New message copy:* pure fn in `src/reminders.js` + characterization test in `test/reminders.test.js`.
 
@@ -104,7 +107,7 @@ bare node:assert scripts.
 | `/login` `/register` `/forgot-password` `/update-password` | `(auth)` group; Turnstile optional |
 | `/link-account` | Redeem Telegram code or skip (synthetic `WEB-<uid>` id); outside route groups |
 | `/install` `/privacy` `/terms` | Standalone/static |
-| `/dashboard` | Server aggregates meds+events+logs → `DashboardClientView` (86 KB) |
+| `/dashboard` | Server aggregates meds+events+logs → `DashboardClientView` (88 KB) |
 | `/medications` · `/medications/new` (6-step wizard) · `/medications/[id]` (edit) | |
 | `/schedule-planner` | Day-timeline planner (client, 42 KB) |
 | `/health-vault` | Vault; `?patientId=` caregiver view gated `can_view_vault` |
@@ -112,7 +115,7 @@ bare node:assert scripts.
 | `/settings` | Connect code, caregiver linking (dual-source new+legacy), account delete |
 | `/care-circle` + `/[patientId]` + `/manage` + `/requests` | Caregiver console, permission manager, requests |
 | `/care-plus` + `/care-plus/voice` | Care+ hub (currently unreachable from UI — entry points hidden) |
-| `/admin-diagnostics` | Push/adherence diagnostics — ⚠ gated only on "signed in" (§8) |
+| `/admin-diagnostics` | Push/adherence diagnostics — `getAdminUser()` `ADMIN_EMAILS` allowlist, 404 for non-admins (hardened 07-26) |
 
 ### API routes (`app/api/`)
 
@@ -157,13 +160,15 @@ Context: `theme-context` (light/dark, time-of-day default), `ui-mode-context`
 Hook: `use-realtime-notifications` (realtime `notifications` channel → bell).
 
 Components live in `components/{layout,dashboard,medications,guide,billing,settings,medical,shared,ui}/`.
-Big ones: `dashboard-client-view.tsx` (86 KB), `settings-client-view.tsx` (42 KB),
+Big ones: `dashboard-client-view.tsx` (88 KB), `settings-client-view.tsx` (42 KB),
 `medication-list.tsx` (26 KB). Also `missed-dose-strip.tsx` (top-pinned missed-dose alert, spec
-2026-07-27). Guided tours: `components/guide/*` (`TOURS` map in `guide-content.ts`,
+2026-07-27; actionable in caregiver-monitor view; permanently-unresolvable doses render info-only)
+and `med-due-gate.tsx` (full-screen "Did you take it?" gate: due-first queue, pinned asked dose,
+one-by-one/all-at-once toggle; exports `permanentResolveError`/`UNSAVEABLE_DOSE_COPY`). Guided tours: `components/guide/*` (`TOURS` map in `guide-content.ts`,
 `data-tour` attributes, `GuideAutoStart`).
 
 **Recipes**
-- *New dashboard page:* `app/(dashboard)/<route>/page.tsx` server component calling `resolveUserData()` with `export const revalidate = 0`. Nav: `getNavItems()` in `components/layout/dashboard-main-layout.tsx` — **exactly 5 icons, hard rule**; secondary pages go in the navbar profile dropdown. Optionally add to `shouldPrefetch()` allowlist and to `isProtectedRoute` in `lib/supabase/middleware.ts` (note: that list is currently stale, §8). Optional tour entry in `guide-content.ts`.
+- *New dashboard page:* `app/(dashboard)/<route>/page.tsx` server component calling `resolveUserData()` with `export const revalidate = 0`. Nav: `getNavItems()` in `components/layout/dashboard-main-layout.tsx` — **exactly 5 icons, hard rule**; secondary pages go in the navbar profile dropdown. Optionally add to `shouldPrefetch()` allowlist and to `isProtectedRoute` in `lib/supabase/middleware.ts` (list synced 07-26 — keep it that way). Optional tour entry in `guide-content.ts`.
 - *Auth flow:* middleware runs on every page/API route → refreshes session → unauthenticated on protected path → `/login`; no `telegram_chat_id` → `/link-account`. `(dashboard)/layout.tsx` + `resolveUserData()` is the real gate for dashboard pages.
 - *Styling:* semantic tokens (`--primary` pink `#F26B8A`, `--foreground` navy, `--radius 1.75rem`); dark mode = `.dark` on `<html>` + compat `!important` layer in globals.css; elderly mode branches classNames via `useUiMode().isElderly`; Care+ surfaces use `lib/billing/luxe.ts` inline styles.
 - *PWA:* `app/manifest.ts`; `public/sw.js` is hand-written, push+click only, **no fetch/caching**; registered app-wide by `components/register-sw.tsx` and again in `register-push.ts` (idempotent, intentional).
@@ -228,7 +233,7 @@ Bot uses service_role, so RLS tightening can only break the web app, never the b
 | Var | Where | Notes |
 |---|---|---|
 | `TELEGRAM_BOT_TOKEN` `SUPABASE_URL` `SUPABASE_KEY`(service) | Render | Worker core |
-| `VAPID_SUBJECT` `NEXT_PUBLIC_VAPID_PUBLIC_KEY` `VAPID_PRIVATE_KEY` | Render + Vercel | Push (worker warns+disables if missing; **absent from `.env.example`**) |
+| `VAPID_SUBJECT` `NEXT_PUBLIC_VAPID_PUBLIC_KEY` `VAPID_PRIVATE_KEY` | Render + Vercel | Push (worker warns+disables if missing) |
 | `NEXT_PUBLIC_SUPABASE_URL` `NEXT_PUBLIC_SUPABASE_ANON_KEY` `SUPABASE_SERVICE_ROLE_KEY` | Vercel (+`web/.env.local`) | Web core |
 | `CRON_SECRET` | Vercel | `/api/cron/tick` bearer; 503 if unset |
 | `TELEGRAM_BOT_TOKEN` | Vercel too (set 2026-07-26) | Failover Telegram sends from `/api/cron/tick`; push-only without it |
@@ -272,6 +277,12 @@ non-idempotent migrations guarded; superseded vault migrations marked.
   future Next upgrade removes support (cosmetic today; builds fine).
 - `check_rate_limit` anon grant was revoked by the 07-09 hardening loop — any future
   unauthenticated rate-limit path is silently broken (web uses service client; fine today).
+- `resolve_reminder_event` permanently rejects some doses (planner-shifted virtual doses →
+  `INVALID_SCHEDULED_TIME`, deactivated meds → `MEDICATION_NOT_FOUND`, plus
+  `EVENT_MEDICATION_MISMATCH` / `VIRTUAL_EVENT_MUST_BE_FOR_TODAY` / `NOT_AUTHORIZED`).
+  The web now marks these session-locally unresolvable (gate skips them, strip rows go
+  info-only with honest copy); they are only recorded by `close_daily_medications` at
+  day's end. The RPC-side limitation itself is unaddressed.
 - `userStates` (bot conversation FSM) is still in-memory; a worker restart drops
   in-flight add-medication flows (acceptable; user restarts the wizard).
 - Worker still pauses at month-end on Render free tier; failover now covers push +
@@ -287,11 +298,11 @@ non-idempotent migrations guarded; superseded vault migrations marked.
 
 | Trust | Docs |
 |---|---|
-| **Live / authoritative** | This ledger · `KNOWN_ISSUES.md` (07-11, freshest state) · `ARCHITECTURE_DECISIONS.md` (ADR-001..006; stops before heartbeat/catalog) · `PROJECT.md` (terse reference, mostly current) · `PROJECT_WALKTHROUGH.md` + `FAQ.md` (07-20, narrated tour + glossary — **untracked in git**) · `web/AGENTS.md` |
+| **Live / authoritative** | This ledger · root `README.md` (rewritten 2026-08-06, three-surface era) · `KNOWN_ISSUES.md` (07-11, freshest state) · `ARCHITECTURE_DECISIONS.md` (ADR-001..006; stops before heartbeat/catalog) · `PROJECT.md` (terse reference, mostly current) · `PROJECT_WALKTHROUGH.md` + `FAQ.md` (07-20, narrated tour + glossary; tracked in git since 07-26) · `web/AGENTS.md` |
 | **Reference, partial** | `PERMISSION_MATRIX.md` (two claims wrong re `are_profiles_connected`) · `DEPLOYMENT_GUIDE.md` (no CRON_SECRET/voice vars) · `DESIGN_BRIEF.md` · `LEGAL_COMPLIANCE.md` |
-| **Stale — do not trust for state** | `AI_SESSION_START.md` (now redirects here) · `CURRENT_SYSTEM_STATE.md` · `SPRINT_STATUS.md` · `FEATURE_INVENTORY.md` · `PROJECT_JOURNAL.md` · `ENGINEERING_STATE.md` (lists shipped work as "Not Started") · `DATABASE_SCHEMA.md` (20 of 27 tables missing, wrong status enum) · `UI_UX_DESIGNER_HANDOVER.md` (says Next 15) · root `README.md` (V1 bot-only era) |
+| **Stale — do not trust for state** | `AI_SESSION_START.md` (now redirects here) · `CURRENT_SYSTEM_STATE.md` · `SPRINT_STATUS.md` · `FEATURE_INVENTORY.md` · `PROJECT_JOURNAL.md` · `ENGINEERING_STATE.md` (lists shipped work as "Not Started") · `DATABASE_SCHEMA.md` (20 of 27 tables missing, wrong status enum) · `UI_UX_DESIGNER_HANDOVER.md` (says Next 15) |
 | **Voice line (shelved)** | `VOICE_CALLS_DESIGN.md` · `VOICE_LAUNCH_CHECKLIST.md` · `EXOTEL_SUPPORT_BRIEF.md` — mutually contradictory on build status; checklist is the accurate runbook |
-| **Plans/specs** | `docs/superpowers/plans/*` — checkbox state is meaningless (all unchecked); every plan through 07-14 is SHIPPED per git |
+| **Plans/specs** | `docs/superpowers/plans/*` — checkbox state is meaningless (all unchecked); every plan through 07-27 is SHIPPED per git (incl. missed-dose visibility, amended post-review: hero prefers a due-now dose) |
 
 Do-not-modify without ADR review (carried over): permission model, care-circle architecture,
 notification architecture.
