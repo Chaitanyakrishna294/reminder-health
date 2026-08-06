@@ -597,7 +597,7 @@ export default function MedicationList({
               )}
             </label>
 
-            {stockError && <p className="text-[12px] font-semibold text-[#FF3B30]">{stockError}</p>}
+            {stockError && <p className="text-[12px] font-semibold text-danger-strong">{stockError}</p>}
 
             <div className="flex gap-2">
               <button
@@ -624,8 +624,8 @@ export default function MedicationList({
       {deleteModalMed && (
         <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in" onClick={() => loadingId === null && setDeleteModalMed(null)}>
           <div className="bg-white rounded-[22px] max-w-sm w-full p-6 space-y-5 text-center" style={{ boxShadow: '0 8px 40px rgba(16, 28, 90, 0.18)' }} onClick={(e) => e.stopPropagation()}>
-            <div className="w-14 h-14 rounded-full bg-[#FFECEA] flex items-center justify-center mx-auto">
-              <Trash2 className="w-6 h-6 text-[#FF3B30]" strokeWidth={2.2} />
+            <div className="w-14 h-14 rounded-full bg-danger/10 flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6 text-danger-strong" strokeWidth={2.2} />
             </div>
             <div>
               <h3 className="text-base font-bold tracking-tight text-foreground">Delete {deleteModalMed.drug_name}?</h3>
@@ -644,7 +644,7 @@ export default function MedicationList({
               <button
                 onClick={confirmDelete}
                 disabled={loadingId !== null}
-                className="flex-1 py-3 bg-[#FF3B30] text-white hover:bg-[#E0352B] text-sm font-semibold rounded-full cursor-pointer transition-all disabled:opacity-50"
+                className="flex-1 py-3 bg-danger-strong text-card hover:brightness-95 text-sm font-semibold rounded-full cursor-pointer transition-all disabled:opacity-50"
                 style={{ boxShadow: '0 4px 12px rgba(255, 59, 48, 0.35)' }}
               >
                 {loadingId !== null ? 'Deleting…' : 'Delete'}

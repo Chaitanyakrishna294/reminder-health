@@ -264,7 +264,7 @@ export default function NewMedicationPage() {
 
       {/* Error Banner */}
       {error && (
-        <div className="flex items-start gap-3 text-[#FF3B30] text-sm p-4 rounded-2xl" style={{ background: '#FFECEA' }}>
+        <div className="flex items-start gap-3 bg-danger/10 text-danger-strong text-sm p-4 rounded-2xl">
           <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
           <span className="font-medium">{error}</span>
         </div>

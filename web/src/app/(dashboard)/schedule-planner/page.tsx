@@ -824,8 +824,7 @@ export default function SchedulePlannerPage() {
                     const dateStr = toOverrideDateStr(selectedDate);
                     saveOverrides(overrides.filter(o => o.dateStr !== dateStr));
                   }}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[10px] font-semibold transition-all cursor-pointer"
-                  style={{ color: '#FF3B30', background: '#FFECEA' }}
+                  className="inline-flex items-center gap-1 h-11 px-3.5 rounded-full text-[11px] font-semibold transition-all cursor-pointer bg-danger/10 text-danger-strong hover:bg-danger/15"
                   title="Reset all adjustments for this day"
                 >
                   <RotateCcw className="w-3 h-3" strokeWidth={2.5} /> Reset
