@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service-role';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { checkRateLimit, getClientIp, tooManyRequests } from '@/lib/rate-limit';
@@ -54,6 +55,27 @@ export async function POST(request: Request) {
     if (upsertErr) {
       console.error('[API Subscribe] Database upsert error:', upsertErr);
       return NextResponse.json({ error: upsertErr.message }, { status: 500 });
+    }
+
+    // A browser's pushManager.subscribe() returns the SAME endpoint for every
+    // account using that browser, so on shared devices (patient + caregiver on
+    // one tablet) rows from previous accounts would keep delivering their
+    // medication reminders here forever. Reclaim the endpoint for the current
+    // user by deleting every other account's row for it. Needs the service
+    // client — RLS blocks the anon client from touching other users' rows.
+    // Non-fatal: the caller's own subscription is already saved above.
+    try {
+      const service = createServiceClient();
+      const { error: cleanupErr } = await service
+        .from('push_subscriptions')
+        .delete()
+        .eq('endpoint', endpoint)
+        .neq('user_id', user.id);
+      if (cleanupErr) {
+        console.error('[API Subscribe] Endpoint cleanup error (non-fatal):', cleanupErr);
+      }
+    } catch (cleanupError) {
+      console.error('[API Subscribe] Endpoint cleanup error (non-fatal):', cleanupError);
     }
 
     console.log(`[PUSH_DIAGNOSTIC] Action: subscription_registered | User: ${user.id} | Device: ${deviceName || 'Unknown'} | Endpoint: ...${endpoint.slice(-30)}`);

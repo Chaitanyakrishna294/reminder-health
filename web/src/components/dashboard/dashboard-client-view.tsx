@@ -325,13 +325,21 @@ export default function DashboardClientView({
           );
 
           // Check if a database event already covers this med at this time today,
-          // comparing hours/minutes in the medication's timezone (not browser local)
+          // comparing hours/minutes in the medication's timezone (not browser local).
+          // Planner overrides are localStorage-only — the bot still fires the real
+          // event at the ORIGINAL slot time — so when an override shifted this slot,
+          // a DB event at the base hh:mm covers the same physical dose too. Match
+          // either time, or one dose becomes two (double-counted totals + a false
+          // unresolvable "missed" twin after the real event is answered).
+          const overrideShifted = hours !== baseH || minutes !== baseM;
           const eventExists = dbEventsToday.some((e) => {
+            if (e.medication_id !== med.id) return false;
             const em = moment(e.scheduled_for).tz(medTz);
+            const eh = em.hours();
+            const emin = em.minutes();
             return (
-              e.medication_id === med.id &&
-              em.hours() === hours &&
-              em.minutes() === minutes
+              (eh === hours && emin === minutes) ||
+              (overrideShifted && eh === baseH && emin === baseM)
             );
           });
 
