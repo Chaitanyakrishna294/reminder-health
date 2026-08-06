@@ -40,10 +40,15 @@ export default function RootLayout({
       className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <head>
-        {/* Apply saved theme before paint to avoid a flash of the wrong theme */}
+        {/* Apply saved theme before paint to avoid a flash of the wrong theme.
+            The no-saved-theme fallback MUST stay in lockstep with
+            getTimeBasedTheme() in context/theme-context.tsx (dark 7 PM–7 AM).
+            It previously seeded from prefers-color-scheme, so on an OS set to
+            dark at midday this script painted dark and ThemeProvider then
+            corrected it to light — the very flash it exists to prevent. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}if(t==='dark'){document.documentElement.classList.add('dark');document.documentElement.style.colorScheme='dark';}}catch(e){}})();`,
+            __html: `(function(){try{var t=localStorage.getItem('theme');if(t!=='dark'&&t!=='light'){var h=new Date().getHours();t=(h>=19||h<7)?'dark':'light';}if(t==='dark'){document.documentElement.classList.add('dark');document.documentElement.style.colorScheme='dark';}else{document.documentElement.style.colorScheme='light';}}catch(e){}})();`,
           }}
         />
       </head>
