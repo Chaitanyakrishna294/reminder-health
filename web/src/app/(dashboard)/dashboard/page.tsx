@@ -1,5 +1,6 @@
 import React from 'react';
 import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service-role';
 import DashboardClientView from '@/components/dashboard/dashboard-client-view';
 import { ReminderEvent } from '@/components/dashboard/todays-schedule';
 import { resolveUserData, getMedicalProfile } from '@/lib/supabase/cached-queries';
@@ -174,6 +175,46 @@ export default async function DashboardPage() {
     peopleCaringForMe = connectionsData.peopleCaringForMe;
   }
 
+  // Photos for the Care Circle card, keyed by telegram id.
+  //
+  // The avatars bucket is owner-only, so a URL for somebody else has to be minted with
+  // the service client — and only where that person left `share_photo_with_caregivers`
+  // on. Patients only: that flag means "show my photo TO my caregivers", so it does not
+  // authorise the reverse. There is no consent flag covering a caregiver's photo being
+  // shown to their patient, so those render as initials rather than inventing one.
+  const careCircleAvatars: Record<string, string> = {};
+  const patientIds = peopleICareFor
+    .map(c => c.patient_telegram_id)
+    .filter((id): id is string => Boolean(id));
+  if (patientIds.length > 0) {
+    try {
+      const admin = createServiceClient();
+      const { data: profs } = await admin
+        .from('profiles')
+        .select('id, telegram_chat_id')
+        .in('telegram_chat_id', patientIds);
+      if (profs?.length) {
+        const telegramById = new Map(profs.map(p => [p.id, p.telegram_chat_id]));
+        const { data: medicals } = await admin
+          .from('medical_profiles')
+          .select('user_id, avatar_path, share_photo_with_caregivers')
+          .in('user_id', profs.map(p => p.id));
+        for (const mp of medicals ?? []) {
+          if (!mp.avatar_path || mp.share_photo_with_caregivers === false) continue;
+          const telegramId = telegramById.get(mp.user_id);
+          if (!telegramId) continue;
+          const { data: signed } = await admin.storage
+            .from('avatars')
+            .createSignedUrl(mp.avatar_path, 600);
+          if (signed?.signedUrl) careCircleAvatars[telegramId] = signed.signedUrl;
+        }
+      }
+    } catch (err) {
+      // A missing photo must never take the dashboard down with it.
+      console.error('Failed to resolve care circle avatars:', err);
+    }
+  }
+
   return (
     <DashboardClientView 
       userRole={userRole}
@@ -199,6 +240,7 @@ export default async function DashboardPage() {
       lastTaken={lastTaken}
       peopleICareFor={peopleICareFor}
       peopleCaringForMe={peopleCaringForMe}
+      careCircleAvatars={careCircleAvatars}
     />
   );
 }

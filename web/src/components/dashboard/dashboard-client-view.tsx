@@ -27,7 +27,7 @@ import { getUnitIcon, getCountdownText, PinkBubbles } from '@/components/dashboa
 import { createClient } from '@/lib/supabase/client';
 import { getSeverityTheme } from '@/lib/severity-theme';
 import { TONE_VAR, doseTone } from '@/lib/design/semantics';
-import { caregiverRoleLabel, firstName } from '@/lib/care-circle/relationship';
+import { caregiverRoleLabel, patientRoleLabel, firstName } from '@/lib/care-circle/relationship';
 import { unitPhrase } from '@/components/medications/medication-form-options';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { 
@@ -87,6 +87,8 @@ interface DashboardClientViewProps {
   lastTaken: { drug_name: string; time: string } | null;
   peopleICareFor?: any[];
   peopleCaringForMe?: any[];
+  /** Signed avatar URLs keyed by telegram id, for members who consented to sharing. */
+  careCircleAvatars?: Record<string, string>;
   avatarUrl?: string | null;
 }
 
@@ -113,6 +115,7 @@ export default function DashboardClientView({
   lastTaken,
   peopleICareFor = [],
   peopleCaringForMe = [],
+  careCircleAvatars = {},
   avatarUrl = null,
 }: DashboardClientViewProps) {
   const { isElderly, toggleMode, viewMode } = useUiMode();
@@ -1385,7 +1388,9 @@ export default function DashboardClientView({
             so the two things you check at a glance were never on screen together. */}
         {/* Compliance takes the wider share: the ring is w-full, so its size is decided by
             the column, not by any max-width. Raising the cap alone measured no change. */}
-        <div className="lg:col-span-5 grid grid-cols-[1.1fr_1fr] lg:grid-cols-1 gap-3 sm:gap-6 items-stretch">
+        {/* `order-first` lifts the pair above Next Medication in the STACKED layout only;
+            from lg the grid returns to source order, so the desktop split is unchanged. */}
+        <div className="order-first lg:order-none lg:col-span-5 grid grid-cols-[1.1fr_1fr] lg:grid-cols-1 gap-3 sm:gap-6 items-stretch">
         <div data-tour="dash-compliance" className="bg-card border border-border rounded-3xl p-4 sm:p-6 shadow-sm flex flex-col justify-between text-center relative min-h-0 sm:min-h-[300px]">
           {/* Half-width now, so the title has to fit one line: "Daily Compliance" wrapped
               to two and the "Daily dose cycle progress" subtitle took two more, spending
@@ -1542,70 +1547,99 @@ export default function DashboardClientView({
           </div>
         </div>
 
-        {/* Care Circle at a glance. First names only: at this width a full name either
-            truncates or wraps to two lines, and the first name is what you actually scan
-            for. The relationship uses caregiverRoleLabel because these are the people
-            caring for YOU — the same field means the opposite thing further down. */}
-        <div className="bg-card border border-border rounded-3xl p-4 sm:p-6 shadow-sm flex flex-col min-h-0">
-          {/* "See all" sat beside the title and squeezed it to "Care …". It moves to the
-              foot of the card, where it also fills the space the short list leaves. */}
-          <h3 className="font-black text-foreground text-xs sm:text-sm flex items-center gap-1.5 min-w-0">
-            <Users className="w-4 h-4 text-primary shrink-0" />
-            <span className="truncate">Care circle</span>
-          </h3>
+        {/* Care Circle at a glance, shown from whichever side you are actually on.
+            Role is derived from the connections themselves rather than a stored flag,
+            because a single account can genuinely be both: someone can be cared for by
+            a daughter while caring for a parent. Patient-only sees caregivers,
+            caregiver-only sees patients, and a dual account sees one of each so neither
+            relationship is hidden by the other. */}
+        {(() => {
+          const byPriority = (a: any, b: any) =>
+            Number(Boolean(b.is_primary)) - Number(Boolean(a.is_primary));
+          const caregivers = [...peopleCaringForMe].sort(byPriority);
+          const patients = [...peopleICareFor].sort(byPriority);
+          const isDual = caregivers.length > 0 && patients.length > 0;
 
-          {peopleCaringForMe.length > 0 ? (
-            <ul className="mt-3 space-y-3">
-              {peopleCaringForMe.slice(0, 3).map((conn) => (
-                <li key={conn.connection_id} className="flex items-center gap-2.5 min-w-0">
-                  {/* text-primary on a primary/10 tint measures 2.9:1. Initials are text. */}
-                  <span className="shrink-0 w-8 h-8 rounded-full bg-primary/10 text-foreground flex items-center justify-center text-[11px] font-black">
-                    {firstName(conn.resolved_name).slice(0, 2).toUpperCase()}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block text-xs font-black text-foreground truncate">
-                      {firstName(conn.resolved_name)}
-                    </span>
-                    <span className="block text-[11px] font-bold text-muted-foreground truncate">
-                      {caregiverRoleLabel(conn.relationship_type)}
-                    </span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className="mt-3 flex-1 flex flex-col justify-center">
-              <p className="text-[11px] font-semibold text-muted-foreground leading-relaxed">
-                Nobody is notified if you miss a dose yet.
-              </p>
-              <Link
-                href="/settings#care-circle"
-                className="mt-2 inline-flex items-center text-[11px] font-black text-primary-strong hover:underline"
-              >
-                Invite someone
-              </Link>
+          type Member = { key: string; name: string; role: string; photo?: string };
+          const toMember = (conn: any, isPatient: boolean): Member => ({
+            key: conn.connection_id,
+            name: firstName(conn.resolved_name),
+            // The same stored value means opposite things depending on which side of
+            // the link the person on screen is standing.
+            role: isPatient
+              ? patientRoleLabel(conn.relationship_type)
+              : caregiverRoleLabel(conn.relationship_type),
+            photo: isPatient ? careCircleAvatars[conn.patient_telegram_id] : undefined,
+          });
+
+          const members: Member[] = isDual
+            ? [toMember(caregivers[0], false), toMember(patients[0], true)]
+            : caregivers.length > 0
+              ? caregivers.slice(0, 3).map(c => toMember(c, false))
+              : patients.slice(0, 3).map(p => toMember(p, true));
+
+          return (
+            <div className="bg-card border border-border rounded-3xl p-4 sm:p-6 shadow-sm flex flex-col min-h-0">
+              {/* "See all" sat beside the title and squeezed it to "Care …". It moves to
+                  the foot of the card, where it also fills the space a short list leaves. */}
+              <h3 className="font-black text-foreground text-xs sm:text-sm flex items-center gap-1.5 min-w-0">
+                <Users className="w-4 h-4 text-primary shrink-0" />
+                <span className="truncate">Care circle</span>
+              </h3>
+
+              {members.length > 0 ? (
+                <ul className="mt-3 space-y-3">
+                  {members.map((m) => (
+                    <li key={m.key} className="flex items-center gap-2.5 min-w-0">
+                      <span className="shrink-0 w-8 h-8 rounded-full bg-primary/10 text-foreground flex items-center justify-center text-[11px] font-black overflow-hidden">
+                        {m.photo ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={m.photo} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          /* text-primary on a primary/10 tint measures 2.9:1. Initials are text. */
+                          m.name.slice(0, 2).toUpperCase()
+                        )}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-xs font-black text-foreground truncate">{m.name}</span>
+                        <span className="block text-[11px] font-bold text-muted-foreground truncate">{m.role}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="mt-3 flex-1 flex flex-col justify-center">
+                  <p className="text-[11px] font-semibold text-muted-foreground leading-relaxed">
+                    Nobody is notified if you miss a dose yet.
+                  </p>
+                  <Link
+                    href="/settings#care-circle"
+                    className="mt-2 inline-flex items-center text-[11px] font-black text-primary-strong hover:underline"
+                  >
+                    Invite someone
+                  </Link>
+                </div>
+              )}
+
+              {members.length > 0 && (
+                <Link
+                  href="/care-circle"
+                  className="mt-auto inline-flex items-center min-h-11 text-[11px] font-black text-primary-strong hover:underline"
+                >
+                  See all
+                </Link>
+              )}
             </div>
-          )}
-
-          {peopleCaringForMe.length > 0 && (
-            <Link
-              href="/care-circle"
-              className="mt-auto inline-flex items-center min-h-11 text-[11px] font-black text-primary-strong hover:underline"
-            >
-              See all
-            </Link>
-          )}
-        </div>
+          );
+        })()}
         </div>
       </div>
 
-      {/* Daily Compliance Timeline Card */}
-      <div className="relative overflow-hidden isolate bg-gradient-to-br from-[#CC3D64] to-[#B52A52] text-white border border-transparent rounded-3xl p-5 shadow-sm shadow-primary/20 space-y-4">
-        <h3 className="font-black text-white text-sm flex items-center gap-1.5">
-          <Clock className="w-4 h-4 text-white" /> Daily Compliance Timeline
-        </h3>
-
-        <div className="grid grid-cols-4 gap-1.5 text-center">
+      {/* The four period tiles, no longer wrapped in a pink gradient panel with its own
+          "Daily Compliance Timeline" heading. The tiles already say Morning/Afternoon/
+          Evening/Night and carry their own status, so the panel was a saturated box
+          restating them — and it was the loudest surface on a page of white cards. */}
+      <div className="grid grid-cols-4 gap-1.5 text-center">
           {[
             { label: 'Morning', icon: <Sun className="w-3.5 h-3.5 shrink-0" />, period: getPeriodStatus(5, 12) },
             { label: 'Afternoon', icon: <CloudSun className="w-3.5 h-3.5 shrink-0" />, period: getPeriodStatus(12, 17) },
@@ -1658,8 +1692,6 @@ export default function DashboardClientView({
               </div>
             );
           })}
-        </div>
-        <PinkBubbles />
       </div>
 
       {/* Main Workspace Layout Grid */}

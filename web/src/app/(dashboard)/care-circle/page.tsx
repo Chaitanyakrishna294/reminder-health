@@ -10,6 +10,7 @@ import {
   isPendingConnection,
 } from '@/lib/supabase/care-circle-service';
 import { createServiceClient } from '@/lib/supabase/service-role';
+import { caregiverRoleLabel, patientRoleLabel } from '@/lib/care-circle/relationship';
 import { CARE_LABELS } from '@/lib/design/semantics';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Badge, CountBadge } from '@/components/ui/badge';
@@ -264,7 +265,8 @@ export default async function CareCirclePage() {
                   </div>
                   <div>
                     <h3 className="font-bold text-foreground text-sm">{conn.resolved_name}</h3>
-                    <p className="text-[11px] text-muted-foreground font-semibold uppercase mt-0.5">{conn.relationship_type}</p>
+                    {/* A caregiver's name, so the stored value reads correctly as-is. */}
+                    <p className="text-[11px] text-muted-foreground font-semibold mt-0.5">{caregiverRoleLabel(conn.relationship_type)}</p>
                   </div>
                 </div>
 
@@ -315,11 +317,15 @@ export default async function CareCirclePage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {peopleICareFor.map((conn) => (
+              /* `relationship` here describes a PATIENT, so the stored caregiver role has
+                 to be inverted. Raw, it printed "Pratap · SON" — tagging the patient with
+                 the caregiver's own role — while the dashboard said "Parent" for the same
+                 person. One field, opposite meanings by side of the link. */
               <PatientStatusCard
                 key={conn.connection_id}
                 id={conn.connection_id}
                 name={conn.resolved_name || 'Patient'}
-                relationship={conn.relationship_type}
+                relationship={patientRoleLabel(conn.relationship_type)}
                 isPrimary={conn.is_primary}
                 telegramId={conn.patient_telegram_id || ''}
                 status={conn.connection_status}
