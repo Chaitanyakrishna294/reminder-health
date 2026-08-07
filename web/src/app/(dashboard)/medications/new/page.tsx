@@ -730,7 +730,7 @@ export default function NewMedicationPage() {
                           type="button"
                           onClick={() => goToStep(row.step)}
                           aria-label={`${row.label}: ${row.value}. Edit in step ${row.step}.`}
-                          className="w-full flex items-center justify-between gap-3 px-5 py-3.5 text-left hover:bg-white/70 transition-colors cursor-pointer group/row"
+                          className="w-full flex items-center justify-between gap-3 px-5 py-3.5 text-left hover:bg-muted transition-colors cursor-pointer group/row"
                         >
                           <div className="flex items-center gap-2.5 shrink-0 text-muted-foreground">
                             {row.icon}
@@ -753,7 +753,7 @@ export default function NewMedicationPage() {
                         type="button"
                         onClick={() => goToStep(5)}
                         aria-label={`Priority: ${priorityMeta(priority).label}. Edit in step 5.`}
-                        className="w-full flex items-center justify-between gap-3 px-5 py-3.5 text-left hover:bg-white/70 transition-colors cursor-pointer group/row"
+                        className="w-full flex items-center justify-between gap-3 px-5 py-3.5 text-left hover:bg-muted transition-colors cursor-pointer group/row"
                       >
                         <div className="flex items-center gap-2.5 shrink-0 text-muted-foreground">
                           {stepMeta[4].icon}

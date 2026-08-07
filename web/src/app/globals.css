@@ -46,6 +46,22 @@
   --success-strong: #1B7A3A;
   --warning-strong: #8A4B00;
   --danger-strong: #B3261E;
+  /* SOLID destructive fill — distinct from --danger-strong, which is TEXT sitting on a
+     danger tint and therefore flips lightness between modes on purpose. Used as a fill,
+     -strong turned Delete Account into a pale pastel in dark mode: softer-looking than
+     the neutral Sign Out beside it, which inverts the one signal that must never
+     weaken. This token stays a committed red in both modes. */
+  --danger-solid: #B3261E;
+  --danger-solid-foreground: #ffffff;
+
+  /* Folder identity hues for the Health Vault covers. IDENTITY ONLY — never status.
+     They are deliberately kept out of the success/warning/danger/info family so a green
+     folder cover can never be misread as "on track". All four carry white text on the
+     frosted strip that sits over them, so they do not need a -foreground pair. */
+  --category-1: #2F6FB5;
+  --category-2: #2E8B6B;
+  --category-3: #6C55B0;
+  --category-4: #B5673A;
 
   /* Informational / trust. Distinct from `warning` and `danger` so security and
      "here's how this works" messaging never reads as an alarm. */
@@ -111,6 +127,16 @@
   --success-strong: #7EE2A0;
   --warning-strong: #FFC266;
   --danger-strong: #FFB4AB;
+  /* Stays a real red on navy — 4.98:1 against white text, and it still reads as the
+     most serious control on the screen rather than the softest. */
+  --danger-solid: #D32F2F;
+  --danger-solid-foreground: #ffffff;
+
+  /* Slightly deeper on navy so the covers sit in the page rather than glowing off it. */
+  --category-1: #2A5F9E;
+  --category-2: #27775C;
+  --category-3: #5C489B;
+  --category-4: #9C5832;
 
   --info: #7DA6FF;
   --info-foreground: #0F1C5A;
@@ -173,6 +199,27 @@ body:has(nav[data-tour="dash-nav"]) .floating-bottom {
   }
 }
 
+/* Folder silhouette for the Health Vault category cards: a raised tab on the top-left
+   above a rounded body. Built from a pseudo-element rather than clip-path, because
+   clip-path discards border-radius and the corners have to stay round. The tab inherits
+   the card's own background so any tint or image carries onto it. */
+.folder-card {
+  position: relative;
+  border-top-left-radius: 0;
+  margin-top: 14px;
+}
+.folder-card::before {
+  content: "";
+  position: absolute;
+  top: -13px;
+  left: 0;
+  width: 46%;
+  height: 14px;
+  background: inherit;
+  border-radius: 10px 10px 0 0;
+  pointer-events: none;
+}
+
 @theme inline {
   --font-sans: var(--font-sans), sans-serif;
   --font-mono: var(--font-mono), monospace;
@@ -197,6 +244,8 @@ body:has(nav[data-tour="dash-nav"]) .floating-bottom {
   --color-danger: var(--danger);
   --color-danger-foreground: var(--danger-foreground);
   --color-danger-strong: var(--danger-strong);
+  --color-danger-solid: var(--danger-solid);
+  --color-danger-solid-foreground: var(--danger-solid-foreground);
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
   --color-info-strong: var(--info-strong);

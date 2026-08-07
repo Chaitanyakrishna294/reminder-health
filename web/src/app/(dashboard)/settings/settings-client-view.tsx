@@ -661,7 +661,7 @@ export default function SettingsClientView({
         <button
           onClick={() => { setDeleteConfirmText(''); setDeleteModalOpen(true); }}
           disabled={deleting}
-          className={`shrink-0 flex items-center justify-center font-black rounded-xl transition-all cursor-pointer shadow-md shadow-danger/25 bg-danger-strong text-card hover:brightness-95 disabled:opacity-60 disabled:cursor-not-allowed ${
+          className={`shrink-0 flex items-center justify-center font-black rounded-xl transition-all cursor-pointer shadow-md shadow-danger/25 bg-danger-solid text-danger-solid-foreground hover:brightness-95 disabled:opacity-60 disabled:cursor-not-allowed ${
             isElderly ? 'h-[80px] px-10 text-2xl gap-2' : 'h-11 px-5 text-xs gap-1.5'
           }`}
         >
@@ -739,7 +739,7 @@ export default function SettingsClientView({
                 type="button"
                 onClick={handleDeleteAccount}
                 disabled={deleting || deleteConfirmText.trim().toUpperCase() !== 'DELETE'}
-                className={`font-black rounded-xl bg-danger-strong text-card shadow-md shadow-danger/25 hover:brightness-95 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+                className={`font-black rounded-xl bg-danger-solid text-danger-solid-foreground shadow-md shadow-danger/25 hover:brightness-95 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
                   isElderly ? 'h-16 px-6 text-lg' : 'h-11 px-5 text-xs'
                 }`}
               >

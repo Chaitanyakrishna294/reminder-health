@@ -70,6 +70,42 @@ there in both themes:
 
 `getToneTheme(tone).text` gives you the right one without thinking about it.
 
+### Never use a `-strong` token as a background
+
+`-strong` means *text sitting on a tint*, so it deliberately flips lightness between
+themes: dark ink in light mode, light ink in dark mode. That is exactly wrong for a fill,
+which needs to stay the same weight in both.
+
+`bg-danger-strong` on Delete Account rendered a committed `#B3261E` red in light mode and
+a pale `#FFB4AB` pastel in dark — softer-looking than the neutral Sign Out beside it, so
+dark mode inverted the one signal that must never weaken. It was in `ui/button.tsx`, so
+every destructive button in the app inherited it.
+
+| Intent | Class |
+|---|---|
+| Destructive fill | `bg-danger-solid text-danger-solid-foreground` |
+| Primary fill | `bg-primary-strong text-primary-strong-foreground` (documented exception, see above) |
+| Text on a danger tint | `text-danger-strong` |
+
+`--danger-solid` is `#B3261E` light / `#D32F2F` dark, both against white at ≥4.98:1.
+
+### The dark compat layer matches exact class names only
+
+`:root.dark .bg-white` cannot match `bg-white/90`, `bg-white/70`, or `bg-white/[0.05]` —
+Tailwind emits those as different classes. Anything with an opacity modifier needs its own
+`dark:` variant or a token (`bg-card/60`). Unguarded, they composite to a near-white panel
+in dark mode and take light text with them.
+
+Legitimate exception: `bg-white/N` over a saturated gradient with an explicit `text-white`
+is correct in both themes, because the gradient does not change with the theme.
+
+### Verify dark mode by measuring, not by looking
+
+Hardcoded hexes are the recurring cause, and light mode hides them: the med gate's
+`#0B1440` looked fine because it was near `--background` (`#F6F2F5`) in light, while in
+dark it sat 4x off `#0F1C5A` and read as a different product. Bind surfaces to
+`var(--background)` / `var(--card)` rather than picking a hex that looks close.
+
 Same trap on **solid** status fills: white on `--danger` (`#FF3B30`, iOS system red) is
 only 3.55:1. Solid danger buttons use `bg-danger-strong text-card` — `--danger-strong`
 darkens in light mode and lightens in dark, `--card` does the opposite, so the pair clears

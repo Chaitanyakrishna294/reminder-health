@@ -655,7 +655,7 @@ export default function MedicationList({
               <button
                 onClick={confirmDelete}
                 disabled={loadingId !== null}
-                className="flex-1 py-3 bg-danger-strong text-card hover:brightness-95 text-sm font-semibold rounded-full cursor-pointer transition-all disabled:opacity-50"
+                className="flex-1 py-3 bg-danger-solid text-danger-solid-foreground hover:brightness-95 text-sm font-semibold rounded-full cursor-pointer transition-all disabled:opacity-50"
                 style={{ boxShadow: '0 4px 12px rgba(255, 59, 48, 0.35)' }}
               >
                 {loadingId !== null ? 'Deleting…' : 'Delete'}

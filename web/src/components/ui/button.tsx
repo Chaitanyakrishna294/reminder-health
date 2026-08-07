@@ -38,7 +38,7 @@ const VARIANTS: Record<ButtonVariant, string> = {
   ghost:
     'bg-muted/70 text-foreground hover:bg-muted active:scale-[0.98]',
   danger:
-    'bg-danger-strong text-card shadow-md shadow-danger/25 hover:brightness-95 active:scale-[0.98]',
+    'bg-danger-solid text-danger-solid-foreground shadow-md shadow-danger/25 hover:brightness-95 active:scale-[0.98]',
   'danger-ghost':
     'bg-danger/10 text-danger-strong border border-danger/25 hover:bg-danger/15 active:scale-[0.98]',
 };
