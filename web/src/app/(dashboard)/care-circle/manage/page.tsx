@@ -21,6 +21,7 @@ import {
   Info
 } from 'lucide-react';
 import moment from 'moment-timezone';
+import { caregiverRoleLabel, patientRoleLabel } from '@/lib/care-circle/relationship';
 
 interface CareCircleConnection {
   connection_id: string;
@@ -527,7 +528,7 @@ export default function SharedTrustCenter() {
                               )}
                             </div>
                             <p className="text-[10px] text-muted-foreground font-semibold mt-0.5 capitalize">
-                              {conn.relationship_type.toLowerCase()} • Caring together for {daysCaring} day{daysCaring !== 1 ? 's' : ''}
+                              {caregiverRoleLabel(conn.relationship_type)} • Caring together for {daysCaring} day{daysCaring !== 1 ? 's' : ''}
                             </p>
                           </div>
                         </div>
@@ -640,7 +641,7 @@ export default function SharedTrustCenter() {
                           <div className="flex items-center gap-1.5">
                             <h3 className="font-bold text-foreground text-sm">{conn.resolved_name}</h3>
                             <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-semibold border border-border capitalize">
-                              {conn.relationship_type.toLowerCase()}
+                              {patientRoleLabel(conn.relationship_type)}
                             </span>
                           </div>
                           <p className="text-[10px] text-muted-foreground font-semibold mt-0.5">

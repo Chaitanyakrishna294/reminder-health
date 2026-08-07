@@ -12,6 +12,7 @@ import {
 } from '@/lib/supabase/care-circle-service';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service-role';
+import { patientRoleLabel, firstName } from '@/lib/care-circle/relationship';
 import moment from 'moment-timezone';
 import { 
   ArrowLeft, 
@@ -40,19 +41,27 @@ interface PageProps {
 }
 
 // 1. Health Story Generator Component/Helper
+/**
+ * These sentences describe the PATIENT, and they used to lead with
+ * `relationship_type` — a field that records who the CAREGIVER is to the patient.
+ * A daughter opening this page read "Son missed their scheduled medication today",
+ * naming her own role and never the person it is about.
+ *
+ * The patient's name is already here and is both correct and clearer than any role
+ * word, so it leads instead. That removes the need for the relationship entirely:
+ * the parameter is gone rather than inverted.
+ */
 function generateHealthStory(
   patientName: string,
-  relationshipType: string,
   metrics: PatientHealthMetrics
 ): { story: string; detail: string; type: 'success' | 'warning' | 'danger' | 'info' } {
-  const rel = relationshipType.toUpperCase();
-  const titleRel = relationshipType.charAt(0).toUpperCase() + relationshipType.slice(1).toLowerCase();
+  const who = firstName(patientName) || 'They';
 
   // Scenario 1: Missed doses today (High Priority Intervention)
   if (metrics.missedDosesCountToday > 0) {
     return {
-      story: `${titleRel} missed their scheduled medication today.`,
-      detail: `Consider checking in on ${patientName} to verify if they took their doses or if they need support.`,
+      story: `${who} missed their scheduled medication today.`,
+      detail: `Consider checking in to see whether they took their doses or need support.`,
       type: 'danger'
     };
   }
@@ -60,7 +69,7 @@ function generateHealthStory(
   // Scenario 2: Low medication stock (Refill Warning)
   if (metrics.minStockDaysRemaining > 0 && metrics.minStockDaysRemaining <= 3) {
     return {
-      story: `${titleRel} may need a refill within 3 days.`,
+      story: `${who} may need a refill within 3 days.`,
       detail: `Their lowest medication stock level has dropped to ${metrics.minStockDaysRemaining} days remaining.`,
       type: 'warning'
     };
@@ -69,7 +78,7 @@ function generateHealthStory(
   // Scenario 3: Highly compliant and stable
   if (metrics.adherenceRate >= 90) {
     return {
-      story: `${titleRel} is doing well today.`,
+      story: `${who} is doing well today.`,
       detail: `They have taken all scheduled doses on track today. Adherence is stable at ${metrics.adherenceRate}% over the last 30 days.`,
       type: 'success'
     };
@@ -77,7 +86,7 @@ function generateHealthStory(
 
   // Scenario 4: Standard stable check-in
   return {
-    story: `${titleRel} is on track with their medications today.`,
+    story: `${who} is on track with their medications today.`,
     detail: `All scheduled doses are logged successfully. Adherence is currently at ${metrics.adherenceRate}%.`,
     type: 'info'
   };
@@ -135,7 +144,7 @@ export default async function PatientConsolePage({ params }: PageProps) {
   const metrics = await getPatientHealthMetrics(patientId);
 
   // Generate the health story summary
-  const healthStory = generateHealthStory(patientName, connection.relationship_type, metrics);
+  const healthStory = generateHealthStory(patientName, metrics);
 
   // Story color styling mapping
   const storyStyles = {
@@ -223,7 +232,7 @@ export default async function PatientConsolePage({ params }: PageProps) {
           <div>
             <h1 className="text-2xl font-black text-foreground tracking-tight">{patientName}</h1>
             <div className="flex flex-wrap items-center gap-2 mt-1.5 text-xs text-muted-foreground font-semibold">
-              <span className="capitalize">{connection.relationship_type.toLowerCase()}</span>
+              <span>{patientRoleLabel(connection.relationship_type)}</span>
               <span>•</span>
               <span>{connection.is_primary ? 'Primary Care Coordinator' : 'Secondary Care Coordinator'}</span>
               <span>•</span>
@@ -342,7 +351,7 @@ export default async function PatientConsolePage({ params }: PageProps) {
             <div className="space-y-3 text-xs text-foreground font-medium">
               <div className="flex justify-between items-center py-1.5 border-b border-border">
                 <span className="text-muted-foreground">Relation</span>
-                <span className="font-bold capitalize">{connection.relationship_type.toLowerCase()}</span>
+                <span className="font-bold">{patientRoleLabel(connection.relationship_type)}</span>
               </div>
               <div className="flex justify-between items-center py-1.5 border-b border-border">
                 <span className="text-muted-foreground">Role</span>
