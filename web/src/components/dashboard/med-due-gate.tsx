@@ -74,6 +74,73 @@ function overdueLabel(scheduledFor: string): string {
 const fmtTime = (iso: string) =>
   new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+const minutesLate = (iso: string) =>
+  Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000));
+
+/** How long the ring takes to fill. Two hours past the scheduled time is a
+ *  full ring; beyond that it stays full rather than resetting. */
+const RING_WINDOW_MINS = 120;
+
+/** Placement of the three blurred colour fields behind the gate. Deliberately larger
+ *  than the viewport and hung off the edges, so what shows is the soft middle of each
+ *  field rather than a recognisable circle. */
+const MESH_FIELDS = [
+  { width: '24rem', height: '24rem', top: '-7rem', left: '-8rem' },
+  { width: '21rem', height: '21rem', bottom: '-6rem', right: '-7rem' },
+  { width: '18rem', height: '18rem', top: '38%', right: '-6rem' },
+] as const;
+
+/** Lateness drawn as an arc around the mascot. Shape carries the urgency, so it
+ *  reads in dark mode, in elderly mode, and without colour vision — and the exact
+ *  figure is always spelled out in the chip beside it, never colour alone. */
+function OverdueRing({
+  minutes,
+  size,
+  missed,
+  children,
+}: {
+  minutes: number;
+  size: number;
+  missed: boolean;
+  children: React.ReactNode;
+}) {
+  const R = 46;
+  const CIRC = 2 * Math.PI * R;
+  const filled = Math.min(minutes / RING_WINDOW_MINS, 1) * CIRC;
+  return (
+    <span
+      className="relative inline-flex items-center justify-center shrink-0"
+      style={{ width: size, height: size }}
+    >
+      <svg
+        viewBox="0 0 100 100"
+        width={size}
+        height={size}
+        className="absolute inset-0 -rotate-90"
+        aria-hidden="true"
+      >
+        <circle cx="50" cy="50" r={R} fill="none" stroke="var(--border)" strokeWidth="3.5" />
+        {filled > 0 && (
+          <circle
+            cx="50"
+            cy="50"
+            r={R}
+            fill="none"
+            stroke={missed ? 'var(--danger)' : 'var(--warning)'}
+            strokeWidth="3.5"
+            strokeLinecap="round"
+            strokeDasharray={`${filled} ${CIRC}`}
+          />
+        )}
+      </svg>
+      {/* A soft lens for the mascot to sit on. Without it the brain art sank into the
+          navy in dark mode — it is a small pink drawing on a large dark field. */}
+      <span className="absolute inset-[8%] rounded-full bg-white/80 dark:bg-white/[0.10] backdrop-blur-md ring-1 ring-white/50 dark:ring-white/10" />
+      <span className="relative">{children}</span>
+    </span>
+  );
+}
+
 export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSnoozeAll, onUnresolvable }: MedDueGateProps) {
   const supabase = createClient();
   const router = useRouter();
@@ -192,16 +259,23 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
   // multi-stop gradient passed as an inline style — there's no utility class to
   // hang a `dark:` variant on. (`dark:` itself is safe to use elsewhere: the
   // `@custom-variant dark` in globals.css binds it to the same .dark class.)
-  const gateBackground =
+  // A flat base plus three oversized, heavily blurred colour fields (rendered below).
+  // The old single radial washed one saturated colour across the whole screen; three
+  // muted fields that overlap give the surface depth and a bit of colour movement
+  // without ever competing with the one green button that matters.
+  // The base is the app's own background token, not a hand-picked hex: an invented
+  // navy read as a different product the moment it met the rest of the dark theme.
+  // Mood comes from the colour fields instead, which are tints of the app's own
+  // navy/pink family so the gate stays in the same world as everything behind it.
+  const gateBase = 'var(--background)';
+  const mesh =
     theme === 'dark'
       ? missedMode
-        ? // Red-tinted deep navy (missed): danger mood, light text stays readable.
-          'radial-gradient(120% 90% at 50% 0%, #47203A 0%, #0F1C5A 55%, #351430 100%)'
-        : // Deep navy (due): mirrors --auth-radial's dark treatment.
-          'radial-gradient(120% 90% at 50% 0%, #1E2E6E 0%, #0F1C5A 55%, #0A1340 100%)'
+        ? ['#5A2447', '#3E2470', '#1B2E6B']
+        : ['#24378F', '#1B3A78', '#3A2A6B']
       : missedMode
-        ? 'radial-gradient(120% 90% at 50% 0%, #FDE8EA 0%, #F8F9FB 55%, #FFF0EE 100%)'
-        : 'radial-gradient(120% 90% at 50% 0%, #FDEEF2 0%, #F8F9FB 55%, #EAF3FF 100%)';
+        ? ['#F7CBCD', '#F8DFC9', '#E9D3E1']
+        : ['#F7CCDB', '#CBDCF2', '#F6E3CA'];
 
   const answer = async (target: GateEvent, action: 'TAKEN' | 'SKIP', flash: boolean) => {
     if (busyId !== null) return;
@@ -257,28 +331,57 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
       role="dialog"
       aria-modal="true"
       aria-label="Medication check"
-      className="fixed inset-0 z-[120] flex flex-col items-center justify-center px-6 py-10 text-center overflow-y-auto outline-none"
-      style={{ background: gateBackground }}
+      data-med-gate
+      className="fixed inset-0 z-[120] flex flex-col overflow-y-auto outline-none"
+      style={{ background: gateBase }}
     >
+      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+        {mesh.map((c, i) => (
+          <span
+            key={i}
+            className="absolute rounded-full"
+            style={{
+              background: c,
+              filter: 'blur(72px)',
+              opacity: theme === 'dark' ? 0.5 : 0.7,
+              ...MESH_FIELDS[i],
+            }}
+          />
+        ))}
+      </div>
+
+      {/* No justify-center: the actions claim the bottom of the column via mt-auto, so
+          they land in thumb reach instead of floating mid-screen above dead space. */}
+      <div className="relative flex-1 flex flex-col items-center px-6 pt-12 pb-6 text-center">
       {remaining > 1 && (
         <span className="absolute top-6 text-xs font-mono font-bold text-muted-foreground tracking-widest">
           {remaining} doses to confirm
         </span>
       )}
 
-      <BrainMascot
-        size={
+      {/* The mascot used to be the biggest thing on a screen whose job is naming a
+          drug — 168px of brain against a 24px medication name. It now sits inside
+          the lateness ring at roughly a third of that, so the name can lead. */}
+      {(() => {
+        const ringSize =
           effectiveView === 'list'
-            ? (small ? 88 : 112)
-            : isElderly ? (small ? 156 : 200) : (small ? 116 : 168)
-        }
-        mood={
-          missedMode ||
-          Math.floor((Date.now() - new Date(event.scheduled_for).getTime()) / 60000) >= 30
-            ? 'concerned'
-            : 'reminder'
-        }
-      />
+            ? (small ? 96 : 108)
+            : isElderly ? (small ? 152 : 172) : (small ? 132 : 148);
+        const mood =
+          missedMode || minutesLate(event.scheduled_for) >= 30 ? 'concerned' : 'reminder';
+        return (
+          <OverdueRing
+            minutes={minutesLate(event.scheduled_for)}
+            size={ringSize}
+            missed={missedMode}
+          >
+            {/* The art has its own transparent margin, so the drawn brain reads a good
+                deal smaller than its box — 0.78 fills the ring optically, not just
+                geometrically. */}
+            <BrainMascot size={Math.round(ringSize * 0.78)} mood={mood} />
+          </OverdueRing>
+        );
+      })()}
 
       {/* View toggle — only when there is a queue worth batching. */}
       {remaining > 1 && (
@@ -326,46 +429,57 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
 
       {effectiveView === 'one' ? (
         <>
-          <p className={`mt-5 font-semibold text-muted-foreground ${isElderly ? 'text-lg' : 'text-sm'}`}>
-            {overdueLabel(event.scheduled_for)} · scheduled {fmtTime(event.scheduled_for)}
-          </p>
+          {/* Lateness as a chip beside the ring, not a sentence. The tint says the
+              same thing the arc does, and the figure is spelled out either way. */}
+          <span
+            className={`mt-5 inline-flex items-center gap-1.5 rounded-full font-bold ${
+              missedMode ? 'bg-danger/15 text-danger-strong' : 'bg-warning/15 text-warning-strong'
+            } ${isElderly ? 'px-4 py-2 text-base' : 'px-3 py-1.5 text-xs'}`}
+          >
+            <Clock className={isElderly ? 'w-5 h-5' : 'w-3.5 h-3.5'} />
+            {overdueLabel(event.scheduled_for)}
+          </span>
 
-          <h1 className={`mt-2 font-black text-foreground tracking-tight ${isElderly ? 'text-3xl' : 'text-2xl'}`}>
-            {missedMode ? 'You missed your' : 'Did you take your'}
+          {/* The question is the eyebrow; the DRUG NAME is the headline. The old markup
+              split one sentence across two nodes with an icon wedged between them, so it
+              rendered as two fragments in two different typefaces. */}
+          <p className={`mt-5 font-semibold text-muted-foreground ${isElderly ? 'text-lg' : 'text-sm'}`}>
+            {missedMode ? 'You missed' : 'Did you take'}
+          </p>
+          {/* Never truncate a drug name on the screen that asks you to confirm it:
+              "Metformin Hydrochloride SR" must not become "Metformin Hydro…". */}
+          <h1
+            className={`mt-1 font-black text-foreground tracking-tight text-balance break-words max-w-[16ch] ${
+              isElderly ? 'text-4xl' : 'text-3xl'
+            }`}
+          >
+            {med.drug_name}
           </h1>
-          <div className="mt-2 flex items-center justify-center gap-2 max-w-[90vw]">
-            <span className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-              {getUnitIcon(med.unit_type ?? undefined, 'w-5 h-5')}
-            </span>
-            {/* Was `text-primary` — brand pink on the gate's pale pink surface measures
-                2.6:1, under the 3:1 floor even at this size. The pink stays on the icon
-                tile beside it, where it is decoration rather than the thing you read. */}
-            <span className={`font-black text-foreground tracking-tight truncate ${isElderly ? 'text-3xl' : 'text-2xl'}`}>
-              {missedMode ? med.drug_name : `${med.drug_name}?`}
-            </span>
-          </div>
           {/* Rendered "1 tablet(s) · N/A" — the placeholder strength leaked through, on
               the one screen whose whole job is a clear yes/no about this dose. */}
           {(() => {
             const parts = [
               med.dosage_amount ? `${med.dosage_amount} ${unitPhrase(med.unit_type ?? undefined, med.dosage_amount)}` : '',
               med.dosage && med.dosage !== 'N/A' ? med.dosage : '',
+              `scheduled ${fmtTime(event.scheduled_for)}`,
             ].filter(Boolean);
-            return parts.length > 0 ? (
-              <p className={`mt-2 text-muted-foreground font-sans ${isElderly ? 'text-base' : 'text-sm'}`}>
+            return (
+              <p
+                className={`mt-2.5 flex flex-wrap items-center justify-center gap-1.5 text-muted-foreground font-sans ${
+                  isElderly ? 'text-lg' : 'text-sm'
+                }`}
+              >
+                <span className="text-primary shrink-0">
+                  {getUnitIcon(med.unit_type ?? undefined, isElderly ? 'w-5 h-5' : 'w-4 h-4')}
+                </span>
                 {parts.join(' · ')}
               </p>
-            ) : null;
+            );
           })()}
-          {missedMode && (
-            <h2 className={`mt-4 font-black text-foreground tracking-tight ${isElderly ? 'text-2xl' : 'text-xl'}`}>
-              Did you take it?
-            </h2>
-          )}
 
           {permanentError && permanentError.id === event.id ? (
             /* Unsaveable dose: honest message + explicit OK before it disappears. */
-            <div className="mt-8 w-full max-w-sm space-y-3">
+            <div className="mt-auto pt-8 w-full max-w-sm space-y-3">
               <p className={`flex items-start justify-center gap-2 text-danger font-semibold ${isElderly ? 'text-lg' : 'text-sm'}`}>
                 <AlertTriangle className={`shrink-0 mt-0.5 ${isElderly ? 'w-6 h-6' : 'w-4 h-4'}`} />
                 <span>{permanentError.message}</span>
@@ -380,11 +494,17 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
               </button>
             </div>
           ) : (
-          <div className="mt-8 w-full max-w-sm space-y-3">
+          /* The actions sit on their own nested surface — an outer tray with a hairline,
+             an inner glass plate inside it — so the answer area reads as a distinct
+             object resting on the gate rather than three buttons floating on a wash.
+             Radii are concentric: 32px outer, 32-6=26 inner, 16 on the buttons. */
+          <div className="mt-auto pt-8 w-full max-w-sm">
+            <div className="rounded-[2rem] p-1.5 bg-foreground/[0.04] dark:bg-white/[0.06] ring-1 ring-foreground/[0.06] dark:ring-white/10">
+              <div className="rounded-[calc(2rem-0.375rem)] p-3 space-y-3 bg-card/70 dark:bg-white/[0.05] backdrop-blur-xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.6)] dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08)]">
             <button
               onClick={() => answer(event, 'TAKEN', false)}
               disabled={busyId !== null}
-              className={`w-full flex items-center justify-center gap-2 rounded-2xl bg-success text-success-foreground font-black shadow-md hover:bg-success/90 active:scale-[0.98] transition-all disabled:opacity-50 cursor-pointer ${
+              className={`w-full flex items-center justify-center gap-2 rounded-2xl bg-success text-success-foreground font-black shadow-[0_6px_16px_-6px_var(--success)] hover:bg-success/90 active:scale-[0.98] transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] disabled:opacity-50 cursor-pointer ${
                 isElderly ? 'py-5 text-2xl' : 'py-4 text-lg'
               }`}
             >
@@ -394,7 +514,7 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
             <button
               onClick={() => answer(event, 'SKIP', false)}
               disabled={busyId !== null}
-              className={`w-full flex items-center justify-center gap-2 rounded-2xl bg-card text-foreground border border-border font-black hover:bg-muted active:scale-[0.98] transition-all disabled:opacity-50 cursor-pointer ${
+              className={`w-full flex items-center justify-center gap-2 rounded-2xl bg-card text-foreground border border-border font-black hover:bg-muted active:scale-[0.98] transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] disabled:opacity-50 cursor-pointer ${
                 isElderly ? 'py-5 text-2xl' : 'py-4 text-lg'
               }`}
             >
@@ -404,13 +524,17 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
             <button
               onClick={() => busyId === null && onSnooze(event.id)}
               disabled={busyId !== null}
-              className={`w-full flex items-center justify-center gap-2 min-h-11 rounded-2xl text-muted-foreground hover:text-foreground font-semibold transition-all disabled:opacity-50 cursor-pointer ${
+              /* Was text-muted-foreground — the faintest text on the screen, for an
+                 action that writes to the dose ledger. Quiet is fine; illegible is not. */
+              className={`w-full flex items-center justify-center gap-2 min-h-11 rounded-2xl text-foreground hover:bg-foreground/5 font-semibold transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] disabled:opacity-50 cursor-pointer ${
                 isElderly ? 'py-3 text-lg' : 'py-2.5 text-sm'
               }`}
             >
               <Clock className="w-4 h-4" />
               {missedMode ? 'Ask me later' : 'Not yet, remind me later'}
             </button>
+              </div>
+            </div>
           </div>
           )}
         </>
@@ -518,6 +642,7 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
       >
         <Siren className="w-3.5 h-3.5" /> Emergency card
       </button>
+      </div>
     </div>
   );
 }
