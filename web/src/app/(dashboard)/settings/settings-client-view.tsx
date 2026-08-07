@@ -341,10 +341,10 @@ export default function SettingsClientView({
             {user.fullName.substring(0, 2).toUpperCase()}
           </div>
           <div className="min-w-0">
-            <h4 className={`font-black text-foreground truncate ${isElderly ? 'text-2xl' : 'text-base'}`}>
+            <h4 className={`font-black text-foreground ${isElderly ? 'text-2xl break-words' : 'text-base truncate'}`}>
               {user.fullName}
             </h4>
-            <p className={`text-muted-foreground font-semibold truncate ${isElderly ? 'text-lg mt-0.5' : 'text-xs'}`}>
+            <p className={`text-muted-foreground font-semibold ${isElderly ? 'text-lg mt-0.5 break-all' : 'text-xs truncate'}`}>
               {user.email}
             </p>
           </div>
@@ -500,14 +500,14 @@ export default function SettingsClientView({
             isElderly ? 'p-6' : 'p-4'
           }`}
         >
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
             <div className={`shrink-0 rounded-2xl bg-primary/10 text-primary flex items-center justify-center ${
               isElderly ? 'w-14 h-14' : 'w-11 h-11'
             }`}>
               <Users className={isElderly ? 'w-7 h-7' : 'w-5 h-5'} />
             </div>
             <div className="min-w-0">
-              <span className={`block font-extrabold text-foreground ${isElderly ? 'text-xl' : 'text-sm'}`}>
+              <span className={`block font-extrabold text-foreground text-balance ${isElderly ? 'text-xl' : 'text-sm'}`}>
                 Open your Care Circle
               </span>
               <span className={`block text-muted-foreground font-semibold ${isElderly ? 'text-base' : 'text-xs'}`}>

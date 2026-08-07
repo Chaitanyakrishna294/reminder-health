@@ -638,7 +638,7 @@ export default function SchedulePlannerPage() {
         <div className="flex items-center justify-between mb-3">
           <button
             onClick={() => shiftWeek(-1)}
-            className="w-11 h-11 rounded-full flex items-center justify-center bg-[#F2F2F7] hover:bg-[#E5E5EA] text-foreground transition-all cursor-pointer"
+            className="w-11 h-11 shrink-0 rounded-full flex items-center justify-center bg-[#F2F2F7] hover:bg-[#E5E5EA] text-foreground transition-all cursor-pointer"
             aria-label="Previous week"
           >
             <ChevronLeft className="w-4 h-4" strokeWidth={2.5} />
@@ -663,7 +663,7 @@ export default function SchedulePlannerPage() {
           </div>
           <button
             onClick={() => shiftWeek(1)}
-            className="w-11 h-11 rounded-full flex items-center justify-center bg-[#F2F2F7] hover:bg-[#E5E5EA] text-foreground transition-all cursor-pointer"
+            className="w-11 h-11 shrink-0 rounded-full flex items-center justify-center bg-[#F2F2F7] hover:bg-[#E5E5EA] text-foreground transition-all cursor-pointer"
             aria-label="Next week"
           >
             <ChevronRight className="w-4 h-4" strokeWidth={2.5} />

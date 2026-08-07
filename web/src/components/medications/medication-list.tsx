@@ -258,7 +258,7 @@ export default function MedicationList({
       {/* Auto-start the guided tour once for first-time users (then summonable via the ? button). */}
       <GuideAutoStart tour="medications" />
       {/* Header */}
-      <div data-tour="med-hero" className="flex items-end justify-between gap-3">
+      <div data-tour="med-hero" className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
         <div>
           <h1 className={`font-bold tracking-tight text-foreground ${isElderly ? 'text-[28px]' : 'text-[26px]'}`}>
             {patientName ? `${patientName}'s Medications` : 'Medications'}
@@ -371,7 +371,7 @@ export default function MedicationList({
                     {/* Name + meta */}
                     <div className="flex-1 min-w-0">
                       <h3
-                        className={`font-bold tracking-tight text-foreground truncate ${isElderly ? 'text-2xl' : 'text-lg'}`}
+                        className={`font-bold tracking-tight text-foreground ${isElderly ? 'text-2xl break-words' : 'text-lg truncate'}`}
                       >
                         {med.drug_name}
                       </h3>

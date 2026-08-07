@@ -1269,7 +1269,7 @@ export default function DashboardClientView({
                       {getUnitIcon(nextPendingEvent.medications.unit_type, "w-6 h-6")}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <h3 className={`text-2xl font-black tracking-tight leading-tight truncate ${onGradient ? 'text-white' : 'text-foreground'}`}>
+                      <h3 className={`text-2xl font-black tracking-tight leading-tight break-words ${onGradient ? 'text-white' : 'text-foreground'}`}>
                         {nextPendingEvent.medications.drug_name}
                       </h3>
                       <div className={`text-xs mt-1 space-y-1 font-sans ${onGradient ? 'text-white/85' : 'text-muted-foreground'}`}>

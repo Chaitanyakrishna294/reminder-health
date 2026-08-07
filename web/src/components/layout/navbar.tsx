@@ -42,7 +42,7 @@ export default function Navbar({ user }: NavbarProps) {
           }`}>
           {/* Logo and Brand */}
           <div className="flex items-center">
-            <Link href="/dashboard" className="flex items-center space-x-2">
+            <Link href="/dashboard" className="flex items-center gap-1 min-h-11 shrink-0">
               
               <span className={`font-black text-foreground tracking-tight transition-all duration-300 font-mono flex items-center gap-0.5 ${isElderly ? 'text-2xl' : 'text-lg'
                 }`}>
@@ -52,8 +52,8 @@ export default function Navbar({ user }: NavbarProps) {
                   alt="MIND"
                   className="inline-block rounded-md object-contain shrink-0 bg-white"
                   style={{
-                    width: isElderly ? '75px' : '55px',
-                    height: isElderly ? '75px' : '55px'
+                    width: isElderly ? '48px' : '40px',
+                    height: isElderly ? '48px' : '40px'
                   }}
                 />
                 <span>eЯ</span>
@@ -62,7 +62,7 @@ export default function Navbar({ user }: NavbarProps) {
           </div>
 
           {/* Action Center (Role Switcher, Realtime Bell, Mode Toggle, Profile Dropdown) */}
-          <div className="flex items-center space-x-3 sm:space-x-4">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
 
             {/* Realtime Bell */}
             <NotificationCenter userId={user.id} />
@@ -72,7 +72,7 @@ export default function Navbar({ user }: NavbarProps) {
               onClick={toggleTheme}
               aria-label={theme === 'dark' ? 'Switch to Light mode' : 'Switch to Dark mode'}
               title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
-              className={`flex items-center justify-center rounded-full transition-all duration-200 border cursor-pointer hover:scale-[1.05] active:scale-[0.95] bg-muted hover:bg-muted/80 border-border text-foreground/80 hover:text-foreground ${isElderly ? 'w-14 h-14' : 'w-11 h-11'
+              className={`flex items-center justify-center rounded-full transition-all duration-200 border cursor-pointer hover:scale-[1.05] active:scale-[0.95] bg-muted hover:bg-muted/80 border-border text-foreground/80 hover:text-foreground ${isElderly ? 'w-12 h-12' : 'w-11 h-11'
                 }`}
             >
               {theme === 'dark'
@@ -99,7 +99,7 @@ export default function Navbar({ user }: NavbarProps) {
                 onClick={() => setUserDropdownOpen(!userDropdownOpen)}
                 className="flex items-center space-x-2 focus:outline-none cursor-pointer font-mono"
               >
-                <div className={`rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold border border-primary/20 transition-all overflow-hidden ${isElderly ? 'w-14 h-14 text-base' : 'w-11 h-11 text-sm'
+                <div className={`rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold border border-primary/20 transition-all overflow-hidden ${isElderly ? 'w-12 h-12 text-base' : 'w-11 h-11 text-sm'
                   }`}>
                   {user.avatarUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
