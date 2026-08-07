@@ -12,7 +12,6 @@ import { registerPush } from '@/lib/push/register-push';
 import { resolveReminderEvent } from '@/lib/reminder-events';
 import { PremiumToast } from '@/components/ui/premium-toast';
 import MedDueGate from '@/components/dashboard/med-due-gate';
-import BrainMascot from '@/components/dashboard/brain-mascot';
 import GuideButton from '@/components/guide/guide-button';
 import GuideAutoStart from '@/components/guide/guide-auto-start';
 import moment from 'moment-timezone';
@@ -27,10 +26,10 @@ import { getUnitIcon, getCountdownText, PinkBubbles } from '@/components/dashboa
 
 import { createClient } from '@/lib/supabase/client';
 import { getSeverityTheme } from '@/lib/severity-theme';
-import { TONE_VAR, doseTone, CARE_LABELS } from '@/lib/design/semantics';
+import { TONE_VAR, doseTone } from '@/lib/design/semantics';
+import { caregiverRoleLabel, firstName } from '@/lib/care-circle/relationship';
 import { unitPhrase } from '@/components/medications/medication-form-options';
 import { Eyebrow } from '@/components/ui/eyebrow';
-import { EmptyState } from '@/components/ui/empty-state';
 import { 
   Activity, 
   Clock, 
@@ -483,7 +482,6 @@ export default function DashboardClientView({
   const dueNowPending = sortedPending.find(e => new Date(e.scheduled_for).getTime() <= nowMs);
   const nextPendingEvent = dueNowPending ?? attentionEvents[0] ?? sortedPending[0];
 
-  const heroMood = activeEscalations > 0 || todayMissed > 0 ? 'concerned' : nextPendingEvent ? 'happy' : 'proud';
   const upcomingCount = events.filter(e => isPendingState(e.reminder_status)).length;
   const activeEvent = hoveredEvent || selectedEvent;
 
@@ -998,7 +996,7 @@ export default function DashboardClientView({
       {showPushBanner && (
         <div className="bg-white/10 dark:bg-slate-900/40 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-3xl p-5 shadow-lg relative overflow-hidden flex flex-col sm:flex-row items-center justify-between gap-4 animate-fade-in z-45">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-full bg-primary/10 text-foreground flex items-center justify-center shrink-0">
               <Send className="w-5 h-5 animate-bounce" />
             </div>
             <div>
@@ -1030,7 +1028,7 @@ export default function DashboardClientView({
       {showIosPwaBanner && (
         <div className="bg-primary/5 dark:bg-primary/10 border border-primary/20 rounded-3xl p-5 shadow-lg relative overflow-hidden flex flex-col sm:flex-row items-center justify-between gap-4 animate-fade-in z-45">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-full bg-primary/10 text-foreground flex items-center justify-center shrink-0">
               <Plus className="w-5 h-5" />
             </div>
             <div>
@@ -1064,7 +1062,7 @@ export default function DashboardClientView({
         <div className="bg-white border border-border rounded-[28px] p-6 shadow-md relative overflow-hidden animate-fade-in space-y-6">
           <div className="flex justify-between items-start gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
+              <div className="w-12 h-12 rounded-full bg-primary/10 text-foreground flex items-center justify-center shrink-0">
                 <Sparkles className="w-6 h-6 animate-pulse" />
               </div>
               <div>
@@ -1133,7 +1131,7 @@ export default function DashboardClientView({
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-transparent border-none shadow-none p-0">
         <div className="flex items-center gap-4 w-full sm:w-auto">
           {/* Profile photo (falls back to initials) */}
-          <div className="w-12 h-12 rounded-full bg-primary/10 text-primary border border-primary/20 flex items-center justify-center font-mono font-black text-lg shadow-inner shrink-0 overflow-hidden">
+          <div className="w-12 h-12 rounded-full bg-primary/10 text-foreground border border-primary/20 flex items-center justify-center font-mono font-black text-lg shadow-inner shrink-0 overflow-hidden">
             {avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={avatarUrl} alt="Profile photo" className="w-full h-full object-cover" />
@@ -1228,9 +1226,9 @@ export default function DashboardClientView({
       )}
 
       {/* First Viewport: Top Row split layout (Left: Next Medication card, Right: Compliance Ring) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
         {/* Left: Next/Missed Medication summary card */}
-        <div data-tour="dash-next-med" className={`lg:col-span-7 rounded-3xl p-6 shadow-sm flex flex-col justify-start gap-4 relative overflow-hidden isolate border transition-colors ${
+        <div data-tour="dash-next-med" className={`lg:col-span-7 rounded-3xl p-5 sm:p-6 shadow-sm flex flex-col justify-start gap-4 relative overflow-hidden isolate border transition-colors ${
           isMissed
             ? 'border-danger/50 shadow-danger/5 shadow-md bg-danger/[0.02]'
             : nextPendingEvent
@@ -1238,17 +1236,6 @@ export default function DashboardClientView({
               : 'bg-card border-border'
         }`}>
           {nextPendingEvent && !isMissed && <PinkBubbles />}
-          {/* Mascot accent filling the card's empty space. Only floated when there IS a
-              dose card to fill space around — in the "All caught up!" state the card is
-              short, and the mascot ended up hovering over the checkmark instead of
-              beside it. There it moves into the flex row (below). */}
-          {nextPendingEvent && (
-            <BrainMascot
-              size={96}
-              mood={heroMood}
-              className="absolute right-3 sm:right-6 top-[42%] -translate-y-1/2 opacity-90 pointer-events-none select-none"
-            />
-          )}
           <div>
             <div className="flex justify-between items-start gap-4">
               <div className="min-w-0 flex-1">
@@ -1263,7 +1250,7 @@ export default function DashboardClientView({
                       isMissed
                         ? 'bg-danger/10 text-danger border border-danger/20'
                         : onGradient
-                          ? 'bg-white/20 text-white border border-white/30'
+                          ? 'bg-black/25 text-white border border-white/35'
                           : nextSeverity.tile
                     }`}>
                       {getUnitIcon(nextPendingEvent.medications.unit_type, "w-6 h-6")}
@@ -1297,11 +1284,6 @@ export default function DashboardClientView({
                   </div>
                 ) : (
                   <div className="mt-4 flex items-center gap-3">
-                    <BrainMascot
-                      size={72}
-                      mood={heroMood}
-                      className="shrink-0 pointer-events-none select-none"
-                    />
                     <CheckCircle className="w-8 h-8 shrink-0 text-success" />
                     <div>
                       <h3 className="text-lg font-black tracking-tight text-success-strong">All caught up!</h3>
@@ -1323,7 +1305,7 @@ export default function DashboardClientView({
                          the dark red ink clears 7:1 on any background this card takes. */
                       ? 'bg-card text-danger-strong border-danger'
                       : onGradient
-                        ? 'bg-white/25 text-white border-white/40'
+                        ? 'bg-black/25 text-white border-white/45'
                         : 'bg-primary/15 text-primary border-primary/25'
                   }`}>
                     {mounted ? getCountdownText(nextPendingEvent.scheduled_for) : 'UPCOMING'}
@@ -1340,7 +1322,7 @@ export default function DashboardClientView({
  
           {nextPendingEvent && (
             viewMode === 'PATIENT_MONITOR' ? (
-              <div className={`mt-6 p-3 rounded-2xl text-[11px] font-bold w-fit flex items-center gap-1.5 ${onGradient ? 'bg-white/15 border border-white/25 text-white' : 'bg-muted border border-border text-muted-foreground'}`}>
+              <div className={`mt-6 p-3 rounded-2xl text-[11px] font-bold w-fit flex items-center gap-1.5 ${onGradient ? 'bg-black/25 border border-white/25 text-white' : 'bg-muted border border-border text-muted-foreground'}`}>
                 <Lock className="w-3.5 h-3.5 shrink-0" />
                 <span>Read-Only Monitoring Mode</span>
               </div>
@@ -1368,7 +1350,11 @@ export default function DashboardClientView({
                   <button
                     onClick={() => handleElderlyTakeNow(nextPendingEvent, 'SKIP')}
                     disabled={updatingId !== null}
-                    className="inline-flex items-center gap-1.5 h-11 px-4 bg-white/70 backdrop-blur-md border border-white/80 text-foreground text-xs font-bold rounded-full hover:bg-white/80 active:scale-[0.98] transition-all cursor-pointer shadow-sm disabled:opacity-50"
+                    /* Was bg-white/70 + text-foreground: fine in light, but in dark
+                       text-foreground is near-white, so this was white text on a
+                       near-white pill. Mirrors the neutral form of its Take Now
+                       sibling's tint + on-tint-text pattern, which reads in both. */
+                    className="inline-flex items-center gap-1.5 h-11 px-4 bg-foreground/10 backdrop-blur-md border border-foreground/25 text-foreground text-xs font-bold rounded-full hover:bg-foreground/20 active:scale-[0.98] transition-all cursor-pointer shadow-sm disabled:opacity-50"
                   >
                     <X className="w-4 h-4" /> Skip
                   </button>
@@ -1385,7 +1371,7 @@ export default function DashboardClientView({
                 </div>
               )
             ) : (
-              <div className={`mt-6 p-4 rounded-2xl text-xs font-semibold w-fit flex items-center gap-1.5 ${onGradient ? 'bg-white/15 border border-white/25 text-white' : 'bg-muted/50 border border-border/80 text-muted-foreground'}`}>
+              <div className={`mt-6 p-4 rounded-2xl text-xs font-semibold w-fit flex items-center gap-1.5 ${onGradient ? 'bg-black/25 border border-white/25 text-white' : 'bg-muted/50 border border-border/80 text-muted-foreground'}`}>
                 <Clock className="w-3.5 h-3.5 shrink-0 animate-pulse" />
                 <span>{nextPendingEvent && isAttentionStatus(nextPendingEvent.reminder_status) ? 'Log this dose in the red missed panel above.' : `Options will become available at ${mounted ? new Date(nextPendingEvent.scheduled_for).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}`}</span>
               </div>
@@ -1394,17 +1380,30 @@ export default function DashboardClientView({
         </div>
 
         {/* Right: Medication Compliance Ring */}
-        <div data-tour="dash-compliance" className="lg:col-span-5 bg-card border border-border rounded-3xl p-6 shadow-sm flex flex-col justify-between text-center relative min-h-[300px]">
+        {/* Compliance and Care Circle pair up at every width. Single-column, the ring
+            card alone ran past the fold and the Care Circle lived ~1500px down the page,
+            so the two things you check at a glance were never on screen together. */}
+        {/* Compliance takes the wider share: the ring is w-full, so its size is decided by
+            the column, not by any max-width. Raising the cap alone measured no change. */}
+        <div className="lg:col-span-5 grid grid-cols-[1.1fr_1fr] lg:grid-cols-1 gap-3 sm:gap-6 items-stretch">
+        <div data-tour="dash-compliance" className="bg-card border border-border rounded-3xl p-4 sm:p-6 shadow-sm flex flex-col justify-between text-center relative min-h-0 sm:min-h-[300px]">
+          {/* Half-width now, so the title has to fit one line: "Daily Compliance" wrapped
+              to two and the "Daily dose cycle progress" subtitle took two more, spending
+              four lines of a small card restating its own heading. */}
           <div className="w-full text-left mb-2">
-            <h3 className="font-black text-foreground text-sm flex items-center gap-1.5">
-              <Activity className="w-4 h-4 text-primary" /> Daily Compliance
+            <h3 className="font-black text-foreground text-xs sm:text-sm flex items-center gap-1.5 min-w-0">
+              <Activity className="w-4 h-4 text-primary shrink-0" />
+              <span className="truncate">Compliance</span>
             </h3>
-            <p className="text-[11px] text-muted-foreground">Daily dose cycle progress</p>
+            <p className="hidden sm:block text-[11px] text-muted-foreground">Daily dose cycle progress</p>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center gap-6 w-full">
-          {/* Left: orbiting compliance ring */}
-          <div className="relative w-full max-w-[200px] aspect-square flex items-center justify-center shrink-0">
+          {/* The ring is the whole card. It gets every pixel the half-width card can spare
+              rather than sharing them with a key — a legend of colour names read as small
+              text below a graphic too small to read. */}
+          <div className="flex flex-col items-center w-full">
+          {/* Orbiting compliance ring */}
+          <div className="relative w-full max-w-[150px] sm:max-w-[200px] aspect-square flex items-center justify-center shrink-0">
             {events.length === 0 ? (
               <div className="text-center space-y-2">
                 <CheckCircle className="w-8 h-8 text-success mx-auto" />
@@ -1540,22 +1539,63 @@ export default function DashboardClientView({
             )}
           </div>
 
-          {/* Right: compliance stat cards */}
-          <div className="w-full flex-1 flex flex-col justify-center gap-2">
-            <div className="flex items-center justify-between rounded-2xl bg-success/10 px-4 py-2.5">
-              <span className="text-xs font-bold text-success flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-success" /> Taken
-              </span>
-              <span className="text-sm font-black text-success">{todayTaken}</span>
-            </div>
-            <div className="flex items-center justify-between rounded-2xl bg-muted px-4 py-2.5">
-              <span className="text-xs font-bold text-muted-foreground flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50" /> Upcoming
-              </span>
-              <span className="text-sm font-black text-foreground">{upcomingCount}</span>
-            </div>
           </div>
-          </div>
+        </div>
+
+        {/* Care Circle at a glance. First names only: at this width a full name either
+            truncates or wraps to two lines, and the first name is what you actually scan
+            for. The relationship uses caregiverRoleLabel because these are the people
+            caring for YOU — the same field means the opposite thing further down. */}
+        <div className="bg-card border border-border rounded-3xl p-4 sm:p-6 shadow-sm flex flex-col min-h-0">
+          {/* "See all" sat beside the title and squeezed it to "Care …". It moves to the
+              foot of the card, where it also fills the space the short list leaves. */}
+          <h3 className="font-black text-foreground text-xs sm:text-sm flex items-center gap-1.5 min-w-0">
+            <Users className="w-4 h-4 text-primary shrink-0" />
+            <span className="truncate">Care circle</span>
+          </h3>
+
+          {peopleCaringForMe.length > 0 ? (
+            <ul className="mt-3 space-y-3">
+              {peopleCaringForMe.slice(0, 3).map((conn) => (
+                <li key={conn.connection_id} className="flex items-center gap-2.5 min-w-0">
+                  {/* text-primary on a primary/10 tint measures 2.9:1. Initials are text. */}
+                  <span className="shrink-0 w-8 h-8 rounded-full bg-primary/10 text-foreground flex items-center justify-center text-[11px] font-black">
+                    {firstName(conn.resolved_name).slice(0, 2).toUpperCase()}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-xs font-black text-foreground truncate">
+                      {firstName(conn.resolved_name)}
+                    </span>
+                    <span className="block text-[11px] font-bold text-muted-foreground truncate">
+                      {caregiverRoleLabel(conn.relationship_type)}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="mt-3 flex-1 flex flex-col justify-center">
+              <p className="text-[11px] font-semibold text-muted-foreground leading-relaxed">
+                Nobody is notified if you miss a dose yet.
+              </p>
+              <Link
+                href="/settings#care-circle"
+                className="mt-2 inline-flex items-center text-[11px] font-black text-primary-strong hover:underline"
+              >
+                Invite someone
+              </Link>
+            </div>
+          )}
+
+          {peopleCaringForMe.length > 0 && (
+            <Link
+              href="/care-circle"
+              className="mt-auto inline-flex items-center min-h-11 text-[11px] font-black text-primary-strong hover:underline"
+            >
+              See all
+            </Link>
+          )}
+        </div>
         </div>
       </div>
 
@@ -1565,7 +1605,7 @@ export default function DashboardClientView({
           <Clock className="w-4 h-4 text-white" /> Daily Compliance Timeline
         </h3>
 
-        <div className="grid grid-cols-4 gap-2 text-center">
+        <div className="grid grid-cols-4 gap-1.5 text-center">
           {[
             { label: 'Morning', icon: <Sun className="w-3.5 h-3.5 shrink-0" />, period: getPeriodStatus(5, 12) },
             { label: 'Afternoon', icon: <CloudSun className="w-3.5 h-3.5 shrink-0" />, period: getPeriodStatus(12, 17) },
@@ -1595,21 +1635,26 @@ export default function DashboardClientView({
             }
 
             return (
+              // Slanted left/right edges, flat top/bottom: skew the tile, counter-skew
+              // the contents. clip-path would give the same silhouette but throws away
+              // the rounded corners, so it's a transform on both layers instead.
               <div
                 key={idx}
-                className={`p-2 rounded-2xl border flex flex-col items-center justify-center gap-2 min-h-[78px] ${bgClass}`}
+                className={`px-1 py-2 rounded-2xl border flex min-h-[78px] [transform:skewX(-6deg)] ${bgClass}`}
                 title={`${item.label}: ${statusWord}`}
               >
-                {/* `truncate` clipped "Afternoon" to "Afternoo" in a 4-column grid on a
-                    375px screen. These are four fixed, known words — let them wrap
-                    rather than lose a letter. */}
-                <span className="text-[11px] font-black font-mono tracking-tight flex flex-col items-center gap-1 w-full">
-                  {item.icon}
-                  <span className="text-center leading-tight break-words max-w-full">{item.label}</span>
-                </span>
-                {/* The icon alone carried the state; screen readers got nothing. */}
-                <span aria-hidden="true">{statusIcon}</span>
-                <span className="sr-only">{statusWord}</span>
+                <div className="flex flex-1 flex-col items-center justify-center gap-2 [transform:skewX(6deg)]">
+                  {/* `truncate` clipped "Afternoon" to "Afternoo" and `break-words` then
+                      split it across two lines ("Afterno/on"). Dropping the wide mono
+                      face and pinning it to one line fits all four words at 11px. */}
+                  <span className="text-[11px] font-black tracking-tight flex flex-col items-center gap-1 w-full">
+                    {item.icon}
+                    <span className="text-center leading-tight whitespace-nowrap">{item.label}</span>
+                  </span>
+                  {/* The icon alone carried the state; screen readers got nothing. */}
+                  <span aria-hidden="true">{statusIcon}</span>
+                  <span className="sr-only">{statusWord}</span>
+                </div>
               </div>
             );
           })}
@@ -1812,113 +1857,10 @@ export default function DashboardClientView({
             ) : (
               <div className="bg-success/5 border border-success/20 p-4 rounded-2xl text-center text-xs space-y-1">
                 <Package className="w-8 h-8 text-success mx-auto mb-2" />
-                <p className="font-black text-success mt-1">Inventory Balanced</p>
+                <p className="font-black text-success-strong mt-1">Inventory Balanced</p>
                 <p className="text-[11px] text-muted-foreground font-semibold">All medication stock levels are sufficient.</p>
               </div>
             )}
-          </div>
-
-          {/* Layer 5: Care Circle.
-              This was a full-bleed saturated pink gradient sitting directly below plain
-              white cards — the loudest surface on the page attached to the least urgent
-              information, so the eye jumped past the inventory warnings to get to it.
-              Now a tinted surface: still clearly the Care Circle, no longer shouting.
-              It also dropped a one-off teal CTA (#5EEAD4) that matched nothing else. */}
-          <div className="relative overflow-hidden isolate bg-primary-soft border border-primary/20 rounded-3xl p-6 shadow-sm space-y-5">
-            <div className="flex justify-between items-center gap-3">
-              <div>
-                <h3 className="font-black text-foreground text-sm">Care Circle</h3>
-                <p className="text-[11px] text-muted-foreground">Manage sharing &amp; family relationships</p>
-              </div>
-              <Link
-                href="/care-circle"
-                className="shrink-0 inline-flex items-center h-11 px-4 rounded-full bg-card border border-border hover:bg-muted text-foreground transition-all text-xs font-bold shadow-sm"
-              >
-                Open Hub
-              </Link>
-            </div>
-
-            <div className="space-y-4">
-              {/* Patient side first — same order as /care-circle. */}
-              <div className="space-y-2">
-                <Eyebrow>{CARE_LABELS.asPatient} ({peopleCaringForMe.length})</Eyebrow>
-                {peopleCaringForMe.length > 0 ? (
-                  <div className="space-y-2">
-                    {peopleCaringForMe.slice(0, 3).map((conn) => {
-                      const initials = conn.resolved_name?.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() || 'C';
-                      return (
-                        <div key={conn.connection_id} className="flex items-center justify-between gap-2 p-3 rounded-2xl bg-card border border-border">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-black">
-                              {initials}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-xs font-black text-foreground truncate">{conn.resolved_name}</p>
-                              <p className="text-[11px] font-bold text-muted-foreground uppercase">{conn.relationship_type}</p>
-                            </div>
-                          </div>
-                          <span className="shrink-0 text-[11px] font-bold px-2 py-0.5 rounded-full bg-muted text-muted-foreground uppercase">
-                            {conn.connection_status}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  /* Was 10px white-on-pink at 70% opacity — the least readable text on
-                     the dashboard — and it offered no way to fix the emptiness. */
-                  <EmptyState
-                    bare
-                    className="bg-card/60 border border-dashed border-border rounded-2xl"
-                    title="No caregivers yet"
-                    description="Invite someone who should know if you miss a dose."
-                    action={{ label: 'Invite someone', href: '/settings#care-circle' }}
-                  />
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Eyebrow>{CARE_LABELS.asCaregiver} ({peopleICareFor.length})</Eyebrow>
-                {peopleICareFor.length > 0 ? (
-                  <div className="space-y-2">
-                    {peopleICareFor.slice(0, 3).map((conn) => {
-                      const initials = conn.resolved_name?.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() || 'P';
-                      return (
-                        <div key={conn.connection_id} className="flex items-center justify-between gap-2 p-3 rounded-2xl bg-card border border-border">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-black">
-                              {initials}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-xs font-black text-foreground truncate">{conn.resolved_name}</p>
-                              <p className="text-[11px] font-bold text-muted-foreground uppercase">{conn.relationship_type}</p>
-                            </div>
-                          </div>
-                          <Link
-                            href={`/care-circle/${conn.patient_telegram_id}`}
-                            className="shrink-0 inline-flex items-center h-11 px-3 rounded-full bg-muted hover:bg-accent-surface text-xs font-bold text-foreground transition-all"
-                          >
-                            Overview
-                          </Link>
-                        </div>
-                      );
-                    })}
-                    {peopleICareFor.length > 3 && (
-                      <p className="text-[11px] text-center text-muted-foreground">
-                        + {peopleICareFor.length - 3} more. <Link href="/care-circle" className="text-primary font-bold underline">View all</Link>
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <EmptyState
-                    bare
-                    className="bg-card/60 border border-dashed border-border rounded-2xl"
-                    title="Not caring for anyone yet"
-                    description="Requests to become someone's caregiver show up here."
-                  />
-                )}
-              </div>
-            </div>
           </div>
 
         </div>

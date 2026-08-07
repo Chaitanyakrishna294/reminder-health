@@ -287,16 +287,21 @@ export default function TodaysSchedule({
                     : isEscalated;
   
               return (
-                <div 
-                  key={event.id} 
-                  className={`p-8 rounded-3xl border-4 shadow-md bg-card flex flex-col gap-6 transition-none ${
-                    isEscalated 
-                      ? 'border-danger bg-danger/5' 
-                      : isPending 
-                        ? 'border-primary' 
+                // Same slanted-edge treatment as the compact card and the compliance
+                // timeline tiles. These cards are tall, and skewX widens the visual
+                // footprint by height/2 * tan(6deg) on each side, so `mx-3` buys back
+                // the room instead of pushing the 375px viewport into overflow.
+                <div
+                  key={event.id}
+                  className={`mx-3 p-8 rounded-3xl border-4 shadow-md bg-card flex flex-col transition-none [transform:skewX(-6deg)] ${
+                    isEscalated
+                      ? 'border-danger bg-danger/5'
+                      : isPending
+                        ? 'border-primary'
                         : 'border-border opacity-70'
                   }`}
                 >
+                  <div className="flex flex-col gap-6 [transform:skewX(6deg)]">
                   <div className="flex items-start gap-4">
                     <Pill className="w-16 h-16 text-primary shrink-0" />
                     <div className="space-y-3 flex-1">
@@ -345,6 +350,7 @@ export default function TodaysSchedule({
                       </button>
                     </div>
                   )}
+                  </div>
                 </div>
               );
             })
@@ -392,10 +398,15 @@ export default function TodaysSchedule({
         : `${theme.bg} border-border/40 opacity-90`;
 
     return (
+      // Slanted left/right edges, flat top/bottom — same treatment as the Daily
+      // Compliance Timeline tiles: skew the card, counter-skew the contents so the
+      // name, time and buttons stay upright. clip-path would give the same silhouette
+      // but throws the rounded corners away, so it's a transform on both layers.
       <div
         key={event.id}
-        className={`rounded-2xl border px-4 py-3 flex items-center justify-between gap-3 shadow-sm hover:shadow-md transition-all duration-200 ${borderClass}`}
+        className={`rounded-2xl border px-5 py-3 flex shadow-sm hover:shadow-md transition-all duration-200 [transform:skewX(-6deg)] ${borderClass}`}
       >
+      <div className="flex flex-1 min-w-0 items-center justify-between gap-3 [transform:skewX(6deg)]">
         {/* Severity dot, then name over time.
             Name and time used to sit side by side on one line with the action buttons,
             which left the NAME 56px on a 375px screen — "TEST Med A" needs 84px, so the
@@ -444,6 +455,7 @@ export default function TodaysSchedule({
           )}
         </div>
       </div>
+      </div>
     );
   };
 
@@ -455,7 +467,10 @@ export default function TodaysSchedule({
     <>
       <div className="space-y-6">
         {completedEvents.length === 0 ? (
-          <div className="p-8 text-center text-sm text-muted-foreground bg-white/40 rounded-3xl border border-dashed border-border/80">
+          /* bg-white/40 had no dark variant, and the compat rule only matches a bare
+             `.bg-white`, so in dark mode this composited to a pale grey-blue panel
+             carrying muted-foreground text at roughly 1.6:1. */
+          <div className="p-8 text-center text-sm text-muted-foreground bg-card/60 rounded-3xl border border-dashed border-border/80">
             No completed medication events today yet.
           </div>
         ) : (
@@ -472,7 +487,7 @@ export default function TodaysSchedule({
   
                 <button 
                   onClick={() => setIsExpanded(!isExpanded)}
-                  className="w-full md:hidden py-4 px-4 border border-primary/20 rounded-[24px] text-sm font-black text-primary bg-primary/5 hover:bg-primary/10 active:scale-[0.97] transition-all select-none cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                  className="w-full md:hidden py-4 px-4 border border-primary/20 rounded-[24px] text-sm font-black text-foreground bg-primary/5 hover:bg-primary/10 active:scale-[0.97] transition-all select-none cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
                 >
                   {isExpanded ? 'Hide Remaining Schedule' : `Show Remaining Schedule (${remaining.length} more)`}
                 </button>
