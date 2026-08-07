@@ -4,6 +4,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUiMode } from '@/context/ui-mode-context';
 import { createClient } from '@/lib/supabase/client';
+import FolderCarousel from '@/components/health-vault/folder-carousel';
 import { 
   FileText, 
   ClipboardList, 
@@ -96,6 +97,12 @@ export default function HealthVaultClientView({
   const [currentPage, setCurrentPage] = useState(0);
   const [recordsError, setRecordsError] = useState<string | null>(null);
 
+  // Recent documents for the folder-grid screen. Records were only ever fetched once a
+  // folder was open, so the first thing you saw on opening the vault was a title, a
+  // paragraph, a CTA and a privacy notice — and not one of your own documents.
+  const [recentRecords, setRecentRecords] = useState<any[]>([]);
+  const [isLoadingRecent, setIsLoadingRecent] = useState(false);
+
   // Search and Trash States
   const [searchQuery, setSearchQuery] = useState('');
   const [viewingTrash, setViewingTrash] = useState(false);
@@ -168,6 +175,40 @@ export default function HealthVaultClientView({
       setTotalRecordsCount(0);
     }
   }, [selectedCategory, viewingTrash, searchQuery]);
+
+  // Newest documents across every real folder, for the grid screen. Placeholder
+  // `default-` categories are not rows in the table, so they are filtered out — passing
+  // them to .in() would match nothing and quietly return an empty list.
+  useEffect(() => {
+    if (selectedCategory) return;
+    const realIds = categories.filter(c => !c.id.startsWith('default-')).map(c => c.id);
+    if (realIds.length === 0) {
+      setRecentRecords([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setIsLoadingRecent(true);
+      const { data, error } = await supabase
+        .from('health_records')
+        .select('id, title, record_date, file_name, file_url, file_type, file_size, category_id')
+        .in('category_id', realIds)
+        .is('deleted_at', null)
+        .order('record_date', { ascending: false })
+        .limit(6);
+      if (cancelled) return;
+      // supabase-js resolves rather than rejects on a Postgres error, so this has to be
+      // checked explicitly or a failure silently renders as "no documents yet".
+      if (error) {
+        console.error('[Health Vault] recent records failed:', error.message);
+        setRecentRecords([]);
+      } else {
+        setRecentRecords(data || []);
+      }
+      setIsLoadingRecent(false);
+    })();
+    return () => { cancelled = true; };
+  }, [selectedCategory, categories, supabase]);
 
   const fetchRecords = async (categoryId: string, page: number, append: boolean = false) => {
     setIsLoadingRecords(true);
@@ -760,34 +801,21 @@ export default function HealthVaultClientView({
       {/* ---------------------------------------------------- */}
       {!selectedCategory ? (
         <>
-          {/* Title Header Section */}
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h1 className={`font-extrabold text-foreground tracking-tight ${isElderly ? 'text-4xl' : 'text-2xl'}`}>
-                {userRole === 'CAREGIVER' ? `Documents Shared by ${patientName}` : 'My Health Vault'}
+          {/* Compact header. The old one spent the whole first screen on chrome — a large
+              title, a three-line paragraph, a full-width CTA and a privacy card — before a
+              single document appeared. The paragraph explained what a vault is to someone
+              already standing in it; upload moved to the FAB below. */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className={`font-extrabold text-foreground tracking-tight ${isElderly ? 'text-3xl' : 'text-xl'}`}>
+                {userRole === 'CAREGIVER' ? `${patientName}'s documents` : 'Health Vault'}
               </h1>
               {userRole === 'CAREGIVER' && (
-                <p className="text-xs text-primary font-bold mt-1.5 bg-primary/5 border border-primary/20 px-3 py-1.5 rounded-xl w-max">
-                  Shared through Care Circle. You currently have read-only access.
+                <p className="text-[11px] text-primary-strong font-bold mt-1">
+                  Shared through Care Circle · read-only
                 </p>
               )}
-              <p className={`text-muted-foreground mt-2 ${isElderly ? 'text-lg' : 'text-sm'}`}>
-                {userRole === 'CAREGIVER'
-                  ? 'Access medical records and categories for your linked patient.'
-                  : 'Securely upload, view, and organize your prescriptions, lab reports, and clinical summaries.'}
-              </p>
             </div>
-            {userRole !== 'CAREGIVER' && (
-              <button
-                onClick={() => openUploadModal()}
-                className={`font-black rounded-xl bg-primary-strong text-primary-strong-foreground hover:bg-primary-strong-hover transition-all cursor-pointer shadow-sm flex items-center justify-center ${
-                  isElderly ? 'h-16 px-6 text-lg' : 'h-11 px-4 text-xs'
-                }`}
-              >
-                <Upload className={`${isElderly ? 'w-5 h-5 mr-2' : 'w-4 h-4 mr-1'} shrink-0`} />
-                <span>Upload Record</span>
-              </button>
-            )}
           </div>
 
           {/* Trust banner.
@@ -798,6 +826,112 @@ export default function HealthVaultClientView({
               deciding whether to upload their discharge summary needs the promise, not
               the mechanism. The mechanism is still here, one tap away, for whoever wants
               it. */}
+          {/* Folders as a horizontal rail with the next card deliberately peeking, so the
+              swipe is discoverable without a label. Stacked full-width, four folders were
+              four screens of scrolling before you reached a document. */}
+          <div className="space-y-3">
+            <h3 className={`font-black text-foreground ${isElderly ? 'text-xl' : 'text-sm'}`}>Folders</h3>
+
+            <FolderCarousel
+              isElderly={isElderly}
+              onSelect={(id) => {
+                const category = displayCategories.find(c => c.id === id);
+                if (category) {
+                  setSelectedCategory(category);
+                  setViewingTrash(false);
+                }
+              }}
+              items={displayCategories.map((category) => {
+                const count = getRecordCount(category);
+                return {
+                  id: category.id,
+                  name: category.name,
+                  // The count used to print twice — "Prescriptions (0)" then "0 documents"
+                  // under it. Once, and at zero say what to do instead of restating it.
+                  caption:
+                    count === 0
+                      ? `Add your first ${singularCategory(category.name)}`
+                      : `${count} ${count === 1 ? 'file' : 'files'}`,
+                  icon: getCategoryIcon(category.name, true),
+                  disabled: category.id.startsWith('default-'),
+                };
+              })}
+            />
+          </div>
+
+          {/* Recent documents — the thing you actually came for, now on the first screen. */}
+          <div className="space-y-3">
+            <h3 className={`font-black text-foreground ${isElderly ? 'text-xl' : 'text-sm'}`}>Recent documents</h3>
+
+            {isLoadingRecent ? (
+              <div className="space-y-2" aria-live="polite">
+                {[0, 1, 2].map(i => (
+                  <div key={i} className="h-14 rounded-2xl bg-muted animate-pulse" />
+                ))}
+                <span className="sr-only">Loading your documents…</span>
+              </div>
+            ) : recentRecords.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-border bg-card/60 p-5 text-center">
+                <p className={`font-semibold text-muted-foreground ${isElderly ? 'text-base' : 'text-xs'}`}>
+                  No documents yet.
+                </p>
+                {userRole !== 'CAREGIVER' && (
+                  <button
+                    onClick={() => openUploadModal()}
+                    className={`mt-2 inline-flex items-center justify-center min-h-11 px-4 rounded-xl font-black bg-primary-strong text-primary-strong-foreground hover:bg-primary-strong-hover transition-all cursor-pointer ${
+                      isElderly ? 'text-base' : 'text-xs'
+                    }`}
+                  >
+                    <Upload className="w-4 h-4 mr-1.5 shrink-0" /> Upload your first record
+                  </button>
+                )}
+              </div>
+            ) : (
+              <ul className="space-y-2">
+                {recentRecords.map((item) => {
+                  const ext = (getExt(item.file_name) || 'file').toUpperCase();
+                  const folder = categories.find(c => c.id === item.category_id);
+                  return (
+                    <li key={item.id} className="flex items-center gap-3 bg-card border border-border rounded-2xl p-3 shadow-sm">
+                      {/* File type is metadata, not a status, so it takes the info tint —
+                          a red PDF badge would read as "missed dose" in this palette. */}
+                      <span className={`shrink-0 flex items-center justify-center rounded-xl bg-info/15 text-info-strong font-black ${
+                        isElderly ? 'w-12 h-12 text-xs' : 'w-10 h-10 text-[11px]'
+                      }`}>
+                        {ext.slice(0, 4)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handlePreview(item.file_url, item.file_type, item.title, item.file_name)}
+                        className="flex-1 min-w-0 text-left min-h-11 cursor-pointer"
+                      >
+                        <span className={`block font-black text-foreground truncate ${isElderly ? 'text-base' : 'text-sm'}`}>
+                          {item.title}
+                        </span>
+                        <span className={`block font-semibold text-muted-foreground truncate ${isElderly ? 'text-sm' : 'text-[11px]'}`}>
+                          {folder?.name ? `${folder.name} · ` : ''}
+                          {item.record_date ? new Date(item.record_date).toLocaleDateString() : ''}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDownload(item.file_url, item.file_name)}
+                        aria-label={`Download ${item.title}`}
+                        className="shrink-0 w-11 h-11 flex items-center justify-center rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+
+          {/* Trust banner, now BELOW the documents. It kept its pink-to-info fix and its
+              plain-language copy, but it was sitting between the header and the folders —
+              a reassurance you had to scroll past every visit to reach your own files.
+              Reassurance belongs where the question occurs, not ahead of the content. */}
           <div className={`bg-info-surface text-info-strong border border-info/25 rounded-3xl transition-all duration-300 ${
             isElderly ? 'p-6 border-2 text-lg' : 'p-4 text-xs'
           }`}>
@@ -823,75 +957,17 @@ export default function HealthVaultClientView({
             </div>
           </div>
 
-          {/* Category Folders Grid */}
-          <div className="space-y-4">
-            <h3 className={`font-black text-foreground ${isElderly ? 'text-2xl' : 'text-sm'}`}>
-              Category Folder Vaults
-            </h3>
-            
-            <div className={`grid grid-cols-1 gap-6 ${isElderly ? 'md:grid-cols-1' : 'md:grid-cols-2 lg:grid-cols-4'}`}>
-              {displayCategories.map((category) => {
-                const count = getRecordCount(category);
-                return (
-                  <div
-                    key={category.id}
-                    onClick={() => {
-                      if (!category.id.startsWith('default-')) {
-                        setSelectedCategory(category);
-                        setViewingTrash(false);
-                      }
-                    }}
-                    className={`bg-card rounded-3xl border border-border flex flex-col justify-between transition-all duration-300 shadow-sm cursor-pointer ${
-                      isElderly 
-                        ? 'p-8 border-4 border-primary/30 space-y-6' 
-                        : 'p-5 hover:scale-[1.01] hover:shadow-md hover:border-primary/40 space-y-4'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className={`rounded-2xl flex items-center justify-center shrink-0 ${getCategoryTint(category.name)} ${
-                          isElderly ? 'w-16 h-16' : 'w-11 h-11'
-                        }`}>
-                          {getCategoryIcon(category.name, isElderly)}
-                        </div>
-                        <div>
-                          {/* The count was printed twice — "Prescriptions (0)" and then
-                              "0 documents" right beneath it. Once, and when it's zero say
-                              what to do instead of restating the nothing. */}
-                          <h4 className={`font-black text-foreground tracking-tight ${isElderly ? 'text-2xl' : 'text-sm'}`}>
-                            {category.name}
-                          </h4>
-                          <p className={`font-semibold ${count === 0 ? 'text-primary' : 'text-muted-foreground'} ${isElderly ? 'text-base mt-1' : 'text-[11px]'}`}>
-                            {count === 0
-                              ? `Upload your first ${singularCategory(category.name)}`
-                              : `${count} ${count === 1 ? 'document' : 'documents'}`}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {userRole !== 'CAREGIVER' && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openUploadModal(category.id);
-                        }}
-                        className={`font-black rounded-xl bg-muted text-foreground hover:bg-muted/80 transition-all border border-border text-center w-full flex items-center justify-center cursor-pointer ${
-                          isElderly ? 'h-16 text-base shadow-sm' : 'h-11 text-xs'
-                        }`}
-                      >
-                        <Upload className="w-3.5 h-3.5 mr-1.5 shrink-0" />
-                        {/* Was "Add to this folder" on every tile, identical to the page's
-                            "Upload Record" button but with a different destination and no
-                            way to tell which was which. Now it names the folder. */}
-                        <span className="truncate">Upload to {category.name}</span>
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          {/* Upload as a FAB. `floating-bottom` is the shared class that clears the mobile
+              dock, so it can't end up painting over the nav the way fixed offsets did. */}
+          {userRole !== 'CAREGIVER' && (
+            <button
+              onClick={() => openUploadModal()}
+              aria-label="Upload a record"
+              className="floating-bottom fixed right-4 z-30 w-14 h-14 rounded-full bg-primary-strong text-primary-strong-foreground shadow-lg hover:bg-primary-strong-hover active:scale-[0.96] transition-all cursor-pointer flex items-center justify-center"
+            >
+              <Upload className="w-6 h-6" />
+            </button>
+          )}
         </>
       ) : (
         // ----------------------------------------------------
@@ -1351,7 +1427,7 @@ export default function HealthVaultClientView({
               <button
                 onClick={handlePermanentDelete}
                 disabled={isDeletingPermanently || deleteConfirmationText.trim().toUpperCase() !== 'DELETE'}
-                className="flex-1 px-4 py-2.5 rounded-xl text-xs font-black bg-danger-strong text-card hover:bg-danger/95 flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-2.5 rounded-xl text-xs font-black bg-danger-solid text-danger-solid-foreground hover:bg-danger/95 flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isDeletingPermanently ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                 <span>Delete Forever</span>
