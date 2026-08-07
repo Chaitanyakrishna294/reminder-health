@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { calculateNextReminder } from '@/lib/medication-utils';
@@ -24,7 +24,7 @@ import GuideButton from '@/components/guide/guide-button';
 import GuideAutoStart from '@/components/guide/guide-auto-start';
 import { useGuide } from '@/components/guide/guide-context';
 import { TOURS } from '@/components/guide/guide-content';
-import type { CatalogLinkValue } from '@/lib/medications/catalog';
+import { searchMedicationCatalog, type CatalogLinkValue } from '@/lib/medications/catalog';
 import { validateMedicationStep, buildSharedMedicationFields } from '@/lib/medications/form-logic';
 import {
   Pill,
@@ -49,8 +49,41 @@ const CARD_SHADOW = '0 1px 3px rgba(16, 28, 90, 0.04), 0 10px 30px rgba(16, 28, 
 
 export default function NewMedicationPage() {
   const [step, setStep] = useState(1);
-  const [drugName, setDrugName] = useState('');
+  // Seeded from ?name= when arriving via "Add <query>" from the medications search, so
+  // the term already typed there is not typed again. Only the free-text name field is
+  // prefilled — no catalog row is selected, because linking a nickname to a real drug
+  // stays a human decision (see docs/WORK_LEDGER.md).
+  const searchParams = useSearchParams();
+  const [drugName, setDrugName] = useState(searchParams.get('name') ?? '');
   const [catalogLink, setCatalogLink] = useState<CatalogLinkValue | null>(null);
+
+  // Arriving from a directory result on /medications: ?catalogId= names the row the user
+  // tapped. The row is re-read from the database rather than reconstructed from the URL,
+  // so a hand-edited link cannot fabricate a catalog association on a medical record —
+  // an id that does not resolve simply leaves the name prefilled and no link set.
+  const prefillCatalogId = searchParams.get('catalogId');
+  useEffect(() => {
+    if (!prefillCatalogId) return;
+    const wanted = Number(prefillCatalogId);
+    if (!Number.isFinite(wanted)) return;
+    let cancelled = false;
+    (async () => {
+      const rows = await searchMedicationCatalog(supabase, searchParams.get('name') ?? '');
+      if (cancelled) return;
+      const row = rows.find(r => r.id === wanted);
+      if (!row) return;
+      setCatalogLink({
+        catalogId: row.id,
+        brandName: row.brand_name,
+        composition: row.composition_text,
+        manufacturer: row.manufacturer_name,
+        isDiscontinued: row.is_discontinued,
+        snapshotDate: row.snapshot_date,
+      });
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefillCatalogId]);
   const [unitType, setUnitType] = useState<UnitType>('TABLET');
   const [unitOpen, setUnitOpen] = useState(false);
   const [frequency, setFrequency] = useState<'once_daily' | 'twice_daily' | 'thrice_daily'>('once_daily');

@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { addStock } from '@/lib/medications/add-stock';
 import { calculateNextReminder } from '@/lib/medication-utils';
 import { useUiMode } from '@/context/ui-mode-context';
-import { Plus, Package, Clock, Pause, Play, SquarePen, Trash2, Pill, X, ChevronDown } from 'lucide-react';
+import { Plus, Package, Clock, Pause, Play, SquarePen, Trash2, Pill, X, ChevronDown, Search } from 'lucide-react';
 import GuideButton from '@/components/guide/guide-button';
 import GuideAutoStart from '@/components/guide/guide-auto-start';
 import { getUnitIcon } from '@/components/ui/custom-icons';
@@ -16,6 +16,7 @@ import { unitPhrase } from '@/components/medications/medication-form-options';
 import { isLowStock as lowStockOf } from '@/lib/medications/stock';
 import { EmptyState } from '@/components/ui/empty-state';
 import { iconButtonClasses } from '@/components/ui/button';
+import { searchMedicationCatalog, type CatalogSearchResult } from '@/lib/medications/catalog';
 
 export interface Medication {
   id: number;
@@ -63,6 +64,11 @@ export default function MedicationList({
   // already see. As a tab pair it earns its place: it says a paused list exists and
   // gets you there. Only shown once something is actually paused.
   const [filter, setFilter] = useState<'active' | 'paused'>('active');
+  const [query, setQuery] = useState('');
+  // Results from the real medicine directory (medication_catalog), so the same box that
+  // finds a medication you already track can also find one you don't yet.
+  const [catalogResults, setCatalogResults] = useState<CatalogSearchResult[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
   const [loadingId, setLoadingId] = useState<number | null>(null);
   const [stockBusyId, setStockBusyId] = useState<number | null>(null);
 
@@ -231,12 +237,48 @@ export default function MedicationList({
     return `${displayHour}:${minStr} ${ampm}`;
   };
 
+  // Debounced directory lookup. `supabase` is recreated on every render, so it is
+  // deliberately NOT a dependency here — including it would restart this effect on each
+  // render and fire a request per keystroke regardless of the debounce.
+  useEffect(() => {
+    const term = query.trim();
+    if (term.length < 2) {
+      setCatalogResults([]);
+      setCatalogLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setCatalogLoading(true);
+    const timer = setTimeout(async () => {
+      const rows = await searchMedicationCatalog(supabase, term);
+      if (cancelled) return;
+      setCatalogResults(rows);
+      setCatalogLoading(false);
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]);
+
   const activeMeds = meds.filter(m => m.active);
   const pausedMeds = meds.filter(m => !m.active);
   // With nothing paused there are no tabs, so the filter must not hide anything.
-  const visibleMeds = pausedMeds.length === 0
+  const tabMeds = pausedMeds.length === 0
     ? meds
     : filter === 'paused' ? pausedMeds : activeMeds;
+
+  // Search across the fields someone would actually recall a medication by: what it is
+  // called, the dose, and why they take it — a reason like "blood pressure" is often the
+  // only thing remembered when the brand name isn't.
+  const q = query.trim().toLowerCase();
+  const visibleMeds = q
+    ? tabMeds.filter(m =>
+        [m.drug_name, m.dosage, m.medication_reason]
+          .some(v => (v || '').toLowerCase().includes(q))
+      )
+    : tabMeds;
 
   // Accent per card, driven by priority. This used to be a local hex map that made
   // routine medications PINK here while the wizard's own picker showed them green —
@@ -287,6 +329,79 @@ export default function MedicationList({
         </div>
       </div>
 
+      {/* One box, two jobs: filter what you already take, and look the rest up in the
+          real medicine directory. Always shown, because searching the directory is
+          useful even with an empty list. */}
+      {activeRole !== 'CAREGIVER' && (
+        <div className="space-y-3">
+          <div className="relative">
+            <Search className={`absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none shrink-0 ${isElderly ? 'w-5 h-5' : 'w-4 h-4'}`} />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search your list or the medicine directory"
+              aria-label="Search your medications or the medicine directory"
+              className={`w-full rounded-2xl bg-card border border-border pl-10 pr-4 font-semibold text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors ${
+                isElderly ? 'h-14 text-base' : 'h-11 text-[13px]'
+              }`}
+            />
+          </div>
+
+          {q.length >= 2 && (
+            <div className="rounded-2xl border border-border bg-card p-3 space-y-2">
+              <p className={`font-black text-muted-foreground ${isElderly ? 'text-sm' : 'text-[11px]'}`}>
+                From the medicine directory
+              </p>
+
+              {catalogLoading ? (
+                <div className="space-y-2" aria-live="polite">
+                  {[0, 1].map(i => <div key={i} className="h-12 rounded-xl bg-muted animate-pulse" />)}
+                  <span className="sr-only">Searching the medicine directory…</span>
+                </div>
+              ) : catalogResults.length === 0 ? (
+                <p className={`text-muted-foreground font-semibold ${isElderly ? 'text-sm' : 'text-[11px]'}`}>
+                  Nothing in the directory matches that. You can still add it by name.
+                </p>
+              ) : (
+                <ul className="space-y-1.5">
+                  {catalogResults.slice(0, 6).map((row) => (
+                    <li key={row.id}>
+                      {/* Carries the chosen row's id AND name. The wizard re-reads that row
+                          from the database before linking it, so a hand-edited URL cannot
+                          invent a link — and the link is still only ever created by this
+                          explicit human choice, never by matching a nickname. */}
+                      <Link
+                        href={`/medications/new?catalogId=${row.id}&name=${encodeURIComponent(row.brand_name)}`}
+                        className="flex items-center gap-2 min-h-11 px-3 py-2 rounded-xl hover:bg-muted transition-colors cursor-pointer"
+                      >
+                        <Plus className="w-4 h-4 shrink-0 text-primary-strong" strokeWidth={2.5} />
+                        <span className="min-w-0">
+                          <span className={`block font-bold text-foreground truncate ${isElderly ? 'text-base' : 'text-[13px]'}`}>
+                            {row.brand_name}
+                            {row.is_discontinued && (
+                              <span className="ml-1.5 font-semibold text-warning-strong">· discontinued</span>
+                            )}
+                          </span>
+                          {/* Pack size is included because the directory holds several rows
+                              per brand — without it "Dolo 500 Tablet" appeared twice,
+                              identical, with no way to tell which one you were picking. */}
+                          {(row.composition_text || row.manufacturer_name || row.pack_size_label) && (
+                            <span className={`block text-muted-foreground truncate ${isElderly ? 'text-sm' : 'text-[11px]'}`}>
+                              {[row.composition_text, row.manufacturer_name, row.pack_size_label].filter(Boolean).join(' · ')}
+                            </span>
+                          )}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Active / Paused tabs — only meaningful once something is paused. */}
       {pausedMeds.length > 0 && (
         <div role="tablist" aria-label="Filter medications" className="flex items-center gap-2">
@@ -318,23 +433,37 @@ export default function MedicationList({
         <EmptyState
           icon={<Pill className={isElderly ? 'w-9 h-9' : 'w-6 h-6'} />}
           title={
-            meds.length === 0
-              ? 'No medications yet'
-              : filter === 'paused'
-                ? 'Nothing paused'
-                : 'No active medications'
+            q
+              ? `No match for “${query.trim()}”`
+              : meds.length === 0
+                ? 'No medications yet'
+                : filter === 'paused'
+                  ? 'Nothing paused'
+                  : 'No active medications'
           }
           description={
-            meds.length === 0
-              ? 'Add your first medication and we will remind you when each dose is due.'
-              : filter === 'paused'
-                ? 'Medications you pause will wait here until you resume them.'
-                : 'All of your medications are paused right now.'
+            q
+              ? 'Nothing in your list matches that. You can add it as a new medication.'
+              : meds.length === 0
+                ? 'Add your first medication and we will remind you when each dose is due.'
+                : filter === 'paused'
+                  ? 'Medications you pause will wait here until you resume them.'
+                  : 'All of your medications are paused right now.'
           }
           action={
-            activeRole !== 'CAREGIVER' && meds.length === 0
-              ? { label: 'Add medication', href: '/medications/new' }
-              : undefined
+            activeRole === 'CAREGIVER'
+              ? undefined
+              : q
+                ? {
+                    /* Carries the query into the wizard, where the catalog picker can
+                       look it up. Still human-select-only — this prefills the name
+                       field, it never matches a nickname to a real drug. */
+                    label: `Add “${query.trim()}”`,
+                    href: `/medications/new?name=${encodeURIComponent(query.trim())}`,
+                  }
+                : meds.length === 0
+                  ? { label: 'Add medication', href: '/medications/new' }
+                  : undefined
           }
         />
       ) : (
