@@ -24,6 +24,7 @@ import {
   ClipboardList,
 } from 'lucide-react';
 import { SpoonIcon, CreamBottleIcon, TabletIcon } from '@/components/ui/custom-icons';
+import { PRIORITY } from '@/lib/design/semantics';
 
 export type UnitType =
   | 'TABLET'
@@ -56,6 +57,43 @@ export const unitOptions: UnitOption[] = [
   { id: 'OTHER', label: 'Other', icon: <Package className="w-5 h-5" /> },
 ];
 
+/** Quick-pick strengths, scoped to the form chosen in step 1. The picker used to offer
+ *  `500mg / 650mg / 5mg / 10mg / 20mg / 100mcg` to everyone — so someone entering a
+ *  syrup or an ointment was shown six tablet strengths and no useful option. Forms with
+ *  no meaningful shorthand get an empty list and the chip row simply doesn't render. */
+export const STRENGTH_SUGGESTIONS: Record<UnitType, string[]> = {
+  TABLET: ['500mg', '650mg', '5mg', '10mg', '20mg', '100mcg'],
+  CAPSULE: ['500mg', '250mg', '10mg', '20mg', '100mcg'],
+  ML: ['5ml', '10ml', '2.5ml', '125mg/5ml'],
+  TEASPOON: ['5ml', '10ml'],
+  DROP: ['0.5%', '1%'],
+  APPLICATION: ['0.5%', '1%', '2%'],
+  PATCH: ['5mg', '10mg', '25mcg/hr'],
+  INHALATION: ['100mcg', '200mcg'],
+  UNIT: ['10 units', '20 units', '40 units'],
+  OTHER: [],
+};
+
+/** Singular, lowercase, no parenthetical — "milliliter", not "Milliliter (ml)". The
+ *  wizard used to render the full label plus "(s)", producing "Milliliter (ml)(s)". */
+export function unitLabel(unitType?: string): string {
+  const id = (unitType || 'TABLET').toUpperCase();
+  return (
+    unitOptions.find((o) => o.id === id)?.label.replace(/\s*\(.*\)$/, '').toLowerCase() ||
+    'tablet'
+  );
+}
+
+/** Pluralised for the amount. Replaces the "(s)" suffix used across the wizard, the
+ *  review screen and the medication list, which produced "1 tablet(s)". */
+export function unitPhrase(unitType: string | undefined, amount: number): string {
+  const singular = unitLabel(unitType);
+  if (amount === 1) return singular;
+  return singular.endsWith('h') || singular.endsWith('s')
+    ? `${singular}es`
+    : `${singular}s`;
+}
+
 // Step metadata for the premium stepper.
 export const stepMeta = [
   { label: 'Details', icon: <Pill className="w-4 h-4" /> },
@@ -72,8 +110,10 @@ export const frequencies = [
   { id: 'thrice_daily', title: 'Thrice Daily', desc: 'Morning, noon, and night', icon: <Moon className="w-5 h-5" /> },
 ];
 
+// Labels and tones come from lib/design/semantics so the picker, the medication list and
+// the planner's legend cannot drift apart again. Only the icons are local.
 export const priorities = [
-  { id: 'normal', title: 'Normal', desc: 'General vitamins and supplements', icon: <ShieldCheck className="w-5 h-5" />, color: 'success' as const },
-  { id: 'important', title: 'Important', desc: 'Core medication, low delay tolerated', icon: <AlertTriangle className="w-5 h-5" />, color: 'warning' as const },
-  { id: 'critical', title: 'Critical', desc: 'Life-critical doses, alarms caregiver on miss', icon: <CircleAlert className="w-5 h-5" />, color: 'danger' as const },
+  { id: 'normal' as const, title: PRIORITY.normal.label, desc: PRIORITY.normal.desc, icon: <ShieldCheck className="w-5 h-5" />, color: PRIORITY.normal.tone },
+  { id: 'important' as const, title: PRIORITY.important.label, desc: PRIORITY.important.desc, icon: <AlertTriangle className="w-5 h-5" />, color: PRIORITY.important.tone },
+  { id: 'critical' as const, title: PRIORITY.critical.label, desc: PRIORITY.critical.desc, icon: <CircleAlert className="w-5 h-5" />, color: PRIORITY.critical.tone },
 ];

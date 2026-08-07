@@ -7,7 +7,18 @@ import { createClient } from '@/lib/supabase/client';
 import { calculateNextReminder } from '@/lib/medication-utils';
 import moment from 'moment-timezone';
 import { useUiMode } from '@/context/ui-mode-context';
-import { type UnitType, unitOptions, stepMeta, frequencies, priorities } from '@/components/medications/medication-form-options';
+import {
+  type UnitType,
+  unitOptions,
+  stepMeta,
+  frequencies,
+  priorities,
+  STRENGTH_SUGGESTIONS,
+  unitLabel,
+  unitPhrase,
+} from '@/components/medications/medication-form-options';
+import { priorityMeta, TONE_VAR } from '@/lib/design/semantics';
+import { getToneTheme } from '@/lib/severity-theme';
 import MedicationCatalogLink from '@/components/medications/medication-catalog-link';
 import GuideButton from '@/components/guide/guide-button';
 import GuideAutoStart from '@/components/guide/guide-auto-start';
@@ -30,6 +41,7 @@ import {
   ChevronDown,
   Minus,
   Plus,
+  Pencil,
 } from 'lucide-react';
 
 // Soft diffuse card shadow shared across the Apple-Health-styled pages.
@@ -252,7 +264,7 @@ export default function NewMedicationPage() {
 
       {/* Error Banner */}
       {error && (
-        <div className="flex items-start gap-3 text-[#FF3B30] text-sm p-4 rounded-2xl" style={{ background: '#FFECEA' }}>
+        <div className="flex items-start gap-3 bg-danger/10 text-danger-strong text-sm p-4 rounded-2xl">
           <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
           <span className="font-medium">{error}</span>
         </div>
@@ -273,16 +285,16 @@ export default function NewMedicationPage() {
                     <button
                       type="button"
                       onClick={() => goToStep(stepNum)}
-                      className="flex flex-col items-center gap-1.5 min-w-0 cursor-pointer group/step"
+                      className="flex flex-col items-center justify-center gap-1.5 min-w-11 min-h-11 cursor-pointer group/step"
                       aria-label={`Go to step ${stepNum}: ${s.label}`}
                       aria-current={isCurrent ? 'step' : undefined}
                     >
                       <div
                         className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 group-hover/step:scale-105 ${
                           isCompleted
-                            ? 'bg-primary text-white'
+                            ? 'bg-primary-strong text-primary-strong-foreground'
                             : isCurrent
-                              ? 'bg-gradient-to-b from-[#F8839E] to-[#F26B8A] text-white'
+                              ? 'bg-gradient-to-b from-[#CC3D64] to-[#B52A52] text-white'
                               : 'bg-[#F2F2F7] text-muted-foreground group-hover/step:bg-[#E5E5EA]'
                         }`}
                         style={isCurrent ? { boxShadow: '0 6px 16px rgba(242,107,138,0.40)' } : undefined}
@@ -316,7 +328,7 @@ export default function NewMedicationPage() {
                   {stepMeta[step - 1].icon}
                 </div>
                 <div>
-                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Step {step} of 6</span>
+                  <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Step {step} of 6</span>
                   <h2 className="text-base font-bold tracking-tight text-foreground leading-tight">{stepMeta[step - 1].label}</h2>
                 </div>
               </div>
@@ -370,7 +382,7 @@ export default function NewMedicationPage() {
                               }`}>
                                 {opt.icon}
                               </div>
-                              <span className={`text-sm font-semibold truncate ${isSel ? 'text-primary' : 'text-foreground'}`}>{opt.label}</span>
+                              <span className={`text-sm font-semibold truncate ${isSel ? 'text-primary-strong' : 'text-foreground'}`}>{opt.label}</span>
                             </div>
                             {/* Right indicator: chevron to open when collapsed, check on the selected row when open */}
                             {!unitOpen ? (
@@ -412,7 +424,7 @@ export default function NewMedicationPage() {
                               {freq.icon}
                             </div>
                             <div>
-                              <h3 className={`font-bold text-sm ${frequency === freq.id ? 'text-primary' : 'text-foreground'}`}>{freq.title}</h3>
+                              <h3 className={`font-bold text-sm ${frequency === freq.id ? 'text-primary-strong' : 'text-foreground'}`}>{freq.title}</h3>
                               <p className="text-xs text-muted-foreground mt-0.5">{freq.desc}</p>
                             </div>
                           </div>
@@ -458,7 +470,10 @@ export default function NewMedicationPage() {
               {step === 3 && (
                 <div className="space-y-6">
                   <div data-tour="mednew-strength">
-                    <label className={labelClass}>Strength</label>
+                    {/* Step 1 marks its optional field as such; this one didn't, so
+                        skipping it felt like an error until "No strength specified"
+                        turned up on the review screen. */}
+                    <label className={labelClass}>Strength <span className="font-normal text-muted-foreground">(optional)</span></label>
                     <input
                       type="text"
                       value={strength}
@@ -466,22 +481,26 @@ export default function NewMedicationPage() {
                       className={inputClass}
                       placeholder="e.g., 500mg, 10ml, 0.5%"
                     />
-                    <div className="flex flex-wrap gap-2 mt-3">
-                      {['500mg', '650mg', '5mg', '10mg', '20mg', '100mcg'].map((s) => (
-                        <button
-                          key={s}
-                          type="button"
-                          onClick={() => setStrength(s)}
-                          className={`px-3.5 py-1.5 text-xs font-semibold rounded-full transition-all cursor-pointer ${
-                            strength === s
-                              ? 'bg-primary/10 text-primary font-bold ring-1 ring-primary/30'
-                              : 'bg-[#F2F2F7] hover:bg-[#E9E9EE] text-muted-foreground'
-                          }`}
-                        >
-                          {s}
-                        </button>
-                      ))}
-                    </div>
+                    {/* Suggestions follow the form picked in step 1 — a syrup no longer
+                        gets offered six tablet strengths. */}
+                    {STRENGTH_SUGGESTIONS[unitType].length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {STRENGTH_SUGGESTIONS[unitType].map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            onClick={() => setStrength(s)}
+                            className={`min-h-11 px-3.5 py-1.5 text-xs font-semibold rounded-full transition-all cursor-pointer ${
+                              strength === s
+                                ? 'bg-primary/10 text-primary-strong font-bold ring-1 ring-primary/30'
+                                : 'bg-[#F2F2F7] hover:bg-[#E9E9EE] text-muted-foreground'
+                            }`}
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <div data-tour="mednew-amount" className="pt-4 border-t border-[#0F1C5A]/[0.06]">
@@ -505,8 +524,8 @@ export default function NewMedicationPage() {
                           onChange={(e) => setDosageAmount(parseFloat(e.target.value) || 1)}
                           className="text-center w-16 bg-transparent text-foreground font-[var(--font-mono)] text-lg font-bold focus:outline-none"
                         />
-                        <span className="text-xs font-semibold text-muted-foreground lowercase whitespace-nowrap">
-                          {unitOptions.find(o => o.id === unitType)?.label}(s)
+                        <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">
+                          {unitPhrase(unitType, dosageAmount)}
                         </span>
                       </div>
                       <button
@@ -530,20 +549,30 @@ export default function NewMedicationPage() {
                         <Layers className="w-5 h-5 text-primary" />
                       </div>
                       <div>
-                        <h3 className="font-bold text-sm text-foreground">Track Stock Inventory</h3>
+                        <h3 id="inventory-toggle-label" className="font-bold text-sm text-foreground">Track Stock Inventory</h3>
                         <p className="text-xs text-muted-foreground mt-0.5">Auto-deduct stock on each dose</p>
                       </div>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
-                      <input 
-                        type="checkbox" 
-                        checked={enableInventory} 
-                        onChange={(e) => setEnableInventory(e.target.checked)} 
+                      <input
+                        type="checkbox"
+                        checked={enableInventory}
+                        onChange={(e) => setEnableInventory(e.target.checked)}
+                        aria-labelledby="inventory-toggle-label"
                         className="sr-only peer"
                       />
-                      <div className="w-11 h-6 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                      <div className="w-11 h-6 bg-muted peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
                     </label>
                   </div>
+
+                  {/* The stock fields unmount entirely when the toggle is off, which
+                      looked like the step had broken. Say what the off state means. */}
+                  {!enableInventory && (
+                    <p className="text-xs text-muted-foreground px-1">
+                      Stock tracking is off — this step is complete. Turn it on if you want
+                      low-stock alerts and automatic counting.
+                    </p>
+                  )}
 
                   {enableInventory && (
                     <div data-tour="mednew-stock" className="space-y-4 pt-2" style={{ animation: 'fadeIn 0.2s ease-out' }}>
@@ -559,7 +588,9 @@ export default function NewMedicationPage() {
                             className={inputClass}
                             placeholder="e.g., 30"
                           />
-                          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">units</span>
+                          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">
+                            {unitPhrase(unitType, 2)}
+                          </span>
                         </div>
                       </div>
                       <div>
@@ -574,7 +605,9 @@ export default function NewMedicationPage() {
                             className={inputClass}
                             placeholder="e.g., 4"
                           />
-                          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">units</span>
+                          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">
+                            {unitPhrase(unitType, 2)}
+                          </span>
                         </div>
                         <p className="text-[11px] text-muted-foreground mt-2">
                           You will receive an alert when stock reaches this amount.
@@ -604,50 +637,36 @@ export default function NewMedicationPage() {
                     <label className={labelClass}>Priority Level</label>
                     <p className="text-xs text-muted-foreground mb-3">Determines escalation behavior on missed doses.</p>
                     <div className="grid grid-cols-1 gap-2.5">
+                      {/* This used to build a three-branch colorMap object inside the
+                          map callback on every render, and derive the same colors again
+                          with an inline ternary for the check badge. One tone lookup. */}
                       {priorities.map((p) => {
                         const isSelected = priority === p.id;
-                        const colorMap = {
-                          success: {
-                            bg: isSelected ? 'bg-success/8' : 'bg-[#F6F6F9] hover:bg-[#EFEFF3]',
-                            ring: isSelected ? 'ring-2 ring-success/30' : '',
-                            iconBg: isSelected ? 'bg-success/15 text-success' : 'bg-white text-muted-foreground',
-                            title: isSelected ? 'text-success' : 'text-foreground',
-                          },
-                          warning: {
-                            bg: isSelected ? 'bg-warning/8' : 'bg-[#F6F6F9] hover:bg-[#EFEFF3]',
-                            ring: isSelected ? 'ring-2 ring-warning/30' : '',
-                            iconBg: isSelected ? 'bg-warning/15 text-warning' : 'bg-white text-muted-foreground',
-                            title: isSelected ? 'text-warning' : 'text-foreground',
-                          },
-                          danger: {
-                            bg: isSelected ? 'bg-danger/8' : 'bg-[#F6F6F9] hover:bg-[#EFEFF3]',
-                            ring: isSelected ? 'ring-2 ring-danger/30' : '',
-                            iconBg: isSelected ? 'bg-danger/15 text-danger' : 'bg-white text-muted-foreground',
-                            title: isSelected ? 'text-danger' : 'text-foreground',
-                          },
-                        };
-                        const c = colorMap[p.color];
+                        const t = getToneTheme(p.color);
                         return (
                           <button
                             key={p.id}
                             type="button"
                             onClick={() => setPriority(p.id as any)}
-                            className={`p-4 rounded-2xl text-left transition-all duration-200 flex items-center justify-between cursor-pointer ${c.bg} ${c.ring}`}
+                            aria-pressed={isSelected}
+                            className={`p-4 rounded-2xl text-left transition-all duration-200 flex items-center justify-between cursor-pointer ${
+                              isSelected ? `${t.bg} ring-2 ${t.border}` : 'bg-[#F6F6F9] hover:bg-[#EFEFF3]'
+                            }`}
                           >
                             <div className="flex items-center gap-3">
-                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors duration-200 ${c.iconBg}`}>
+                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors duration-200 ${
+                                isSelected ? t.tile : 'bg-white text-muted-foreground'
+                              }`}>
                                 {p.icon}
                               </div>
                               <div>
-                                <h3 className={`font-bold text-sm transition-colors duration-200 ${c.title}`}>{p.title}</h3>
+                                <h3 className={`font-bold text-sm transition-colors duration-200 ${isSelected ? t.text : 'text-foreground'}`}>{p.title}</h3>
                                 <p className="text-xs text-muted-foreground mt-0.5">{p.desc}</p>
                               </div>
                             </div>
                             {isSelected && (
-                              <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                                p.color === 'success' ? 'bg-success' : p.color === 'warning' ? 'bg-warning' : 'bg-danger'
-                              }`}>
-                                <Check className="w-3.5 h-3.5 text-white" />
+                              <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${t.solid}`}>
+                                <Check className="w-3.5 h-3.5" />
                               </div>
                             )}
                           </button>
@@ -672,67 +691,82 @@ export default function NewMedicationPage() {
                         <div>
                           <h3 className="font-bold text-foreground text-base font-[var(--font-mono)]">{drugName}</h3>
                           <p className="text-xs text-muted-foreground mt-0.5">
-                            {unitOptions.find(u => u.id === unitType)?.label} · {strength || 'No strength specified'}
+                            {unitLabel(unitType)}{strength ? ` · ${strength}` : ''}
                           </p>
                         </div>
                       </div>
                     </div>
 
-                    {/* Detail rows */}
+                    {/* Detail rows.
+                        Two changes here. First, NAME is a row: it was only ever the card's
+                        header, so the one field you type by hand — the one a typo actually
+                        ruins — was the one field the review never asked you to confirm.
+                        Second, every row is a button back to the step that owns it, tagged
+                        with that step's own icon, so the review reads as a map of the flow
+                        instead of a flat list you can only leave by going Back five times. */}
                     <div className="divide-y divide-[#0F1C5A]/[0.06]">
-                      <div className="flex items-center justify-between px-5 py-3.5">
-                        <div className="flex items-center gap-2.5">
-                          <Clock className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-xs font-semibold text-muted-foreground">Schedule</span>
-                        </div>
-                        <span className="text-sm font-bold text-foreground font-[var(--font-mono)] capitalize">{frequency.replace(/_/g, ' ')}</span>
-                      </div>
-                      <div className="flex items-center justify-between px-5 py-3.5">
-                        <div className="flex items-center gap-2.5">
-                          <Clock className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-xs font-semibold text-muted-foreground">Times</span>
-                        </div>
-                        <span className="text-sm font-bold text-foreground font-[var(--font-mono)]">{times.join(', ')}</span>
-                      </div>
-                      <div className="flex items-center justify-between px-5 py-3.5">
-                        <div className="flex items-center gap-2.5">
-                          <Beaker className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-xs font-semibold text-muted-foreground">Dosage</span>
-                        </div>
-                        <span className="text-sm font-bold text-foreground font-[var(--font-mono)]">{dosageAmount} {unitType.toLowerCase()}(s)</span>
-                      </div>
-                      <div className="flex items-center justify-between px-5 py-3.5">
-                        <div className="flex items-center gap-2.5">
-                          <Layers className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-xs font-semibold text-muted-foreground">Inventory</span>
-                        </div>
-                        <span className="text-sm font-bold text-foreground font-[var(--font-mono)]">
-                          {enableInventory ? `${currentStock} units (alert at ${stockThreshold})` : 'Disabled'}
-                        </span>
-                      </div>
-                      {medicationReason && (
-                        <div className="flex items-center justify-between px-5 py-3.5">
-                          <div className="flex items-center gap-2.5">
-                            <FileText className="w-4 h-4 text-muted-foreground" />
-                            <span className="text-xs font-semibold text-muted-foreground">Reason</span>
+                      {([
+                        { step: 1, icon: stepMeta[0].icon, label: 'Name', value: drugName, mono: true },
+                        { step: 1, icon: stepMeta[0].icon, label: 'Form', value: unitLabel(unitType) },
+                        { step: 2, icon: stepMeta[1].icon, label: 'Schedule', value: frequency.replace(/_/g, ' '), mono: true, capitalize: true },
+                        { step: 2, icon: stepMeta[1].icon, label: 'Times', value: times.join(', '), mono: true },
+                        { step: 3, icon: stepMeta[2].icon, label: 'Strength', value: strength || 'Not specified', muted: !strength },
+                        { step: 3, icon: stepMeta[2].icon, label: 'Each dose', value: `${dosageAmount} ${unitPhrase(unitType, dosageAmount)}`, mono: true },
+                        {
+                          step: 4,
+                          icon: stepMeta[3].icon,
+                          label: 'Inventory',
+                          value: enableInventory
+                            ? `${currentStock} ${unitPhrase(unitType, Number(currentStock) || 2)} · alert at ${stockThreshold}`
+                            : 'Not tracked',
+                          muted: !enableInventory,
+                        },
+                        ...(medicationReason
+                          ? [{ step: 5, icon: stepMeta[4].icon, label: 'Reason', value: medicationReason }]
+                          : []),
+                      ] as const).map((row, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => goToStep(row.step)}
+                          aria-label={`${row.label}: ${row.value}. Edit in step ${row.step}.`}
+                          className="w-full flex items-center justify-between gap-3 px-5 py-3.5 text-left hover:bg-white/70 transition-colors cursor-pointer group/row"
+                        >
+                          <div className="flex items-center gap-2.5 shrink-0 text-muted-foreground">
+                            {row.icon}
+                            <span className="text-xs font-semibold">{row.label}</span>
                           </div>
-                          <span className="text-sm font-bold text-foreground">{medicationReason}</span>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className={`text-sm font-bold truncate ${
+                              'muted' in row && row.muted ? 'text-muted-foreground font-medium' : 'text-foreground'
+                            } ${'mono' in row && row.mono ? 'font-[var(--font-mono)]' : ''} ${
+                              'capitalize' in row && row.capitalize ? 'capitalize' : ''
+                            }`}>
+                              {row.value}
+                            </span>
+                            <Pencil className="w-3.5 h-3.5 shrink-0 text-muted-foreground/40 group-hover/row:text-primary transition-colors" aria-hidden="true" />
+                          </div>
+                        </button>
+                      ))}
+
+                      <button
+                        type="button"
+                        onClick={() => goToStep(5)}
+                        aria-label={`Priority: ${priorityMeta(priority).label}. Edit in step 5.`}
+                        className="w-full flex items-center justify-between gap-3 px-5 py-3.5 text-left hover:bg-white/70 transition-colors cursor-pointer group/row"
+                      >
+                        <div className="flex items-center gap-2.5 shrink-0 text-muted-foreground">
+                          {stepMeta[4].icon}
+                          <span className="text-xs font-semibold">Priority</span>
                         </div>
-                      )}
-                      <div className="flex items-center justify-between px-5 py-3.5">
-                        <div className="flex items-center gap-2.5">
-                          <ShieldAlert className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-xs font-semibold text-muted-foreground">Priority</span>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-sm font-bold flex items-center gap-1.5 ${getToneTheme(priorityMeta(priority).tone).text}`}>
+                            <span className="w-2 h-2 rounded-full" style={{ background: TONE_VAR[priorityMeta(priority).tone] }} />
+                            {priorityMeta(priority).label}
+                          </span>
+                          <Pencil className="w-3.5 h-3.5 shrink-0 text-muted-foreground/40 group-hover/row:text-primary transition-colors" aria-hidden="true" />
                         </div>
-                        <span className={`text-sm font-bold font-[var(--font-mono)] capitalize flex items-center gap-1.5 ${
-                          priority === 'normal' ? 'text-success' : priority === 'important' ? 'text-warning' : 'text-danger'
-                        }`}>
-                          <span className={`w-2 h-2 rounded-full ${
-                            priority === 'normal' ? 'bg-success' : priority === 'important' ? 'bg-warning' : 'bg-danger'
-                          }`} />
-                          {priority}
-                        </span>
-                      </div>
+                      </button>
                     </div>
                   </div>
 
@@ -754,8 +788,8 @@ export default function NewMedicationPage() {
                   <button
                     type="button"
                     onClick={handlePrevStep}
-                    className={`px-5 py-2.5 font-semibold rounded-full text-foreground bg-[#F2F2F7] hover:bg-[#E5E5EA] transition-all duration-200 flex items-center gap-2 cursor-pointer ${
-                      isElderly ? 'h-[72px] text-lg' : 'text-sm'
+                    className={`px-5 font-semibold rounded-full text-foreground bg-[#F2F2F7] hover:bg-[#E5E5EA] transition-all duration-200 flex items-center gap-2 cursor-pointer ${
+                      isElderly ? 'h-[72px] text-lg' : 'h-11 text-sm'
                     }`}
                   >
                     <ArrowLeft className="w-4 h-4" strokeWidth={2.5} />
@@ -764,8 +798,8 @@ export default function NewMedicationPage() {
                 ) : (
                   <Link
                     href="/medications"
-                    className={`px-5 py-2.5 font-semibold rounded-full text-foreground bg-[#F2F2F7] hover:bg-[#E5E5EA] transition-all duration-200 flex items-center justify-center gap-2 ${
-                      isElderly ? 'h-[72px] text-lg' : 'text-sm'
+                    className={`px-5 font-semibold rounded-full text-foreground bg-[#F2F2F7] hover:bg-[#E5E5EA] transition-all duration-200 flex items-center justify-center gap-2 ${
+                      isElderly ? 'h-[72px] text-lg' : 'h-11 text-sm'
                     }`}
                   >
                     Cancel
@@ -776,8 +810,8 @@ export default function NewMedicationPage() {
                   <button
                     type="button"
                     onClick={handleNextStep}
-                    className={`px-6 py-2.5 font-semibold rounded-full bg-primary text-white hover:bg-primary-hover transition-all duration-200 flex items-center gap-2 cursor-pointer ${
-                      isElderly ? 'h-[72px] text-lg' : 'text-sm'
+                    className={`px-6 py-2.5 font-semibold rounded-full bg-primary-strong text-primary-strong-foreground hover:bg-primary-strong-hover transition-all duration-200 flex items-center gap-2 cursor-pointer ${
+                      isElderly ? 'h-[72px] text-lg' : 'h-11 text-sm'
                     }`}
                     style={{ boxShadow: '0 4px 12px rgba(242, 107, 138, 0.35)' }}
                   >
@@ -788,8 +822,8 @@ export default function NewMedicationPage() {
                   <button
                     type="submit"
                     disabled={loading}
-                    className={`px-6 py-2.5 font-semibold rounded-full bg-primary text-white hover:bg-primary-hover transition-all duration-200 flex items-center gap-2 cursor-pointer disabled:opacity-50 ${
-                      isElderly ? 'h-[72px] text-lg' : 'text-sm'
+                    className={`px-6 py-2.5 font-semibold rounded-full bg-primary-strong text-primary-strong-foreground hover:bg-primary-strong-hover transition-all duration-200 flex items-center gap-2 cursor-pointer disabled:opacity-50 ${
+                      isElderly ? 'h-[72px] text-lg' : 'h-11 text-sm'
                     }`}
                     style={{ boxShadow: '0 4px 12px rgba(242, 107, 138, 0.35)' }}
                   >

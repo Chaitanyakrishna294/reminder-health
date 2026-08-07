@@ -151,6 +151,10 @@ through RPCs, never raw table writes. `lib/rate-limit.ts` and `lib/medications/c
 | `lib/schedule/dose-attention.ts` | Pending-vs-attention (missed) status partition + gate-queue order; shared by gate, missed strip, hero; has test |
 | `lib/push/register-push.ts` (client) · `send-push.ts` (server) | Web-push both directions |
 | `lib/plan.ts` · `billing/use-plan-status.ts` · `billing/luxe.ts` | Plan gate, client mirror, Care+ inline-style tokens (deliberately outside Tailwind) |
+| `lib/design/semantics.ts` | **Colour→meaning + canonical labels.** `PRIORITY` (Routine/Important/Critical), `CARE_LABELS` (patient-side first), `DOSE_TONE`/`doseLabel`, `TONE_VAR`. Import these instead of typing a status word or a hex — see `docs/DESIGN_SYSTEM.md` |
+| `lib/severity-theme.ts` | tone→Tailwind classes (`getToneTheme`, `getSeverityTheme`). `.text` is the readable-on-tint colour; never `text-*-foreground` on a tint |
+| `lib/medications/stock.ts` | **Web mirror of the bot's low-stock predicate** (`isLowStock`: threshold first, `daysOfStockLeft <= 3` backup). Lockstep with `src/reminders.js` is enforced by `test/fixtures/low-stock-cases.json`, which both tests read — same mirror discipline as the moment-timezone pair |
+| `lib/medications/add-stock.ts` | The single web path that writes `current_stock`. Raising it clears `low_stock_notified_at` via the `rearm_low_stock_notice()` trigger |
 | `lib/rate-limit.ts` · `razorpay.ts` · `sms.ts` · `severity-theme.ts` · `medications/{catalog,form-logic}.ts` | As named |
 | `lib/telegram.ts` | Failover Telegram sender (raw Bot API fetch; bot-compatible callback_data; no-op for `WEB-*` ids / missing token) |
 | `lib/admin.ts` | `getAdminUser()` — `ADMIN_EMAILS` allowlist, fail closed |
@@ -159,18 +163,26 @@ Context: `theme-context` (light/dark, time-of-day default), `ui-mode-context`
 (`normal|elderly` + `PATIENT_SELF|PATIENT_MONITOR`, persisted to `view-mode` cookie).
 Hook: `use-realtime-notifications` (realtime `notifications` channel → bell).
 
-Components live in `components/{layout,dashboard,medications,guide,billing,settings,medical,shared,ui}/`.
+Components live in `components/{layout,dashboard,medications,guide,billing,settings,medical,shared,care-circle,ui}/`.
+`components/ui/` holds the shared primitives — `button.tsx` (`Button`/`buttonClasses()`/`IconButton`,
+all sizes ≥44px), `badge.tsx` (`Badge`/`CountBadge`), `empty-state.tsx`, `eyebrow.tsx`, plus
+`custom-icons.tsx` and `premium-toast.tsx`. `components/care-circle/connection-actions.tsx` owns
+accept/disconnect/monitor for care relationships (incl. the legacy `caregiver_info` branches) —
+**`/care-circle` is canonical for these; `/settings` keeps identity codes only and links out.**
 Big ones: `dashboard-client-view.tsx` (88 KB), `settings-client-view.tsx` (42 KB),
 `medication-list.tsx` (26 KB). Also `missed-dose-strip.tsx` (top-pinned missed-dose alert, spec
 2026-07-27; actionable in caregiver-monitor view; permanently-unresolvable doses render info-only)
 and `med-due-gate.tsx` (full-screen "Did you take it?" gate: due-first queue, pinned asked dose,
-one-by-one/all-at-once toggle; exports `permanentResolveError`/`UNSAVEABLE_DOSE_COPY`). Guided tours: `components/guide/*` (`TOURS` map in `guide-content.ts`,
+one-by-one/all-at-once toggle; exports `permanentResolveError`/`UNSAVEABLE_DOSE_COPY`).
+`dashboard/refill-strip.tsx` (dashboard-pinned low-stock summary, warning tone) and
+`dashboard/refill-gate.tsx` (full-screen refill prompt, same one-stock-write path as the strip) round
+out the refill-reminder feature. Guided tours: `components/guide/*` (`TOURS` map in `guide-content.ts`,
 `data-tour` attributes, `GuideAutoStart`).
 
 **Recipes**
 - *New dashboard page:* `app/(dashboard)/<route>/page.tsx` server component calling `resolveUserData()` with `export const revalidate = 0`. Nav: `getNavItems()` in `components/layout/dashboard-main-layout.tsx` — **exactly 5 icons, hard rule**; secondary pages go in the navbar profile dropdown. Optionally add to `shouldPrefetch()` allowlist and to `isProtectedRoute` in `lib/supabase/middleware.ts` (list synced 07-26 — keep it that way). Optional tour entry in `guide-content.ts`.
 - *Auth flow:* middleware runs on every page/API route → refreshes session → unauthenticated on protected path → `/login`; no `telegram_chat_id` → `/link-account`. `(dashboard)/layout.tsx` + `resolveUserData()` is the real gate for dashboard pages.
-- *Styling:* semantic tokens (`--primary` pink `#F26B8A`, `--foreground` navy, `--radius 1.75rem`); dark mode = `.dark` on `<html>` + compat `!important` layer in globals.css; elderly mode branches classNames via `useUiMode().isElderly`; Care+ surfaces use `lib/billing/luxe.ts` inline styles.
+- *Styling:* semantic tokens (`--primary` pink `#F26B8A`, `--foreground` navy, `--radius 1.75rem`). **Read `docs/DESIGN_SYSTEM.md` before picking a colour** — solid buttons use `--primary-strong`/`--danger-strong` (the base tokens are too light to carry white text: 2.9:1 and 3.55:1), text on a status tint uses the `-strong` variants (`-foreground` is white and vanishes there), and `.floating-bottom` is how root-layout overlays clear the mobile dock; dark mode = `.dark` on `<html>` + compat `!important` layer in globals.css; elderly mode branches classNames via `useUiMode().isElderly`; Care+ surfaces use `lib/billing/luxe.ts` inline styles.
   - Tailwind's `dark:` variant is bound to that same `.dark` class by `@custom-variant dark (&:where(.dark, .dark *));` in globals.css. **Keep that line** — Tailwind v4 otherwise defaults `dark:` to the OS `prefers-color-scheme`, which the in-app toggle can contradict. Note `<html>` is also `.dark`-classed by the anti-FOUC script in `app/layout.tsx`, which seeds from the OS preference while `theme-context.tsx` defaults to time-of-day — the two disagree on first paint when no theme is saved.
 - *PWA:* `app/manifest.ts`; `public/sw.js` is hand-written, push+click only, **no fetch/caching**; registered app-wide by `components/register-sw.tsx` and again in `register-push.ts` (idempotent, intentional).
 
@@ -183,13 +195,16 @@ agent-audited 2026-07-25; `docs/DATABASE_SCHEMA.md` is badly stale (§9).
 
 **Core:** `profiles` (1:1 auth.users; `telegram_chat_id` unique, synthetic `WEB-<uuid>` for web-only;
 `connect_code` RM+6) · `medications` (**no CREATE TABLE in repo** — pre-repo bot table, only ALTERed;
-stock cols BOTH `tablet_count` and `current_stock`, see §8) · `reminder_events` (per-dose state
+stock cols BOTH `tablet_count` and `current_stock`, see §8) · `low_stock_notified_at`
+(refill-alert suppression; cleared by `rearm_low_stock_notice()` on any stock increase) ·
+`reminder_events` (per-dose state
 machine; UNIQUE(medication_id, scheduled_for); statuses SENT/DISPLAYED/OPENED/GENTLE_REMINDER/
 ESCALATED/CAREGIVER_ACKNOWLEDGED/PENDING_REVIEW/UNCONFIRMED/TAKEN/SKIPPED/SNOOZED;
 `last_prompted_at` = escalation-anchor override, stamped ONLY at snooze re-fire via a separate
 best-effort write; initial-send anchor = `created_at` DB default, never named in the INSERT;
 ladder clamps the anchor to `created_at`+30m — migration pending 2026-08-06, see APPLIED.md) ·
-`reminder_logs` (adherence history; also no CREATE TABLE) · `notifications` (uuid PK, bell feed).
+`reminder_logs` (adherence history; also no CREATE TABLE) ·
+`notifications` (uuid PK, bell feed).
 
 **Care circle:** `caregiver_connections` (modern many-to-many + 6 `can_*` permission flags,
 `is_primary`) · `caregiver_info` (legacy CG###### registry — **still load-bearing** in RLS dual-reads
@@ -306,6 +321,8 @@ non-idempotent migrations guarded; superseded vault migrations marked.
   verify against live schema before trusting for a prod-parity environment.
 - 2 unreferenced mascot PNGs (`point-left`, `point-right`) kept (may be used by future tours).
 - `.claude/worktrees/exciting-chaplygin-cb98c4/` is a full old checkout — **exclude it from repo-wide greps**.
+- Refill-gate snooze (`localStorage.refillGateSnoozedUntil`) is per-device, like the
+  dose gate's `medGateSnoozes` — "remind me tomorrow" on a phone does not silence a tablet.
 
 ---
 

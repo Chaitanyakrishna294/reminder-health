@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useRealtimeNotifications, Notification } from '@/hooks/use-realtime-notifications';
-import { Bell, Check, SkipForward, AlertTriangle, XCircle, Heart, Trash2 } from 'lucide-react';
+import { Bell, Check, SkipForward, AlertTriangle, XCircle, Heart, Trash2, PackagePlus } from 'lucide-react';
 
 interface NotificationCenterProps {
   userId: string;
@@ -47,6 +47,8 @@ export default function NotificationCenter({ userId }: NotificationCenterProps) 
         return { icon: <Heart className="w-4 h-4 text-danger" />, bg: 'bg-danger/10' };
       case 'CARE_CIRCLE_PRIMARY_CHANGED':
         return { icon: <Heart className="w-4 h-4 text-primary font-bold" />, bg: 'bg-primary/10' };
+      case 'LOW_STOCK':
+        return { icon: <PackagePlus className="w-4 h-4 text-warning-strong" />, bg: 'bg-warning/10' };
       default:
         return { icon: <Bell className="w-4 h-4 text-muted-foreground" />, bg: 'bg-muted' };
     }
@@ -57,12 +59,12 @@ export default function NotificationCenter({ userId }: NotificationCenterProps) 
       {/* Bell Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground focus:outline-none transition-colors cursor-pointer flex items-center justify-center"
+        className="relative w-11 h-11 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground focus:outline-none transition-colors cursor-pointer flex items-center justify-center"
         aria-label="View notifications"
       >
         <Bell className="w-5 h-5" />
         {unreadCount > 0 && (
-          <span className="absolute top-0 right-0 inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-xs font-bold leading-none text-danger-foreground bg-danger transform translate-x-1/3 -translate-y-1/3">
+          <span className="absolute top-0 right-0 inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-xs font-bold leading-none text-card bg-danger-strong transform translate-x-1/3 -translate-y-1/3">
             {unreadCount}
           </span>
         )}

@@ -79,7 +79,7 @@ export default function MedicationCatalogLink({ value, onChange }: MedicationCat
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-primary"
+        className="mt-2 inline-flex items-center gap-1.5 min-h-11 text-xs font-semibold text-primary-strong"
       >
         <Search className="w-3.5 h-3.5" /> Link to real medication (optional)
       </button>

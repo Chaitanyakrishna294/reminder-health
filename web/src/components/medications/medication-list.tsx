@@ -4,13 +4,18 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { addStock } from '@/lib/medications/add-stock';
 import { calculateNextReminder } from '@/lib/medication-utils';
 import { useUiMode } from '@/context/ui-mode-context';
 import { Plus, Package, Clock, Pause, Play, SquarePen, Trash2, Pill, X, ChevronDown } from 'lucide-react';
 import GuideButton from '@/components/guide/guide-button';
 import GuideAutoStart from '@/components/guide/guide-auto-start';
 import { getUnitIcon } from '@/components/ui/custom-icons';
-import { getSeverityTheme } from '@/lib/severity-theme';
+import { priorityMeta } from '@/lib/design/semantics';
+import { unitPhrase } from '@/components/medications/medication-form-options';
+import { isLowStock as lowStockOf } from '@/lib/medications/stock';
+import { EmptyState } from '@/components/ui/empty-state';
+import { iconButtonClasses } from '@/components/ui/button';
 
 export interface Medication {
   id: number;
@@ -27,6 +32,7 @@ export interface Medication {
   dosage_amount?: number;
   current_stock?: number | null;
   stock_threshold?: number | null;
+  low_stock_alert_enabled?: boolean | null;
   medication_reason?: string | null;
   timezone?: string | null;
   catalog_id?: number | null;
@@ -53,6 +59,10 @@ export default function MedicationList({
   patientName,
 }: MedicationListProps) {
   const [meds, setMeds] = useState<Medication[]>(initialMeds);
+  // "1 active" was a caption next to a single visible card — it restated what you could
+  // already see. As a tab pair it earns its place: it says a paused list exists and
+  // gets you there. Only shown once something is actually paused.
+  const [filter, setFilter] = useState<'active' | 'paused'>('active');
   const [loadingId, setLoadingId] = useState<number | null>(null);
   const [stockBusyId, setStockBusyId] = useState<number | null>(null);
 
@@ -88,28 +98,27 @@ export default function MedicationList({
 
   // Refill: add the entered amount to current_stock (source of truth; a DB trigger
   // syncs tablet_count). Mirrors the Telegram /refill flow.
+  //
+  // current_stock ?? tablet_count: for a legacy medication current_stock is NULL and
+  // tablet_count holds the real count. addStock treats a null/undefined base as 0,
+  // so passing the raw field would silently drop the existing stock on refill
+  // (e.g. 20 + 30 -> 30, not 50). The predicate, strip, gate and bot all use this
+  // same fallback; this is the last write path that didn't.
   const confirmAddStock = async () => {
     if (!stockModalMed) return;
     const med = stockModalMed;
     const amount = Number(stockInput);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      setStockError('Please enter a positive number.');
-      return;
-    }
     setStockBusyId(med.id);
     setStockError('');
     try {
-      const newStock = Number(med.current_stock || 0) + amount;
-      const { error } = await supabase
-        .from('medications')
-        .update({ current_stock: newStock })
-        .eq('id', med.id);
-      if (error) throw error;
-      setMeds(prev => prev.map(m => m.id === med.id ? { ...m, current_stock: newStock } : m));
+      const { newStock } = await addStock({
+        supabase, medicationId: med.id, currentStock: med.current_stock ?? med.tablet_count, amount,
+      });
+      setMeds(prev => prev.map(m => (m.id === med.id ? { ...m, current_stock: newStock } : m)));
       setStockModalMed(null);
-    } catch (err: any) {
-      console.error('[Medications] add stock failed:', err);
-      setStockError('Could not update stock. Please try again.');
+      setStockInput('');
+    } catch (err) {
+      setStockError(err instanceof Error ? err.message : 'Could not update stock.');
     } finally {
       setStockBusyId(null);
     }
@@ -137,7 +146,7 @@ export default function MedicationList({
 
         const { data, error } = await supabase
           .from('medications')
-          .select('id, telegram_id, drug_name, dosage, frequency, reminder_times, tablet_count, priority_level, next_reminder_at, active, unit_type, dosage_amount, current_stock, stock_threshold, medication_reason, catalog_id, linked_brand_name, linked_composition, linked_manufacturer, linked_snapshot_date, linked_is_discontinued')
+          .select('id, telegram_id, drug_name, dosage, frequency, reminder_times, tablet_count, priority_level, next_reminder_at, active, unit_type, dosage_amount, current_stock, stock_threshold, low_stock_alert_enabled, medication_reason, catalog_id, linked_brand_name, linked_composition, linked_manufacturer, linked_snapshot_date, linked_is_discontinued')
           .eq('telegram_id', queryId);
 
         if (!error && data) {
@@ -224,13 +233,22 @@ export default function MedicationList({
 
   const activeMeds = meds.filter(m => m.active);
   const pausedMeds = meds.filter(m => !m.active);
+  // With nothing paused there are no tabs, so the filter must not hide anything.
+  const visibleMeds = pausedMeds.length === 0
+    ? meds
+    : filter === 'paused' ? pausedMeds : activeMeds;
 
-  // Apple Health-style category colors — vibrant accent on clean white.
+  // Accent per card, driven by priority. This used to be a local hex map that made
+  // routine medications PINK here while the wizard's own picker showed them green —
+  // the same medication changed color between the screen you set it on and the screen
+  // you read it on. Tokens now, one source (lib/design/semantics).
   const cardTheme = (med: Medication) => {
-    if (!med.active) return { color: '#8E8E93', tint: '#F2F2F7' };
-    if (med.priority_level === 'critical') return { color: '#FF3B30', tint: '#FFECEA' }; // system red
-    if (med.priority_level === 'important') return { color: '#FF9500', tint: '#FFF3E0' }; // system orange
-    return { color: '#F26B8A', tint: '#FFEDF2' }; // app pink
+    if (!med.active) return { color: 'var(--muted-foreground)', tint: 'var(--muted)' };
+    const tone = priorityMeta(med.priority_level).tone;
+    return {
+      color: `var(--${tone}-strong)`,
+      tint: `color-mix(in srgb, var(--${tone}) 12%, transparent)`,
+    };
   };
 
   const cardShadow = '0 1px 3px rgba(16, 28, 90, 0.04), 0 10px 30px rgba(16, 28, 90, 0.06)';
@@ -240,14 +258,16 @@ export default function MedicationList({
       {/* Auto-start the guided tour once for first-time users (then summonable via the ? button). */}
       <GuideAutoStart tour="medications" />
       {/* Header */}
-      <div data-tour="med-hero" className="flex items-end justify-between gap-3">
+      <div data-tour="med-hero" className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
         <div>
           <h1 className={`font-bold tracking-tight text-foreground ${isElderly ? 'text-[28px]' : 'text-[26px]'}`}>
             {patientName ? `${patientName}'s Medications` : 'Medications'}
           </h1>
-          <p className={`text-muted-foreground mt-0.5 font-medium ${isElderly ? 'text-base' : 'text-[13px]'}`}>
-            {activeMeds.length} active{pausedMeds.length > 0 ? ` · ${pausedMeds.length} paused` : ''}
-          </p>
+          {pausedMeds.length === 0 && (
+            <p className={`text-muted-foreground mt-0.5 font-medium ${isElderly ? 'text-base' : 'text-[13px]'}`}>
+              {activeMeds.length} {activeMeds.length === 1 ? 'medication' : 'medications'}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <GuideButton tour="medications" />
@@ -255,8 +275,8 @@ export default function MedicationList({
             <Link
               href="/medications/new"
               aria-label="Add medication"
-              className={`inline-flex items-center gap-1.5 font-semibold rounded-full bg-primary text-white hover:bg-primary-hover transition-all ${
-                isElderly ? 'px-5 py-2.5 text-base' : 'px-4 py-2 text-[13px]'
+              className={`inline-flex items-center justify-center gap-1.5 font-semibold rounded-full bg-primary-strong text-primary-strong-foreground hover:bg-primary-strong-hover transition-all ${
+                isElderly ? 'h-14 px-6 text-base' : 'h-11 px-4 text-[13px]'
               }`}
               style={{ boxShadow: '0 4px 12px rgba(242, 107, 138, 0.35)' }}
             >
@@ -267,25 +287,68 @@ export default function MedicationList({
         </div>
       </div>
 
-      {/* Cards */}
-      {meds.length === 0 ? (
-        <div
-          className="bg-white rounded-[22px] text-center text-muted-foreground p-12 text-sm"
-          style={{ boxShadow: cardShadow }}
-        >
-          No medications yet. Tap &quot;Add&quot; to get started.
+      {/* Active / Paused tabs — only meaningful once something is paused. */}
+      {pausedMeds.length > 0 && (
+        <div role="tablist" aria-label="Filter medications" className="flex items-center gap-2">
+          {([
+            ['active', 'Active', activeMeds.length],
+            ['paused', 'Paused', pausedMeds.length],
+          ] as const).map(([id, label, count]) => (
+            <button
+              key={id}
+              role="tab"
+              aria-selected={filter === id}
+              onClick={() => setFilter(id)}
+              className={`h-11 px-4 rounded-full font-bold transition-all cursor-pointer ${
+                isElderly ? 'text-base' : 'text-[13px]'
+              } ${
+                filter === id
+                  ? 'bg-primary-strong text-primary-strong-foreground shadow-sm'
+                  : 'bg-muted text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {label} ({count})
+            </button>
+          ))}
         </div>
+      )}
+
+      {/* Cards */}
+      {visibleMeds.length === 0 ? (
+        <EmptyState
+          icon={<Pill className={isElderly ? 'w-9 h-9' : 'w-6 h-6'} />}
+          title={
+            meds.length === 0
+              ? 'No medications yet'
+              : filter === 'paused'
+                ? 'Nothing paused'
+                : 'No active medications'
+          }
+          description={
+            meds.length === 0
+              ? 'Add your first medication and we will remind you when each dose is due.'
+              : filter === 'paused'
+                ? 'Medications you pause will wait here until you resume them.'
+                : 'All of your medications are paused right now.'
+          }
+          action={
+            activeRole !== 'CAREGIVER' && meds.length === 0
+              ? { label: 'Add medication', href: '/medications/new' }
+              : undefined
+          }
+        />
       ) : (
         <div className="grid grid-cols-1 gap-4">
-          {meds.map((med, idx) => {
+          {visibleMeds.map((med, idx) => {
             const isLoading = loadingId === med.id;
-            const isLowStock = med.current_stock !== null
-              && med.current_stock !== undefined
-              && med.stock_threshold !== null
-              && med.stock_threshold !== undefined
-              && Number(med.current_stock) <= Number(med.stock_threshold);
+            const isLowStock = lowStockOf(med).low;
             const t = cardTheme(med);
-            const stockColor = isLowStock ? '#FF3B30' : t.color;
+            const stockColor = isLowStock ? 'var(--warning-strong)' : t.color;
+            // Same current_stock ?? tablet_count fallback the predicate uses, so a
+            // legacy medication (current_stock NULL, tablet_count holds the real
+            // count) doesn't render "Stock not tracked" while the dashboard strip
+            // and Low stock badge above say it's low.
+            const displayStock = med.current_stock ?? med.tablet_count ?? null;
 
             return (
               <div
@@ -308,13 +371,19 @@ export default function MedicationList({
                     {/* Name + meta */}
                     <div className="flex-1 min-w-0">
                       <h3
-                        className={`font-bold tracking-tight text-foreground truncate ${isElderly ? 'text-2xl' : 'text-lg'}`}
+                        className={`font-bold tracking-tight text-foreground ${isElderly ? 'text-2xl break-words' : 'text-lg truncate'}`}
                       >
                         {med.drug_name}
                       </h3>
+                      {/* Amount-per-dose and strength used to run together as
+                          "5 ml(s) · 10mg", which reads as two competing numbers. Label
+                          which is which. */}
                       <p className={`text-muted-foreground font-medium mt-0.5 ${isElderly ? 'text-base' : 'text-[13px]'}`}>
-                        {med.dosage_amount || 1} {med.unit_type?.toLowerCase() || 'tablet'}(s)
-                        {med.dosage && med.dosage !== 'N/A' && <> · {med.dosage}</>}
+                        {med.dosage && med.dosage !== 'N/A' ? (
+                          <>Dose: {med.dosage} in {med.dosage_amount || 1} {unitPhrase(med.unit_type, med.dosage_amount || 1)}</>
+                        ) : (
+                          <>Dose: {med.dosage_amount || 1} {unitPhrase(med.unit_type, med.dosage_amount || 1)}</>
+                        )}
                       </p>
                       {med.linked_brand_name && (
                         <div className="mt-1">
@@ -357,11 +426,11 @@ export default function MedicationList({
                       {/* Category + frequency pills */}
                       <div className="flex items-center gap-1.5 mt-2 flex-wrap">
                         <span
-                          className="inline-flex items-center gap-1 font-semibold capitalize rounded-full px-2.5 py-1 text-[11px]"
+                          className="inline-flex items-center gap-1 font-semibold rounded-full px-2.5 py-1 text-[11px]"
                           style={{ background: t.tint, color: t.color }}
                         >
                           <span className="w-1.5 h-1.5 rounded-full" style={{ background: t.color }} />
-                          {med.priority_level}
+                          {priorityMeta(med.priority_level).label}
                         </span>
                         <span className="inline-flex items-center font-semibold capitalize rounded-full px-2.5 py-1 text-[11px] bg-[#F2F2F7] text-muted-foreground">
                           {med.frequency.replace(/_/g, ' ')}
@@ -375,21 +444,38 @@ export default function MedicationList({
                     </div>
 
                     {/* Stock */}
-                    <div data-tour={idx === 0 ? 'med-stock' : undefined} className="shrink-0 text-right">
-                      {med.current_stock !== null && med.current_stock !== undefined ? (
+                    {/* Capped: an uncapped "inhalations left" label grew this column to
+                        99px and pushed "Dose: 5mg in 2.5 inhalations" onto two lines.
+                        The word "left" is dropped too — a bare count beside a unit
+                        already reads as remaining, and the Low stock line below says
+                        the state outright. */}
+                    <div data-tour={idx === 0 ? 'med-stock' : undefined} className="shrink-0 text-right max-w-[76px]">
+                      {displayStock !== null ? (
                         <>
                           <p
-                            className={`font-bold tabular-nums leading-none ${isElderly ? 'text-4xl' : 'text-[32px]'} ${isLowStock ? 'animate-pulse' : ''}`}
+                            className={`font-bold tabular-nums leading-none ${isElderly ? 'text-4xl' : 'text-[32px]'}`}
                             style={{ color: stockColor }}
                           >
-                            {med.current_stock}
+                            {displayStock}
                           </p>
-                          <p className="font-semibold text-[10px] uppercase tracking-wide mt-1 text-muted-foreground">
-                            {isLowStock ? 'Low' : 'left'}
+                          {/* A bare "4" told you nothing — 4 tablets or 4 ml? And the
+                              label flipped between "Low" and "left" for the same slot.
+                              Always the unit; "Low" is an extra word, not a swap, so the
+                              warning never costs you the reading. */}
+                          {/* No `tracking-wide` here: the extra letter-spacing pushed
+                              the longest unit ("inhalations") 2px past the column and
+                              clipped its last letter. */}
+                          <p className="font-semibold text-[11px] uppercase mt-1 leading-tight text-muted-foreground">
+                            {unitPhrase(med.unit_type, Number(displayStock))}
                           </p>
+                          {isLowStock && (
+                            <p className="font-black text-[11px] uppercase tracking-wide mt-0.5 leading-tight text-warning-strong">
+                              Low stock
+                            </p>
+                          )}
                         </>
                       ) : (
-                        <Package className="w-5 h-5 text-muted-foreground/40 mt-1" />
+                        <Package className="w-5 h-5 text-muted-foreground/40 mt-1" aria-label="Stock not tracked" />
                       )}
                     </div>
                   </div>
@@ -398,14 +484,19 @@ export default function MedicationList({
                 {/* Divider */}
                 <div className="h-px bg-[#0F1C5A]/[0.06] mx-5" />
 
-                {/* Footer region */}
-                <div className="px-5 py-3.5 flex items-center justify-between gap-3">
+                {/* Footer region.
+                    Times and the four action buttons used to share one row. Once the
+                    buttons went to 44px for touch, four of them plus the divider ate
+                    ~210px of a 375px screen and squeezed the time pills to 58px — so
+                    "7:40 PM" wrapped onto two lines inside its own pill. They get their
+                    own rows below sm; side by side from sm up where there is room. */}
+                <div className="px-5 py-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   {/* Times */}
                   <div data-tour={idx === 0 ? 'med-times' : undefined} className="flex items-center gap-1.5 flex-wrap min-w-0">
                     {med.reminder_times.map((time, ti) => (
                       <span
                         key={ti}
-                        className={`inline-flex items-center gap-1 font-semibold rounded-full ${
+                        className={`inline-flex items-center gap-1 font-semibold rounded-full whitespace-nowrap ${
                           isElderly ? 'px-3 py-1.5 text-sm' : 'px-2.5 py-1 text-[11px]'
                         }`}
                         style={{ background: t.tint, color: t.color }}
@@ -418,13 +509,19 @@ export default function MedicationList({
 
                   {/* Actions */}
                   {activeRole !== 'CAREGIVER' && (
-                    <div data-tour={idx === 0 ? 'med-actions' : undefined} className="flex items-center gap-1.5 shrink-0">
+                    /* Four identical 36px circles in a row, distinguishable only by a
+                       small glyph, put "delete this medication" one slip away from
+                       "log a dose". Now: 44px targets, real accessible names (a `title`
+                       is not announced on touch), and the destructive one pushed out of
+                       the group by a divider. */
+                    <div data-tour={idx === 0 ? 'med-actions' : undefined} className="flex items-center gap-2 shrink-0">
                       {isOwnMeds && (
                         <button
                           onClick={() => openStockModal(med)}
                           disabled={stockBusyId === med.id}
                           title="Add stock"
-                          className="w-9 h-9 rounded-full flex items-center justify-center bg-[#F2F2F7] text-foreground/70 hover:bg-[#E5E5EA] transition-all cursor-pointer disabled:opacity-50"
+                          aria-label={`Add stock for ${med.drug_name}`}
+                          className={iconButtonClasses({ isElderly })}
                         >
                           {stockBusyId === med.id
                             ? <span className="text-[10px]">…</span>
@@ -435,22 +532,28 @@ export default function MedicationList({
                         onClick={() => handleToggleActive(med)}
                         disabled={isLoading}
                         title={med.active ? 'Pause' : 'Resume'}
-                        className={`w-9 h-9 rounded-full flex items-center justify-center bg-[#F2F2F7] text-foreground/70 hover:bg-[#E5E5EA] transition-all cursor-pointer disabled:opacity-50 ${isLoading ? 'animate-pulse' : ''}`}
+                        aria-label={`${med.active ? 'Pause' : 'Resume'} reminders for ${med.drug_name}`}
+                        className={iconButtonClasses({ isElderly, className: isLoading ? 'animate-pulse' : '' })}
                       >
                         {med.active ? <Pause className="w-4 h-4" strokeWidth={2.5} /> : <Play className="w-4 h-4" strokeWidth={2.5} />}
                       </button>
                       <Link
                         href={`/medications/${med.id}`}
                         title="Edit"
-                        className="w-9 h-9 rounded-full flex items-center justify-center bg-[#F2F2F7] text-foreground/70 hover:bg-[#E5E5EA] transition-all"
+                        aria-label={`Edit ${med.drug_name}`}
+                        className={iconButtonClasses({ isElderly })}
                       >
                         <SquarePen className="w-4 h-4" strokeWidth={2.5} />
                       </Link>
+
+                      <span className="w-px self-stretch bg-border mx-1" aria-hidden="true" />
+
                       <button
                         onClick={() => setDeleteModalMed(med)}
                         disabled={isLoading}
                         title="Delete"
-                        className="w-9 h-9 rounded-full flex items-center justify-center bg-[#FFECEA] text-[#FF3B30] hover:bg-[#FFDAD6] transition-all cursor-pointer disabled:opacity-50"
+                        aria-label={`Delete ${med.drug_name}`}
+                        className={iconButtonClasses({ variant: 'danger-ghost', isElderly })}
                       >
                         <Trash2 className="w-4 h-4" strokeWidth={2.5} />
                       </button>
@@ -484,7 +587,7 @@ export default function MedicationList({
 
             <label className="block">
               <span className="text-[10px] uppercase font-semibold text-muted-foreground">
-                How many {stockModalMed.unit_type?.toLowerCase() || 'unit'}(s) did you add?
+                How many {unitPhrase(stockModalMed.unit_type, 2)} did you add?
               </span>
               <input
                 type="number"
@@ -497,15 +600,15 @@ export default function MedicationList({
                 placeholder="0"
                 className="mt-1.5 w-full px-4 py-3 bg-[#F2F2F7] rounded-2xl text-sm font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
               />
-              {stockModalMed.current_stock !== null && stockModalMed.current_stock !== undefined && (
+              {(stockModalMed.current_stock ?? stockModalMed.tablet_count ?? null) !== null && (
                 <span className="block mt-1.5 text-[11px] font-medium text-muted-foreground">
-                  Current: {stockModalMed.current_stock}
-                  {stockInput && Number(stockInput) > 0 ? ` → ${Number(stockModalMed.current_stock) + Number(stockInput)}` : ''}
+                  Current: {stockModalMed.current_stock ?? stockModalMed.tablet_count}
+                  {stockInput && Number(stockInput) > 0 ? ` → ${Number(stockModalMed.current_stock ?? stockModalMed.tablet_count) + Number(stockInput)}` : ''}
                 </span>
               )}
             </label>
 
-            {stockError && <p className="text-[12px] font-semibold text-[#FF3B30]">{stockError}</p>}
+            {stockError && <p className="text-[12px] font-semibold text-danger-strong">{stockError}</p>}
 
             <div className="flex gap-2">
               <button
@@ -518,7 +621,7 @@ export default function MedicationList({
               <button
                 onClick={confirmAddStock}
                 disabled={stockBusyId !== null}
-                className="flex-1 py-3 bg-primary text-white hover:bg-primary-hover text-sm font-semibold rounded-full cursor-pointer transition-all disabled:opacity-50"
+                className="flex-1 py-3 bg-primary-strong text-primary-strong-foreground hover:bg-primary-strong-hover text-sm font-semibold rounded-full cursor-pointer transition-all disabled:opacity-50"
                 style={{ boxShadow: '0 4px 12px rgba(242, 107, 138, 0.35)' }}
               >
                 {stockBusyId !== null ? 'Adding…' : 'Add stock'}
@@ -532,8 +635,8 @@ export default function MedicationList({
       {deleteModalMed && (
         <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in" onClick={() => loadingId === null && setDeleteModalMed(null)}>
           <div className="bg-white rounded-[22px] max-w-sm w-full p-6 space-y-5 text-center" style={{ boxShadow: '0 8px 40px rgba(16, 28, 90, 0.18)' }} onClick={(e) => e.stopPropagation()}>
-            <div className="w-14 h-14 rounded-full bg-[#FFECEA] flex items-center justify-center mx-auto">
-              <Trash2 className="w-6 h-6 text-[#FF3B30]" strokeWidth={2.2} />
+            <div className="w-14 h-14 rounded-full bg-danger/10 flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6 text-danger-strong" strokeWidth={2.2} />
             </div>
             <div>
               <h3 className="text-base font-bold tracking-tight text-foreground">Delete {deleteModalMed.drug_name}?</h3>
@@ -552,7 +655,7 @@ export default function MedicationList({
               <button
                 onClick={confirmDelete}
                 disabled={loadingId !== null}
-                className="flex-1 py-3 bg-[#FF3B30] text-white hover:bg-[#E0352B] text-sm font-semibold rounded-full cursor-pointer transition-all disabled:opacity-50"
+                className="flex-1 py-3 bg-danger-strong text-card hover:brightness-95 text-sm font-semibold rounded-full cursor-pointer transition-all disabled:opacity-50"
                 style={{ boxShadow: '0 4px 12px rgba(255, 59, 48, 0.35)' }}
               >
                 {loadingId !== null ? 'Deleting…' : 'Delete'}

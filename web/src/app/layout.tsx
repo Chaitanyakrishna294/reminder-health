@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { UiModeProvider } from "@/context/ui-mode-context";
@@ -26,6 +26,16 @@ export const metadata: Metadata = {
     icon: "/favicon.ico",
     apple: "/apple-icon.png",
   },
+};
+
+// `viewportFit: 'cover'` is what makes env(safe-area-inset-*) resolve to anything other
+// than 0. The floating bottom dock and the install FAB both sit in the region a phone's
+// home indicator occupies, so without this the last card on every scrolling page ends up
+// underneath them on notched devices.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

@@ -213,7 +213,8 @@ export default function DashboardMainLayout({
   return (
     <div className="flex flex-1 min-h-[calc(100vh-4rem)] relative w-full">
       {/* LEFT VERTICAL RAIL (Desktop/Tablet) */}
-      <aside 
+      <aside
+        aria-label="Main navigation"
         className={`hidden md:flex flex-col items-center justify-center fixed left-6 top-1/2 -translate-y-1/2 z-40 rounded-[28px] bg-white/80 dark:bg-card/70 backdrop-blur-xl border border-border/70 shadow-lg transition-all duration-300 ${
           isElderly
             ? 'w-24 py-10 space-y-8 border-2 border-primary/50'
@@ -229,14 +230,16 @@ export default function DashboardMainLayout({
               prefetch={shouldPrefetch(item.href)}
               className={`flex flex-col items-center justify-center rounded-[20px] transition-all relative group ${
                 isElderly
-                  ? `w-20 h-20 text-3xl ${active ? 'bg-primary text-primary-foreground shadow-lg' : 'text-foreground hover:bg-muted/80'}`
+                  ? `w-20 h-20 text-3xl ${active ? 'bg-primary-strong text-primary-strong-foreground shadow-lg' : 'text-foreground hover:bg-muted/80'}`
                   : `w-14 h-14 text-xl ${
                       active 
-                        ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20' 
+                        ? 'bg-primary-strong text-primary-strong-foreground shadow-md shadow-primary/20' 
                         : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
                     }`
               }`}
               title={item.label}
+              aria-label={item.label}
+              aria-current={active ? 'page' : undefined}
             >
               <span><NavIcon icon={item.icon} /></span>
               {!isElderly && (
@@ -252,7 +255,8 @@ export default function DashboardMainLayout({
       {/* BOTTOM FLOATING PILL DOCK (Mobile) */}
       <nav
         data-tour="dash-nav"
-        className={`md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-40 rounded-[32px] bg-white/85 dark:bg-card/80 backdrop-blur-xl border border-border/70 shadow-lg flex items-center justify-around px-4 transition-all duration-300 ${
+        aria-label="Main navigation"
+        className={`md:hidden fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-40 rounded-[32px] bg-white/85 dark:bg-card/80 backdrop-blur-xl border border-border/70 shadow-lg flex items-center justify-around px-4 transition-all duration-300 ${
           isElderly
             ? 'w-[92%] h-24 border-2 border-primary/50'
             : 'w-[90%] max-w-[480px] h-[72px]'
@@ -268,15 +272,17 @@ export default function DashboardMainLayout({
               className={`flex items-center justify-center rounded-full transition-all ${
                 isElderly
                   ? `h-16 flex-1 max-w-[64px] aspect-square ${
-                      active ? 'bg-primary text-primary-foreground shadow-lg' : 'text-foreground bg-muted/40'
+                      active ? 'bg-primary-strong text-primary-strong-foreground shadow-lg' : 'text-foreground bg-muted/40'
                     }`
                   : `h-12 flex-1 max-w-[48px] aspect-square ${
                       active 
-                        ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20' 
+                        ? 'bg-primary-strong text-primary-strong-foreground shadow-md shadow-primary/20' 
                         : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
                     }`
               }`}
               title={item.label}
+              aria-label={item.label}
+              aria-current={active ? 'page' : undefined}
             >
               <span className={isElderly ? "text-2xl" : "text-lg"}><NavIcon icon={item.icon} /></span>
             </Link>
@@ -284,12 +290,17 @@ export default function DashboardMainLayout({
         })}
       </nav>
 
-      {/* Main Content Area */}
-      <main 
+      {/* Main Content Area.
+          Bottom padding must clear the floating dock, which is NOT part of the flow:
+          it occupies bottom-6 (24px) + its own height (72px normal / 96px elderly),
+          plus the home-indicator inset. The old pb-24 (96px) exactly equalled the
+          normal-mode dock band, i.e. zero clearance — the last card on every scrolling
+          page sat under it. These values leave ~24-32px of real breathing room. */}
+      <main
         className={`flex-1 w-full max-w-[1600px] mx-auto transition-all duration-300 ${
-          isElderly 
-            ? 'p-8 md:p-12 md:pl-40 pb-32 md:pb-12' 
-            : 'p-6 md:p-8 md:pl-32 pb-24 md:pb-8'
+          isElderly
+            ? 'p-8 md:p-12 md:pl-40 pb-[calc(9.5rem+env(safe-area-inset-bottom))] md:pb-12'
+            : 'p-6 md:p-8 md:pl-32 pb-[calc(7.5rem+env(safe-area-inset-bottom))] md:pb-8'
         }`}
       >
         {viewMode === 'PATIENT_MONITOR' && (
@@ -365,7 +376,7 @@ export default function DashboardMainLayout({
                       </button>
                       <a
                         href={`tel:${patientPhone}`}
-                        className="flex-1 inline-flex items-center justify-center gap-1 text-[10px] font-black bg-primary text-primary-foreground hover:bg-primary-hover px-2 py-1.5 rounded-lg transition-all text-center"
+                        className="flex-1 inline-flex items-center justify-center gap-1 text-[10px] font-black bg-primary-strong text-primary-strong-foreground hover:bg-primary-strong-hover px-2 py-1.5 rounded-lg transition-all text-center"
                       >
                         <ExternalLink className="w-3 h-3" />
                         <span>Open App</span>

@@ -6,8 +6,9 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { calculateNextReminder } from '@/lib/medication-utils';
 import { useUiMode } from '@/context/ui-mode-context';
-import { type UnitType, unitOptions, stepMeta, frequencies, priorities } from '@/components/medications/medication-form-options';
+import { type UnitType, unitOptions, stepMeta, frequencies, priorities, unitPhrase } from '@/components/medications/medication-form-options';
 import { validateMedicationStep, buildSharedMedicationFields } from '@/lib/medications/form-logic';
+import { getToneTheme } from '@/lib/severity-theme';
 import MedicationCatalogLink from '@/components/medications/medication-catalog-link';
 import type { CatalogLinkValue } from '@/lib/medications/catalog';
 import {
@@ -245,7 +246,7 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
                         isCompleted
                           ? 'bg-success text-white'
                           : isCurrent
-                            ? 'bg-primary text-white shadow-[0_0_0_4px_rgba(242,107,138,0.15)]'
+                            ? 'bg-primary-strong text-primary-strong-foreground shadow-[0_0_0_4px_rgba(242,107,138,0.15)]'
                             : 'bg-muted text-muted-foreground'
                       }`}
                     >
@@ -352,7 +353,7 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
                             {freq.icon}
                           </div>
                           <div>
-                            <h3 className={`font-bold text-sm ${frequency === freq.id ? 'text-primary' : 'text-foreground'}`}>{freq.title}</h3>
+                            <h3 className={`font-bold text-sm ${frequency === freq.id ? 'text-primary-strong' : 'text-foreground'}`}>{freq.title}</h3>
                             <p className="text-xs text-muted-foreground mt-0.5">{freq.desc}</p>
                           </div>
                         </div>
@@ -546,51 +547,31 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
                   <div className="grid grid-cols-1 gap-2.5">
                     {priorities.map((p) => {
                       const isSelected = priority === p.id;
-                      const colorMap = {
-                        success: {
-                          border: isSelected ? 'border-success' : 'border-border',
-                          bg: isSelected ? 'bg-success/6' : '',
-                          ring: isSelected ? 'ring-2 ring-success/15' : '',
-                          iconBg: isSelected ? 'bg-success/12 text-success' : 'bg-muted text-muted-foreground',
-                          title: isSelected ? 'text-success' : 'text-foreground',
-                        },
-                        warning: {
-                          border: isSelected ? 'border-warning' : 'border-border',
-                          bg: isSelected ? 'bg-warning/6' : '',
-                          ring: isSelected ? 'ring-2 ring-warning/15' : '',
-                          iconBg: isSelected ? 'bg-warning/12 text-warning' : 'bg-muted text-muted-foreground',
-                          title: isSelected ? 'text-warning' : 'text-foreground',
-                        },
-                        danger: {
-                          border: isSelected ? 'border-danger' : 'border-border',
-                          bg: isSelected ? 'bg-danger/6' : '',
-                          ring: isSelected ? 'ring-2 ring-danger/15' : '',
-                          iconBg: isSelected ? 'bg-danger/12 text-danger' : 'bg-muted text-muted-foreground',
-                          title: isSelected ? 'text-danger' : 'text-foreground',
-                        },
-                      };
-                      const c = colorMap[p.color];
+                      const t = getToneTheme(p.color);
                       return (
                         <button
                           key={p.id}
                           type="button"
                           onClick={() => setPriority(p.id as any)}
-                          className={`p-4 rounded-2xl border text-left transition-all duration-200 flex items-center justify-between cursor-pointer hover:bg-muted/40 ${c.border} ${c.bg} ${c.ring}`}
+                          aria-pressed={isSelected}
+                          className={`p-4 rounded-2xl border text-left transition-all duration-200 flex items-center justify-between cursor-pointer hover:bg-muted/40 ${
+                            isSelected ? `${t.borderStrong} ${t.bg} ring-2 ${t.border}` : 'border-border'
+                          }`}
                         >
                           <div className="flex items-center gap-3">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors duration-200 ${c.iconBg}`}>
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors duration-200 ${
+                              isSelected ? t.tile : 'bg-muted text-muted-foreground'
+                            }`}>
                               {p.icon}
                             </div>
                             <div>
-                              <h3 className={`font-bold text-sm transition-colors duration-200 ${c.title}`}>{p.title}</h3>
+                              <h3 className={`font-bold text-sm transition-colors duration-200 ${isSelected ? t.text : 'text-foreground'}`}>{p.title}</h3>
                               <p className="text-xs text-muted-foreground mt-0.5">{p.desc}</p>
                             </div>
                           </div>
                           {isSelected && (
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                              p.color === 'success' ? 'bg-success' : p.color === 'warning' ? 'bg-warning' : 'bg-danger'
-                            }`}>
-                              <Check className="w-3.5 h-3.5 text-white" />
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${t.solid}`}>
+                              <Check className="w-3.5 h-3.5" />
                             </div>
                           )}
                         </button>
@@ -642,7 +623,7 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
                         <Beaker className="w-4 h-4 text-muted-foreground" />
                         <span className="text-xs font-semibold text-muted-foreground">Dosage</span>
                       </div>
-                      <span className="text-sm font-bold text-foreground font-[var(--font-mono)]">{dosageAmount} {unitType.toLowerCase()}(s)</span>
+                      <span className="text-sm font-bold text-foreground font-[var(--font-mono)]">{dosageAmount} {unitPhrase(unitType, dosageAmount)}</span>
                     </div>
                     <div className="flex items-center justify-between px-5 py-3.5">
                       <div className="flex items-center gap-2.5">
@@ -690,7 +671,7 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
                   type="button"
                   onClick={handlePrevStep}
                   className={`px-5 py-2.5 font-semibold rounded-2xl border border-border text-foreground bg-muted hover:bg-muted/70 transition-all duration-200 flex items-center gap-2 cursor-pointer ${
-                    isElderly ? 'h-[72px] text-lg' : 'text-sm'
+                    isElderly ? 'h-[72px] text-lg' : 'h-11 text-sm'
                   }`}
                 >
                   <ArrowLeft className="w-4 h-4" />
@@ -700,7 +681,7 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
                 <Link
                   href="/medications"
                   className={`px-5 py-2.5 font-semibold rounded-2xl border border-border text-foreground bg-muted hover:bg-muted/70 transition-all duration-200 flex items-center justify-center gap-2 ${
-                    isElderly ? 'h-[72px] text-lg' : 'text-sm'
+                    isElderly ? 'h-[72px] text-lg' : 'h-11 text-sm'
                   }`}
                 >
                   Cancel
@@ -711,8 +692,8 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
                 <button
                   type="button"
                   onClick={handleNextStep}
-                  className={`px-6 py-2.5 font-semibold rounded-2xl bg-primary text-primary-foreground hover:bg-primary-hover transition-all duration-200 flex items-center gap-2 cursor-pointer shadow-sm ${
-                    isElderly ? 'h-[72px] text-lg' : 'text-sm'
+                  className={`px-6 py-2.5 font-semibold rounded-2xl bg-primary-strong text-primary-strong-foreground hover:bg-primary-strong-hover transition-all duration-200 flex items-center gap-2 cursor-pointer shadow-sm ${
+                    isElderly ? 'h-[72px] text-lg' : 'h-11 text-sm'
                   }`}
                 >
                   Continue
@@ -723,7 +704,7 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
                   type="submit"
                   disabled={loading}
                   className={`px-6 py-2.5 font-semibold rounded-2xl bg-success text-success-foreground hover:bg-success/90 transition-all duration-200 flex items-center gap-2 cursor-pointer disabled:opacity-50 shadow-sm ${
-                    isElderly ? 'h-[72px] text-lg' : 'text-sm'
+                    isElderly ? 'h-[72px] text-lg' : 'h-11 text-sm'
                   }`}
                 >
                   {loading ? 'Saving...' : 'Save Changes'}

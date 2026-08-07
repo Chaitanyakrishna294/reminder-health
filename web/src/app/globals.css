@@ -20,6 +20,15 @@
   --primary-foreground: #ffffff;
   --primary-hover: #ED5276; /* Pressed/hover pink */
   --primary-soft: #FDEEF2; /* Tinted pink surface */
+  /* SOLID button fills only. White on Mind Pink is 2.9:1 — every primary CTA in the app
+     failed the 4.5:1 floor, which is the single most-cited usability defect in mobile
+     health apps and matters most for exactly the users Elderly Mode exists for. This is
+     the same hue carried down in lightness to 4.75:1, so buttons read as the brand while
+     staying legible. The lighter --primary above still owns every decorative use: tints,
+     borders, icons, the logo, focus rings. */
+  --primary-strong: #CC3D64;
+  --primary-strong-hover: #BD2F58;
+  --primary-strong-foreground: #ffffff;
 
   --success: #34C759; /* Success Green */
   --success-foreground: #ffffff;
@@ -30,12 +39,31 @@
   --danger: #FF3B30;  /* Danger Red */
   --danger-foreground: #ffffff;
 
+  /* Text-on-tint variants. The `-foreground` tokens above are white, which is only
+     legible on a SOLID fill; used on a `/10`-`/15` tint they vanish (that was the
+     unreadable "Refill recommended for:" row). Use `-strong` for any label, heading
+     or body copy sitting on a tinted status surface — each clears 4.5:1 there. */
+  --success-strong: #1B7A3A;
+  --warning-strong: #8A4B00;
+  --danger-strong: #B3261E;
+
+  /* Informational / trust. Distinct from `warning` and `danger` so security and
+     "here's how this works" messaging never reads as an alarm. */
+  --info: #2563EB;
+  --info-foreground: #ffffff;
+  --info-strong: #1D4ED8;
+  --info-surface: #EAF3FF;
+
   --border: rgba(15, 23, 42, 0.07); /* Soft card border */
   --input: rgba(15, 23, 42, 0.10);
   --ring: #F26B8A;
   
   --muted: #EEF4FB; /* Secondary Background */
-  --muted-foreground: #64748b;
+  /* Was #64748b — 4.76:1 on pure white, which drops under the 4.5:1 floor as soon as the
+     text sits on a tinted card (measured 3.85:1 on the schedule rows). This carries most
+     of the app's secondary copy for an audience that includes older adults, so it gets
+     headroom rather than a bare pass. */
+  --muted-foreground: #556274;
   
   --accent-surface: #EAF3FF; /* Accent Surface */
   --accent-surface-foreground: #0F1C5A;
@@ -64,6 +92,11 @@
   --primary-foreground: #ffffff;
   --primary-hover: #F583A0;
   --primary-soft: rgba(242, 107, 138, 0.16);
+  /* Dark mode: the button sits on a navy page, so the fill goes LIGHTER and takes navy
+     ink — #F583A0 against #0F1C5A ink is 7.4:1. */
+  --primary-strong: #F583A0;
+  --primary-strong-hover: #F9A3B8;
+  --primary-strong-foreground: #0F1C5A;
 
   --success: #34C759;
   --success-foreground: #ffffff;
@@ -73,6 +106,16 @@
 
   --danger: #FF453A;
   --danger-foreground: #ffffff;
+
+  /* On dark surfaces the tint is dark, so "strong" means lighter, not darker. */
+  --success-strong: #7EE2A0;
+  --warning-strong: #FFC266;
+  --danger-strong: #FFB4AB;
+
+  --info: #7DA6FF;
+  --info-foreground: #0F1C5A;
+  --info-strong: #A8C4FF;
+  --info-surface: #2A3B7E;
 
   --border: rgba(234, 240, 255, 0.12);
   --input: rgba(234, 240, 255, 0.10);
@@ -112,6 +155,24 @@
 
 :root.dark [class*="border-[#0F1C5A]"] { border-color: var(--border) !important; }
 
+/* Floating bottom overlays — the install FAB/banner and toasts. They live in the ROOT
+   layout, so they know nothing about the dashboard's floating dock and used to paint on
+   top of it (FAB at z-[90] over a z-40 dock, banner spanning left-4/right-4 straight
+   across it). The dock only exists on dashboard routes, so `:has()` asks the page
+   whether it's there rather than threading a prop through two layouts. */
+.floating-bottom {
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+}
+body:has(nav[data-tour="dash-nav"]) .floating-bottom {
+  bottom: calc(7rem + env(safe-area-inset-bottom));
+}
+@media (min-width: 768px) {
+  /* Desktop nav is a left rail, not a bottom dock — nothing to clear. */
+  body:has(nav[data-tour="dash-nav"]) .floating-bottom {
+    bottom: 1rem;
+  }
+}
+
 @theme inline {
   --font-sans: var(--font-sans), sans-serif;
   --font-mono: var(--font-mono), monospace;
@@ -124,12 +185,22 @@
   --color-primary-foreground: var(--primary-foreground);
   --color-primary-hover: var(--primary-hover);
   --color-primary-soft: var(--primary-soft);
+  --color-primary-strong: var(--primary-strong);
+  --color-primary-strong-hover: var(--primary-strong-hover);
+  --color-primary-strong-foreground: var(--primary-strong-foreground);
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
+  --color-success-strong: var(--success-strong);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
+  --color-warning-strong: var(--warning-strong);
   --color-danger: var(--danger);
   --color-danger-foreground: var(--danger-foreground);
+  --color-danger-strong: var(--danger-strong);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-strong: var(--info-strong);
+  --color-info-surface: var(--info-surface);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);

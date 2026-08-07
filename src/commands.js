@@ -4,7 +4,7 @@ const { supabase } = require('./db');
 const moment = require('moment-timezone');
 const { STATES, FREQUENCIES, CALLBACK_ACTIONS, MAIN_MENU, MAX_SNOOZES, SNOOZE_MINUTES } = require('./constants');
 const { isValidTime, calculateNextReminder, escapeHTML } = require('./utils');
-const { daysOfStockLeft } = require('./reminders');
+const { daysOfStockLeft, isLowStock } = require('./reminders');
 
 const userStates = {};
 
@@ -265,12 +265,18 @@ const handleCaregiverPanel = async (chatId) => {
           
           // daysOfStockLeft returns null when stock tracking is simply not enabled for
           // this medication (a normal, common state, e.g. vitamins) — not an error.
+          // isLowStock() is the single "needs a refill" definition (also driving the
+          // 09:00 cron and the web dashboard), so this panel cannot tell a caregiver
+          // "fine" on the same day the patient was warned, and it honors
+          // low_stock_alert_enabled instead of re-deciding low stock on its own.
           const daysRemaining = daysOfStockLeft(med);
-          const isLowStock = daysRemaining !== null && daysRemaining <= 3;
+          const stockCheck = isLowStock(med);
           const stockStatus = daysRemaining === null
             ? 'Stock tracking not enabled'
-            : isLowStock
-              ? `⚠️ LOW STOCK (Only ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining)`
+            : stockCheck.low
+              ? stockCheck.reason === 'threshold'
+                ? `⚠️ LOW STOCK (You asked to be warned at ${stockCheck.threshold})`
+                : `⚠️ LOW STOCK (Only ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining)`
               : `Stock: ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining (${med.current_stock ?? med.tablet_count} left)`;
 
           // Weekly adherence

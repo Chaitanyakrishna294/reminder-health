@@ -8,6 +8,7 @@ import { isAttentionStatus } from '@/lib/schedule/dose-attention';
 import { useUiMode } from '@/context/ui-mode-context';
 import { useTheme } from '@/context/theme-context';
 import { getUnitIcon } from '@/components/ui/custom-icons';
+import { unitPhrase } from '@/components/medications/medication-form-options';
 import { Check, X, Clock, Siren, AlertTriangle } from 'lucide-react';
 import BrainMascot from './brain-mascot';
 
@@ -294,7 +295,7 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
               isElderly ? 'py-2.5 text-base' : 'py-1.5 text-xs'
             } ${
               effectiveView === 'one'
-                ? 'bg-primary text-primary-foreground'
+                ? 'bg-primary-strong text-primary-strong-foreground'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -308,7 +309,7 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
               isElderly ? 'py-2.5 text-base' : 'py-1.5 text-xs'
             } ${
               effectiveView === 'list'
-                ? 'bg-primary text-primary-foreground'
+                ? 'bg-primary-strong text-primary-strong-foreground'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -336,17 +337,26 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
             <span className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
               {getUnitIcon(med.unit_type ?? undefined, 'w-5 h-5')}
             </span>
-            <span className={`font-black text-primary tracking-tight truncate ${isElderly ? 'text-3xl' : 'text-2xl'}`}>
+            {/* Was `text-primary` — brand pink on the gate's pale pink surface measures
+                2.6:1, under the 3:1 floor even at this size. The pink stays on the icon
+                tile beside it, where it is decoration rather than the thing you read. */}
+            <span className={`font-black text-foreground tracking-tight truncate ${isElderly ? 'text-3xl' : 'text-2xl'}`}>
               {missedMode ? med.drug_name : `${med.drug_name}?`}
             </span>
           </div>
-          {(med.dosage_amount || med.dosage) && (
-            <p className={`mt-2 text-muted-foreground font-sans ${isElderly ? 'text-base' : 'text-sm'}`}>
-              {med.dosage_amount ? `${med.dosage_amount} ${med.unit_type?.toLowerCase() || 'unit'}(s)` : ''}
-              {med.dosage_amount && med.dosage ? ' · ' : ''}
-              {med.dosage || ''}
-            </p>
-          )}
+          {/* Rendered "1 tablet(s) · N/A" — the placeholder strength leaked through, on
+              the one screen whose whole job is a clear yes/no about this dose. */}
+          {(() => {
+            const parts = [
+              med.dosage_amount ? `${med.dosage_amount} ${unitPhrase(med.unit_type ?? undefined, med.dosage_amount)}` : '',
+              med.dosage && med.dosage !== 'N/A' ? med.dosage : '',
+            ].filter(Boolean);
+            return parts.length > 0 ? (
+              <p className={`mt-2 text-muted-foreground font-sans ${isElderly ? 'text-base' : 'text-sm'}`}>
+                {parts.join(' · ')}
+              </p>
+            ) : null;
+          })()}
           {missedMode && (
             <h2 className={`mt-4 font-black text-foreground tracking-tight ${isElderly ? 'text-2xl' : 'text-xl'}`}>
               Did you take it?
@@ -504,7 +514,7 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
       {/* Safety carve-out: the emergency card is always reachable, even mid-gate. */}
       <button
         onClick={() => router.push('/emergency')}
-        className="mt-6 inline-flex items-center gap-1.5 text-xs font-bold text-danger/80 hover:text-danger transition-colors cursor-pointer"
+        className="mt-6 inline-flex items-center justify-center gap-1.5 min-h-11 px-3 text-xs font-bold text-danger-strong hover:text-danger transition-colors cursor-pointer"
       >
         <Siren className="w-3.5 h-3.5" /> Emergency card
       </button>

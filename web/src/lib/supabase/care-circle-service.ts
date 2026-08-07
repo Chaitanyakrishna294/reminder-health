@@ -23,10 +23,28 @@ export interface CareCircleConnection {
   resolved_phone?: string;
 }
 
+/** ACCEPTED is the only status that means the link is live. `active_caregiver_links`
+ *  filters on `is_active` only, so PENDING rows arrive mixed into both lists — which is
+ *  why the Care Circle count pills used to include people who had not accepted yet, and
+ *  why a PENDING row could render inside a success-green badge.
+ *
+ *  Legacy `caregiver_info` rows predate the status column and carry NULL. The legacy
+ *  model had no pending state — an active row WAS the link — so NULL counts as live. */
+export const isLiveConnection = (c: CareCircleConnection) => {
+  const s = (c.connection_status || '').toUpperCase();
+  return s === 'ACCEPTED' || (!c.is_migrated && s === '');
+};
+
+export const isPendingConnection = (c: CareCircleConnection) =>
+  (c.connection_status || '').toUpperCase() === 'PENDING';
+
 // 1. Fetch Care Circle connection list for a specific profile (checks both patient and caregiver paths)
 export const getCareCircleConnections = cache(async (telegramChatId: string): Promise<{
   peopleICareFor: CareCircleConnection[];
   peopleCaringForMe: CareCircleConnection[];
+  /** Requests waiting on THIS user to accept being someone's caregiver — the same set
+   *  /care-circle/requests lists. Surfaced here so the entry point can carry a count. */
+  pendingRequestCount: number;
 }> => {
   const supabase = await createClient();
 
@@ -38,7 +56,7 @@ export const getCareCircleConnections = cache(async (telegramChatId: string): Pr
 
   if (error || !links) {
     console.error('[CareCircleService] Error fetching caregiver links:', error);
-    return { peopleICareFor: [], peopleCaringForMe: [] };
+    return { peopleICareFor: [], peopleCaringForMe: [], pendingRequestCount: 0 };
   }
 
   const peopleICareFor: CareCircleConnection[] = [];
@@ -48,12 +66,16 @@ export const getCareCircleConnections = cache(async (telegramChatId: string): Pr
   const targetTelegramIds: string[] = [];
 
   links.forEach((link: any) => {
-    if (link.caregiver_chat_id === telegramChatId) {
+    // A legacy `caregiver_info` row with no patient attached is a caregiver REGISTRATION,
+    // not a relationship — the user generated a Caregiver ID and nobody has used it yet.
+    // It used to fall into `peopleICareFor` anyway and render as a phantom patient called
+    // "Patient", inflating the caregiver count on both the dashboard and Care Circle.
+    if (link.caregiver_chat_id === telegramChatId && link.patient_telegram_id) {
       peopleICareFor.push(link);
-      if (link.patient_telegram_id) targetTelegramIds.push(link.patient_telegram_id);
-    } else if (link.patient_telegram_id === telegramChatId) {
+      targetTelegramIds.push(link.patient_telegram_id);
+    } else if (link.patient_telegram_id === telegramChatId && link.caregiver_chat_id) {
       peopleCaringForMe.push(link);
-      if (link.caregiver_chat_id) targetTelegramIds.push(link.caregiver_chat_id);
+      targetTelegramIds.push(link.caregiver_chat_id);
     }
   });
 
@@ -85,7 +107,11 @@ export const getCareCircleConnections = cache(async (telegramChatId: string): Pr
     }
   }
 
-  return { peopleICareFor, peopleCaringForMe };
+  return {
+    peopleICareFor,
+    peopleCaringForMe,
+    pendingRequestCount: peopleICareFor.filter(isPendingConnection).length,
+  };
 });
 
 // 2. Fetch specific caregiver connection by patient profile id and caregiver profile id

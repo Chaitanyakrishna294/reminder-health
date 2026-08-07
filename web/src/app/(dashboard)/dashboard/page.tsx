@@ -4,6 +4,7 @@ import DashboardClientView from '@/components/dashboard/dashboard-client-view';
 import { ReminderEvent } from '@/components/dashboard/todays-schedule';
 import { resolveUserData, getMedicalProfile } from '@/lib/supabase/cached-queries';
 import { getCareCircleConnections } from '@/lib/supabase/care-circle-service';
+import { isLowStock, type LowStockMed } from '@/lib/medications/stock';
 import { Stethoscope } from 'lucide-react';
 
 
@@ -45,7 +46,7 @@ export default async function DashboardPage() {
   const [medsResult, eventsResult, logsResult, monthlyLogsResult] = await Promise.all([
     supabase
       .from('medications')
-      .select('id, drug_name, dosage, frequency, tablet_count, current_stock, low_stock_alert_enabled, reminder_times, priority_level, unit_type, dosage_amount, medication_reason, timezone')
+      .select('id, drug_name, dosage, frequency, tablet_count, current_stock, stock_threshold, low_stock_alert_enabled, active, reminder_times, priority_level, unit_type, dosage_amount, medication_reason, timezone')
       .eq('telegram_id', targetChatId)
       .eq('active', true),
     supabase
@@ -94,21 +95,38 @@ export default async function DashboardPage() {
   const takenMonthlyDoses = monthlyLogs?.filter(l => l.response === 'TAKEN').length || 0;
   const monthlyAdherence = totalMonthlyDoses > 0 ? Math.round((takenMonthlyDoses / totalMonthlyDoses) * 100) : 100;
 
-  // Active alerts (Low stock)
-  const lowStockMedicines = (medications || [])
-    .filter(m => {
-      // current_stock is the source of truth; tablet_count is its floored DB-trigger
-      // mirror. Burn rate must include dosage_amount (2 tablets × 2/day = 4/day).
-      const stock = m.current_stock ?? m.tablet_count;
-      if (stock === null || stock === undefined) return false;
-      const dosesPerDay = m.frequency === 'twice_daily' ? 2 : m.frequency === 'thrice_daily' ? 3 : 1;
-      const perDay = dosesPerDay * (Number(m.dosage_amount) || 1);
-      const daysRemaining = Math.floor(stock / perDay);
-      return daysRemaining <= 3 && m.low_stock_alert_enabled;
-    })
-    .map(m => ({ id: m.id, drug_name: m.drug_name, tablet_count: m.tablet_count, current_stock: m.current_stock }));
+  // Low stock — one shared definition (web/src/lib/medications/stock.ts), mirrored in
+  // the bot. This used to re-type a 3-day heuristic inline and never read
+  // stock_threshold at all, so the value the user set in the wizard did nothing.
+  const lowStockMedicines: LowStockMed[] = (medications || [])
+    .map((m) => ({ med: m, status: isLowStock(m) }))
+    .filter(({ status }) => status.low)
+    .map(({ med, status }) => ({
+      id: med.id,
+      drug_name: med.drug_name,
+      unit_type: med.unit_type ?? null,
+      stock: Number(status.stock),
+      threshold: status.threshold,
+      daysLeft: status.daysLeft,
+      reason: status.reason as 'threshold' | 'days',
+    }));
 
   const lowStockCount = lowStockMedicines.length;
+
+  // Adding stock is a medication write. A caregiver in monitor mode only has it with
+  // can_edit_medications; without it the gate must say so rather than offer an input
+  // that dies on RLS.
+  let canEditStock = true;
+  if (targetChatId && myTelegramChatId && targetChatId !== myTelegramChatId) {
+    const { data: link } = await supabase
+      .from('active_caregiver_links')
+      .select('can_edit_medications')
+      .eq('caregiver_chat_id', myTelegramChatId)
+      .eq('patient_telegram_id', targetChatId)
+      .eq('is_active', true)
+      .maybeSingle();
+    canEditStock = !!link?.can_edit_medications;
+  }
 
   // Group 7-day chart data points
   const chartDataMap: { [key: string]: { Taken: number; Skipped: number; Missed: number; day: number } } = {};
@@ -175,6 +193,7 @@ export default async function DashboardPage() {
       targetTelegramChatId={targetChatId || ''}
       chartData={chartData}
       lowStockMedicines={lowStockMedicines}
+      canEditStock={canEditStock}
       hasPatientLinked={!!targetChatId}
       caregiverId={caregiverId}
       lastTaken={lastTaken}

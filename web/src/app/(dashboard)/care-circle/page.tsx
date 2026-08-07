@@ -2,19 +2,34 @@ import React from 'react';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { resolveUserData } from '@/lib/supabase/cached-queries';
-import { getCareCircleConnections, getPatientHealthMetrics, PatientHealthMetrics } from '@/lib/supabase/care-circle-service';
+import {
+  getCareCircleConnections,
+  getPatientHealthMetrics,
+  PatientHealthMetrics,
+  isLiveConnection,
+  isPendingConnection,
+} from '@/lib/supabase/care-circle-service';
 import { createServiceClient } from '@/lib/supabase/service-role';
-import { 
-  Users, 
-  ArrowLeft, 
-  ShieldAlert, 
-  Settings, 
-  Activity, 
-  Pill, 
-  Clock, 
+import { CARE_LABELS } from '@/lib/design/semantics';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Badge, CountBadge } from '@/components/ui/badge';
+import {
+  PatientConnectionActions,
+  CaregiverConnectionActions,
+} from '@/components/care-circle/connection-actions';
+import { sourceOf, type ConnectionSource } from '@/lib/care-circle/connection-source';
+import {
+  Users,
+  ArrowLeft,
+  ShieldAlert,
+  Settings,
+  Activity,
+  Pill,
+  Clock,
   ArrowUpRight,
   TrendingUp,
-  UserCheck
+  UserCheck,
+  Link2,
 } from 'lucide-react';
 
 export const revalidate = 0; // Dynamic, always fresh
@@ -25,9 +40,12 @@ interface PatientCardProps {
   relationship: string;
   isPrimary: boolean;
   telegramId: string;
+  status: string;
+  source: ConnectionSource;
+  userId: string;
 }
 
-async function PatientStatusCard({ id, name, relationship, isPrimary, telegramId }: PatientCardProps) {
+async function PatientStatusCard({ id, name, relationship, isPrimary, telegramId, status, source, userId }: PatientCardProps) {
   let metrics: PatientHealthMetrics | null = null;
   try {
     metrics = await getPatientHealthMetrics(telegramId);
@@ -89,9 +107,9 @@ async function PatientStatusCard({ id, name, relationship, isPrimary, telegramId
           <div>
             <h3 className="font-black text-foreground text-base tracking-tight">{name}</h3>
             <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="text-[10px] uppercase font-bold text-muted-foreground">{relationship}</span>
+              <span className="text-[11px] uppercase font-bold text-muted-foreground">{relationship}</span>
               {isPrimary && (
-                <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-primary/10 text-primary font-bold border border-primary/20">
+                <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-primary/10 text-primary-strong font-bold border border-primary/20">
                   Primary
                 </span>
               )}
@@ -101,14 +119,14 @@ async function PatientStatusCard({ id, name, relationship, isPrimary, telegramId
 
         {/* Health status indicator */}
         <div className="flex items-center gap-2">
-          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${statusColor}`}>
+          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${statusColor}`}>
             <span className={`h-1.5 w-1.5 rounded-full ${
               metrics?.complianceStatus === 'missed' ? 'bg-danger' : 'bg-success'
             }`} />
             {statusLabel}
           </span>
           {metrics && (
-            <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
+            <span className="text-[11px] text-muted-foreground font-semibold flex items-center gap-1">
               <TrendingUp className="w-3.5 h-3.5 text-primary" />
               {metrics.adherenceRate}% adherence
             </span>
@@ -125,18 +143,27 @@ async function PatientStatusCard({ id, name, relationship, isPrimary, telegramId
           </div>
           <div className="flex items-center gap-2 text-foreground">
             <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
-            <span className="truncate">{metrics?.nextScheduledDoseTime ? `Dose: ${metrics.nextScheduledDoseTime}` : 'No remaining doses'}</span>
+            <span className="min-w-0">{metrics?.nextScheduledDoseTime ? `Dose: ${metrics.nextScheduledDoseTime}` : 'No remaining doses'}</span>
           </div>
         </div>
       </div>
 
-      <div className="mt-5">
-        <Link 
+      <div className="mt-5 space-y-2">
+        <Link
           href={`/care-circle/${telegramId}`}
-          className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold bg-muted hover:bg-slate-100 text-foreground transition-all border border-border"
+          className="w-full flex items-center justify-center gap-1.5 h-11 rounded-xl text-xs font-bold bg-muted hover:bg-accent-surface text-foreground transition-all border border-border"
         >
           View Health Overview
         </Link>
+        {/* Accept / monitor / remove used to be reachable only from Settings. */}
+        <PatientConnectionActions
+          connectionId={id}
+          patientName={name}
+          patientTelegramId={telegramId}
+          status={status}
+          source={source}
+          userId={userId}
+        />
       </div>
     </div>
   );
@@ -155,15 +182,19 @@ export default async function CareCirclePage() {
   }
 
   // Fetch connections split into care/cared categories
-  const { peopleICareFor, peopleCaringForMe } = await getCareCircleConnections(myTelegramChatId);
+  const { peopleICareFor, peopleCaringForMe, pendingRequestCount } =
+    await getCareCircleConnections(myTelegramChatId);
+  // The count pills used to include people who hadn't accepted yet.
+  const liveICareFor = peopleICareFor.filter(isLiveConnection);
+  const liveCaringForMe = peopleCaringForMe.filter(isLiveConnection);
 
   return (
-    <div className="max-w-5xl mx-auto space-y-10 pb-12 font-sans">
+    <div className="max-w-5xl mx-auto space-y-10 font-sans">
       
       {/* Header bar */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-border pb-6">
         <div className="flex items-center gap-3">
-          <Link href="/dashboard" className="p-2 hover:bg-muted rounded-xl transition-all border border-transparent hover:border-border text-muted-foreground hover:text-foreground">
+          <Link href="/dashboard" aria-label="Back to dashboard" className="w-11 h-11 shrink-0 flex items-center justify-center hover:bg-muted rounded-xl transition-all border border-transparent hover:border-border text-muted-foreground hover:text-foreground">
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
@@ -180,76 +211,50 @@ export default async function CareCirclePage() {
         </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          <Link 
+          {/* "Manage Requests" gave no hint that anything was waiting — the page never
+              fetched a count. It does now. */}
+          <Link
             href="/care-circle/requests"
-            className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-card border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-all shadow-sm"
+            className="flex items-center justify-center gap-2 h-11 px-4 rounded-xl text-xs font-bold bg-card border border-border hover:bg-muted text-muted-foreground hover:text-foreground transition-all shadow-sm"
           >
             Manage Requests
+            <CountBadge count={pendingRequestCount} label="requests waiting for you" />
           </Link>
-          <Link 
+          <Link
             href="/care-circle/manage"
-            className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-primary hover:bg-primary-hover text-white transition-all shadow-sm"
+            className="flex items-center justify-center gap-2 h-11 px-4 rounded-xl text-xs font-bold bg-primary-strong hover:bg-primary-strong-hover text-primary-strong-foreground transition-all shadow-sm"
           >
             <Settings className="w-3.5 h-3.5" /> Manage Shared Trust
           </Link>
         </div>
       </div>
 
-      {/* Section A: People I Care For */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <Activity className="w-4 h-4 text-primary" />
-          <h2 className="text-sm font-black text-foreground uppercase tracking-wider">People I Care For</h2>
-          <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border font-bold">
-            {peopleICareFor.length}
-          </span>
-        </div>
+      {/* Patient side first, everywhere. This page used to lead with the caregiver role
+          while Settings led with the patient role, so the same two lists appeared in
+          opposite orders under three different names. */}
 
-        {peopleICareFor.length === 0 ? (
-          <div className="bg-card border border-border rounded-3xl p-10 text-center text-muted-foreground max-w-lg shadow-sm">
-            <ShieldAlert className="w-8 h-8 mx-auto text-muted-foreground mb-3 opacity-60" />
-            <h3 className="font-bold text-foreground text-sm">No active patients</h3>
-            <p className="text-xs mt-1 text-muted-foreground leading-relaxed">
-              You are currently not linked as a caregiver for any patient. Ask your patient to share their connection request code using the bot.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {peopleICareFor.map((conn) => (
-              <PatientStatusCard 
-                key={conn.connection_id}
-                id={conn.connection_id}
-                name={conn.resolved_name || 'Patient'}
-                relationship={conn.relationship_type}
-                isPrimary={conn.is_primary}
-                telegramId={conn.patient_telegram_id || ''}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Section B: People Caring For Me */}
+      {/* Section A: People Caring For Me */}
       <div className="space-y-4">
         <div className="flex items-center gap-2">
           <UserCheck className="w-4 h-4 text-primary" />
-          <h2 className="text-sm font-black text-foreground uppercase tracking-wider">People Caring For Me</h2>
+          <h2 className="text-sm font-black text-foreground uppercase tracking-wider">{CARE_LABELS.asPatient}</h2>
           <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border font-bold">
-            {peopleCaringForMe.length}
+            {liveCaringForMe.length}
           </span>
         </div>
 
         {peopleCaringForMe.length === 0 ? (
-          <div className="bg-card border border-border rounded-3xl p-8 text-center text-muted-foreground max-w-lg shadow-sm">
-            <h3 className="font-bold text-foreground text-sm">No active caregivers</h3>
-            <p className="text-xs mt-1 text-muted-foreground leading-relaxed">
-              No one is currently linked to monitor your schedules. You can connect a caregiver under Account Settings to share logs.
-            </p>
-          </div>
+          <EmptyState
+            className="max-w-lg"
+            icon={<Users className="w-6 h-6" />}
+            title="No caregivers yet"
+            description="A caregiver can see your schedule and gets alerted if you miss a critical dose. Share your connect code to invite one."
+            action={{ label: 'Get your connect code', href: '/settings#care-circle' }}
+          />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {peopleCaringForMe.map((conn) => (
-              <div 
+              <div
                 key={conn.connection_id}
                 className="bg-card border border-border rounded-2xl p-5 flex justify-between items-center shadow-sm"
               >
@@ -259,23 +264,68 @@ export default async function CareCirclePage() {
                   </div>
                   <div>
                     <h3 className="font-bold text-foreground text-sm">{conn.resolved_name}</h3>
-                    <p className="text-[10px] text-muted-foreground font-semibold uppercase mt-0.5">{conn.relationship_type}</p>
+                    <p className="text-[11px] text-muted-foreground font-semibold uppercase mt-0.5">{conn.relationship_type}</p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="text-[9px] px-2 py-0.5 rounded bg-success/10 text-success font-bold border border-success/20 uppercase">
+                  {/* Was hardcoded success-green, so a PENDING link showed up as a green
+                      "PENDING" pill — the badge said the opposite of the word inside it. */}
+                  <Badge tone={isLiveConnection(conn) ? 'success' : isPendingConnection(conn) ? 'warning' : 'neutral'}>
                     {conn.connection_status}
-                  </span>
-                  <Link 
+                  </Badge>
+                  <Link
                     href="/care-circle/manage"
-                    className="p-1.5 hover:bg-muted rounded-lg text-muted-foreground hover:text-foreground border border-transparent hover:border-border transition-all"
+                    className="w-11 h-11 flex items-center justify-center hover:bg-muted rounded-xl text-muted-foreground hover:text-foreground border border-transparent hover:border-border transition-all"
                     title="Manage Shared Trust"
+                    aria-label={`Manage what ${conn.resolved_name} can see`}
                   >
                     <Settings className="w-4 h-4" />
                   </Link>
+                  <CaregiverConnectionActions
+                    connectionId={conn.connection_id}
+                    caregiverName={conn.resolved_name || 'this caregiver'}
+                    source={sourceOf(conn.is_migrated)}
+                  />
                 </div>
               </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Section B: People I Care For */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Activity className="w-4 h-4 text-primary" />
+          <h2 className="text-sm font-black text-foreground uppercase tracking-wider">{CARE_LABELS.asCaregiver}</h2>
+          <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border font-bold">
+            {liveICareFor.length}
+          </span>
+        </div>
+
+        {peopleICareFor.length === 0 ? (
+          <EmptyState
+            className="max-w-lg"
+            icon={<Link2 className="w-6 h-6" />}
+            title="Not caring for anyone yet"
+            description="When someone adds you as their caregiver, their request appears here for you to accept."
+            action={{ label: 'Check requests', href: '/care-circle/requests' }}
+          />
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {peopleICareFor.map((conn) => (
+              <PatientStatusCard
+                key={conn.connection_id}
+                id={conn.connection_id}
+                name={conn.resolved_name || 'Patient'}
+                relationship={conn.relationship_type}
+                isPrimary={conn.is_primary}
+                telegramId={conn.patient_telegram_id || ''}
+                status={conn.connection_status}
+                source={sourceOf(conn.is_migrated)}
+                userId={userData.user.id}
+              />
             ))}
           </div>
         )}

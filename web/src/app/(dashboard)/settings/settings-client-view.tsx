@@ -5,21 +5,21 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useUiMode } from '@/context/ui-mode-context';
 import { createClient } from '@/lib/supabase/client';
-import { 
-  Settings, 
-  User, 
-  Shield, 
-  LogOut, 
-  Stethoscope, 
-  Copy, 
-  Check, 
-  AlertCircle, 
-  Trash2, 
-  Link2, 
+import {
+  Settings,
+  LogOut,
+  Stethoscope,
+  Copy,
+  Check,
+  AlertCircle,
+  Trash2,
+  Link2,
   Sparkles,
-  Smartphone,
-  Clock
+  Share2,
+  Users,
+  ArrowRight
 } from 'lucide-react';
+import { CARE_LABELS } from '@/lib/design/semantics';
 
 interface SettingsClientViewProps {
   user: {
@@ -63,12 +63,13 @@ export default function SettingsClientView({
 }: SettingsClientViewProps) {
   const router = useRouter();
   const supabase = createClient();
-  const { isElderly, toggleMode, setViewMode } = useUiMode();
+  const { isElderly, toggleMode } = useUiMode();
 
-  // State management
+  // State management. `linkedCaregivers` and `linkedPatients` are only counts on this
+  // screen now — /care-circle owns the lists and every mutation on them.
   const [linkedCaregivers, setLinkedCaregivers] = useState(initialLinkedCaregivers);
   const [caregiverRecord, setCaregiverRecord] = useState(initialCaregiverRecord);
-  const [linkedPatients, setLinkedPatients] = useState(initialLinkedPatients);
+  const linkedPatients = initialLinkedPatients;
 
   const [cgIdInput, setCgIdInput] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -99,14 +100,16 @@ export default function SettingsClientView({
   };
 
   // --- Account deletion (GDPR right to erasure) ---
+  // The confirmation used to be `window.prompt`. Installed PWAs and several mobile
+  // browsers suppress it outright, and a suppressed prompt returns null — which this
+  // code reads as "not confirmed", so the button did nothing at all and gave no reason.
+  // An in-app modal always renders, and can spell out what is about to be destroyed.
   const [deleting, setDeleting] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+
   const handleDeleteAccount = async () => {
-    const confirmText = window.prompt(
-      'This permanently deletes your account and ALL your data (medications, reminders, ' +
-      'health vault files, caregiver links). This cannot be undone.\n\n' +
-      'Type DELETE to confirm.'
-    );
-    if (confirmText !== 'DELETE') return;
+    if (deleteConfirmText.trim().toUpperCase() !== 'DELETE') return;
 
     setDeleting(true);
     setErrorMsg(null);
@@ -122,6 +125,7 @@ export default function SettingsClientView({
     } catch (err: any) {
       setErrorMsg(err?.message || 'Failed to delete account.');
       setDeleting(false);
+      setDeleteModalOpen(false);
     }
   };
 
@@ -231,45 +235,6 @@ export default function SettingsClientView({
     }
   };
 
-  // --- PATIENT: Unlink Caregiver (supports both caregiver_connections and legacy) ---
-  const handleUnlinkCaregiver = async (id: number | string, source: 'connections' | 'legacy') => {
-    if (!confirm('Are you sure you want to disconnect from this caregiver?')) return;
-
-    setErrorMsg(null);
-    setSuccessMsg(null);
-    setProcessing(true);
-
-    try {
-      if (source === 'connections') {
-        // New architecture: update caregiver_connections. We deliberately do NOT touch
-        // is_primary here — the DB validation trigger forbids caregivers from changing it,
-        // and the AFTER-UPDATE reassign trigger promotes a replacement primary once this
-        // row leaves the active-accepted set.
-        const { error } = await supabase
-          .from('caregiver_connections')
-          .update({ is_active: false, connection_status: 'REJECTED' })
-          .eq('id', id);
-        if (error) throw error;
-      } else {
-        // Legacy: update caregiver_info
-        const { error } = await supabase
-          .from('caregiver_info')
-          .update({ patient_telegram_id: null })
-          .eq('id', id);
-        if (error) throw error;
-      }
-
-      setLinkedCaregivers(prev => prev.filter(c => c.id !== id));
-      setSuccessMsg('Successfully disconnected from caregiver.');
-      router.refresh();
-    } catch (err: any) {
-      console.error('[Settings] Unlink Caregiver Error:', err);
-      setErrorMsg('Failed to disconnect from caregiver.');
-    } finally {
-      setProcessing(false);
-    }
-  };
-
   // --- CAREGIVER: Register/Generate Caregiver ID ---
   const handleBecomeCaregiver = async () => {
     if (!user.telegramChatId) {
@@ -329,118 +294,10 @@ export default function SettingsClientView({
     }
   };
 
-  type LinkedPatient = SettingsClientViewProps['linkedPatients'][number];
+  // Accept / reject / disconnect / monitor for care relationships moved to
+  // components/care-circle/connection-actions.tsx when /care-circle became the
+  // canonical screen for them. They were implemented twice before that.
 
-  // --- CAREGIVER: Unlink Patient / Reject a SPECIFIC Connection Request ---
-  // Filters by the individual connection id so we never touch sibling patients (no "unlink-all").
-  const handleUnlinkPatient = async (patient: LinkedPatient) => {
-    const isPending = patient.connection_status === 'PENDING';
-    const confirmMessage = isPending
-      ? `Reject the connection request from ${patient.patient_name}?`
-      : `Disconnect from ${patient.patient_name}?`;
-
-    if (!confirm(confirmMessage)) return;
-
-    setErrorMsg(null);
-    setSuccessMsg(null);
-    setProcessing(true);
-
-    try {
-      if (patient.source === 'connections') {
-        // Revoke this one relationship. We do NOT touch is_primary (the DB validation trigger
-        // forbids caregivers from changing it). The AFTER-UPDATE triggers emit the revoke
-        // notification and promote a replacement primary once this row is deactivated.
-        const { error } = await supabase
-          .from('caregiver_connections')
-          .update({ connection_status: 'REJECTED', is_active: false })
-          .eq('id', patient.id);
-        if (error) throw error;
-      } else {
-        // Legacy row: clear the single caregiver_info link for this record only.
-        const { error } = await supabase
-          .from('caregiver_info')
-          .update({ patient_telegram_id: null, connection_status: null })
-          .eq('id', patient.id);
-        if (error) throw error;
-      }
-
-      setLinkedPatients(prev => prev.filter(p => p.id !== patient.id));
-      setSuccessMsg(isPending ? 'Rejected patient connection request.' : `Disconnected from ${patient.patient_name}.`);
-      router.refresh();
-    } catch (err: any) {
-      console.error('[Settings] Unlink Patient Error:', err);
-      setErrorMsg('Failed to process request.');
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  // --- CAREGIVER: Accept a SPECIFIC Patient Connection Request ---
-  // Filters by the individual connection id — fixes the "accept-all" glitch where every
-  // pending request flipped to ACCEPTED at once.
-  const handleAcceptPatient = async (patient: LinkedPatient) => {
-    setErrorMsg(null);
-    setSuccessMsg(null);
-    setProcessing(true);
-
-    try {
-      if (patient.source === 'connections') {
-        // Caregiver accepts via SECURITY DEFINER RPC. A direct UPDATE would still be filtered
-        // through the validation trigger (auth.uid() is unchanged by SECURITY DEFINER); the RPC
-        // is the canonical, authorization-checked entry point for responding to a request.
-        const { error } = await supabase.rpc('respond_to_caregiver_request', {
-          p_connection_id: patient.id,
-          p_action: 'ACCEPT',
-        });
-        if (error) throw error;
-      } else {
-        // Legacy caregiver_info row (pre-migration link). Accept in place; no new relationship
-        // writes are introduced — caregiver_connections is the source of truth going forward.
-        const { error } = await supabase
-          .from('caregiver_info')
-          .update({ connection_status: 'ACCEPTED' })
-          .eq('id', patient.id);
-        if (error) throw error;
-      }
-
-      setLinkedPatients(prev =>
-        prev.map(p => (p.id === patient.id ? { ...p, connection_status: 'ACCEPTED' } : p))
-      );
-      setSuccessMsg(`Accepted connection request from ${patient.patient_name}. You are now linked.`);
-      router.refresh();
-    } catch (err: any) {
-      console.error('[Settings] Accept Patient Error:', err);
-      setErrorMsg('Failed to accept patient connection.');
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  const handleMonitorPatient = async (patient: LinkedPatient) => {
-    if (!patient.patient_telegram_id) return;
-    setProcessing(true);
-    try {
-      // Compliance logging
-      await supabase
-        .from('audit_logs')
-        .insert([{
-          user_id: user.id,
-          action: 'Entered Monitoring Mode',
-          details: {
-            patient_name: patient.patient_name || 'Your Patient',
-            patient_chat_id: patient.patient_telegram_id
-          }
-        }]);
-    } catch (err) {
-      console.error('[Settings] Compliance audit log error:', err);
-    } finally {
-      document.cookie = `monitored-patient-id=${patient.patient_telegram_id}; path=/; max-age=31536000; SameSite=Lax`;
-      setViewMode('PATIENT_MONITOR');
-      setProcessing(false);
-      router.push('/dashboard');
-      router.refresh();
-    }
-  };
 
   return (
     <div className={`max-w-3xl mx-auto space-y-6 ${isElderly ? 'p-6 md:p-8 space-y-10' : ''}`}>
@@ -459,14 +316,14 @@ export default function SettingsClientView({
 
       {/* Notifications Alerts */}
       {errorMsg && (
-        <div className="bg-danger/10 border border-danger/30 text-danger-foreground p-4 rounded-2xl flex items-start gap-2.5 animate-fade-in">
+        <div className="bg-danger/10 border border-danger/30 text-danger-strong p-4 rounded-2xl flex items-start gap-2.5 animate-fade-in">
           <AlertCircle className="w-5 h-5 shrink-0 text-danger mt-0.5" />
           <p className={`font-bold ${isElderly ? 'text-lg' : 'text-xs'}`}>{errorMsg}</p>
         </div>
       )}
 
       {successMsg && (
-        <div className="bg-success/10 border border-success/30 text-success-foreground p-4 rounded-2xl flex items-start gap-2.5 animate-fade-in">
+        <div className="bg-success/10 border border-success/30 text-success-strong p-4 rounded-2xl flex items-start gap-2.5 animate-fade-in">
           <Check className="w-5 h-5 shrink-0 text-success mt-0.5" />
           <p className={`font-bold ${isElderly ? 'text-lg' : 'text-xs'}`}>{successMsg}</p>
         </div>
@@ -484,10 +341,10 @@ export default function SettingsClientView({
             {user.fullName.substring(0, 2).toUpperCase()}
           </div>
           <div className="min-w-0">
-            <h4 className={`font-black text-foreground truncate ${isElderly ? 'text-2xl' : 'text-base'}`}>
+            <h4 className={`font-black text-foreground ${isElderly ? 'text-2xl break-words' : 'text-base truncate'}`}>
               {user.fullName}
             </h4>
-            <p className={`text-muted-foreground font-semibold truncate ${isElderly ? 'text-lg mt-0.5' : 'text-xs'}`}>
+            <p className={`text-muted-foreground font-semibold ${isElderly ? 'text-lg mt-0.5 break-all' : 'text-xs truncate'}`}>
               {user.email}
             </p>
           </div>
@@ -495,35 +352,38 @@ export default function SettingsClientView({
         <div className="flex flex-wrap gap-2.5 pt-2">
           {user.telegramChatId && !user.telegramChatId.startsWith('WEB-') ? (
             <span className={`inline-flex items-center px-3 py-1 rounded-full font-bold bg-muted text-muted-foreground border border-border ${
-              isElderly ? 'text-base' : 'text-[10px]'
+              isElderly ? 'text-base' : 'text-[11px]'
             }`}>
               Telegram Linked: {user.telegramChatId}
             </span>
           ) : (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className={`inline-flex items-center px-3 py-1 rounded-full font-bold bg-warning/10 text-warning border border-warning/30 ${
-                isElderly ? 'text-base' : 'text-[10px]'
-              }`}>
-                Telegram Not Connected
-              </span>
-              <button
-                onClick={() => router.push('/link-account')}
-                className={`font-black rounded-lg border border-primary text-primary hover:bg-primary/5 transition-all cursor-pointer flex items-center justify-center ${
-                  isElderly ? 'h-9 px-4 text-xs' : 'h-7 px-2.5 text-[10px]'
-                }`}
-              >
-                Connect Telegram Bot
-              </button>
-            </div>
+            /* The "Telegram Not Connected" badge sat right beside a button reading
+               "Connect Telegram Bot" — two controls' worth of space saying the same
+               thing once. The button already carries the state. It was also 28px tall,
+               well under a usable touch target. */
+            <button
+              onClick={() => router.push('/link-account')}
+              className={`font-black rounded-xl border border-primary text-primary hover:bg-primary/5 transition-all cursor-pointer inline-flex items-center justify-center gap-1.5 ${
+                isElderly ? 'h-14 px-6 text-base' : 'h-11 px-4 text-xs'
+              }`}
+            >
+              Connect Telegram Bot
+            </button>
           )}
         </div>
 
         {/* Universal Connect Code — share to let anyone (web or Telegram) link with you */}
         {user.connectCode && (
-          <div className="mt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-primary/5 border border-primary/20 rounded-2xl p-4">
+          /* There are two codes on this page and a field for typing in a third. The
+             share-out cards and the type-in field looked nearly identical, so "the code
+             I give people" and "the code someone gave me" were easy to confuse. Every
+             outbound code now wears the info tint and an outbound arrow; the inbound
+             field stays neutral. */
+          <div className="mt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-info/5 border border-info/25 rounded-2xl p-4">
             <div className="space-y-0.5">
-              <span className={`font-extrabold text-foreground block ${isElderly ? 'text-lg' : 'text-sm'}`}>
-                Your Connect Code
+              <span className={`font-extrabold text-foreground flex items-center gap-1.5 ${isElderly ? 'text-lg' : 'text-sm'}`}>
+                <Share2 className="w-4 h-4 text-info shrink-0" aria-hidden="true" />
+                Your Connect Code — give this out
               </span>
               <span className={`text-muted-foreground block ${isElderly ? 'text-base' : 'text-xs'}`}>
                 Share this so others can connect with you in Care Circle. Works for any account.
@@ -536,7 +396,7 @@ export default function SettingsClientView({
               <button
                 onClick={handleCopyConnectCode}
                 aria-label="Copy connect code"
-                className="flex items-center gap-1.5 font-bold rounded-xl bg-primary text-primary-foreground hover:bg-primary-hover transition-all cursor-pointer px-3 py-2 text-xs"
+                className="flex items-center gap-1.5 font-bold rounded-xl bg-primary-strong text-primary-strong-foreground hover:bg-primary-strong-hover transition-all cursor-pointer h-11 px-3 text-xs"
               >
                 {copiedCode ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                 <span>{copiedCode ? 'Copied' : 'Copy'}</span>
@@ -567,300 +427,193 @@ export default function SettingsClientView({
             </span>
           </div>
 
+          {/* Was a plain button whose only state signal was its own label — you had to
+              read "Enable"/"Disable" and reason backwards to work out whether the mode
+              was currently on. It's a setting with two states, so it's a switch: the
+              knob's position shows the state without being read, and `role="switch"` +
+              `aria-checked` say the same thing to a screen reader. Matches the inventory
+              toggle in the medication wizard. */}
           <button
+            type="button"
+            role="switch"
+            aria-checked={isElderly}
             onClick={toggleMode}
-            className={`flex items-center justify-center font-black rounded-xl transition-all border cursor-pointer hover:scale-[1.02] active:scale-[0.98] ${
-              isElderly 
-                ? 'bg-warning hover:bg-warning/90 border-warning text-warning-foreground h-[64px] px-8 text-xl shadow-md' 
-                : 'bg-white hover:bg-muted border-border text-foreground px-4 py-2 text-xs font-semibold'
+            className={`shrink-0 self-start sm:self-center inline-flex items-center gap-3 rounded-2xl border transition-all cursor-pointer bg-card hover:bg-muted border-border ${
+              isElderly ? 'h-16 px-5' : 'h-12 px-4'
             }`}
           >
-            {isElderly ? 'Disable Elderly Mode' : 'Enable Elderly Mode'}
+            <span className={`font-bold text-foreground ${isElderly ? 'text-lg' : 'text-xs'}`}>
+              {isElderly ? 'On' : 'Off'}
+            </span>
+            <span
+              aria-hidden="true"
+              className={`relative shrink-0 rounded-full transition-colors ${
+                isElderly ? 'w-16 h-9 bg-primary' : 'w-11 h-6 bg-input'
+              }`}
+            >
+              <span
+                className={`absolute top-[2px] bg-white border border-border rounded-full transition-all ${
+                  isElderly
+                    ? 'h-8 w-8 left-[calc(100%-2.125rem)]'
+                    : 'h-5 w-5 left-[2px]'
+                }`}
+              />
+            </span>
           </button>
         </div>
       </div>
 
-      {/* SECTION 3: UNIFIED CAREGIVER & CLIENT MANAGEMENT */}
-      <div 
+      {/* SECTION 3: CARE CIRCLE — IDENTITY ONLY.
+          This section used to duplicate /care-circle wholesale: it re-queried the
+          caregiver and patient lists through a THIRD data path (caregiver_connections +
+          legacy caregiver_info + active_caregiver_links, with its own name-resolution
+          helpers), and carried a second, independent implementation of accept/reject.
+          Two screens owning the same relationships meant they could disagree, and neither
+          was obviously the real one.
+
+          /care-circle is canonical now. What stays here is identity — the codes you hand
+          out and the code you type in — because that is genuinely account settings. The
+          relationships themselves live one tap away. */}
+      <div
         id="care-circle"
         className={`bg-card border rounded-3xl p-6 shadow-sm space-y-6 transition-all duration-500 ${
-          highlightCareCircle 
-            ? 'border-primary ring-2 ring-primary/20 bg-primary/5 scale-[1.01]' 
+          highlightCareCircle
+            ? 'border-primary ring-2 ring-primary/20 bg-primary/5 scale-[1.01]'
             : 'border-border'
         }`}
       >
         <div className="space-y-1">
           <h3 className={`font-black text-foreground flex items-center gap-1.5 ${isElderly ? 'text-2xl' : 'text-sm'}`}>
             <Stethoscope className="w-5 h-5 text-primary" />
-            Care Circle Management
+            Care Circle
           </h3>
           <p className={`text-muted-foreground ${isElderly ? 'text-lg' : 'text-xs'}`}>
-            Connect with a health caregiver to support your medication progress, or register as a caregiver to support others.
+            Your connect codes live here. To see who you are linked to, accept requests, or
+            change what a caregiver can view, open the Care Circle.
           </p>
         </div>
 
-        {/* INCOMING SUPPORT: PATIENT ROLE FLOW */}
-        <div className="space-y-6 border-b border-border/40 pb-6">
-          <h4 className="text-xs font-black text-foreground uppercase tracking-wider">People Who Care For Me</h4>
-          {/* List of Connected Caregivers */}
-          {linkedCaregivers.length > 0 && (
-            <div className="space-y-4">
-              {linkedCaregivers.map((cg) => (
-                cg.connection_status === 'ACCEPTED' ? (
-                  <div key={cg.id} className="border border-border rounded-2xl p-4 bg-success/5 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-success/15 text-success flex items-center justify-center">
-                          <Stethoscope className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <span className={`block font-black text-foreground ${isElderly ? 'text-xl' : 'text-sm'}`}>
-                            {cg.caregiver_name}
-                          </span>
-                          <span className={`block text-muted-foreground font-semibold ${isElderly ? 'text-base' : 'text-[11px]'}`}>
-                            Caregiver ID: {cg.caregiver_id || 'N/A'}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Link
-                          href="/care-circle/manage"
-                          className="px-3.5 py-2 text-xs font-bold text-primary bg-primary/10 hover:bg-primary/20 rounded-xl cursor-pointer transition-all flex items-center gap-1 shrink-0"
-                        >
-                          Manage Shared Trust
-                        </Link>
-                        <button
-                          onClick={() => handleUnlinkCaregiver(cg.id, cg.source || 'connections')}
-                          disabled={processing}
-                          className="p-2 text-danger bg-danger/10 hover:bg-danger/20 rounded-lg cursor-pointer transition-all disabled:opacity-50 shrink-0"
-                          title="Disconnect Caregiver"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                    <div className={`p-3 bg-white border border-border rounded-xl text-muted-foreground font-medium ${isElderly ? 'text-base' : 'text-[11px]'}`}>
-                      Connected! Your caregiver is now synced to your routine alerts and can review your compliance ring.
-                    </div>
-                  </div>
-                ) : (
-                  <div key={cg.id} className="border border-warning/30 rounded-2xl p-4 bg-warning/5 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-warning/15 text-warning flex items-center justify-center">
-                          <Clock className="w-4 h-4 animate-pulse" />
-                        </div>
-                        <div>
-                          <span className={`block font-black text-foreground ${isElderly ? 'text-xl' : 'text-sm'}`}>
-                            {cg.caregiver_name}
-                          </span>
-                          <span className={`block text-muted-foreground font-semibold ${isElderly ? 'text-base' : 'text-[11px]'}`}>
-                            Connection Status: <b className="text-warning">PENDING APPROVAL</b>
-                          </span>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => handleUnlinkCaregiver(cg.id, cg.source || 'connections')}
-                        disabled={processing}
-                        className="px-3 py-1.5 text-xs font-bold text-danger bg-danger/10 hover:bg-danger/20 rounded-lg cursor-pointer transition-all disabled:opacity-50 shrink-0"
-                        title="Cancel Request"
-                      >
-                        Cancel Request
-                      </button>
-                    </div>
-                    <div className={`p-3 bg-white border border-border rounded-xl text-muted-foreground font-medium ${isElderly ? 'text-base' : 'text-[11px]'}`}>
-                      Waiting for your caregiver to accept the link request. You can ask them to check their dashboard or settings page to approve.
-                    </div>
-                  </div>
-                )
-              ))}
+        {/* Summary + the one route to the lists. */}
+        <Link
+          href="/care-circle"
+          className={`flex items-center justify-between gap-4 rounded-2xl border border-border bg-muted/30 hover:bg-muted transition-all cursor-pointer ${
+            isElderly ? 'p-6' : 'p-4'
+          }`}
+        >
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className={`shrink-0 rounded-2xl bg-primary/10 text-primary flex items-center justify-center ${
+              isElderly ? 'w-14 h-14' : 'w-11 h-11'
+            }`}>
+              <Users className={isElderly ? 'w-7 h-7' : 'w-5 h-5'} />
             </div>
-          )}
-
-          {/* Form to Link Additional Caregiver (Always Visible) */}
-          <form onSubmit={handleLinkCaregiver} className="space-y-4 pt-2">
-            <div className="bg-muted/10 border border-border/80 rounded-2xl p-4 space-y-3">
-              <p className={`text-muted-foreground font-semibold ${isElderly ? 'text-lg' : 'text-xs'}`}>
-                {linkedCaregivers.length > 0
-                  ? 'Link another caregiver to support your routine. Enter their Connect Code (or legacy Caregiver ID) below:'
-                  : 'You are currently not connected to a caregiver. Ask them for their Connect Code (or Caregiver ID) and enter it below:'}
-              </p>
-
-              <div className="flex flex-col sm:flex-row gap-3">
-                <input
-                  type="text"
-                  placeholder="RMAB12CD or CG123456"
-                  value={cgIdInput}
-                  onChange={(e) => setCgIdInput(e.target.value)}
-                  disabled={processing}
-                  maxLength={8}
-                  className={`flex-1 bg-white border border-border rounded-xl focus:outline-none focus:border-primary font-mono uppercase font-black text-center ${
-                    isElderly ? 'h-16 px-4 text-2xl border-2' : 'h-10 px-3 text-sm'
-                  }`}
-                />
-                <button
-                  type="submit"
-                  disabled={processing || !cgIdInput.trim()}
-                  className={`font-black rounded-xl bg-primary text-primary-foreground hover:bg-primary-hover transition-all shadow-sm cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 ${
-                    isElderly ? 'h-16 px-8 text-xl' : 'h-10 px-5 text-xs'
-                  }`}
-                >
-                  <Link2 className="w-4 h-4" />
-                  <span>{processing ? 'Linking...' : 'Link Caregiver'}</span>
-                </button>
-              </div>
+            <div className="min-w-0">
+              <span className={`block font-extrabold text-foreground text-balance ${isElderly ? 'text-xl' : 'text-sm'}`}>
+                Open your Care Circle
+              </span>
+              <span className={`block text-muted-foreground font-semibold ${isElderly ? 'text-base' : 'text-xs'}`}>
+                {CARE_LABELS.asPatient}: {linkedCaregivers.length}
+                {' · '}
+                {CARE_LABELS.asCaregiver}: {linkedPatients.length}
+              </span>
             </div>
-          </form>
-        </div>
+          </div>
+          <ArrowRight className={`shrink-0 text-muted-foreground ${isElderly ? 'w-7 h-7' : 'w-5 h-5'}`} />
+        </Link>
 
-        {/* OUTGOING SUPPORT: CAREGIVER ROLE FLOW */}
-        <div className="space-y-4">
-          <h4 className="text-xs font-black text-foreground uppercase tracking-wider">People I Care For</h4>
+        {/* INBOUND: a code someone gave me. Deliberately neutral, so it never reads like
+            one of the outbound share cards above and below it. */}
+        <form onSubmit={handleLinkCaregiver} className="space-y-3">
+          <h4 className="text-xs font-black text-foreground uppercase tracking-wider">
+            Link a caregiver — enter their code
+          </h4>
+          <div className="bg-muted/10 border border-border/80 rounded-2xl p-4 space-y-3">
+            <p className={`text-muted-foreground font-semibold ${isElderly ? 'text-lg' : 'text-xs'}`}>
+              Ask your caregiver for their Connect Code (or legacy Caregiver ID) and enter it here.
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-3">
+              <input
+                type="text"
+                placeholder="RMAB12CD or CG123456"
+                aria-label="Caregiver connect code"
+                value={cgIdInput}
+                onChange={(e) => setCgIdInput(e.target.value)}
+                disabled={processing}
+                maxLength={8}
+                className={`w-full sm:flex-1 shrink-0 bg-white border border-border rounded-xl focus:outline-none focus:border-primary font-mono uppercase font-black text-center ${
+                  isElderly ? 'h-16 px-4 text-2xl border-2' : 'h-11 px-3 text-sm'
+                }`}
+              />
+              <button
+                type="submit"
+                disabled={processing || !cgIdInput.trim()}
+                className={`font-black rounded-xl bg-primary-strong text-primary-strong-foreground hover:bg-primary-strong-hover transition-all shadow-sm cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 ${
+                  isElderly ? 'h-16 px-8 text-xl' : 'h-11 px-5 text-xs'
+                }`}
+              >
+                <Link2 className="w-4 h-4" />
+                <span>{processing ? 'Linking...' : 'Link Caregiver'}</span>
+              </button>
+            </div>
+          </div>
+        </form>
+
+        {/* OUTBOUND: my caregiver ID, for patients to enter on their side. */}
+        <div className="space-y-3 pt-2 border-t border-border/40">
+          {/* NOT `CARE_LABELS.asCaregiver` — that names a LIST of people, which lives on
+              /care-circle now. This block is about your own caregiver identity. */}
+          <h4 className="text-xs font-black text-foreground uppercase tracking-wider">
+            Being a caregiver — your ID
+          </h4>
           {caregiverRecord ? (
-            <div className="space-y-4">
-              {/* ID Display Box */}
-              <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div>
-                  <span className={`block text-muted-foreground font-semibold ${isElderly ? 'text-lg' : 'text-xs'}`}>
-                    Your Caregiver ID (for others to link you)
-                  </span>
-                  <span className={`block font-black text-primary font-mono tracking-wide mt-1 ${isElderly ? 'text-3xl' : 'text-xl'}`}>
-                    {caregiverRecord.caregiver_id}
-                  </span>
-                </div>
-
-                <button
-                  onClick={handleCopyId}
-                  type="button"
-                  className={`flex items-center gap-1.5 font-bold rounded-xl border border-primary/30 bg-white hover:bg-primary/5 text-primary transition-all cursor-pointer ${
-                    isElderly ? 'h-14 px-6 text-lg' : 'h-9 px-3.5 text-xs'
-                  }`}
-                >
-                  {copied ? (
-                    <>
-                      <Check className="w-4 h-4" />
-                      <span>Copied!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-4 h-4" />
-                      <span>Copy ID</span>
-                    </>
-                  )}
-                </button>
+            <div className="bg-info/5 border border-info/25 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div>
+                <span className={`text-muted-foreground font-semibold flex items-center gap-1.5 ${isElderly ? 'text-lg' : 'text-xs'}`}>
+                  <Share2 className="w-4 h-4 text-info shrink-0" aria-hidden="true" />
+                  Your Caregiver ID — give this to your patients
+                </span>
+                <span className={`block font-black text-primary-strong font-mono tracking-wide mt-1 ${isElderly ? 'text-3xl' : 'text-xl'}`}>
+                  {caregiverRecord.caregiver_id}
+                </span>
               </div>
 
-              {/* Patient Connections (many-to-many): one card per linked patient */}
-              {linkedPatients.length > 0 ? (
-                <div className="space-y-4">
-                  {linkedPatients.map((patient) => (
-                    patient.connection_status === 'ACCEPTED' ? (
-                      <div key={patient.id} className="border border-border rounded-2xl p-4 bg-success/5 space-y-4">
-                        <div className="flex items-center justify-between border-b border-border/40 pb-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-success/15 text-success flex items-center justify-center">
-                              <User className="w-4 h-4" />
-                            </div>
-                            <div>
-                              <span className={`block font-black text-foreground ${isElderly ? 'text-xl' : 'text-sm'}`}>
-                                Connected Patient: {patient.patient_name || 'Your Patient'}
-                              </span>
-                              <span className={`block text-muted-foreground font-semibold ${isElderly ? 'text-base' : 'text-[11px]'}`}>
-                                Telegram Chat ID: {patient.patient_telegram_id || 'N/A'}
-                              </span>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => handleUnlinkPatient(patient)}
-                            disabled={processing}
-                            className="p-2.5 text-danger bg-danger/10 hover:bg-danger/20 rounded-xl cursor-pointer transition-all disabled:opacity-50 shrink-0"
-                            title="Disconnect Patient"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-
-                        <button
-                          onClick={() => handleMonitorPatient(patient)}
-                          disabled={processing || !patient.patient_telegram_id}
-                          className={`w-full font-black rounded-xl bg-primary text-primary-foreground hover:bg-primary-hover transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 ${
-                            isElderly ? 'h-[72px] text-2xl' : 'h-10 text-xs'
-                          }`}
-                        >
-                          <Stethoscope className="w-4 h-4" />
-                          <span>Monitor Patient Dashboard</span>
-                        </button>
-                      </div>
-                    ) : (
-                      <div key={patient.id} className="border border-warning/30 rounded-2xl p-4 bg-warning/5 space-y-4">
-                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-border/40 pb-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-warning/15 text-warning flex items-center justify-center">
-                              <User className="w-4 h-4 animate-bounce" />
-                            </div>
-                            <div>
-                              <span className={`block font-black text-foreground ${isElderly ? 'text-xl' : 'text-sm'}`}>
-                                Pending Connection Request: {patient.patient_name || 'New Patient'}
-                              </span>
-                              <span className={`block text-muted-foreground font-semibold ${isElderly ? 'text-base' : 'text-[11px]'}`}>
-                                Telegram Chat ID: {patient.patient_telegram_id || 'N/A'}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col sm:flex-row gap-3">
-                          <button
-                            onClick={() => handleAcceptPatient(patient)}
-                            disabled={processing}
-                            className={`flex-1 font-black rounded-xl bg-success text-success-foreground hover:bg-success/90 transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2 ${
-                              isElderly ? 'h-[72px] text-2xl' : 'h-10 text-xs'
-                            }`}
-                          >
-                            <Check className="w-4 h-4" />
-                            <span>Accept Connection Request</span>
-                          </button>
-                          <button
-                            onClick={() => handleUnlinkPatient(patient)}
-                            disabled={processing}
-                            className={`font-bold rounded-xl bg-danger/10 text-danger hover:bg-danger/20 transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                              isElderly ? 'h-[72px] px-8 text-2xl' : 'h-10 px-5 text-xs'
-                            }`}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                            <span>Reject</span>
-                          </button>
-                        </div>
-                      </div>
-                    )
-                  ))}
-                </div>
-              ) : (
-                <div className="border border-border border-dashed rounded-2xl p-6 text-center space-y-2 bg-muted/10">
-                  <Smartphone className="w-8 h-8 text-muted-foreground mx-auto" />
-                  <p className={`font-black text-foreground ${isElderly ? 'text-xl' : 'text-sm'}`}>
-                    Waiting for patient connection...
-                  </p>
-                  <p className={`text-muted-foreground max-w-md mx-auto font-semibold ${isElderly ? 'text-lg' : 'text-xs'}`}>
-                    Provide your Caregiver ID (<b>{caregiverRecord.caregiver_id}</b>) to your patients. They can enter this ID in their profile settings or Telegram Bot to link up. You can support multiple patients at once.
-                  </p>
-                </div>
-              )}
+              <button
+                onClick={handleCopyId}
+                type="button"
+                className={`flex items-center gap-1.5 font-bold rounded-xl border border-primary/30 bg-white hover:bg-primary/5 text-primary-strong transition-all cursor-pointer ${
+                  isElderly ? 'h-14 px-6 text-lg' : 'h-11 px-4 text-xs'
+                }`}
+              >
+                {copied ? (
+                  <>
+                    <Check className="w-4 h-4" />
+                    <span>Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4" />
+                    <span>Copy ID</span>
+                  </>
+                )}
+              </button>
             </div>
           ) : (
             <div className="bg-muted/10 border border-border rounded-2xl p-6 text-center space-y-4">
+              {/* "People I Care For" as a heading above a button called "Register
+                  Caregiver ID" never explained which direction it went. Say it. */}
               <p className={`text-muted-foreground max-w-md mx-auto font-semibold ${isElderly ? 'text-xl' : 'text-xs'}`}>
-                You do not have a Caregiver ID generated yet. Generate your registration ID to link up with your patient.
+                Looking after someone else? Generate an ID they can enter to add you as
+                their caregiver.
               </p>
               <button
                 onClick={handleBecomeCaregiver}
                 disabled={processing}
-                className={`font-black rounded-xl bg-primary text-primary-foreground hover:bg-primary-hover transition-all shadow-sm cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 mx-auto ${
-                  isElderly ? 'h-[72px] px-10 text-2xl' : 'h-10 px-6 text-xs'
+                className={`font-black rounded-xl bg-primary-strong text-primary-strong-foreground hover:bg-primary-strong-hover transition-all shadow-sm cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 mx-auto ${
+                  isElderly ? 'h-[72px] px-10 text-2xl' : 'h-11 px-6 text-xs'
                 }`}
               >
                 <Sparkles className="w-4 h-4" />
-                <span>{processing ? 'Registering...' : 'Register Caregiver ID'}</span>
+                <span>{processing ? 'Registering...' : "Become someone's caregiver"}</span>
               </button>
             </div>
           )}
@@ -878,12 +631,14 @@ export default function SettingsClientView({
           </span>
         </div>
 
+        {/* Sign Out and Delete Account used to be class-for-class IDENTICAL — same red
+            tint, same weight, same size, sitting in adjacent cards. One ends a session;
+            the other erases everything permanently. Sign Out is a neutral secondary
+            action; only Delete gets the solid red. */}
         <button
           onClick={handleLogout}
-          className={`flex items-center justify-center font-black rounded-xl transition-all cursor-pointer shadow-sm ${
-            isElderly 
-              ? 'bg-danger text-danger-foreground hover:bg-danger/90 h-[80px] px-10 text-2xl gap-2' 
-              : 'bg-danger/10 hover:bg-danger/20 text-danger px-4 py-2.5 text-xs font-semibold gap-1.5'
+          className={`shrink-0 flex items-center justify-center font-bold rounded-xl transition-all cursor-pointer bg-card border border-border text-foreground hover:bg-muted ${
+            isElderly ? 'h-[72px] px-8 text-xl gap-2' : 'h-11 px-4 text-xs gap-1.5'
           }`}
         >
           <LogOut className={isElderly ? 'w-6 h-6' : 'w-4 h-4'} />
@@ -894,7 +649,7 @@ export default function SettingsClientView({
       {/* SECTION 5: DANGER ZONE — DELETE ACCOUNT */}
       <div className="bg-card border-2 border-danger/40 rounded-3xl p-6 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
         <div className="space-y-0.5">
-          <span className={`font-extrabold text-danger block ${isElderly ? 'text-xl' : 'text-sm'}`}>
+          <span className={`font-extrabold text-danger-strong block ${isElderly ? 'text-xl' : 'text-sm'}`}>
             Delete Account
           </span>
           <span className={`text-muted-foreground block font-semibold ${isElderly ? 'text-base' : 'text-xs'}`}>
@@ -904,12 +659,10 @@ export default function SettingsClientView({
         </div>
 
         <button
-          onClick={handleDeleteAccount}
+          onClick={() => { setDeleteConfirmText(''); setDeleteModalOpen(true); }}
           disabled={deleting}
-          className={`flex items-center justify-center font-black rounded-xl transition-all cursor-pointer shadow-sm disabled:opacity-60 disabled:cursor-not-allowed ${
-            isElderly
-              ? 'bg-danger text-danger-foreground hover:bg-danger/90 h-[80px] px-10 text-2xl gap-2'
-              : 'bg-danger/10 hover:bg-danger/20 text-danger px-4 py-2.5 text-xs font-semibold gap-1.5'
+          className={`shrink-0 flex items-center justify-center font-black rounded-xl transition-all cursor-pointer shadow-md shadow-danger/25 bg-danger-strong text-card hover:brightness-95 disabled:opacity-60 disabled:cursor-not-allowed ${
+            isElderly ? 'h-[80px] px-10 text-2xl gap-2' : 'h-11 px-5 text-xs gap-1.5'
           }`}
         >
           <Trash2 className={isElderly ? 'w-6 h-6' : 'w-4 h-4'} />
@@ -919,10 +672,83 @@ export default function SettingsClientView({
 
       {/* SECTION 6: LEGAL */}
       <div className="text-center text-xs text-muted-foreground pt-2">
-        <Link href="/privacy" className="hover:underline">Privacy Policy</Link>
+        <Link href="/privacy" className="inline-flex items-center min-h-11 px-1 hover:underline">Privacy Policy</Link>
         <span className="mx-2">·</span>
-        <Link href="/terms" className="hover:underline">Terms of Service</Link>
+        <Link href="/terms" className="inline-flex items-center min-h-11 px-1 hover:underline">Terms of Service</Link>
       </div>
+
+      {/* Delete-account confirmation. Type-to-confirm rather than a single OK, because
+          this is the one action in the app with nothing behind it. */}
+      {deleteModalOpen && (
+        <div
+          className="fixed inset-0 bg-foreground/50 backdrop-blur-sm flex items-center justify-center p-4 z-[100] animate-fade-in"
+          onClick={() => !deleting && setDeleteModalOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-account-title"
+            className="bg-card border-2 border-danger/40 rounded-3xl p-6 w-full max-w-md shadow-lg space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3">
+              <div className="shrink-0 w-11 h-11 rounded-2xl bg-danger/10 text-danger flex items-center justify-center">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 id="delete-account-title" className={`font-black text-foreground ${isElderly ? 'text-2xl' : 'text-base'}`}>
+                  Delete your account?
+                </h3>
+                <p className={`text-muted-foreground mt-1 ${isElderly ? 'text-base' : 'text-xs'}`}>
+                  This permanently erases your medications, reminder history, health vault
+                  files and caregiver links. It cannot be undone, and your caregivers will
+                  stop receiving alerts about you.
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="delete-confirm" className={`block font-bold text-foreground mb-1.5 ${isElderly ? 'text-lg' : 'text-xs'}`}>
+                Type <span className="font-mono text-danger-strong">DELETE</span> to confirm
+              </label>
+              <input
+                id="delete-confirm"
+                type="text"
+                autoComplete="off"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                disabled={deleting}
+                className={`w-full px-4 rounded-2xl bg-background border border-input text-foreground font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-danger ${
+                  isElderly ? 'h-16 text-xl' : 'h-12 text-sm'
+                }`}
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setDeleteModalOpen(false)}
+                disabled={deleting}
+                className={`font-bold rounded-xl bg-card border border-border text-foreground hover:bg-muted transition-all cursor-pointer disabled:opacity-50 ${
+                  isElderly ? 'h-16 px-6 text-lg' : 'h-11 px-4 text-xs'
+                }`}
+              >
+                Keep my account
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteAccount}
+                disabled={deleting || deleteConfirmText.trim().toUpperCase() !== 'DELETE'}
+                className={`font-black rounded-xl bg-danger-strong text-card shadow-md shadow-danger/25 hover:brightness-95 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+                  isElderly ? 'h-16 px-6 text-lg' : 'h-11 px-5 text-xs'
+                }`}
+              >
+                {deleting ? 'Deleting…' : 'Delete forever'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

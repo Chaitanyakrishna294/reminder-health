@@ -78,9 +78,61 @@ const daysOfStockLeft = (med) => {
   return Math.floor(stock / perDay);
 };
 
+/** Days of remaining stock at or below which a medication counts as low, when no
+ *  usable stock_threshold is set — and as a backup when the threshold is so small
+ *  it would give almost no warning (threshold 2 on a 4-doses-a-day med is half a day). */
+const LOW_STOCK_DAYS = 3;
+
+/**
+ * The single definition of "this medication needs refilling".
+ *
+ * Before this existed there were three: the 09:00 cron used `daysOfStockLeft <= 3`,
+ * the web dashboard re-typed the same math inline, and the medication card badge used
+ * `current_stock <= stock_threshold` — so the threshold the user set in the wizard,
+ * under the promise "You will receive an alert when stock reaches this amount",
+ * drove one badge and no alert at all.
+ *
+ * Mirrored in web/src/lib/medications/stock.ts; both are run against
+ * test/fixtures/low-stock-cases.json so they cannot drift apart silently.
+ *
+ * `reason` exists so copy can be honest: "4 left, you asked to be warned at 4" and
+ * "about 2 days left" are different sentences and one generic string is wrong half
+ * the time.
+ *
+ * @param {{active?: boolean, low_stock_alert_enabled?: boolean, current_stock?: number|null,
+ *          tablet_count?: number|null, stock_threshold?: number|null, frequency: string,
+ *          dosage_amount?: number|null}} med
+ * @returns {{low: boolean, reason: 'threshold'|'days'|null, stock: number|null,
+ *            daysLeft: number|null, threshold: number|null}}
+ */
+const isLowStock = (med) => {
+  const threshold = med.stock_threshold ?? null;
+  const stock = med.current_stock ?? med.tablet_count ?? null;
+  const idle = { low: false, reason: null, stock, daysLeft: null, threshold };
+
+  // `active` is undefined when the caller did not select the column; every such
+  // caller has already filtered to active rows, so absent means active.
+  if (med.active === false) return idle;
+  if (!med.low_stock_alert_enabled) return idle;
+  if (stock === null || stock === undefined) return idle;
+
+  const daysLeft = daysOfStockLeft(med);
+  const base = { ...idle, daysLeft };
+
+  if (threshold !== null && threshold !== undefined && Number(stock) <= Number(threshold)) {
+    return { ...base, low: true, reason: 'threshold' };
+  }
+  if (daysLeft !== null && daysLeft <= LOW_STOCK_DAYS) {
+    return { ...base, low: true, reason: 'days' };
+  }
+  return base;
+};
+
 module.exports = {
   dosesPerDay,
   buildDoseKeyboard,
   buildTakePromptMessage,
   daysOfStockLeft,
+  LOW_STOCK_DAYS,
+  isLowStock,
 };

@@ -68,6 +68,7 @@ maintainer applies it in the Supabase SQL editor (project `jaflclnakwtikqbfhfdk`
 | # | File | Date |
 |---|---|---|
 | — | `migration_escalation_anchor_2026_08_06.sql` | **NOT YET APPLIED** (written 2026-08-06; anchors the escalation ladder to the last real prompt — `last_prompted_at` if snooze-re-fired, else `created_at` — clamped to `created_at`+30m; apply-first is recommended but EITHER order is safe: the send paths never name the column on INSERT and the snooze-re-fire stamp is a separate best-effort write; on apply, move this row up and repoint the `scan_and_escalate_overdue_reminders` row in the function map below to this file; has rollback + validation files) |
+| — | `migration_refill_reminder.sql` | **NOT YET APPLIED** (written 2026-08-06; adds `medications.low_stock_notified_at`, the `LOW_STOCK` notifications type, and `rearm_low_stock_notice()` / `trigger_rearm_low_stock_notice`; also drops the legacy `trigger_medication_low_stock` / `handle_medication_low_stock_trigger()` installed by entry 19 — the 09:00 low-stock cron becomes the single owner of every low-stock channel; on apply, move this row up and update the function map below (add `rearm_low_stock_notice`, remove `handle_medication_low_stock_trigger`); has rollback + validation files) |
 
 > Lockdown note: if `try_acquire_scheduler_lock`, `release_scheduler_lock`,
 > `close_daily_medications`, or `scan_and_escalate_overdue_reminders` is ever
@@ -119,3 +120,4 @@ relying on them.
 | `get_policies_debug` | `migration_security_fix_rls.sql` |
 | `guard_caregiver_info_client_writes` | `migration_security_lockdown_2026_07_29.sql` (applied 2026-08-06) |
 | `deactivate_legacy_caregiver_link_on_revoke` | `migration_security_lockdown_2026_07_29.sql` (applied 2026-08-06) |
+| `rearm_low_stock_notice` | `migration_refill_reminder.sql` |

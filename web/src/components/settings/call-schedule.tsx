@@ -339,7 +339,7 @@ export default function CallSchedule({ telegramId, isElderly }: { telegramId: st
                       type="button"
                       onClick={handleCheckCode}
                       disabled={otpBusy || code.length !== 6}
-                      className={`shrink-0 font-bold rounded-xl bg-primary text-primary-foreground hover:bg-primary-hover transition-all cursor-pointer disabled:opacity-50 ${
+                      className={`shrink-0 font-bold rounded-xl bg-primary-strong text-primary-strong-foreground hover:bg-primary-strong-hover transition-all cursor-pointer disabled:opacity-50 ${
                         isElderly ? 'h-14 px-5 text-base' : 'h-10 px-4 text-xs'
                       }`}
                     >
@@ -451,7 +451,7 @@ export default function CallSchedule({ telegramId, isElderly }: { telegramId: st
           <button
             onClick={handleSave}
             disabled={saving}
-            className={`font-black rounded-xl bg-primary text-primary-foreground hover:bg-primary-hover transition-all shadow-sm cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 ${
+            className={`font-black rounded-xl bg-primary-strong text-primary-strong-foreground hover:bg-primary-strong-hover transition-all shadow-sm cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 ${
               isElderly ? 'h-14 px-8 text-lg w-full' : 'h-10 px-6 text-xs'
             }`}
           >
