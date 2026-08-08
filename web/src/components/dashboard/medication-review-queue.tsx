@@ -72,7 +72,10 @@ export default function MedicationReviewQueue({
         .order('scheduled_for', { ascending: false });
 
       if (error) throw error;
-      setEvents((data as any) || []);
+      // Same guard as the dashboard: a deleted medication leaves medication_id NULL, so
+      // the join returns null and every read of event.medications.drug_name below throws.
+      // Nothing to review for a medication that no longer exists.
+      setEvents(((data as any[]) || []).filter(e => e.medications != null) as any);
     } catch (err) {
       console.error('[MedicationReviewQueue] Error fetching unconfirmed events:', err);
     } finally {

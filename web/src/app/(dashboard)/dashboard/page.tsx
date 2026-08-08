@@ -74,7 +74,7 @@ export default async function DashboardPage() {
       .order('scheduled_for', { ascending: true }),
     supabase
       .from('reminder_logs')
-      .select('id, response, scheduled_time, medications(drug_name)')
+      .select('id, response, scheduled_time, drug_name_snapshot, medications(drug_name)')
       .eq('telegram_id', targetChatId)
       .gte('scheduled_time', sevenDaysAgo.toISOString())
       .order('scheduled_time', { ascending: true }),
@@ -90,7 +90,17 @@ export default async function DashboardPage() {
   const logs = logsResult.data;
   const monthlyLogs = monthlyLogsResult.data;
 
-  const todayEvents = (rawEvents || []) as unknown as ReminderEvent[];
+  // Drop events whose medication no longer exists. Deleting a medication now nulls
+  // medication_id instead of cascading away the dose history (see
+  // migration_preserve_dose_history.sql), so the joined `medications` comes back null
+  // and every consumer that reads event.medications.priority_level threw.
+  //
+  // Filtered here rather than null-guarded at ~28 call sites, because the semantics are
+  // the point: a deleted medication is not something you can still take, so it does not
+  // belong in today's actionable list. Its history survives in reminder_logs, which
+  // adherence reads WITHOUT joining medications — so the record stays intact.
+  const todayEvents = ((rawEvents || []) as unknown as ReminderEvent[])
+    .filter(e => e.medications != null);
 
   const totalMonthlyDoses = monthlyLogs?.length || 0;
   const takenMonthlyDoses = monthlyLogs?.filter(l => l.response === 'TAKEN').length || 0;
@@ -160,9 +170,14 @@ export default async function DashboardPage() {
 
   // Pass raw scheduled_time to avoid timezone formatting mismatch on the server
   const lastTaken = takenLogs.length > 0 ? {
-    drug_name: Array.isArray(takenLogs[0].medications)
-      ? (takenLogs[0].medications[0]?.drug_name || 'Medication')
-      : (takenLogs[0].medications as any)?.drug_name || 'Medication',
+    // Live medication first, then the name captured when the dose was logged. The
+    // snapshot is what keeps history readable after a medication is deleted — without
+    // it this degrades to "Medication", recording that a dose was taken but not of what.
+    drug_name: (Array.isArray(takenLogs[0].medications)
+      ? takenLogs[0].medications[0]?.drug_name
+      : (takenLogs[0].medications as any)?.drug_name)
+      || (takenLogs[0] as any).drug_name_snapshot
+      || 'Medication',
     time: takenLogs[0].scheduled_time
   } : null;
 
