@@ -1,11 +1,23 @@
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service-role';
 
-/** Best-effort client IP from proxy headers (Vercel sets x-forwarded-for). */
+/** Best-effort client IP from proxy headers, resistant to header spoofing. */
 export function getClientIp(request: Request): string {
+  // SECURITY: never trust the LEFTMOST x-forwarded-for entry — it is client-supplied
+  // (an attacker can prepend arbitrary IPs), so keying rate limits on it lets every
+  // request land in a fresh bucket and bypasses the limiter entirely. On Vercel,
+  // x-real-ip is set by the edge to the true client IP and overwrites any incoming
+  // value, so it cannot be spoofed. Prefer it.
+  const realIp = request.headers.get('x-real-ip');
+  if (realIp) return realIp.trim();
+  // Fallback for non-Vercel / local dev: use the LAST x-forwarded-for hop (the one the
+  // nearest trusted proxy appended), not the attacker-controlled leftmost token.
   const xff = request.headers.get('x-forwarded-for');
-  if (xff) return xff.split(',')[0].trim();
-  return request.headers.get('x-real-ip') || 'unknown';
+  if (xff) {
+    const parts = xff.split(',').map((s) => s.trim()).filter(Boolean);
+    if (parts.length > 0) return parts[parts.length - 1];
+  }
+  return 'unknown';
 }
 
 /**

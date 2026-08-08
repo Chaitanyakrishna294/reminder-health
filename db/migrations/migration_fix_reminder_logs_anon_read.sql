@@ -32,6 +32,27 @@ ALTER TABLE public.reminder_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.reminder_logs   FORCE ROW LEVEL SECURITY;
 ALTER TABLE public.reminder_events FORCE ROW LEVEL SECURITY;
 
+-- reminder_events had the SAME class of exposure latent: migration.sql originally created
+-- three USING(true)/WITH CHECK(true) policies ("Allow select/insert/update for authenticated
+-- users"). migration_remove_client_reminder_writes.sql was written to drop them, but the
+-- reminder_logs drift here proves a sibling drop can silently fail to stick on the live DB.
+-- So drop them defensively by exact name (idempotent no-op if already gone), then GUARANTEE
+-- the patient self-read policy exists so FORCE RLS can never lock patients out of their own
+-- events. The scoped caregiver SELECT policy (5.6d, with the can_view_medications flag) is
+-- left untouched.
+DROP POLICY IF EXISTS "Allow select for authenticated users" ON public.reminder_events;
+DROP POLICY IF EXISTS "Allow insert for authenticated users" ON public.reminder_events;
+DROP POLICY IF EXISTS "Allow update for authenticated users" ON public.reminder_events;
+
+DROP POLICY IF EXISTS "Users view own events" ON public.reminder_events;
+CREATE POLICY "Users view own events" ON public.reminder_events
+  FOR SELECT TO authenticated
+  USING (
+    telegram_id IN (
+      SELECT telegram_chat_id FROM public.profiles WHERE id = auth.uid()
+    )
+  );
+
 -- Drop EVERY existing SELECT policy on reminder_logs rather than guessing the name of
 -- the permissive one. Anything legitimate is recreated immediately below.
 DO $$
