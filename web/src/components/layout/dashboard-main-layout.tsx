@@ -19,7 +19,8 @@ import {
   LogOut,
   Check,
   FolderHeart,
-  ChevronDown
+  ChevronDown,
+  Users
 } from 'lucide-react';
 
 // Spins the tapped nav icon from click until the destination page is ready
@@ -143,11 +144,16 @@ export default function DashboardMainLayout({
 
   const getNavItems = () => {
     // Mobile-first: keep the nav to exactly 5 icons. Secondary destinations
-    // (Medical Profile, Emergency) live in the profile menu, not here.
+    // (Medical Profile, Emergency, Scheduler) live in the profile menu, not here.
+    //
+    // Care Circle took the Scheduler's slot. This is a caregiver product and Care
+    // Circle was reachable only through a dashboard card or Settings, while the
+    // planner — a task you do occasionally, not daily — held a permanent slot.
+    // Scheduler is still one tap from the Medications page and the profile menu.
     const baseItems = [
       { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
       { href: '/medications', label: 'Medications', icon: Pill },
-      { href: '/schedule-planner', label: 'Scheduler', icon: Calendar },
+      { href: '/care-circle', label: 'Care Circle', icon: Users },
       { href: '/health-vault', label: 'Health Vault', icon: FolderHeart },
       { href: '/settings', label: 'Settings', icon: Settings },
     ];
@@ -162,7 +168,7 @@ export default function DashboardMainLayout({
   const navItems = getNavItems();
 
   const shouldPrefetch = (path: string) => {
-    const allowed = ['/dashboard', '/medications', '/schedule-planner', '/health-vault'];
+    const allowed = ['/dashboard', '/medications', '/care-circle', '/health-vault'];
     return allowed.includes(path);
   };
 

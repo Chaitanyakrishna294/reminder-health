@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { addStock } from '@/lib/medications/add-stock';
 import { calculateNextReminder } from '@/lib/medication-utils';
 import { useUiMode } from '@/context/ui-mode-context';
-import { Plus, Package, Clock, Pause, Play, SquarePen, Trash2, Pill, X, ChevronDown, Search } from 'lucide-react';
+import { Plus, Package, Clock, Pause, Play, SquarePen, Trash2, Pill, X, ChevronDown, Search, Calendar } from 'lucide-react';
 import GuideButton from '@/components/guide/guide-button';
 import GuideAutoStart from '@/components/guide/guide-auto-start';
 import { getUnitIcon } from '@/components/ui/custom-icons';
@@ -312,6 +312,20 @@ export default function MedicationList({
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {/* Scheduler's primary entry point now that it is out of the bottom nav. A
+              plain labelled link on purpose: the week strip on the planner SELECTS a day,
+              and reusing that control here to navigate instead would give one control two
+              meanings depending on the page it appears on. */}
+          <Link
+            href="/schedule-planner"
+            aria-label="Open the schedule planner"
+            className={`inline-flex items-center justify-center gap-1.5 font-semibold rounded-full bg-muted text-foreground hover:bg-accent-surface transition-all ${
+              isElderly ? 'h-14 px-5 text-base' : 'h-11 px-4 text-[13px]'
+            }`}
+          >
+            <Calendar className="w-4 h-4 shrink-0" strokeWidth={2.5} />
+            Schedule
+          </Link>
           <GuideButton tour="medications" />
           {activeRole !== 'CAREGIVER' && (
             <Link

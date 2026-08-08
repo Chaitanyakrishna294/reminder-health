@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useUiMode } from '@/context/ui-mode-context';
 import { useTheme } from '@/context/theme-context';
-import { Pill, ChevronDown, LogOut, Glasses, HeartPulse, Siren, Moon, Sun } from 'lucide-react';
+import { Pill, ChevronDown, LogOut, Glasses, HeartPulse, Siren, Moon, Sun, Calendar } from 'lucide-react';
 import NotificationCenter from '@/components/shared/notification-center';
 
 interface NavbarProps {
@@ -131,6 +131,17 @@ export default function Navbar({ user }: NavbarProps) {
                   <div className="px-4 py-1.5 border-b border-border text-[11px] text-muted-foreground">
                     Telegram: {user.telegramChatId}
                   </div>
+                  {/* Scheduler moved out of the bottom nav to make room for Care Circle.
+                      It is listed here so it keeps a permanent, findable home rather than
+                      existing only as a link on another page. */}
+                  <Link
+                    href="/schedule-planner"
+                    onClick={() => setUserDropdownOpen(false)}
+                    className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted font-medium transition-colors cursor-pointer flex items-center gap-2 font-mono"
+                  >
+                    <Calendar className="w-3.5 h-3.5 text-primary" />
+                    <span>Scheduler</span>
+                  </Link>
                   {viewMode !== 'PATIENT_MONITOR' && (
                     <>
                       <Link
