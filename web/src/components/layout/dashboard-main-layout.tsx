@@ -183,10 +183,12 @@ export default function DashboardMainLayout({
     // Circle was reachable only through a dashboard card or Settings, while the
     // planner — a task you do occasionally, not daily — held a permanent slot.
     // Scheduler is still one tap from the Medications page and the profile menu.
+    // Medications holds the CENTER slot: it is the app's core object and the thumb's
+    // natural resting position on a phone dock.
     const baseItems = [
       { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-      { href: '/medications', label: 'Medications', icon: Pill },
       { href: '/care-circle', label: 'Care Circle', icon: Users },
+      { href: '/medications', label: 'Medications', icon: Pill },
       { href: '/health-vault', label: 'Health Vault', icon: FolderHeart },
       { href: '/settings', label: 'Settings', icon: Settings },
     ];
