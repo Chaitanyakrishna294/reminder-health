@@ -181,7 +181,7 @@ out the refill-reminder feature. Guided tours: `components/guide/*` (`TOURS` map
 
 **Recipes**
 - *New dashboard page:* `app/(dashboard)/<route>/page.tsx` server component calling `resolveUserData()` with `export const revalidate = 0`. Nav: `getNavItems()` in `components/layout/dashboard-main-layout.tsx` — **exactly 5 icons, hard rule**; secondary pages go in the navbar profile dropdown. Optionally add to `shouldPrefetch()` allowlist and to `isProtectedRoute` in `lib/supabase/middleware.ts` (list synced 07-26 — keep it that way). Optional tour entry in `guide-content.ts`.
-- *Auth flow:* middleware runs on every page/API route → refreshes session → unauthenticated on protected path → `/login`; no `telegram_chat_id` → `/link-account`. `(dashboard)/layout.tsx` + `resolveUserData()` is the real gate for dashboard pages.
+- *Auth flow:* the proxy (`web/src/proxy.ts` — Next 16's renamed `middleware` convention) runs on every page/API route → refreshes session → unauthenticated on protected path → `/login`; no `telegram_chat_id` → `/link-account`. `(dashboard)/layout.tsx` + `resolveUserData()` is the real gate for dashboard pages.
 - *Styling:* semantic tokens (`--primary` pink `#F26B8A`, `--foreground` navy, `--radius 1.75rem`). **Read `docs/DESIGN_SYSTEM.md` before picking a colour** — solid buttons use `--primary-strong`/`--danger-strong` (the base tokens are too light to carry white text: 2.9:1 and 3.55:1), text on a status tint uses the `-strong` variants (`-foreground` is white and vanishes there), and `.floating-bottom` is how root-layout overlays clear the mobile dock; dark mode = `.dark` on `<html>` + compat `!important` layer in globals.css; elderly mode branches classNames via `useUiMode().isElderly`; Care+ surfaces use `lib/billing/luxe.ts` inline styles.
   - Tailwind's `dark:` variant is bound to that same `.dark` class by `@custom-variant dark (&:where(.dark, .dark *));` in globals.css. **Keep that line** — Tailwind v4 otherwise defaults `dark:` to the OS `prefers-color-scheme`, which the in-app toggle can contradict. Note `<html>` is also `.dark`-classed by the anti-FOUC script in `app/layout.tsx`, which seeds from the OS preference while `theme-context.tsx` defaults to time-of-day — the two disagree on first paint when no theme is saved.
 - *PWA:* `app/manifest.ts`; `public/sw.js` is hand-written, push+click only, **no fetch/caching**; registered app-wide by `components/register-sw.tsx` and again in `register-push.ts` (idempotent, intentional).
@@ -302,9 +302,11 @@ non-idempotent migrations guarded; superseded vault migrations marked.
 - `ADMIN_EMAILS` on Vercel is intentionally unset (nobody can open
   /admin-diagnostics) — the context email krishnac0294@gmail.com is a TEST mail,
   never auto-enroll it; the maintainer adds their real email when needed.
-- Next 16 deprecation warning at build: the `middleware` file convention → rename
-  `web/src/middleware.ts` to `proxy.ts` per the Next migration guide before a
-  future Next upgrade removes support (cosmetic today; builds fine).
+- ✅ DONE 2026-08-08: renamed `web/src/middleware.ts` → `web/src/proxy.ts` (Next 16
+  renamed the `middleware` file convention to `proxy`; the export is now `proxy`, same
+  matcher config). `npm run build` confirms `ƒ Proxy (Middleware)` and no deprecation
+  warning. The auth policy still lives in `lib/supabase/middleware.ts` (`updateSession`) —
+  that is a plain module, not a file convention, so it keeps its name.
 - `check_rate_limit` anon grant was revoked by the 07-09 hardening loop — any future
   unauthenticated rate-limit path is silently broken (web uses service client; fine today).
 - `resolve_reminder_event` permanently rejects some doses (planner-shifted virtual doses →

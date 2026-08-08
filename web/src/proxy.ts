@@ -1,7 +1,12 @@
 import { type NextRequest } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
 
-export async function middleware(request: NextRequest) {
+// Next 16 renamed the "middleware" file convention to "proxy" — same functionality,
+// clearer name. The exported function must be named `proxy` (or be the default export).
+// See node_modules/next/dist/docs/01-app/01-getting-started/16-proxy.md.
+// The auth policy itself still lives in @/lib/supabase/middleware (updateSession) — that
+// is a plain module, not a file convention, so it keeps its name.
+export async function proxy(request: NextRequest) {
   return await updateSession(request);
 }
 
