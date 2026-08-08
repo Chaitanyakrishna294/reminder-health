@@ -30,3 +30,11 @@ FROM (VALUES
   ('reminder_logs',   'Caregivers view patient logs'),
   ('reminder_events', 'Users view own events')
 ) AS x(tbl, pol) CROSS JOIN LATERAL (SELECT x.tbl || ' :: ' || x.pol) AS y(object);
+
+-- 4. The caregiver logs policy must stay GATED on can_view_reports (regression guard: an
+-- ungated active_caregiver_links version silently over-granted dose-report access).
+SELECT 'caregiver_logs_gated' AS check,
+       CASE WHEN qual ILIKE '%can_view_reports%' THEN 'OK' ELSE 'FAIL — over-grant' END AS result
+FROM pg_policies
+WHERE schemaname = 'public' AND tablename = 'reminder_logs'
+  AND policyname = 'Caregivers view patient logs';

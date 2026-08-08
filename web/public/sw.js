@@ -84,9 +84,20 @@ self.addEventListener('push', function(event) {
 self.addEventListener('notificationclick', function(event) {
   event.notification.close();
 
+  // Same-origin guard: only ever navigate within our own origin. Push payloads are
+  // VAPID-signed (server-authored), so data.url is not attacker-controlled today, but
+  // resolving an absolute/cross-origin URL here would be an open-redirect if that ever
+  // changed. Accept only a same-origin path; otherwise fall back to the dashboard.
   let targetUrl = '/dashboard';
   if (event.notification.data && event.notification.data.url) {
-    targetUrl = event.notification.data.url;
+    try {
+      const resolved = new URL(event.notification.data.url, self.location.origin);
+      if (resolved.origin === self.location.origin) {
+        targetUrl = resolved.pathname + resolved.search;
+      }
+    } catch (e) {
+      // malformed url -> keep the default
+    }
   }
 
   let fetchPromise = Promise.resolve();

@@ -18,16 +18,22 @@
 --   3. the Render bot (service_role) — current_user='service_role'; allowed.
 -- Everything else from a client role is rejected.
 
+-- CRITICAL: this function must run as SECURITY INVOKER (the default — do NOT add SECURITY
+-- DEFINER). A SECURITY DEFINER trigger runs with current_user = the function OWNER (postgres),
+-- so `current_user IN ('authenticated','anon')` would ALWAYS be false and the guard would be a
+-- silent no-op. As INVOKER, current_user reflects the actual caller: 'authenticated'/'anon' for
+-- a direct client PATCH (guard fires), the owner role when invoked inside the SECURITY DEFINER
+-- redeem_link_code (guard passes → rebind allowed), and 'service_role' for the bot (passes).
+-- Do NOT use session_user either: in Supabase that is 'authenticator', which never matches.
 CREATE OR REPLACE FUNCTION public.guard_profile_telegram_chat_id()
 RETURNS TRIGGER
 LANGUAGE plpgsql
-SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  -- Only police writes coming DIRECTLY from the PostgREST client roles. SECURITY DEFINER RPCs
-  -- (redeem_link_code) execute as the function owner, and the bot uses service_role — both have
-  -- a current_user outside this set and are trusted to rebind identity.
+  -- Only police writes coming DIRECTLY from the PostgREST client roles. redeem_link_code runs
+  -- SECURITY DEFINER (current_user = owner) and the bot uses service_role — both fall outside
+  -- this set and are trusted to rebind identity.
   IF current_user IN ('authenticated', 'anon') THEN
     IF NEW.telegram_chat_id IS DISTINCT FROM OLD.telegram_chat_id THEN
       -- The one legitimate client change: self-healing to your OWN synthetic web id (the

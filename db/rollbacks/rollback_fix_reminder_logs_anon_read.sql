@@ -16,10 +16,14 @@ BEGIN;
 ALTER TABLE public.reminder_logs   NO FORCE ROW LEVEL SECURITY;
 ALTER TABLE public.reminder_events NO FORCE ROW LEVEL SECURITY;
 
--- Drop the policies this migration created.
-DROP POLICY IF EXISTS "Users view own logs"        ON public.reminder_logs;
+-- Drop the reminder_logs policies this migration created.
+DROP POLICY IF EXISTS "Users view own logs"          ON public.reminder_logs;
 DROP POLICY IF EXISTS "Caregivers view patient logs" ON public.reminder_logs;
-DROP POLICY IF EXISTS "Users view own events"      ON public.reminder_events;
+
+-- Deliberately do NOT drop "Users view own events": the forward migration only DROP/CREATEs it
+-- (it pre-existed, from migration_remove_client_reminder_writes.sql). Dropping it here would
+-- revoke a legitimate patient self-read the migration never introduced and break the dashboard's
+-- events reads. It stays in place; it is correctly scoped either way.
 
 COMMIT;
 

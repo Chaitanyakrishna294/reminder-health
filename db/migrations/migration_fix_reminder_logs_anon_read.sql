@@ -38,8 +38,9 @@ ALTER TABLE public.reminder_events FORCE ROW LEVEL SECURITY;
 -- reminder_logs drift here proves a sibling drop can silently fail to stick on the live DB.
 -- So drop them defensively by exact name (idempotent no-op if already gone), then GUARANTEE
 -- the patient self-read policy exists so FORCE RLS can never lock patients out of their own
--- events. The scoped caregiver SELECT policy (5.6d, with the can_view_medications flag) is
--- left untouched.
+-- events. The existing caregiver SELECT policy on reminder_events ("Caregivers view patient
+-- events") is left untouched — its permission gating is owned by the canonical care-circle
+-- migrations (latest: migration_remove_role_onboarding.sql, gated on can_view_medications).
 DROP POLICY IF EXISTS "Allow select for authenticated users" ON public.reminder_events;
 DROP POLICY IF EXISTS "Allow insert for authenticated users" ON public.reminder_events;
 DROP POLICY IF EXISTS "Allow update for authenticated users" ON public.reminder_events;
@@ -76,17 +77,33 @@ CREATE POLICY "Users view own logs" ON public.reminder_logs
     )
   );
 
--- ...or if you are an accepted, active caregiver for the patient it belongs to.
+-- ...or if you are an accepted, active caregiver WITH the reports permission. This is logically
+-- identical to the canonical policy (migration_remove_role_onboarding.sql). An earlier draft used
+-- an ungated active_caregiver_links lookup, which silently OVER-GRANTED dose-report access to
+-- caregivers the patient had explicitly denied can_view_reports. The upgraded path gates on
+-- can_view_reports; the legacy caregiver_info path stays as the canonical defines it (ACCEPTED).
 CREATE POLICY "Caregivers view patient logs" ON public.reminder_logs
   FOR SELECT TO authenticated
   USING (
     telegram_id IN (
-      SELECT l.patient_telegram_id
-        FROM public.active_caregiver_links l
-        JOIN public.profiles p ON p.telegram_chat_id = l.caregiver_chat_id
-       WHERE p.id = auth.uid()
-         AND l.is_active = true
-         AND l.connection_status = 'ACCEPTED'
+      -- Upgraded path (caregiver_connections), gated on the reports permission.
+      SELECT p_pat.telegram_chat_id
+      FROM public.caregiver_connections cc
+      JOIN public.profiles p_pat ON p_pat.id = cc.patient_profile_id
+      WHERE cc.caregiver_profile_id = auth.uid()
+        AND cc.is_active = true
+        AND cc.connection_status = 'ACCEPTED'
+        AND cc.can_view_reports = true
+
+      UNION
+
+      -- Legacy dual-read path (caregiver_info).
+      SELECT ci.patient_telegram_id
+      FROM public.caregiver_info ci
+      JOIN public.profiles p ON p.telegram_chat_id = ci.caregiver_chat_id
+      WHERE p.id = auth.uid()
+        AND ci.is_active = true
+        AND ci.connection_status = 'ACCEPTED'
     )
   );
 

@@ -1,9 +1,17 @@
 -- ROLLBACK for migration_redeem_link_code_ratelimit_2026_08_08.sql
--- Restores redeem_link_code to its prior body (no in-DB rate limit), verbatim from
--- migration_link_codes_hardening_2026_07.sql. Note: reverting removes the brute-force guard;
--- only the API route's IP limit remains (bypassable by calling the RPC directly).
+-- Restores redeem_link_code to its prior VOID-returning, RAISE-on-error body (verbatim from
+-- migration_link_codes_hardening_2026_07.sql, no in-DB rate limit).
+--
+-- WARNING 1: reverting removes the brute-force guard; only the API route's IP limit remains
+-- (bypassable by calling the RPC directly).
+-- WARNING 2: the forward migration changed the return type void -> text and the redeem route was
+-- updated to read the returned status. The route is written to ALSO handle the old RAISE-based
+-- errors, so a DB-only rollback degrades gracefully; still, redeploy the matching route if you
+-- want a clean revert. Return type change requires DROP first.
 
-CREATE OR REPLACE FUNCTION public.redeem_link_code(p_code text)
+DROP FUNCTION IF EXISTS public.redeem_link_code(text);
+
+CREATE FUNCTION public.redeem_link_code(p_code text)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -39,5 +47,9 @@ BEGIN
 END;
 $$;
 
+-- DROP+CREATE reset the ACL to the default PUBLIC EXECUTE; REVOKE FROM anon alone does NOT
+-- remove the PUBLIC grant (anon is a member of PUBLIC), so REVOKE FROM PUBLIC too — otherwise
+-- this rollback would silently re-open the grant that migration_rpc_grant_lockdown closed.
 GRANT EXECUTE ON FUNCTION public.redeem_link_code(text) TO authenticated;
+REVOKE ALL     ON FUNCTION public.redeem_link_code(text) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.redeem_link_code(text) FROM anon;
