@@ -13,6 +13,7 @@ import {
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service-role';
 import { patientRoleLabel, firstName } from '@/lib/care-circle/relationship';
+import PatientStockCard from '@/components/care-circle/patient-stock-card';
 import moment from 'moment-timezone';
 import { 
   ArrowLeft, 
@@ -290,19 +291,14 @@ export default async function PatientConsolePage({ params }: PageProps) {
         </div>
 
         {/* Stock Status */}
-        <div className="bg-card border border-border rounded-2xl p-5 flex flex-col justify-between shadow-sm">
-          <div>
-            <span className="text-[10px] text-muted-foreground font-bold tracking-wider uppercase">Lowest Stock</span>
-            <h3 className="text-3xl font-extrabold text-foreground mt-1.5">{metrics.minStockDaysRemaining} Days</h3>
-          </div>
-          <div className={`text-[10px] font-bold mt-3 flex items-center gap-1.5 px-2 py-1 rounded-md w-max border ${
-            metrics.minStockDaysRemaining <= 3 
-              ? 'text-danger bg-danger/10 border-danger/20' 
-              : 'text-muted-foreground bg-muted border-border'
-          }`}>
-            <Package className="w-3.5 h-3.5" /> Refill Remaining
-          </div>
-        </div>
+        {/* Interactive when the patient granted can_edit_medications: the caregiver
+            refills stock from here, so the patient never manages counts themselves.
+            The route re-checks the permission server-side on every write. */}
+        <PatientStockCard
+          medications={medications}
+          minDays={metrics.minStockDaysRemaining}
+          canEdit={Boolean(connection.can_edit_medications) && medications.length > 0}
+        />
 
         {/* Missed Doses */}
         <div className="bg-card border border-border rounded-2xl p-5 flex flex-col justify-between shadow-sm">
