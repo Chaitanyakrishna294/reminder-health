@@ -202,7 +202,7 @@ machine; UNIQUE(medication_id, scheduled_for); statuses SENT/DISPLAYED/OPENED/GE
 ESCALATED/CAREGIVER_ACKNOWLEDGED/PENDING_REVIEW/UNCONFIRMED/TAKEN/SKIPPED/SNOOZED;
 `last_prompted_at` = escalation-anchor override, stamped ONLY at snooze re-fire via a separate
 best-effort write; initial-send anchor = `created_at` DB default, never named in the INSERT;
-ladder clamps the anchor to `created_at`+30m — migration pending 2026-08-06, see APPLIED.md) ·
+ladder clamps the anchor to `created_at`+30m — applied 2026-08-08, APPLIED.md #59) ·
 `reminder_logs` (adherence history; also no CREATE TABLE) ·
 `notifications` (uuid PK, bell feed).
 

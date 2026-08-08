@@ -68,13 +68,12 @@ maintainer applies it in the Supabase SQL editor (project `jaflclnakwtikqbfhfdk`
 | 56 | `migration_pin_search_path_2026_08_08.sql` | 2026-08-08 (A4 — `ALTER FUNCTION SET search_path=public` on 7 SECURITY DEFINER helper/trigger fns; no body change; has rollback) |
 | 57 | `migration_profile_telegram_id_immutable_2026_08_08.sql` | 2026-08-08 (B1 — closes account/PHI takeover: BEFORE UPDATE trigger `guard_profile_telegram_chat_id` (**SECURITY INVOKER** — must NOT be DEFINER or it no-ops) blocks client changes to `telegram_chat_id`, exempts redeem_link_code + the own-`WEB-<id>` self-heal; has rollback + validation) |
 | 58 | `migration_profiles_select_accepted_2026_08_08.sql` | 2026-08-08 (B2 — profiles SELECT requires `connection_status='ACCEPTED'` (was is_active only); adds `get_connection_counterpart_names` RPC (id+full_name only) so the pending-requests UI still resolves names without leaking PII; has rollback + validation) |
+| 59 | `migration_escalation_anchor_2026_08_06.sql` | 2026-08-08 (written 2026-08-06; adds `reminder_events.last_prompted_at` and redefines `scan_and_escalate_overdue_reminders` to anchor the ladder on the last real prompt — `last_prompted_at` if snooze-re-fired else `created_at`, clamped to `created_at`+30m. Verified applied via `VERIFY_REFILL_ESCALATION_2026_08_08.sql` (E1–E3 DONE); has rollback + validation) |
+| 60 | `migration_refill_reminder.sql` | 2026-08-08 (written 2026-08-06; adds `medications.low_stock_notified_at`, the `LOW_STOCK` notifications type, and `rearm_low_stock_notice()` / `trigger_rearm_low_stock_notice`; drops the legacy `trigger_medication_low_stock` / `handle_medication_low_stock_trigger()` from entry 19 — the 09:00 cron is now the single low-stock owner. Verified via `VERIFY_REFILL_ESCALATION_2026_08_08.sql` (R1–R4 DONE); has rollback + validation) |
 
 ## PENDING (written, not yet applied)
 
-| # | File | Date |
-|---|---|---|
-| — | `migration_escalation_anchor_2026_08_06.sql` | **NOT YET APPLIED** (written 2026-08-06; anchors the escalation ladder to the last real prompt — `last_prompted_at` if snooze-re-fired, else `created_at` — clamped to `created_at`+30m; apply-first is recommended but EITHER order is safe: the send paths never name the column on INSERT and the snooze-re-fire stamp is a separate best-effort write; on apply, move this row up and repoint the `scan_and_escalate_overdue_reminders` row in the function map below to this file; has rollback + validation files) |
-| — | `migration_refill_reminder.sql` | **NOT YET APPLIED** (written 2026-08-06; adds `medications.low_stock_notified_at`, the `LOW_STOCK` notifications type, and `rearm_low_stock_notice()` / `trigger_rearm_low_stock_notice`; also drops the legacy `trigger_medication_low_stock` / `handle_medication_low_stock_trigger()` installed by entry 19 — the 09:00 low-stock cron becomes the single owner of every low-stock channel; on apply, move this row up and update the function map below (add `rearm_low_stock_notice`, remove `handle_medication_low_stock_trigger`); has rollback + validation files) |
+_None — every written migration is applied. Entries #59–#60 (escalation anchor, refill reminder) were the last two, applied 2026-08-08 and confirmed by `db/validations/VERIFY_REFILL_ESCALATION_2026_08_08.sql`._
 
 > Lockdown note: if `try_acquire_scheduler_lock`, `release_scheduler_lock`,
 > `close_daily_medications`, or `scan_and_escalate_overdue_reminders` is ever
@@ -94,7 +93,7 @@ relying on them.
 | `correct_reminder_event` | `migration_dose_correction.sql` |
 | `validate_reminder_event_status_transition` | `migration_dose_correction.sql` |
 | `handle_reminder_event_state_change` | `migration_carecircle_rca_fixes.sql` âš  (vs remove_role_onboarding) |
-| `scan_and_escalate_overdue_reminders` | `migration_5.7b_escalation_outcomes_logic.sql` |
+| `scan_and_escalate_overdue_reminders` | `migration_escalation_anchor_2026_08_06.sql` (applied 2026-08-08, entry #59 — anchors thresholds on `last_prompted_at`/`created_at`; supersedes `migration_5.7b_escalation_outcomes_logic.sql`) |
 | `close_daily_medications` | `migration_arch_hardening_2026_06.sql` |
 | `handle_reminder_event_taken_stock_reduction` | `migration_arch_hardening_2026_06.sql` |
 | `try_acquire_scheduler_lock` / `release_scheduler_lock` | `migration_arch_hardening_2026_06.sql` |
@@ -116,7 +115,7 @@ relying on them.
 | `handle_new_user_health_categories` | `migration_health_vault_combined.sql` |
 | `cleanup_expired_trash` | `migration_health_vault_stabilization.sql` |
 | `cleanup_expired_link_codes` | `migration_arch_hardening_2026_06.sql` |
-| `sync_medication_stock_fields` / `handle_medication_low_stock_trigger` | `migration_medication_enhancements.sql` |
+| `sync_medication_stock_fields` | `migration_medication_enhancements.sql` (its `handle_medication_low_stock_trigger` was **DROPPED** by `migration_refill_reminder.sql`, entry #60 — the 09:00 cron is now the single low-stock owner) |
 | `expire_stale_connection_requests` / `cleanup_resolved_request_notifications` | `migration_5.6c.1_expiration_and_primary.sql` |
 | `handle_profile_telegram_chat_id_update` | `migration_optional_telegram.sql` |
 | `handle_health_records_storage_path` | `migration_5.6e_vault_permissions.sql` |
@@ -126,6 +125,6 @@ relying on them.
 | ~~`get_policies_debug`~~ | **DROPPED** by `migration_rpc_grant_lockdown_2026_08_08.sql` (entry #54) — leaked the RLS model to any authenticated user |
 | `guard_caregiver_info_client_writes` | `migration_security_lockdown_2026_07_29.sql` (applied 2026-08-06) |
 | `deactivate_legacy_caregiver_link_on_revoke` | `migration_security_lockdown_2026_07_29.sql` (applied 2026-08-06) |
-| `rearm_low_stock_notice` | `migration_refill_reminder.sql` |
+| `rearm_low_stock_notice` | `migration_refill_reminder.sql` (applied 2026-08-08, entry #60) |
 | `guard_profile_telegram_chat_id` | `migration_profile_telegram_id_immutable_2026_08_08.sql` (applied 2026-08-08 — **SECURITY INVOKER**; BEFORE UPDATE OF telegram_chat_id on profiles) |
 | `get_connection_counterpart_names` | `migration_profiles_select_accepted_2026_08_08.sql` (applied 2026-08-08 — returns id+full_name only for connections the caller is party to) |
