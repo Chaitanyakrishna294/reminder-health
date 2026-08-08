@@ -199,6 +199,26 @@ body:has(nav[data-tour="dash-nav"]) .floating-bottom {
   }
 }
 
+/* Document-preview modal enter/exit. The modal used to unmount the instant its state
+   cleared — open faded in, close SNAPPED. Exit needs its own animation because React
+   removes the node immediately: the component holds a `closing` state for the exit's
+   duration, plays these, then unmounts. Transform/opacity only. */
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes modalOut {
+  from { opacity: 1; transform: scale(1) translateY(0); }
+  to   { opacity: 0; transform: scale(0.97) translateY(6px); }
+}
+.animate-modal-in  { animation: modalIn 240ms cubic-bezier(0.32, 0.72, 0, 1); }
+.animate-modal-out { animation: modalOut 200ms ease-in forwards; }
+@keyframes backdropOut { from { opacity: 1; } to { opacity: 0; } }
+.animate-backdrop-out { animation: backdropOut 200ms ease-in forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .animate-modal-in, .animate-modal-out, .animate-backdrop-out { animation: none; }
+}
+
 /* Nav icon tap animation. Replaces a spinner that ran from tap until the destination
    was ready: on a fast route that was a flicker of rotation, and on a slow one it
    implied something was wrong. This is press feedback, not a progress indicator — it

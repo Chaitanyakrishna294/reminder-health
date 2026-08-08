@@ -134,6 +134,9 @@ export default function HealthVaultClientView({
 
   // Preview Modal State
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  // Close is a two-step: `previewClosing` plays the exit animation, THEN state clears
+  // and the node unmounts. Without it, closing snapped — open faded, close blinked.
+  const [previewClosing, setPreviewClosing] = useState(false);
   const [previewType, setPreviewType] = useState<string | null>(null);
   const [previewTitle, setPreviewTitle] = useState<string | null>(null);
   const [previewName, setPreviewName] = useState<string | null>(null);
@@ -322,6 +325,34 @@ export default function HealthVaultClientView({
       alert('Failed to load document preview.');
     }
   };
+
+  const closePreview = () => {
+    if (previewClosing) return;
+    setPreviewClosing(true);
+    setTimeout(() => {
+      setPreviewUrl(null);
+      setPreviewType(null);
+      setPreviewTitle(null);
+      setPreviewName(null);
+      setPreviewPath(null); // stops the signed-URL auto-refresh effect
+      setPreviewClosing(false);
+    }, 200);
+  };
+
+  // Escape closes, and the page behind must not scroll while a document is open —
+  // on mobile the modal is near-fullscreen and background scroll reads as breakage.
+  useEffect(() => {
+    if (!previewUrl) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closePreview(); };
+    window.addEventListener('keydown', onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewUrl]);
 
   // Re-sign the preview URL before its TTL expires so an open document (e.g. a
   // large PDF being read) doesn't break mid-session with a 403. Runs only while
@@ -1714,11 +1745,21 @@ export default function HealthVaultClientView({
 
       {/* Preview Modal */}
       {previewUrl && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/70 backdrop-blur-md animate-fade-in">
-          <div 
-            className={`bg-card border border-border shadow-2xl rounded-3xl w-full max-w-4xl h-[80vh] flex flex-col relative ${
-              isElderly ? 'p-8 border-2' : 'p-6'
-            }`}
+        <div
+          onClick={closePreview}
+          role="presentation"
+          className={`fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-background/70 backdrop-blur-md ${
+            previewClosing ? 'animate-backdrop-out' : 'animate-fade-in'
+          }`}
+        >
+          {/* h-[88dvh] + tighter mobile padding: at 375px the old p-4/p-6 pair left a
+              document window barely half the screen. dvh, not vh, so the browser chrome
+              collapsing on scroll doesn't push the footer under the toolbar. */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className={`bg-card border border-border shadow-2xl rounded-2xl sm:rounded-3xl w-full max-w-4xl h-[88dvh] sm:h-[80vh] flex flex-col relative ${
+              previewClosing ? 'animate-modal-out' : 'animate-modal-in'
+            } ${isElderly ? 'p-4 sm:p-8 border-2' : 'p-3 sm:p-6'}`}
           >
             {/* Preview Header */}
             <div className="flex items-center justify-between border-b border-border/50 pb-4 mb-4">
@@ -1745,13 +1786,8 @@ export default function HealthVaultClientView({
                   <span>Open</span>
                 </a>
                 <button
-                  onClick={() => {
-                    setPreviewUrl(null);
-                    setPreviewType(null);
-                    setPreviewTitle(null);
-                    setPreviewName(null);
-                    setPreviewPath(null); // stops the signed-URL auto-refresh effect
-                  }}
+                  onClick={closePreview}
+                  aria-label="Close preview"
                   className="text-muted-foreground hover:text-foreground hover:bg-muted p-1.5 rounded-full transition-all cursor-pointer"
                 >
                   <X className="w-5 h-5 shrink-0" />
@@ -1769,7 +1805,7 @@ export default function HealthVaultClientView({
                     <img
                       src={previewUrl}
                       alt={previewTitle || 'Preview'}
-                      className="max-w-full max-h-full object-contain p-2 rounded-2xl"
+                      className="max-w-full max-h-full object-contain select-none"
                     />
                   );
                 }
