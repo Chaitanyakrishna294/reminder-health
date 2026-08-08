@@ -10,58 +10,90 @@
   and plays while the real dashboard is server-rendered behind it.
 
   It forwards with ?launch=1, and the dashboard renders an IDENTICAL overlay scene
-  (components/launch-handoff.tsx) that only lifts once the page has fully loaded —
-  so the animation ends when the dashboard is ready, not merely when its first byte
-  paints. THE SCENE IS DUPLICATED THERE ON PURPOSE: this file must stay
-  self-contained to render from cache alone. Change one, change both.
+  (components/launch-handoff.tsx) that only lifts once the page has fully loaded.
+  THE SCENE IS DUPLICATED THERE ON PURPOSE: this file must stay self-contained to
+  render from cache alone. Change one, change both.
 
-  Self-contained: no webfonts, no framework, one image (pre-cached).
+  One deliberate divergence: the colour fields here are pre-blurred radial-gradients,
+  not filter: blur() — a static blur forces a multi-pass GPU raster at first paint,
+  and this file's entire reason to exist is instant first paint from cache. The
+  handoff overlay uses the real blur for pixel parity with the med-due gate.
 -->
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { height: 100%; }
   body {
+    position: relative; overflow: hidden;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     gap: 14px;
     font-family: ui-monospace, 'JetBrains Mono', Consolas, monospace;
     background: #F8F9FB; color: #0F1C5A;
     padding: 24px; text-align: center;
   }
+  /* Soft colour fields, same family as the med-due gate's mesh. Static, so they cost
+     one raster and nothing per frame. */
+  .field { position: absolute; border-radius: 50%; pointer-events: none; }
+  .f1 { width: 24rem; height: 24rem; top: -7rem; left: -8rem;
+        background: radial-gradient(closest-side, rgba(247,204,219,0.7) 0%, transparent 70%); }
+  .f2 { width: 21rem; height: 21rem; bottom: -6rem; right: -7rem;
+        background: radial-gradient(closest-side, rgba(203,220,242,0.7) 0%, transparent 70%); }
+  .f3 { width: 18rem; height: 18rem; top: 38%; right: -6rem;
+        background: radial-gradient(closest-side, rgba(246,227,202,0.7) 0%, transparent 70%); }
   @media (prefers-color-scheme: dark) {
     body { background: #0F1C5A; color: #EAF0FF; }
-    .tablet { background: #2A3B7E; }
+    .f1 { background: radial-gradient(closest-side, rgba(36,55,143,0.5) 0%, transparent 70%); }
+    .f2 { background: radial-gradient(closest-side, rgba(27,58,120,0.5) 0%, transparent 70%); }
+    .f3 { background: radial-gradient(closest-side, rgba(58,42,107,0.5) 0%, transparent 70%); }
+    .tablet { background: #3A2F1E; border-color: #E8A13D; }
+    .tablet::after { background: #E8A13D; }
     .capsule { background: linear-gradient(90deg, #F26B8A 50%, #2A3B7E 50%); }
   }
+  .scene { position: relative; display: flex; flex-direction: column; align-items: center; gap: 14px; }
   .brain {
     width: 96px; height: 96px; object-fit: contain;
     animation: breathe 1.6s ease-in-out infinite;
   }
   .name { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
 
-  /* The choreography: a tablet, a capsule and a softgel hopping in sequence — the
-     medication cabinet as the loading dots. Transform-only, so it composites. */
-  .choreo { display: flex; align-items: flex-end; gap: 12px; height: 34px; margin-top: 2px; }
+  /* The choreography: tablet, capsule, softgel hopping in sequence — the medication
+     cabinet as the loading dots. Each sits on a grounded shadow that flattens as its
+     pill leaves the floor. Transform/opacity only.
+     Tablet amber is deliberately NOT the --warning token (#FF9500): warning means
+     low stock / skipped, and the next screen can be the med-due gate where that hue
+     is the overdue ring. Pharmaceutical amber instead, with a border that clears
+     3:1 for low-contrast-sensitivity vision. */
+  .choreo { display: flex; align-items: flex-end; gap: 14px; height: 40px; margin-top: 2px; }
+  .slot { display: flex; flex-direction: column; align-items: center; gap: 3px; }
   .pill { animation: hop 1.35s cubic-bezier(0.34, 1.56, 0.64, 1) infinite; }
+  .pill-shadow {
+    width: 14px; height: 3px; border-radius: 50%;
+    background: rgba(15, 28, 90, 0.18);
+    animation: squash 1.35s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+  }
   .tablet {
     width: 18px; height: 18px; border-radius: 50%;
-    background: #FDEEF2; border: 2px solid #CC3D64; position: relative;
+    background: #FDF1DF; border: 2px solid #B36B00; position: relative;
   }
   .tablet::after {
     content: ''; position: absolute; left: 2px; right: 2px; top: 50%;
-    height: 2px; margin-top: -1px; border-radius: 1px; background: #CC3D64; opacity: .55;
+    height: 2px; margin-top: -1px; border-radius: 1px; background: #B36B00; opacity: .6;
   }
   .capsule {
     width: 30px; height: 15px; border-radius: 8px;
     background: linear-gradient(90deg, #CC3D64 50%, #FDEEF2 50%);
     border: 2px solid #CC3D64;
-    animation-delay: 0.15s;
+    box-shadow: inset 0 1px 1px rgba(255,255,255,0.4);
   }
   .softgel {
     width: 15px; height: 15px; border-radius: 50%;
     background: #34C759; border: 2px solid #1B7A3A;
-    animation-delay: 0.3s;
+    box-shadow: inset 0 1px 1px rgba(255,255,255,0.35);
   }
-  .hint { font-size: 12px; font-weight: 600; opacity: 0.65; }
+  .slot:nth-child(2) .pill, .slot:nth-child(2) .pill-shadow { animation-delay: 0.15s; }
+  .slot:nth-child(3) .pill, .slot:nth-child(3) .pill-shadow { animation-delay: 0.3s; }
+  /* 0.75, not 0.65: the mesh fields lighten the ground, and where two overlap the
+     old value measured 4.48:1 — under the floor. Keep in lockstep with .lh-hint. */
+  .hint { font-size: 12px; font-weight: 600; opacity: 0.75; }
   .dots::after {
     content: ''; display: inline-block; width: 1.2em; text-align: left;
     animation: dots 1.5s steps(4, end) infinite;
@@ -75,6 +107,12 @@
     25%           { transform: translateY(-12px) rotate(-10deg); }
     40%           { transform: translateY(-2px) rotate(6deg); }
   }
+  /* 0% is the rest pose, so a reduced-motion freeze reads as a normal shadow. */
+  @keyframes squash {
+    0%, 55%, 100% { transform: scaleX(1); opacity: 1; }
+    25%           { transform: scaleX(0.55); opacity: 0.55; }
+    40%           { transform: scaleX(0.85); opacity: 0.8; }
+  }
   @keyframes dots {
     0%   { content: ''; }
     25%  { content: '.'; }
@@ -82,7 +120,7 @@
     75%  { content: '...'; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .brain, .pill { animation: none; }
+    .brain, .pill, .pill-shadow { animation: none; }
     .dots::after { content: '…'; animation: none; }
   }
   #offline { display: none; }
@@ -95,23 +133,26 @@
 </style>
 </head>
 <body>
-  <img class="brain" src="/mascot/reminder.png" alt="" width="96" height="96" />
-  <div class="name">Re&#8209;MIND&#8209;e&#1071;</div>
-  <div class="choreo" aria-hidden="true">
-    <span class="pill tablet"></span>
-    <span class="pill capsule"></span>
-    <span class="pill softgel"></span>
-  </div>
-  <p class="hint dots" id="opening">Opening your medications</p>
-  <div id="offline" role="alert">
-    <p class="hint">You're offline. Re-MIND-eЯ needs a connection to load your medications.</p>
-    <button onclick="go()">Try again</button>
+  <span class="field f1"></span><span class="field f2"></span><span class="field f3"></span>
+  <div class="scene">
+    <img class="brain" src="/mascot/reminder.png" alt="" width="96" height="96" />
+    <div class="name">Re&#8209;MIND&#8209;e&#1071;</div>
+    <div class="choreo" aria-hidden="true">
+      <span class="slot"><span class="pill tablet"></span><span class="pill-shadow"></span></span>
+      <span class="slot"><span class="pill capsule"></span><span class="pill-shadow"></span></span>
+      <span class="slot"><span class="pill softgel"></span><span class="pill-shadow"></span></span>
+    </div>
+    <p class="hint dots" id="opening">Opening your medications</p>
+    <div id="offline" role="alert">
+      <p class="hint">You're offline. Re-MIND-eЯ needs a connection to load your medications.</p>
+      <button onclick="go()">Try again</button>
+    </div>
   </div>
 <script>
   // location.replace keeps this page out of history, so Back from the dashboard
   // never lands on the splash. ?launch=1 tells the dashboard to keep an identical
-  // overlay up until it has FULLY loaded — the handoff that makes the animation end
-  // when the dashboard is ready rather than when its first byte paints.
+  // overlay up until it has FULLY loaded — including the capsule's flight home into
+  // the dock's Medications slot (see launch-handoff.tsx).
   function go() {
     if (!navigator.onLine) {
       document.getElementById('opening').style.display = 'none';
