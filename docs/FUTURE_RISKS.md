@@ -198,8 +198,16 @@ false alarms (documented so they aren't "re-fixed"):
 **Fixed:**
 - 🔴 **Stored XSS** — `dangerouslySetInnerHTML` injecting `caregiver_name` is now rendered as JSX
   (`web/src/app/(dashboard)/care-circle/manage/page.tsx`).
-- 🟠 **Security headers** — `web/next.config.ts` now serves CSP (`frame-ancestors 'none'`),
-  `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, HSTS, `Permissions-Policy` (verified live).
+- 🟠 **Security headers** — the static ones (`X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`,
+  HSTS, `Permissions-Policy`) are served from `web/next.config.ts`; CSP is now served per-request
+  from `web/src/proxy.ts` with a nonce (see the CSP item below).
+- 🟠 **CSP `script-src` hardened (2026-08-09)** — moved CSP out of `next.config.ts` into
+  `web/src/proxy.ts` with a per-request nonce: `script-src 'self' 'nonce-…' 'strict-dynamic'`, with
+  **no `'unsafe-inline'`** and `'unsafe-eval'` only in dev. `app/layout.tsx` reads `x-nonce` to nonce
+  the two inline theme/launch scripts. Trade-off: every page now renders dynamically (nonce must be
+  fresh per request). `style-src` deliberately keeps `'unsafe-inline'` (React `style={{}}`). Verified
+  in a prod `next start`: strict header served, all scripts nonced + executing, **zero CSP
+  violations**, theme applies, auth redirect intact.
 - 🟠 **Open redirect** — auth callback `?next=` is sanitized to internal paths only
   (`web/src/app/api/auth/callback/route.ts`).
 - 🟡 **`noopener`** added to the one external `target="_blank"` link (`caregiver-console.tsx`).
@@ -217,5 +225,5 @@ false alarms (documented so they aren't "re-fixed"):
 - **npm audit (moderate):** `postcss < 8.5.10` XSS (GHSA-qx2v-qp2m-jg93) pulled transitively via
   `next@16.2.7`. Build-time CSS-stringify issue, not a runtime vector here. Only `npm audit fix
   --force` resolves it — it downgrades Next to 9.3.3 (unacceptable). Hold for an in-major Next patch.
-- **CSP** intentionally allows `'unsafe-inline'`/`'unsafe-eval'` on `script-src` so Next's inline
-  runtime isn't broken; nonce-based hardening is future work.
+- ~~**CSP** allows `'unsafe-inline'`/`'unsafe-eval'` on `script-src`~~ — **DONE 2026-08-09**, see the
+  nonce item under **Fixed** above.

@@ -1,25 +1,10 @@
 import type { NextConfig } from "next";
 
-// Content-Security-Policy: conservative — blocks framing/clickjacking and mixed
-// content while allowing Next's inline runtime and Supabase (API, realtime,
-// storage signed URLs / PDF <object> previews). Tightening script-src with a
-// nonce is tracked as follow-up debt in docs/FUTURE_RISKS.md.
-const contentSecurityPolicy = [
-  "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https:",
-  "font-src 'self' data:",
-  "connect-src 'self' https: wss:",
-  "frame-src 'self' blob: https:",
-  "object-src 'self' blob: https:",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'none'",
-].join('; ');
-
+// NOTE: Content-Security-Policy is NOT here anymore. It carries a per-request nonce
+// (script-src 'nonce-…' 'strict-dynamic', no 'unsafe-inline'), so it is set dynamically
+// in src/proxy.ts / src/lib/supabase/middleware.ts. The headers below are static and safe
+// to serve from the config.
 const securityHeaders = [
-  { key: 'Content-Security-Policy', value: contentSecurityPolicy },
   // Defense-in-depth against clickjacking alongside CSP frame-ancestors.
   { key: 'X-Frame-Options', value: 'DENY' },
   { key: 'X-Content-Type-Options', value: 'nosniff' },

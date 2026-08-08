@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { UiModeProvider } from "@/context/ui-mode-context";
@@ -39,11 +40,14 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Per-request nonce set by proxy.ts. Reading headers() here also opts the whole app into
+  // dynamic rendering — required for nonce-based CSP (the nonce must be fresh per request).
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
     <html
       lang="en"
@@ -56,8 +60,10 @@ export default function RootLayout({
             getTimeBasedTheme() in context/theme-context.tsx (dark 7 PM–7 AM).
             It previously seeded from prefers-color-scheme, so on an OS set to
             dark at midday this script painted dark and ThemeProvider then
-            corrected it to light — the very flash it exists to prevent. */}
+            corrected it to light — the very flash it exists to prevent.
+            nonce: required so the strict CSP (no 'unsafe-inline') allows this inline script. */}
         <script
+          nonce={nonce}
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var t=localStorage.getItem('theme');if(t!=='dark'&&t!=='light'){var h=new Date().getHours();t=(h>=19||h<7)?'dark':'light';}if(t==='dark'){document.documentElement.classList.add('dark');document.documentElement.style.colorScheme='dark';}else{document.documentElement.style.colorScheme='light';}}catch(e){}})();`,
           }}
@@ -68,6 +74,7 @@ export default function RootLayout({
             no gap between the splash page and the still-loading dashboard. The overlay
             removes the attribute once the window has fully loaded. */}
         <script
+          nonce={nonce}
           dangerouslySetInnerHTML={{
             __html: `(function(){try{if(/[?&]launch=1(&|$)/.test(location.search))document.documentElement.setAttribute('data-launching','1');}catch(e){}})();`,
           }}

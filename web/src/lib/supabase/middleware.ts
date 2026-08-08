@@ -1,10 +1,27 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
-    request,
-  });
+// `nonce` + `cspHeader` are generated per-request by proxy.ts. We do two things with them:
+//   1. Forward them on the REQUEST headers (x-nonce + Content-Security-Policy) so the server
+//      render can nonce its scripts — Next parses the CSP header to nonce its own framework/
+//      bundle scripts, and app/layout.tsx reads x-nonce to nonce the inline theme/launch scripts.
+//   2. Set the CSP on every RESPONSE (including redirects) so the browser enforces it.
+// The Supabase auth/cookie logic and the routing rules below are unchanged from before.
+export async function updateSession(request: NextRequest, nonce: string, cspHeader: string) {
+  // Rebuilt whenever cookies change so the REFRESHED auth cookies and the nonce both reach
+  // the downstream render (request.cookies.set syncs into request.headers' cookie header).
+  const forwardHeaders = () => {
+    const h = new Headers(request.headers);
+    h.set('x-nonce', nonce);
+    h.set('content-security-policy', cspHeader);
+    return h;
+  };
+  const withCsp = (res: NextResponse) => {
+    res.headers.set('content-security-policy', cspHeader);
+    return res;
+  };
+
+  let supabaseResponse = NextResponse.next({ request: { headers: forwardHeaders() } });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -16,9 +33,7 @@ export async function updateSession(request: NextRequest) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          supabaseResponse = NextResponse.next({
-            request,
-          });
+          supabaseResponse = NextResponse.next({ request: { headers: forwardHeaders() } });
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
           );
@@ -52,7 +67,7 @@ export async function updateSession(request: NextRequest) {
   // Redirect to login if user is not authenticated and attempts to access protected routes
   if (!user && isProtectedRoute) {
     url.pathname = '/login';
-    return NextResponse.redirect(url);
+    return withCsp(NextResponse.redirect(url));
   }
 
   // Redirect to dashboard if authenticated user attempts to access auth pages or root
@@ -72,22 +87,22 @@ export async function updateSession(request: NextRequest) {
       // If Telegram is not linked, and the user is not already on the linking page or update-password page, redirect them
       if (url.pathname !== '/link-account' && url.pathname !== '/update-password') {
         url.pathname = '/link-account';
-        return NextResponse.redirect(url);
+        return withCsp(NextResponse.redirect(url));
       }
     } else {
       // If Telegram is linked with a real account, prevent accessing the link page
       if (isRealTelegram && url.pathname === '/link-account') {
         url.pathname = '/dashboard';
-        return NextResponse.redirect(url);
+        return withCsp(NextResponse.redirect(url));
       }
-      
+
       // Prevent accessing auth pages
       if (isAuthPage || url.pathname === '/') {
         url.pathname = '/dashboard';
-        return NextResponse.redirect(url);
+        return withCsp(NextResponse.redirect(url));
       }
     }
   }
 
-  return supabaseResponse;
+  return withCsp(supabaseResponse);
 }
