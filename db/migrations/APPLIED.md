@@ -70,10 +70,11 @@ maintainer applies it in the Supabase SQL editor (project `jaflclnakwtikqbfhfdk`
 | 58 | `migration_profiles_select_accepted_2026_08_08.sql` | 2026-08-08 (B2 — profiles SELECT requires `connection_status='ACCEPTED'` (was is_active only); adds `get_connection_counterpart_names` RPC (id+full_name only) so the pending-requests UI still resolves names without leaking PII; has rollback + validation) |
 | 59 | `migration_escalation_anchor_2026_08_06.sql` | 2026-08-08 (written 2026-08-06; adds `reminder_events.last_prompted_at` and redefines `scan_and_escalate_overdue_reminders` to anchor the ladder on the last real prompt — `last_prompted_at` if snooze-re-fired else `created_at`, clamped to `created_at`+30m. Verified applied via `VERIFY_REFILL_ESCALATION_2026_08_08.sql` (E1–E3 DONE); has rollback + validation) |
 | 60 | `migration_refill_reminder.sql` | 2026-08-08 (written 2026-08-06; adds `medications.low_stock_notified_at`, the `LOW_STOCK` notifications type, and `rearm_low_stock_notice()` / `trigger_rearm_low_stock_notice`; drops the legacy `trigger_medication_low_stock` / `handle_medication_low_stock_trigger()` from entry 19 — the 09:00 cron is now the single low-stock owner. Verified via `VERIFY_REFILL_ESCALATION_2026_08_08.sql` (R1–R4 DONE); has rollback + validation) |
+| 61 | `migration_delete_account_storage_fix_2026_08_09.sql` | 2026-08-09 (redefines `delete_my_account` WITHOUT the illegal `DELETE FROM storage.objects` line — it failed with 42501 "Direct deletion from storage tables is not allowed" and blocked ALL in-app account deletion; storage cleanup moved to the app route via the Storage API. Has rollback) |
 
 ## PENDING (written, not yet applied)
 
-_None — every written migration is applied. Entries #59–#60 (escalation anchor, refill reminder) were the last two, applied 2026-08-08 and confirmed by `db/validations/VERIFY_REFILL_ESCALATION_2026_08_08.sql`._
+_None — every written migration is applied. Latest: #61 (`migration_delete_account_storage_fix_2026_08_09.sql`, applied 2026-08-09)._
 
 > Lockdown note: if `try_acquire_scheduler_lock`, `release_scheduler_lock`,
 > `close_daily_medications`, or `scan_and_escalate_overdue_reminders` is ever
@@ -110,7 +111,8 @@ relying on them.
 | `are_profiles_connected` | `migration_are_profiles_connected_dual_read_2026_07.sql` (applied 2026-07-26, entry #51 — supersedes `migration_security_fix_rls.sql`) |
 | `get_my_telegram_chat_id` | `migration_security_fix_rls.sql` |
 | `redeem_link_code` | `migration_redeem_link_code_ratelimit_2026_08_08.sql` (applied 2026-08-08, entry #55 — RETURNS text + in-RPC rate limit; supersedes `migration_link_codes_hardening_2026_07.sql`) |
-| `delete_my_account` / `check_rate_limit` / `cleanup_rate_limits` | `migration_compliance_2026_06.sql` (`check_rate_limit` EXECUTE locked to service_role by `migration_rpc_grant_lockdown_2026_08_08.sql`, entry #54) |
+| `delete_my_account` | `migration_delete_account_storage_fix_2026_08_09.sql` (applied 2026-08-09, entry #61 — no longer deletes from `storage.objects`; storage cleanup lives in the app route. Supersedes `migration_compliance_2026_06.sql`) |
+| `check_rate_limit` / `cleanup_rate_limits` | `migration_compliance_2026_06.sql` (`check_rate_limit` EXECUTE locked to service_role by `migration_rpc_grant_lockdown_2026_08_08.sql`, entry #54) |
 | `search_medication_catalog` | `migration_medication_catalog_2026_07.sql` |
 | `handle_new_user_health_categories` | `migration_health_vault_combined.sql` |
 | `cleanup_expired_trash` | `migration_health_vault_stabilization.sql` |
