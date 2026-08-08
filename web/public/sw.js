@@ -9,7 +9,7 @@
 // API calls, everything — falls through to the network untouched, so this can
 // never serve a stale page or interfere with auth.
 // ---------------------------------------------------------------------------
-const LAUNCH_CACHE = 'remind-launch-v1';
+const LAUNCH_CACHE = 'remind-launch-v2';
 const LAUNCH_ASSETS = ['/launch.html', '/mascot/reminder.png'];
 
 self.addEventListener('install', function(event) {

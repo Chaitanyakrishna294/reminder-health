@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/context/theme-context";
 import CookieConsent from "@/components/cookie-consent";
 import InstallPrompt from "@/components/install-prompt";
 import RegisterSW from "@/components/register-sw";
+import LaunchHandoff from "@/components/launch-handoff";
 
 // Variable fonts: one file per family covers every weight (vs 12 static files).
 const inter = Inter({
@@ -61,8 +62,19 @@ export default function RootLayout({
             __html: `(function(){try{var t=localStorage.getItem('theme');if(t!=='dark'&&t!=='light'){var h=new Date().getHours();t=(h>=19||h<7)?'dark':'light';}if(t==='dark'){document.documentElement.classList.add('dark');document.documentElement.style.colorScheme='dark';}else{document.documentElement.style.colorScheme='light';}}catch(e){}})();`,
           }}
         />
+        {/* PWA launch handoff, before paint for the same reason as the theme script:
+            /launch.html forwards here with ?launch=1, and this attribute makes the
+            LaunchHandoff overlay (the same splash scene) visible from the FIRST frame —
+            no gap between the splash page and the still-loading dashboard. The overlay
+            removes the attribute once the window has fully loaded. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{if(/[?&]launch=1(&|$)/.test(location.search))document.documentElement.setAttribute('data-launching','1');}catch(e){}})();`,
+          }}
+        />
       </head>
       <body className="min-h-full flex flex-col">
+        <LaunchHandoff />
         <ThemeProvider>
           <UiModeProvider>
             {children}

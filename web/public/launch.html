@@ -7,32 +7,60 @@
 <!--
   The installed app's launch screen. start_url points here, and sw.js pre-caches this
   file plus the mascot — so it opens INSTANTLY from disk, with no network involved,
-  and plays while the real dashboard is server-rendered behind it. The browser keeps
-  this page (and its animation) on screen until /dashboard's response arrives, which
-  is exactly the wait this exists to cover. An animation cannot run any earlier than
-  this: before first paint of OUR code, only the OS's static manifest splash exists.
+  and plays while the real dashboard is server-rendered behind it.
 
-  Self-contained on purpose: no webfonts, no framework, one image (pre-cached). It
-  must render from cache alone.
+  It forwards with ?launch=1, and the dashboard renders an IDENTICAL overlay scene
+  (components/launch-handoff.tsx) that only lifts once the page has fully loaded —
+  so the animation ends when the dashboard is ready, not merely when its first byte
+  paints. THE SCENE IS DUPLICATED THERE ON PURPOSE: this file must stay
+  self-contained to render from cache alone. Change one, change both.
+
+  Self-contained: no webfonts, no framework, one image (pre-cached).
 -->
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { height: 100%; }
   body {
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 18px;
+    gap: 14px;
     font-family: ui-monospace, 'JetBrains Mono', Consolas, monospace;
     background: #F8F9FB; color: #0F1C5A;
     padding: 24px; text-align: center;
   }
   @media (prefers-color-scheme: dark) {
     body { background: #0F1C5A; color: #EAF0FF; }
+    .tablet { background: #2A3B7E; }
+    .capsule { background: linear-gradient(90deg, #F26B8A 50%, #2A3B7E 50%); }
   }
   .brain {
     width: 96px; height: 96px; object-fit: contain;
     animation: breathe 1.6s ease-in-out infinite;
   }
   .name { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
+
+  /* The choreography: a tablet, a capsule and a softgel hopping in sequence — the
+     medication cabinet as the loading dots. Transform-only, so it composites. */
+  .choreo { display: flex; align-items: flex-end; gap: 12px; height: 34px; margin-top: 2px; }
+  .pill { animation: hop 1.35s cubic-bezier(0.34, 1.56, 0.64, 1) infinite; }
+  .tablet {
+    width: 18px; height: 18px; border-radius: 50%;
+    background: #FDEEF2; border: 2px solid #CC3D64; position: relative;
+  }
+  .tablet::after {
+    content: ''; position: absolute; left: 2px; right: 2px; top: 50%;
+    height: 2px; margin-top: -1px; border-radius: 1px; background: #CC3D64; opacity: .55;
+  }
+  .capsule {
+    width: 30px; height: 15px; border-radius: 8px;
+    background: linear-gradient(90deg, #CC3D64 50%, #FDEEF2 50%);
+    border: 2px solid #CC3D64;
+    animation-delay: 0.15s;
+  }
+  .softgel {
+    width: 15px; height: 15px; border-radius: 50%;
+    background: #34C759; border: 2px solid #1B7A3A;
+    animation-delay: 0.3s;
+  }
   .hint { font-size: 12px; font-weight: 600; opacity: 0.65; }
   .dots::after {
     content: ''; display: inline-block; width: 1.2em; text-align: left;
@@ -42,6 +70,11 @@
     0%, 100% { transform: scale(1) translateY(0); }
     50%      { transform: scale(1.07) translateY(-4px); }
   }
+  @keyframes hop {
+    0%, 55%, 100% { transform: translateY(0) rotate(0deg); }
+    25%           { transform: translateY(-12px) rotate(-10deg); }
+    40%           { transform: translateY(-2px) rotate(6deg); }
+  }
   @keyframes dots {
     0%   { content: ''; }
     25%  { content: '.'; }
@@ -49,7 +82,7 @@
     75%  { content: '...'; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .brain { animation: none; }
+    .brain, .pill { animation: none; }
     .dots::after { content: '…'; animation: none; }
   }
   #offline { display: none; }
@@ -64,6 +97,11 @@
 <body>
   <img class="brain" src="/mascot/reminder.png" alt="" width="96" height="96" />
   <div class="name">Re&#8209;MIND&#8209;e&#1071;</div>
+  <div class="choreo" aria-hidden="true">
+    <span class="pill tablet"></span>
+    <span class="pill capsule"></span>
+    <span class="pill softgel"></span>
+  </div>
   <p class="hint dots" id="opening">Opening your medications</p>
   <div id="offline" role="alert">
     <p class="hint">You're offline. Re-MIND-eЯ needs a connection to load your medications.</p>
@@ -71,8 +109,9 @@
   </div>
 <script>
   // location.replace keeps this page out of history, so Back from the dashboard
-  // never lands on the splash. The page (and its animation) stays visible until
-  // the dashboard's server response actually arrives.
+  // never lands on the splash. ?launch=1 tells the dashboard to keep an identical
+  // overlay up until it has FULLY loaded — the handoff that makes the animation end
+  // when the dashboard is ready rather than when its first byte paints.
   function go() {
     if (!navigator.onLine) {
       document.getElementById('opening').style.display = 'none';
@@ -81,7 +120,7 @@
     }
     document.getElementById('offline').style.display = 'none';
     document.getElementById('opening').style.display = '';
-    location.replace('/dashboard');
+    location.replace('/dashboard?launch=1');
   }
   window.addEventListener('online', go);
   go();
