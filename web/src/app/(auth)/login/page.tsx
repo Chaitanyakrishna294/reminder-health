@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useUiMode } from '@/context/ui-mode-context';
-import { Eye, EyeOff, Sparkles, AlertTriangle, Info, Mail, Lock, KeyRound } from 'lucide-react';
+import { Eye, EyeOff, Sparkles, AlertTriangle, Info, Mail, Lock, KeyRound, MailWarning } from 'lucide-react';
 import Turnstile, { captchaEnabled } from '@/components/turnstile';
 
 function LoginForm() {
@@ -224,6 +224,10 @@ function LoginForm() {
         </div>
       ) : (
         <form onSubmit={handleVerifyCode} className="space-y-3">
+          <div className="bg-warning/10 border border-warning/35 p-3 rounded-2xl flex items-start gap-2 text-warning-strong text-xs font-semibold">
+            <MailWarning className="w-4 h-4 shrink-0 mt-0.5" />
+            <span>Not in your inbox? <b>Check your Spam / Junk folder</b> — and mark it &quot;Not spam&quot;.</span>
+          </div>
           <div>
             <label htmlFor="login-code" className={`block font-bold text-foreground mb-1.5 ${isElderly ? 'text-base' : 'text-xs'}`}>Sign-in code</label>
             <div className="relative">

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useUiMode } from '@/context/ui-mode-context';
-import { Eye, EyeOff, User, Mail, Lock, AlertTriangle, KeyRound } from 'lucide-react';
+import { Eye, EyeOff, User, Mail, Lock, AlertTriangle, KeyRound, MailWarning } from 'lucide-react';
 import Turnstile, { captchaEnabled } from '@/components/turnstile';
 
 export default function RegisterPage() {
@@ -59,9 +59,11 @@ export default function RegisterPage() {
 
     setLoading(false);
     // If confirmation is required, show the code entry. If not, the account is already active.
+    // New users go straight to the dashboard (Telegram linking is optional, done later from
+    // Settings) — no forced Connect-Telegram step.
     if (data.session) {
       router.refresh();
-      router.push('/link-account');
+      router.push('/dashboard');
     } else {
       setSuccess(true);
     }
@@ -91,7 +93,7 @@ export default function RegisterPage() {
       setLoading(false);
     } else {
       router.refresh();
-      router.push('/link-account');
+      router.push('/dashboard');
     }
   };
 
@@ -122,8 +124,12 @@ export default function RegisterPage() {
           <h2 className={`font-bold text-foreground ${isElderly ? 'text-2xl' : 'text-xl'}`}>Enter your code</h2>
           <p className={`text-muted-foreground ${isElderly ? 'text-lg' : 'text-sm'}`}>
             We emailed a 6-digit code to <b>{email}</b>. Enter it below to activate your account.
-            <br /><span className="text-xs">(Check your spam folder if you don&apos;t see it.)</span>
           </p>
+        </div>
+
+        <div className="bg-warning/10 border border-warning/35 p-3 rounded-2xl flex items-start gap-2 text-warning-strong text-xs font-semibold">
+          <MailWarning className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>Not in your inbox? <b>Check your Spam / Junk folder</b> — and mark it &quot;Not spam&quot; so future codes arrive on time.</span>
         </div>
 
         <form onSubmit={handleVerifyCode} className="space-y-3">
