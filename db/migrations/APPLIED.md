@@ -62,6 +62,12 @@ maintainer applies it in the Supabase SQL editor (project `jaflclnakwtikqbfhfdk`
 | 50 | `migration_notifications_no_client_insert_2026_07.sql` | 2026-07-26 |
 | 51 | `migration_are_profiles_connected_dual_read_2026_07.sql` | 2026-07-26 (validated: dual-read + SECURITY DEFINER confirmed) |
 | 52 | `migration_security_lockdown_2026_07_29.sql` | 2026-08-06 (validated: anon call to `try_acquire_scheduler_lock` / `release_scheduler_lock` now returns 42501 permission denied; has rollback + validation files) |
+| 53 | `migration_fix_reminder_logs_anon_read.sql` | 2026-08-08 (A1 — closes the anon-read PHI leak: FORCE RLS on reminder_logs + reminder_events, rebuild scoped SELECT policies; caregiver logs policy gated on `can_view_reports`. Validated via `STATE_CHECK` + anon probe `*/0`; has rollback + validation) |
+| 54 | `migration_rpc_grant_lockdown_2026_08_08.sql` | 2026-08-08 (A2 — `check_rate_limit` EXECUTE → service_role only; **dropped `get_policies_debug`**; `REVOKE PUBLIC` on `redeem_link_code` + `search_medication_catalog`; has rollback) |
+| 55 | `migration_redeem_link_code_ratelimit_2026_08_08.sql` | 2026-08-08 (A3 — `redeem_link_code` now RETURNS text + in-RPC per-user rate limit 5/300s; RETURNs status instead of RAISE so the counter INSERT commits. Supersedes link_codes_hardening def; has rollback) |
+| 56 | `migration_pin_search_path_2026_08_08.sql` | 2026-08-08 (A4 — `ALTER FUNCTION SET search_path=public` on 7 SECURITY DEFINER helper/trigger fns; no body change; has rollback) |
+| 57 | `migration_profile_telegram_id_immutable_2026_08_08.sql` | 2026-08-08 (B1 — closes account/PHI takeover: BEFORE UPDATE trigger `guard_profile_telegram_chat_id` (**SECURITY INVOKER** — must NOT be DEFINER or it no-ops) blocks client changes to `telegram_chat_id`, exempts redeem_link_code + the own-`WEB-<id>` self-heal; has rollback + validation) |
+| 58 | `migration_profiles_select_accepted_2026_08_08.sql` | 2026-08-08 (B2 — profiles SELECT requires `connection_status='ACCEPTED'` (was is_active only); adds `get_connection_counterpart_names` RPC (id+full_name only) so the pending-requests UI still resolves names without leaking PII; has rollback + validation) |
 
 ## PENDING (written, not yet applied)
 
@@ -104,8 +110,8 @@ relying on them.
 | `lookup_caregiver_by_code` | `migration_carecircle_lookup_rpc.sql` |
 | `are_profiles_connected` | `migration_are_profiles_connected_dual_read_2026_07.sql` (applied 2026-07-26, entry #51 — supersedes `migration_security_fix_rls.sql`) |
 | `get_my_telegram_chat_id` | `migration_security_fix_rls.sql` |
-| `redeem_link_code` | `migration_link_codes_hardening_2026_07.sql` |
-| `delete_my_account` / `check_rate_limit` / `cleanup_rate_limits` | `migration_compliance_2026_06.sql` |
+| `redeem_link_code` | `migration_redeem_link_code_ratelimit_2026_08_08.sql` (applied 2026-08-08, entry #55 — RETURNS text + in-RPC rate limit; supersedes `migration_link_codes_hardening_2026_07.sql`) |
+| `delete_my_account` / `check_rate_limit` / `cleanup_rate_limits` | `migration_compliance_2026_06.sql` (`check_rate_limit` EXECUTE locked to service_role by `migration_rpc_grant_lockdown_2026_08_08.sql`, entry #54) |
 | `search_medication_catalog` | `migration_medication_catalog_2026_07.sql` |
 | `handle_new_user_health_categories` | `migration_health_vault_combined.sql` |
 | `cleanup_expired_trash` | `migration_health_vault_stabilization.sql` |
@@ -117,7 +123,9 @@ relying on them.
 | `set_medical_profiles_updated_at` | `migration_medical_profiles.sql` |
 | `update_caregiver_connection_updated_at` | `migration_caregiver_decoupling_phase_a.sql` |
 | `clean_old_chat_messages` | `migration_caregiver_accept.sql` |
-| `get_policies_debug` | `migration_security_fix_rls.sql` |
+| ~~`get_policies_debug`~~ | **DROPPED** by `migration_rpc_grant_lockdown_2026_08_08.sql` (entry #54) — leaked the RLS model to any authenticated user |
 | `guard_caregiver_info_client_writes` | `migration_security_lockdown_2026_07_29.sql` (applied 2026-08-06) |
 | `deactivate_legacy_caregiver_link_on_revoke` | `migration_security_lockdown_2026_07_29.sql` (applied 2026-08-06) |
 | `rearm_low_stock_notice` | `migration_refill_reminder.sql` |
+| `guard_profile_telegram_chat_id` | `migration_profile_telegram_id_immutable_2026_08_08.sql` (applied 2026-08-08 — **SECURITY INVOKER**; BEFORE UPDATE OF telegram_chat_id on profiles) |
+| `get_connection_counterpart_names` | `migration_profiles_select_accepted_2026_08_08.sql` (applied 2026-08-08 — returns id+full_name only for connections the caller is party to) |
