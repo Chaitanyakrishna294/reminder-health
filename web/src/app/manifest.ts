@@ -7,7 +7,11 @@ export default function manifest(): MetadataRoute.Manifest {
     name: 'Re-MIND-eЯ | Healthcare Companion',
     short_name: 'Re-MIND-eЯ',
     description: 'Your calm, intelligent healthcare companion. Medication tracking, adherence progress, and caregiver coordination.',
-    start_url: '/dashboard',
+    // A tiny static page sw.js pre-caches, so the installed app OPENS instantly from
+    // disk with an animated splash while /dashboard server-renders behind it. The `id`
+    // above keeps the app's identity stable across this change. Existing installs pick
+    // up a manifest change lazily — it can take a couple of launches to apply.
+    start_url: '/launch.html',
     scope: '/',
     lang: 'en',
     dir: 'ltr',

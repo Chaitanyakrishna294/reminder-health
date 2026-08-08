@@ -1,3 +1,50 @@
+// ---------------------------------------------------------------------------
+// Launch-screen precache. The manifest's start_url is /launch.html, and the ONLY
+// reason opening the installed app can show an animation during the slow server
+// render is that this file (and the mascot it shows) is already on disk — a launch
+// with no network involved. Bump LAUNCH_CACHE when launch.html changes.
+//
+// The fetch handler is deliberately narrow: it answers ONLY for the precached
+// launch assets and touches nothing else. Every other request — the dashboard SSR,
+// API calls, everything — falls through to the network untouched, so this can
+// never serve a stale page or interfere with auth.
+// ---------------------------------------------------------------------------
+const LAUNCH_CACHE = 'remind-launch-v1';
+const LAUNCH_ASSETS = ['/launch.html', '/mascot/reminder.png'];
+
+self.addEventListener('install', function(event) {
+  event.waitUntil(
+    caches.open(LAUNCH_CACHE)
+      .then(cache => cache.addAll(LAUNCH_ASSETS))
+      .then(() => self.skipWaiting())
+  );
+});
+
+self.addEventListener('activate', function(event) {
+  event.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(
+        keys.filter(k => k.startsWith('remind-launch-') && k !== LAUNCH_CACHE)
+            .map(k => caches.delete(k))
+      ))
+      .then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener('fetch', function(event) {
+  const path = new URL(event.request.url).pathname;
+  if (event.request.method !== 'GET' || !LAUNCH_ASSETS.includes(path)) return;
+  event.respondWith(
+    caches.match(event.request).then(cached =>
+      cached || fetch(event.request).then(res => {
+        const copy = res.clone();
+        caches.open(LAUNCH_CACHE).then(cache => cache.put(event.request, copy));
+        return res;
+      })
+    )
+  );
+});
+
 self.addEventListener('push', function(event) {
   let data = { title: 'Medication Reminder', body: 'Take your scheduled medication.' };
   if (event.data) {
