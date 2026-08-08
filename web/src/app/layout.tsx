@@ -56,16 +56,14 @@ export default async function RootLayout({
     >
       <head>
         {/* Apply saved theme before paint to avoid a flash of the wrong theme.
-            The no-saved-theme fallback MUST stay in lockstep with
-            getTimeBasedTheme() in context/theme-context.tsx (dark 7 PM–7 AM).
-            It previously seeded from prefers-color-scheme, so on an OS set to
-            dark at midday this script painted dark and ThemeProvider then
-            corrected it to light — the very flash it exists to prevent.
+            Default when nothing is saved is LIGHT — must stay in lockstep with
+            context/theme-context.tsx, which also defaults to light. Only a saved
+            'dark' choice paints dark; anything else paints light.
             nonce: required so the strict CSP (no 'unsafe-inline') allows this inline script. */}
         <script
           nonce={nonce}
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('theme');if(t!=='dark'&&t!=='light'){var h=new Date().getHours();t=(h>=19||h<7)?'dark':'light';}if(t==='dark'){document.documentElement.classList.add('dark');document.documentElement.style.colorScheme='dark';}else{document.documentElement.style.colorScheme='light';}}catch(e){}})();`,
+            __html: `(function(){try{if(localStorage.getItem('theme')==='dark'){document.documentElement.classList.add('dark');document.documentElement.style.colorScheme='dark';}else{document.documentElement.style.colorScheme='light';}}catch(e){}})();`,
           }}
         />
         {/* PWA launch handoff, before paint for the same reason as the theme script:

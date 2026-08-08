@@ -12,14 +12,6 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-// Theme that suits the current time of day: dark in the evening/night
-// (7 PM – 7 AM), light through the day. Used as the default when the user
-// hasn't explicitly chosen a theme.
-function getTimeBasedTheme(): Theme {
-  const hour = new Date().getHours();
-  return hour >= 19 || hour < 7 ? 'dark' : 'light';
-}
-
 // Reflect the chosen theme onto <html> (class + color-scheme). Pure DOM, no React
 // state, so it lives at module scope.
 function applyTheme(newTheme: Theme) {
@@ -44,24 +36,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       setThemeState(saved);
       applyTheme(saved);
     } else {
-      // No saved choice → follow the time of day.
-      const initialTheme = getTimeBasedTheme();
-      setThemeState(initialTheme);
-      applyTheme(initialTheme);
+      // No saved choice → default to light.
+      setThemeState('light');
+      applyTheme('light');
     }
     setMounted(true);
-
-    // Keep the time-based theme live for users who haven't picked one manually,
-    // so the app shifts to dark in the evening and back to light in the morning
-    // without a reload. A manual toggle (saved in localStorage) disables this.
-    const intervalId = setInterval(() => {
-      if (localStorage.getItem('theme')) return; // manual choice in effect
-      const next = getTimeBasedTheme();
-      applyTheme(next);
-      setThemeState(next); // no-op re-render if unchanged
-    }, 60 * 1000);
-
-    return () => clearInterval(intervalId);
   }, []);
 
   const setTheme = (newTheme: Theme) => {

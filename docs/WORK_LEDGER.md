@@ -159,7 +159,7 @@ through RPCs, never raw table writes. `lib/rate-limit.ts` and `lib/medications/c
 | `lib/telegram.ts` | Failover Telegram sender (raw Bot API fetch; bot-compatible callback_data; no-op for `WEB-*` ids / missing token) |
 | `lib/admin.ts` | `getAdminUser()` — `ADMIN_EMAILS` allowlist, fail closed |
 
-Context: `theme-context` (light/dark, time-of-day default), `ui-mode-context`
+Context: `theme-context` (light/dark, **defaults to light** when nothing is saved), `ui-mode-context`
 (`normal|elderly` + `PATIENT_SELF|PATIENT_MONITOR`, persisted to `view-mode` cookie).
 Hook: `use-realtime-notifications` (realtime `notifications` channel → bell).
 
@@ -183,7 +183,7 @@ out the refill-reminder feature. Guided tours: `components/guide/*` (`TOURS` map
 - *New dashboard page:* `app/(dashboard)/<route>/page.tsx` server component calling `resolveUserData()` with `export const revalidate = 0`. Nav: `getNavItems()` in `components/layout/dashboard-main-layout.tsx` — **exactly 5 icons, hard rule**; secondary pages go in the navbar profile dropdown. Optionally add to `shouldPrefetch()` allowlist and to `isProtectedRoute` in `lib/supabase/middleware.ts` (list synced 07-26 — keep it that way). Optional tour entry in `guide-content.ts`.
 - *Auth flow:* the proxy (`web/src/proxy.ts` — Next 16's renamed `middleware` convention) runs on every page/API route → refreshes session → unauthenticated on protected path → `/login`; no `telegram_chat_id` → `/link-account`. `(dashboard)/layout.tsx` + `resolveUserData()` is the real gate for dashboard pages.
 - *Styling:* semantic tokens (`--primary` pink `#F26B8A`, `--foreground` navy, `--radius 1.75rem`). **Read `docs/DESIGN_SYSTEM.md` before picking a colour** — solid buttons use `--primary-strong`/`--danger-strong` (the base tokens are too light to carry white text: 2.9:1 and 3.55:1), text on a status tint uses the `-strong` variants (`-foreground` is white and vanishes there), and `.floating-bottom` is how root-layout overlays clear the mobile dock; dark mode = `.dark` on `<html>` + compat `!important` layer in globals.css; elderly mode branches classNames via `useUiMode().isElderly`; Care+ surfaces use `lib/billing/luxe.ts` inline styles.
-  - Tailwind's `dark:` variant is bound to that same `.dark` class by `@custom-variant dark (&:where(.dark, .dark *));` in globals.css. **Keep that line** — Tailwind v4 otherwise defaults `dark:` to the OS `prefers-color-scheme`, which the in-app toggle can contradict. Note `<html>` is also `.dark`-classed by the anti-FOUC script in `app/layout.tsx`, which seeds from the OS preference while `theme-context.tsx` defaults to time-of-day — the two disagree on first paint when no theme is saved.
+  - Tailwind's `dark:` variant is bound to that same `.dark` class by `@custom-variant dark (&:where(.dark, .dark *));` in globals.css. **Keep that line** — Tailwind v4 otherwise defaults `dark:` to the OS `prefers-color-scheme`, which the in-app toggle can contradict. Note `<html>` is `.dark`-classed by the anti-FOUC script in `app/layout.tsx` ONLY when a saved `'dark'` choice exists; otherwise it paints light. This is in lockstep with `theme-context.tsx`, which also defaults to light — keep the two matching to avoid a first-paint flash.
 - *PWA:* `app/manifest.ts`; `public/sw.js` is hand-written, push+click only, **no fetch/caching**; registered app-wide by `components/register-sw.tsx` and again in `register-push.ts` (idempotent, intentional).
 
 ---
