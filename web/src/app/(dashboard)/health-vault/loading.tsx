@@ -1,5 +1,5 @@
 import RouteLoading from '@/components/ui/route-loading';
 
 export default function Loading() {
-  return <RouteLoading label="Loading your settings…" />;
+  return <RouteLoading label="Loading your health vault…" />;
 }

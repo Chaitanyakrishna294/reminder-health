@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import Link, { useLinkStatus } from 'next/link';
+import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useUiMode } from '@/context/ui-mode-context';
 import { createClient } from '@/lib/supabase/client';
@@ -23,12 +23,45 @@ import {
   Users
 } from 'lucide-react';
 
-// Spins the tapped nav icon from click until the destination page is ready
-// (useLinkStatus reports the pending state of the nearest ancestor <Link>).
-// See docs/superpowers/specs/2026-07-12-nav-loading-indicator-design.md.
-function NavIcon({ icon: Icon }: { icon: React.ComponentType<{ className?: string }> }) {
-  const { pending } = useLinkStatus();
-  return <Icon className={`w-5 h-5 ${pending ? 'animate-spin' : ''}`} />;
+// The nav icon used to SPIN from tap until the destination was ready
+// (useLinkStatus). On a fast route that was a flicker of rotation; on a slow one a
+// spinner on the thing you just pressed reads as "something is wrong". It is replaced
+// by a press animation: a quick squash-and-overshoot that confirms the tap landed and
+// then settles, with no relationship to how long the route takes.
+//
+// The class is removed on animationend rather than left on the node, so a second tap
+// re-triggers it — CSS animations do not restart while the class is still applied.
+function NavIcon({
+  icon: Icon,
+  size = 'w-5 h-5',
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  size?: string;
+}) {
+  const [tapped, setTapped] = useState(false);
+
+  // Cleared on a timer rather than on `animationend`. That event is not guaranteed to
+  // arrive: it never fires if the tab is backgrounded while the animation is pending
+  // (frames stop compositing), if the icon unmounts on navigation, or if the animation
+  // is cancelled. Any of those would leave the class stuck on the node, and a CSS
+  // animation will not restart while its class is still applied — so the next tap
+  // would do nothing.
+  React.useEffect(() => {
+    if (!tapped) return;
+    const t = setTimeout(() => setTapped(false), 340);
+    return () => clearTimeout(t);
+  }, [tapped]);
+
+  // The handler sits on a wrapper because the lucide icon components accept only
+  // `className`. The wrapper is what animates; the icon stays a plain icon.
+  return (
+    <span
+      className={`inline-flex ${tapped ? 'nav-icon-tap' : ''}`}
+      onPointerDown={() => setTapped(true)}
+    >
+      <Icon className={size} />
+    </span>
+  );
 }
 
 export default function DashboardMainLayout({
@@ -159,8 +192,13 @@ export default function DashboardMainLayout({
     ];
 
     if (viewMode === 'PATIENT_MONITOR') {
-      // Hide medications in monitoring view
-      return baseItems.filter(item => item.href !== '/medications');
+      // Monitoring is a focused, read-only view of ONE patient. It used to hide only
+      // Medications, leaving Care Circle / Vault / Settings in the dock — all of which
+      // are the caregiver's OWN pages, so tapping them mid-monitoring silently changed
+      // whose data you were looking at. Only the monitor dashboard remains; leaving
+      // the mode goes through the banner's "Return to My Dashboard", which also writes
+      // the audit log entry that a plain nav tap would skip.
+      return baseItems.filter(item => item.href === '/dashboard');
     }
     return baseItems;
   };
@@ -247,7 +285,7 @@ export default function DashboardMainLayout({
               aria-label={item.label}
               aria-current={active ? 'page' : undefined}
             >
-              <span><NavIcon icon={item.icon} /></span>
+              <NavIcon icon={item.icon} size={isElderly ? 'w-7 h-7' : 'w-5 h-5'} />
               {!isElderly && (
                 <span className="absolute left-20 scale-0 group-hover:scale-100 transition-all duration-200 bg-foreground text-background text-xs font-bold px-2.5 py-1 rounded shadow-sm pointer-events-none whitespace-nowrap z-50 font-mono">
                   {item.label}
@@ -290,7 +328,7 @@ export default function DashboardMainLayout({
               aria-label={item.label}
               aria-current={active ? 'page' : undefined}
             >
-              <span className={isElderly ? "text-2xl" : "text-lg"}><NavIcon icon={item.icon} /></span>
+              <NavIcon icon={item.icon} size={isElderly ? 'w-7 h-7' : 'w-5 h-5'} />
             </Link>
           );
         })}
