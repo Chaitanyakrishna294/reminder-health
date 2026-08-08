@@ -813,14 +813,22 @@ const initCommands = () => {
         }
 
         if (state.step === STATES.DRUG_NAME) {
-          state.drug_name = text;
+          // Trim + cap length: this string is stored and later rendered on the patient's
+          // web dashboard AND their caregiver's, so bound it defensively (React escapes,
+          // but an unbounded name is still a storage/DoS smell).
+          const drugName = text.trim().slice(0, 100);
+          if (!drugName) {
+            await bot.sendMessage(chatId, `⚠️ Please enter a medication name.`);
+            return;
+          }
+          state.drug_name = drugName;
           state.step = STATES.DOSAGE;
           await bot.sendMessage(chatId, `Got it. What is the dosage for ${state.drug_name}? (e.g., 500mg)`);
           return;
         }
 
         if (state.step === STATES.DOSAGE) {
-          state.dosage = text;
+          state.dosage = text.trim().slice(0, 60);
           state.step = 'waiting_for_freq';
           const inlineKeyboard = {
             inline_keyboard: [
@@ -883,8 +891,14 @@ const initCommands = () => {
 
         if (state.step === STATES.EDIT_FIELD) {
            let updateData = {};
-           if (state.field === 'name') updateData = { drug_name: text };
-           if (state.field === 'dosage') updateData = { dosage: text };
+           // Same defensive caps as the add-medication flow (these strings render on the
+           // patient's and their caregiver's web dashboards): trim + bound the length.
+           if (state.field === 'name') {
+             const drugName = text.trim().slice(0, 100);
+             if (!drugName) return bot.sendMessage(chatId, `⚠️ Please enter a medication name.`);
+             updateData = { drug_name: drugName };
+           }
+           if (state.field === 'dosage') updateData = { dosage: text.trim().slice(0, 60) };
            if (state.field === 'stock') {
              const count = parseInt(text);
              if (isNaN(count) || count < 0) return bot.sendMessage(chatId, `⚠️ Invalid stock.`);
