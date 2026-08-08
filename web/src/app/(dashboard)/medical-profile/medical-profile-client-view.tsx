@@ -228,7 +228,7 @@ export default function MedicalProfileClientView({ userId, fullName, email, init
         </div>
         <label className="flex items-center justify-between gap-3 cursor-pointer rounded-xl bg-muted/30 border border-border/80 p-3">
           <span className={`font-semibold text-foreground ${isElderly ? 'text-base' : 'text-sm'}`}>
-            Show my photo to connected caregivers
+            Show my photo to my care circle
           </span>
           <input
             type="checkbox"

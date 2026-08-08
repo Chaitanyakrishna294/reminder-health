@@ -189,6 +189,38 @@ export default async function CareCirclePage() {
   const liveICareFor = peopleICareFor.filter(isLiveConnection);
   const liveCaringForMe = peopleCaringForMe.filter(isLiveConnection);
 
+  // Caregiver photos for the "people caring for me" list, gated on each caregiver's
+  // own share toggle — the same flag that shows a patient's photo to caregivers,
+  // broadened by product decision to mean "my care circle", both directions.
+  const caregiverAvatars: Record<string, string> = {};
+  const cgIds = peopleCaringForMe
+    .map((c: any) => c.caregiver_chat_id)
+    .filter((id: any): id is string => Boolean(id));
+  if (cgIds.length > 0) {
+    try {
+      const adminCg = createServiceClient();
+      const { data: cgProfs } = await adminCg
+        .from('profiles').select('id, telegram_chat_id').in('telegram_chat_id', cgIds);
+      if (cgProfs?.length) {
+        const byUser = new Map(cgProfs.map(p => [p.id, p.telegram_chat_id]));
+        const { data: cgMps } = await adminCg
+          .from('medical_profiles')
+          .select('user_id, avatar_path, share_photo_with_caregivers')
+          .in('user_id', cgProfs.map(p => p.id));
+        for (const mp of cgMps ?? []) {
+          if (!mp.avatar_path || mp.share_photo_with_caregivers === false) continue;
+          const tid = byUser.get(mp.user_id);
+          if (!tid) continue;
+          const { data: signed } = await adminCg.storage
+            .from('avatars').createSignedUrl(mp.avatar_path, 600);
+          if (signed?.signedUrl) caregiverAvatars[tid] = signed.signedUrl;
+        }
+      }
+    } catch (err) {
+      console.error('Failed to resolve caregiver avatars:', err);
+    }
+  }
+
   return (
     <div className="max-w-5xl mx-auto space-y-10 font-sans">
       
@@ -260,8 +292,13 @@ export default async function CareCirclePage() {
                 className="bg-card border border-border rounded-2xl p-5 flex justify-between items-center shadow-sm"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold border border-primary/20 text-sm">
-                    {conn.resolved_name?.substring(0, 2).toUpperCase() || 'CG'}
+                  <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold border border-primary/20 text-sm overflow-hidden">
+                    {conn.caregiver_chat_id && caregiverAvatars[conn.caregiver_chat_id] ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={caregiverAvatars[conn.caregiver_chat_id]} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                    conn.resolved_name?.substring(0, 2).toUpperCase() || 'CG'
+                    )}
                   </div>
                   <div>
                     <h3 className="font-bold text-foreground text-sm">{conn.resolved_name}</h3>

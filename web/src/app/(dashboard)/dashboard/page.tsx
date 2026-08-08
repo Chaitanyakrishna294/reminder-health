@@ -193,14 +193,16 @@ export default async function DashboardPage() {
   // Photos for the Care Circle card, keyed by telegram id.
   //
   // The avatars bucket is owner-only, so a URL for somebody else has to be minted with
-  // the service client — and only where that person left `share_photo_with_caregivers`
-  // on. Patients only: that flag means "show my photo TO my caregivers", so it does not
-  // authorise the reverse. There is no consent flag covering a caregiver's photo being
-  // shown to their patient, so those render as initials rather than inventing one.
+  // the service client — and only where that person left the share toggle on. The flag
+  // now covers BOTH directions by product decision (2026-08-09): the Medical Profile
+  // toggle reads "Show my photo to my care circle", and it governs a patient's photo
+  // shown to caregivers AND a caregiver's photo shown to their patients. One switch,
+  // one meaning; the column name predates the broadening.
   const careCircleAvatars: Record<string, string> = {};
-  const patientIds = peopleICareFor
-    .map(c => c.patient_telegram_id)
-    .filter((id): id is string => Boolean(id));
+  const patientIds = [
+    ...peopleICareFor.map(c => c.patient_telegram_id),
+    ...peopleCaringForMe.map(c => c.caregiver_chat_id),
+  ].filter((id): id is string => Boolean(id));
   if (patientIds.length > 0) {
     try {
       const admin = createServiceClient();

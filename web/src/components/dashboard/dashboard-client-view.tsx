@@ -1569,7 +1569,11 @@ export default function DashboardClientView({
             role: isPatient
               ? patientRoleLabel(conn.relationship_type)
               : caregiverRoleLabel(conn.relationship_type),
-            photo: isPatient ? careCircleAvatars[conn.patient_telegram_id] : undefined,
+            // Both directions now: the Medical Profile toggle reads "show my photo to
+            // my care circle" and covers caregiver photos shown to patients too.
+            photo: isPatient
+              ? careCircleAvatars[conn.patient_telegram_id]
+              : careCircleAvatars[conn.caregiver_chat_id],
           });
 
           const members: Member[] = isDual
