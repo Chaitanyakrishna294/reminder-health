@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useUiMode } from '@/context/ui-mode-context';
-import { Eye, EyeOff, User, Mail, Lock, AlertTriangle } from 'lucide-react';
+import { Eye, EyeOff, User, Mail, Lock, AlertTriangle, KeyRound } from 'lucide-react';
 import Turnstile, { captchaEnabled } from '@/components/turnstile';
 
 export default function RegisterPage() {
@@ -18,6 +18,7 @@ export default function RegisterPage() {
   const [success, setSuccess] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [agreed, setAgreed] = useState(false);
+  const [code, setCode] = useState('');
 
   const router = useRouter();
   const supabase = createClient();
@@ -40,10 +41,12 @@ export default function RegisterPage() {
       email,
       password,
       options: {
+        // No emailRedirectTo → Supabase sends the {{ .Token }} confirmation CODE instead of a
+        // link (requires the "Confirm signup" email template to include {{ .Token }}). A typed
+        // code avoids the link/PKCE/in-app-browser problem, same as the login flow.
         data: {
           full_name: fullName,
         },
-        emailRedirectTo: `${window.location.origin}/api/auth/callback?next=/link-account`,
         captchaToken: captchaToken ?? undefined,
       },
     });
@@ -55,7 +58,7 @@ export default function RegisterPage() {
     }
 
     setLoading(false);
-    // If confirmation is required, show verification prompt. If not, auto-logged in.
+    // If confirmation is required, show the code entry. If not, the account is already active.
     if (data.session) {
       router.refresh();
       router.push('/link-account');
@@ -64,28 +67,104 @@ export default function RegisterPage() {
     }
   };
 
-  if (success) {
-    return (
-      <div className={`space-y-6 text-center transition-all duration-300 ${isElderly ? 'max-w-2xl space-y-8' : ''}`}>
-        <div className="inline-flex items-center justify-center w-12 h-12 bg-success/10 text-success rounded-full">
-          <Mail className="w-6 h-6" />
-        </div>
-        <h2 className={`font-bold text-foreground ${isElderly ? 'text-2xl' : 'text-xl'}`}>Verify Your Email</h2>
-        <p className={`text-muted-foreground ${isElderly ? 'text-lg mt-2' : 'text-sm'}`}>
-          We have sent a verification email to <b>{email}</b>.<br />
-          Please click the link in the email to activate your account and set up your Telegram link.
-        </p>
-        <div className="pt-4">
-          <Link href="/login" className={`font-semibold text-primary hover:underline ${isElderly ? 'text-lg' : 'text-sm'}`}>
-            Back to Sign In
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  const handleVerifyCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const token = code.trim();
+    if (token.length < 6) {
+      setError('Enter the 6-digit code from your email.');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+
+    // type 'signup' confirms the account created by signUp; on success the session is stored
+    // client-side and the proxy sees the user on the next navigation.
+    const { error: verifyErr } = await supabase.auth.verifyOtp({ email, token, type: 'signup' });
+
+    if (verifyErr) {
+      const m = (verifyErr.message || '').toLowerCase();
+      setError(
+        m.includes('expired') || m.includes('invalid')
+          ? 'That code is invalid or expired. Tap "Resend code" for a fresh one.'
+          : verifyErr.message
+      );
+      setLoading(false);
+    } else {
+      router.refresh();
+      router.push('/link-account');
+    }
+  };
+
+  const handleResendCode = async () => {
+    setLoading(true);
+    setError(null);
+    const { error: resendErr } = await supabase.auth.resend({ type: 'signup', email });
+    setLoading(false);
+    if (resendErr) setError(resendErr.message);
+  };
 
   const inputClass = `w-full pl-11 pr-4 rounded-2xl bg-white border border-border text-foreground shadow-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all ${isElderly ? 'py-4 text-lg' : 'py-3.5 text-sm'}`;
   const iconClass = 'absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none w-4 h-4';
+
+  if (success) {
+    return (
+      <div className={`space-y-5 ${isElderly ? 'max-w-2xl' : ''}`}>
+        {error && (
+          <div className="bg-danger/10 text-danger text-sm p-3 rounded-2xl border border-danger/20 flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /> <span>{error}</span>
+          </div>
+        )}
+
+        <div className="text-center space-y-2">
+          <div className="inline-flex items-center justify-center w-12 h-12 bg-success/10 text-success rounded-full">
+            <Mail className="w-6 h-6" />
+          </div>
+          <h2 className={`font-bold text-foreground ${isElderly ? 'text-2xl' : 'text-xl'}`}>Enter your code</h2>
+          <p className={`text-muted-foreground ${isElderly ? 'text-lg' : 'text-sm'}`}>
+            We emailed a 6-digit code to <b>{email}</b>. Enter it below to activate your account.
+            <br /><span className="text-xs">(Check your spam folder if you don&apos;t see it.)</span>
+          </p>
+        </div>
+
+        <form onSubmit={handleVerifyCode} className="space-y-3">
+          <div className="relative">
+            <KeyRound className={iconClass} />
+            <input
+              id="reg-code"
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              required
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+              className={`${inputClass} text-center font-mono tracking-[0.4em]`}
+              placeholder="000000"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            style={{ background: 'linear-gradient(180deg, #F8839E 0%, #F26B8A 100%)' }}
+            className={`w-full flex justify-center rounded-2xl shadow-md font-black text-white hover:brightness-[0.97] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 transition-all active:scale-[0.98] cursor-pointer ${isElderly ? 'py-4 text-xl' : 'py-3.5 text-base'}`}
+          >
+            {loading ? 'Verifying…' : 'Verify & Continue'}
+          </button>
+
+          <div className="flex items-center justify-center gap-3 text-xs text-muted-foreground">
+            <button type="button" disabled={loading} onClick={handleResendCode} className="hover:text-primary disabled:opacity-50 transition-colors cursor-pointer">
+              Resend code
+            </button>
+            <span>·</span>
+            <Link href="/login" className="hover:text-primary transition-colors">
+              Back to Sign In
+            </Link>
+          </div>
+        </form>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
