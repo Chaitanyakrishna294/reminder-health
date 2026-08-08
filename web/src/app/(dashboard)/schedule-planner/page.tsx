@@ -16,28 +16,21 @@ import {
   Grid3x3,
   Minus,
   GripVertical,
+  Info,
 } from 'lucide-react';
 import { useUiMode } from '@/context/ui-mode-context';
 import { createClient } from '@/lib/supabase/client';
 import {
   type OverrideEntry,
-  findOverride,
   parseTimeToMinutes,
   toOverrideDateStr,
 } from '@/lib/schedule/dose-engine';
 import { PRIORITY, TONE_VAR, priorityMeta } from '@/lib/design/semantics';
+import { fetchDoseHistory, dosesForDate, type DayDose, type DoseHistory } from '@/lib/schedule/day-doses';
 
-interface ScheduledMed {
-  id: number;
-  drug_name: string;
-  dosage: string;
-  frequency: string;
-  time: string;
-  priority_level: string;
-  isOverridden?: boolean;
-  overriddenTime?: string;
-  isSkipped?: boolean;
-}
+// One definition of a dose, shared with the Medications page (lib/schedule/day-doses).
+type ScheduledMed = DayDose;
+
 
 const HOUR_HEIGHT = 64; // px per hour on the timeline rail
 
@@ -94,12 +87,14 @@ interface DoseCardProps {
   setDragging: (v: null) => void;
   /** Below sm the card stacks into two rows so the medication name stays legible. */
   narrow: boolean;
+  /** Past doses open a read-only detail instead of the adjust controls. */
+  openDetail: (med: ScheduledMed) => void;
 }
 
 function DoseCard({
   med, groupMinutes, canEdit, dragging,
   openOverride, handleRemoveOverride,
-  startDrag, onDragMove, endDrag, setDragging, narrow,
+  startDrag, onDragMove, endDrag, setDragging, narrow, openDetail,
 }: DoseCardProps) {
   const isDraggingThis = dragging?.medId === med.id;
   const accent = med.isSkipped ? 'var(--muted-foreground)' : priorityColor(med.priority_level);
@@ -140,6 +135,22 @@ function DoseCard({
 
   const statusAndTime = (
     <>
+      {/* On a past day this is a record, so it states what happened. Never colour
+          alone — the word carries the meaning, the tint only reinforces it. */}
+      {med.outcome && (
+        <span
+          className={
+            'shrink-0 text-[11px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 ' +
+            (med.outcome === 'TAKEN'
+              ? 'bg-success/15 text-success-strong'
+              : med.outcome === 'SKIP'
+                ? 'bg-warning/15 text-warning-strong'
+                : 'bg-danger/15 text-danger-strong')
+          }
+        >
+          {med.outcome === 'TAKEN' ? 'Taken' : med.outcome === 'SKIP' ? 'Skipped' : 'Missed'}
+        </span>
+      )}
       {/* "skip"/"adj" at 8px were closer to noise than labels. Spelled out, at a size
           that survives a phone at arm's length. */}
       {med.isSkipped && (
@@ -171,7 +182,20 @@ function DoseCard({
   // These were 24px AND `opacity-0 group-hover:opacity-100` — a hover-only control on a
   // screen most people use on a phone, i.e. no way to reach "move this dose" or "skip
   // today" at all by touch. Always visible, 44px.
-  const editControls = canEdit ? (
+  // A logged dose is a record. There is nothing to reschedule about yesterday, so the
+  // adjust/skip controls give way to a detail view of what was actually taken.
+  const editControls = med.outcome ? (
+    <div className="shrink-0 flex items-center gap-1">
+      <button
+        onClick={() => openDetail(med)}
+        className="inline-flex items-center justify-center w-11 h-11 rounded-full text-foreground/70 bg-muted hover:bg-accent-surface transition-all cursor-pointer"
+        title={`Details for ${med.drug_name}`}
+        aria-label={`See details for the ${med.drug_name} dose`}
+      >
+        <Info className="w-4 h-4" strokeWidth={2.5} />
+      </button>
+    </div>
+  ) : canEdit ? (
     <div className="shrink-0 flex items-center gap-1">
       {med.isOverridden || med.isSkipped ? (
         <button
@@ -242,6 +266,16 @@ export default function SchedulePlannerPage() {
   const [newOverrideTime, setNewOverrideTime] = useState('');
   const [skipForToday, setSkipForToday] = useState(false);
   const [patientName, setPatientName] = useState<string | null>(null);
+  // Whose schedule is on screen — the signed-in user, or the patient a caregiver is
+  // viewing. Held in state because the history query below needs it outside the
+  // effect that resolves it.
+  const [scheduleChatId, setScheduleChatId] = useState<string | null>(null);
+  // What ACTUALLY happened, keyed by day. The planner only ever projected
+  // `reminder_times` forward, so past days showed a hypothetical schedule rather than
+  // the doses that were really taken, skipped or missed.
+  const [pastDoses, setPastDoses] = useState<DoseHistory>({});
+  // Read-only detail for a dose that has already happened.
+  const [detailMed, setDetailMed] = useState<ScheduledMed | null>(null);
   const [now, setNow] = useState<Date>(new Date());
   const railRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1.0);
@@ -351,6 +385,8 @@ export default function SchedulePlannerPage() {
           setMedications(meds || []);
         }
 
+        setScheduleChatId(targetChatId);
+
         const storageKey = 'schedule-overrides-' + user.id;
         const savedOverrides = localStorage.getItem(storageKey);
         if (savedOverrides) {
@@ -374,36 +410,8 @@ export default function SchedulePlannerPage() {
     });
   };
 
-  const getMedicationsForDate = (date: Date): ScheduledMed[] => {
-    const dateStr = toOverrideDateStr(date);
-
-    // Every active medication has a dose on every day: the reminder engine
-    // (src/utils.js calculateNextReminder) expands `reminder_times` daily and does
-    // NOT honor every_other_day/weekly, so those frequencies actually fire daily.
-    // The planner shows what truly happens rather than a recurrence the engine
-    // never follows. (Real recurrence support is a separate engine feature — see
-    // docs/KNOWN_ISSUES.md §3.)
-    return medications
-      .flatMap((med) => {
-        return (med.reminder_times || []).map((timeStr: string) => {
-          const medOverride = findOverride(overrides, med.id, dateStr);
-          const result: ScheduledMed = {
-            id: med.id,
-            drug_name: med.drug_name,
-            dosage: med.dosage,
-            frequency: med.frequency,
-            time: medOverride?.overriddenTime || timeStr,
-            priority_level: med.priority_level,
-            isOverridden: !!medOverride?.overriddenTime,
-            overriddenTime: medOverride?.overriddenTime,
-            isSkipped: medOverride?.isSkipped || false,
-          };
-          return result;
-        });
-      })
-      .sort((a, b) => (parseTimeToMinutes(a.time) ?? 0) - (parseTimeToMinutes(b.time) ?? 0))
-      .filter((med, idx, arr) => arr.findIndex(m => m.id === med.id && m.time === med.time) === idx);
-  };
+  const getMedicationsForDate = (date: Date): ScheduledMed[] =>
+    dosesForDate(date, { medications, overrides, history: pastDoses });
 
   const weekDays = useMemo(() => {
     const start = new Date(selectedDate);
@@ -414,6 +422,24 @@ export default function SchedulePlannerPage() {
       return d;
     });
   }, [selectedDate]);
+
+  // Real dose history for the week on screen, refetched as you page through weeks.
+  // drug_name_snapshot is selected alongside the join so a dose logged against a
+  // medication you have since deleted still shows WHAT was taken, not a blank.
+  useEffect(() => {
+    if (!scheduleChatId || weekDays.length === 0) return;
+    const from = new Date(weekDays[0]);
+    from.setHours(0, 0, 0, 0);
+    const to = new Date(weekDays[weekDays.length - 1]);
+    to.setHours(23, 59, 59, 999);
+
+    let cancelled = false;
+    (async () => {
+      const grouped = await fetchDoseHistory(supabase, scheduleChatId, from, to);
+      if (!cancelled) setPastDoses(grouped);
+    })();
+    return () => { cancelled = true; };
+  }, [scheduleChatId, weekDays, supabase]);
 
   const shiftWeek = (dir: number) => {
     const d = new Date(selectedDate);
@@ -911,7 +937,8 @@ export default function SchedulePlannerPage() {
                       <DoseCard
                         med={med}
                         groupMinutes={medMins}
-                        canEdit={canEdit}
+                        canEdit={canEdit && !med.outcome}
+                        openDetail={setDetailMed}
                         dragging={dragging}
                         openOverride={openOverride}
                         handleRemoveOverride={handleRemoveOverride}
@@ -1006,6 +1033,89 @@ export default function SchedulePlannerPage() {
       </div>
 
       {/* Override modal */}
+      {/* Read-only detail for a dose that already happened. Deliberately separate from
+          the Adjust modal: that one changes the future, this one reports the past. */}
+      {detailMed && (
+        <div
+          className="fixed inset-0 bg-foreground/40 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+          onClick={() => setDetailMed(null)}
+          role="presentation"
+        >
+          <div
+            className="bg-card rounded-[22px] max-w-md w-full p-6 space-y-4 border border-border"
+            style={{ boxShadow: CARD_SHADOW }}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Details for ${detailMed.drug_name}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[11px] uppercase tracking-widest font-semibold text-muted-foreground">Dose record</p>
+                <h3 className="text-base font-bold tracking-tight text-foreground mt-0.5 break-words">{detailMed.drug_name}</h3>
+                <p className="text-[11px] font-semibold text-primary-strong mt-0.5">{selectedDateLong}</p>
+              </div>
+              <button
+                onClick={() => setDetailMed(null)}
+                aria-label="Close details"
+                className="shrink-0 w-11 h-11 rounded-full flex items-center justify-center bg-muted hover:bg-accent-surface text-foreground transition-all cursor-pointer"
+              >
+                <X className="w-4 h-4" strokeWidth={2.5} />
+              </button>
+            </div>
+
+            <dl className="space-y-2.5">
+              <div className="flex items-start justify-between gap-4">
+                <dt className="text-[11px] font-semibold text-muted-foreground shrink-0">Outcome</dt>
+                <dd className="text-[12px] font-bold text-foreground text-right">
+                  {detailMed.outcome === 'TAKEN' ? 'Taken' : detailMed.outcome === 'SKIP' ? 'Skipped' : 'Missed'}
+                </dd>
+              </div>
+              <div className="flex items-start justify-between gap-4">
+                <dt className="text-[11px] font-semibold text-muted-foreground shrink-0">Scheduled for</dt>
+                <dd className="text-[12px] font-bold text-foreground text-right">{formatTimeLabel(detailMed.time)}</dd>
+              </div>
+              {detailMed.respondedAt && (
+                <div className="flex items-start justify-between gap-4">
+                  <dt className="text-[11px] font-semibold text-muted-foreground shrink-0">Answered at</dt>
+                  <dd className="text-[12px] font-bold text-foreground text-right">
+                    {new Date(detailMed.respondedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </dd>
+                </div>
+              )}
+              {detailMed.dosage && detailMed.dosage !== 'N/A' && (
+                <div className="flex items-start justify-between gap-4">
+                  <dt className="text-[11px] font-semibold text-muted-foreground shrink-0">Dose</dt>
+                  <dd className="text-[12px] font-bold text-foreground text-right break-words">{detailMed.dosage}</dd>
+                </div>
+              )}
+              {detailMed.linkedBrandName && (
+                <div className="flex items-start justify-between gap-4">
+                  <dt className="text-[11px] font-semibold text-muted-foreground shrink-0">Linked medicine</dt>
+                  <dd className="text-[12px] font-bold text-foreground text-right break-words">{detailMed.linkedBrandName}</dd>
+                </div>
+              )}
+              {detailMed.medicationReason && (
+                <div className="flex items-start justify-between gap-4">
+                  <dt className="text-[11px] font-semibold text-muted-foreground shrink-0">Reason</dt>
+                  <dd className="text-[12px] font-bold text-foreground text-right break-words">{detailMed.medicationReason}</dd>
+                </div>
+              )}
+            </dl>
+
+            {detailMed.isDeleted && (
+              /* Say plainly what is missing and why, rather than showing a detail panel
+                 with blanks where the reason and linked medicine would be. */
+              <p className="text-[11px] font-semibold text-muted-foreground leading-relaxed border-t border-border pt-3">
+                This medication has been deleted. The dose itself is kept, but its dose
+                amount, linked medicine and reason lived on the medication and are gone —
+                only the name and the times were preserved.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
       {showOverrideModal && selectedMedForOverride && (
         <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
           <div className="bg-white rounded-[22px] max-w-md w-full p-6 space-y-5" style={{ boxShadow: '0 8px 40px rgba(16, 28, 90, 0.18)' }}>

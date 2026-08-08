@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { addStock } from '@/lib/medications/add-stock';
 import { calculateNextReminder } from '@/lib/medication-utils';
 import { useUiMode } from '@/context/ui-mode-context';
-import { Plus, Package, Clock, Pause, Play, SquarePen, Trash2, Pill, X, ChevronDown, Search, Calendar } from 'lucide-react';
+import { Plus, Package, Clock, Pause, Play, SquarePen, Trash2, Pill, X, ChevronDown, Search, Calendar, ChevronLeft, ChevronRight, Info } from 'lucide-react';
 import GuideButton from '@/components/guide/guide-button';
 import GuideAutoStart from '@/components/guide/guide-auto-start';
 import { getUnitIcon } from '@/components/ui/custom-icons';
@@ -17,6 +17,8 @@ import { isLowStock as lowStockOf } from '@/lib/medications/stock';
 import { EmptyState } from '@/components/ui/empty-state';
 import { iconButtonClasses } from '@/components/ui/button';
 import { searchMedicationCatalog, type CatalogSearchResult } from '@/lib/medications/catalog';
+import { fetchDoseHistory, dosesForDate, weekOf, type DayDose, type DoseHistory } from '@/lib/schedule/day-doses';
+import { toOverrideDateStr } from '@/lib/schedule/dose-engine';
 
 export interface Medication {
   id: number;
@@ -69,6 +71,12 @@ export default function MedicationList({
   // finds a medication you already track can also find one you don't yet.
   const [catalogResults, setCatalogResults] = useState<CatalogSearchResult[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
+  // Day view. `null` means "show my medication list", which stays the page's default
+  // job — picking a day switches the panel below to that day's doses.
+  const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+  const [weekAnchor, setWeekAnchor] = useState<Date>(new Date());
+  const [dayHistory, setDayHistory] = useState<DoseHistory>({});
+
   const [loadingId, setLoadingId] = useState<number | null>(null);
   const [stockBusyId, setStockBusyId] = useState<number | null>(null);
 
@@ -262,6 +270,29 @@ export default function MedicationList({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
 
+  const weekDays = React.useMemo(() => weekOf(weekAnchor), [weekAnchor]);
+
+  // Fetched per WEEK, not per selected day. Gating it on selection was wrong: the
+  // strip prints a dose count on every day, and without history a past day shows its
+  // projection — "2 doses" on a day that actually recorded one. The count has to be
+  // the real one before it is shown, not after you tap it.
+  useEffect(() => {
+    if (!targetTelegramChatId || weekDays.length === 0) return;
+    const from = new Date(weekDays[0]); from.setHours(0, 0, 0, 0);
+    const to = new Date(weekDays[weekDays.length - 1]); to.setHours(23, 59, 59, 999);
+    let cancelled = false;
+    (async () => {
+      const grouped = await fetchDoseHistory(supabase, targetTelegramChatId, from, to);
+      if (!cancelled) setDayHistory(grouped);
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetTelegramChatId, weekDays]);
+
+  const dosesForSelectedDay: DayDose[] = selectedDay
+    ? dosesForDate(selectedDay, { medications: meds.filter(m => m.active), history: dayHistory })
+    : [];
+
   const activeMeds = meds.filter(m => m.active);
   const pausedMeds = meds.filter(m => !m.active);
   // With nothing paused there are no tabs, so the filter must not hide anything.
@@ -346,7 +377,7 @@ export default function MedicationList({
       {/* One box, two jobs: filter what you already take, and look the rest up in the
           real medicine directory. Always shown, because searching the directory is
           useful even with an empty list. */}
-      {activeRole !== 'CAREGIVER' && (
+      {!selectedDay && activeRole !== 'CAREGIVER' && (
         <div className="space-y-3">
           <div className="relative">
             <Search className={`absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none shrink-0 ${isElderly ? 'w-5 h-5' : 'w-4 h-4'}`} />
@@ -416,8 +447,127 @@ export default function MedicationList({
         </div>
       )}
 
+      {/* Week strip. It SELECTS a day — the same thing this control does on the
+          planner — rather than navigating somewhere. A day-picker that teleports would
+          mean one control with two meanings depending on the page it sits on.
+          Tapping the selected day again returns to the medication list.
+
+          Client-only, deliberately. Every label here is locale- and timezone-derived
+          (`toLocaleDateString`, and "today" itself), so server-rendering it produced
+          "Aug 2" on the server against "2 Aug" in the browser and React threw a
+          hydration mismatch. A reserved-height placeholder keeps the page from
+          jumping when the real strip arrives. */}
+      {!mounted ? (
+        <div className="bg-card rounded-[22px] border border-border p-2 sm:p-4 shadow-sm h-[136px] sm:h-[150px]" aria-hidden />
+      ) : (
+      <div className="bg-card rounded-[22px] border border-border p-2 sm:p-4 shadow-sm">
+        <div className="flex items-center justify-between mb-3 gap-2">
+          <button
+            onClick={() => setWeekAnchor(d => { const n = new Date(d); n.setDate(d.getDate() - 7); return n; })}
+            aria-label="Previous week"
+            className="w-11 h-11 shrink-0 rounded-full flex items-center justify-center bg-muted hover:bg-accent-surface text-foreground transition-all cursor-pointer"
+          >
+            <ChevronLeft className="w-4 h-4" strokeWidth={2.5} />
+          </button>
+          <h2 className={`font-bold tracking-tight text-foreground text-center min-w-0 truncate ${isElderly ? 'text-base' : 'text-sm'}`}>
+            {weekDays[0].toLocaleDateString([], { month: 'short', day: 'numeric' })} – {weekDays[6].toLocaleDateString([], { month: 'short', day: 'numeric' })}
+          </h2>
+          <button
+            onClick={() => setWeekAnchor(d => { const n = new Date(d); n.setDate(d.getDate() + 7); return n; })}
+            aria-label="Next week"
+            className="w-11 h-11 shrink-0 rounded-full flex items-center justify-center bg-muted hover:bg-accent-surface text-foreground transition-all cursor-pointer"
+          >
+            <ChevronRight className="w-4 h-4" strokeWidth={2.5} />
+          </button>
+        </div>
+
+        {/* gap-0.5 below sm is not cosmetic: seven buttons across a 375px screen only
+            clear the 44px touch floor once the padding and gaps give the width back. */}
+        <div className="flex gap-0.5 sm:gap-1.5 items-stretch">
+          {weekDays.map((d) => {
+            const dayStr = toOverrideDateStr(d);
+            const isSelected = selectedDay != null && toOverrideDateStr(selectedDay) === dayStr;
+            const isToday = dayStr === toOverrideDateStr(new Date());
+            const count = dosesForDate(d, { medications: meds.filter(m => m.active), history: dayHistory }).length;
+            return (
+              <button
+                key={dayStr}
+                onClick={() => setSelectedDay(isSelected ? null : d)}
+                aria-pressed={isSelected}
+                aria-label={`${d.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}, ${count} ${count === 1 ? 'dose' : 'doses'}`}
+                /* Matches the Schedule Planner's strip: -9deg skew, a 7px radius rather
+                   than a soft pill, and the selected tab growing and lifting out of the
+                   row. Tokens instead of the planner's hardcoded hexes so it survives
+                   dark mode. */
+                className={
+                  /* No min-width, matching the planner. Seven 44px tiles need more
+                     than a 375px row has, so a floor here left flex-grow no slack and
+                     every tile stayed the same size — the selected tab could not
+                     expand. Unselected tiles now shrink below 44px on a narrow screen;
+                     the selected one is always well over it. */
+                  'group relative cursor-pointer rounded-[7px] ' +
+                  (isSelected
+                    ? 'bg-gradient-to-b from-[#CC3D64] to-[#B52A52] text-white z-10'
+                    : isToday
+                      ? 'bg-primary-soft text-foreground'
+                      : 'bg-muted text-foreground hover:bg-accent-surface')
+                }
+                style={{
+                  flexGrow: isSelected ? 2.1 : 1,
+                  flexBasis: 0,
+                  // A flex item defaults to min-width:auto, which refuses to shrink
+                  // below its own text. With seven nowrap tiles that consumed the whole
+                  // row, so flex-grow had nothing left to distribute and every tile
+                  // rendered identically. This is the line that lets the tab expand.
+                  minWidth: 0,
+                  transform: `skewX(-9deg)${isSelected ? ' translateY(-5px)' : ''}`,
+                  boxShadow: isSelected ? '0 14px 26px rgba(242, 107, 138, 0.45)' : '0 0 0 rgba(242, 107, 138, 0)',
+                  willChange: 'flex-grow, transform',
+                  transitionProperty: 'flex-grow, transform, background-color, box-shadow',
+                  transitionDuration: '650ms',
+                  transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
+                }}
+              >
+                <span
+                  className={'flex flex-col items-center justify-center ' + (isSelected ? 'gap-1 py-3.5' : 'gap-1.5 py-3')}
+                  style={{
+                    transform: 'skewX(9deg)',
+                    transitionProperty: 'gap, padding',
+                    transitionDuration: '650ms',
+                    transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
+                  }}
+                >
+                  <span
+                    className={
+                      'uppercase font-bold tracking-wide whitespace-nowrap ' +
+                      (isSelected ? 'text-[11px] text-white/80' : 'text-[11px] text-muted-foreground')
+                    }
+                  >
+                    {d.toLocaleDateString([], { weekday: 'short' })}
+                  </span>
+                  <span
+                    className={
+                      'font-extrabold leading-none tabular-nums transition-[font-size] duration-[650ms] ease-[cubic-bezier(0.16,1,0.3,1)] ' +
+                      (isSelected ? 'text-2xl' : 'text-base')
+                    }
+                  >
+                    {d.getDate()}
+                  </span>
+                  {isSelected && (
+                    <span className="mt-0.5 text-[11px] font-bold leading-none text-white/85 whitespace-nowrap animate-fade-in">
+                      {count > 0 ? `${count} dose${count > 1 ? 's' : ''}` : 'clear'}
+                    </span>
+                  )}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      )}
+
       {/* Active / Paused tabs — only meaningful once something is paused. */}
-      {pausedMeds.length > 0 && (
+      {!selectedDay && pausedMeds.length > 0 && (
         <div role="tablist" aria-label="Filter medications" className="flex items-center gap-2">
           {([
             ['active', 'Active', activeMeds.length],
@@ -442,8 +592,75 @@ export default function MedicationList({
         </div>
       )}
 
+      {/* Day view. Replaces the list while a day is selected, so the page has one job
+          at a time rather than two stacked answers to "what am I looking at". */}
+      {selectedDay && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className={`font-bold tracking-tight text-foreground ${isElderly ? 'text-lg' : 'text-sm'}`}>
+              {selectedDay.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
+            </h3>
+            <button
+              onClick={() => setSelectedDay(null)}
+              className={`shrink-0 inline-flex items-center justify-center min-h-11 px-4 rounded-full bg-muted text-foreground hover:bg-accent-surface font-semibold transition-all cursor-pointer ${isElderly ? 'text-base' : 'text-[13px]'}`}
+            >
+              Back to all medications
+            </button>
+          </div>
+
+          {dosesForSelectedDay.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border bg-card/60 p-8 text-center">
+              <p className={`font-bold text-foreground ${isElderly ? 'text-base' : 'text-sm'}`}>A clear day</p>
+              <p className={`font-medium text-muted-foreground mt-1 ${isElderly ? 'text-sm' : 'text-xs'}`}>
+                No doses on this day.
+              </p>
+            </div>
+          ) : (
+            <ul className="space-y-2">
+              {dosesForSelectedDay.map((dose, i) => (
+                <li
+                  key={`${dose.id}-${dose.time}-${i}`}
+                  className="flex items-center gap-3 bg-card border border-border rounded-2xl p-3 shadow-sm"
+                >
+                  <span
+                    aria-hidden
+                    className="shrink-0 w-2.5 h-2.5 rounded-full"
+                    style={{ background: `var(--${priorityMeta(dose.priority_level).tone})` }}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className={`block font-bold text-foreground truncate ${isElderly ? 'text-base' : 'text-[13px]'}`}>
+                      {dose.drug_name}
+                    </span>
+                    <span className={`block font-semibold text-muted-foreground truncate ${isElderly ? 'text-sm' : 'text-[11px]'}`}>
+                      {dose.time}
+                      {dose.dosage && dose.dosage !== 'N/A' ? ` · ${dose.dosage}` : ''}
+                      {/* Named plainly: this dose survives only through the log's snapshot. */}
+                      {dose.isDeleted ? ' · deleted medication' : ''}
+                    </span>
+                  </span>
+                  {dose.outcome && (
+                    <span
+                      className={
+                        'shrink-0 text-[11px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 ' +
+                        (dose.outcome === 'TAKEN'
+                          ? 'bg-success/15 text-success-strong'
+                          : dose.outcome === 'SKIP'
+                            ? 'bg-warning/15 text-warning-strong'
+                            : 'bg-danger/15 text-danger-strong')
+                      }
+                    >
+                      {dose.outcome === 'TAKEN' ? 'Taken' : dose.outcome === 'SKIP' ? 'Skipped' : 'Missed'}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
       {/* Cards */}
-      {visibleMeds.length === 0 ? (
+      {selectedDay ? null : visibleMeds.length === 0 ? (
         <EmptyState
           icon={<Pill className={isElderly ? 'w-9 h-9' : 'w-6 h-6'} />}
           title={
