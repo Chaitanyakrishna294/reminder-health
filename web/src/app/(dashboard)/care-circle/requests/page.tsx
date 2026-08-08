@@ -82,12 +82,15 @@ export default function CareCircleRequestsPage() {
         // Resolve patient names
         const patientIds = validRequests.map(r => r.patient_profile_id);
         if (patientIds.length > 0) {
+          // Names via a scoped RPC, not a direct profiles SELECT: the profiles policy now
+          // exposes full rows only to ACCEPTED counterparties, so a PENDING invite can no
+          // longer read the inviter's PII. This RPC returns id+full_name only, and only for
+          // your own connections.
           const { data: profiles } = await supabase
-            .from('profiles')
-            .select('id, full_name')
-            .in('id', patientIds);
+            .rpc('get_connection_counterpart_names', { p_ids: patientIds });
 
-          const nameMap = new Map(profiles?.map(p => [p.id, p.full_name]) || []);
+          const nameRows = (profiles ?? []) as Array<{ id: string; full_name: string }>;
+          const nameMap = new Map(nameRows.map((p) => [p.id, p.full_name] as [string, string]));
 
           setPendingRequests(validRequests.map(r => ({
             ...r,
@@ -118,12 +121,12 @@ export default function CareCircleRequestsPage() {
 
       if (outgoing && outgoing.length > 0) {
         const caregiverIds = outgoing.map(r => r.caregiver_profile_id);
+        // Scoped names RPC (see incoming block) — PENDING invites no longer read profile PII.
         const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, full_name')
-          .in('id', caregiverIds);
+          .rpc('get_connection_counterpart_names', { p_ids: caregiverIds });
 
-        const nameMap = new Map(profiles?.map(p => [p.id, p.full_name]) || []);
+        const nameRows = (profiles ?? []) as Array<{ id: string; full_name: string }>;
+        const nameMap = new Map(nameRows.map((p) => [p.id, p.full_name] as [string, string]));
 
         setSentRequests(outgoing.map(r => ({
           ...r,

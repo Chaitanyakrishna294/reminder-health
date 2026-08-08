@@ -38,6 +38,14 @@ yarn-error.log*
 # Local datasets (source CSVs already imported into Supabase — do not commit)
 dataset/
 
+# Android TWA signing keys + build artifacts (NEVER commit the app-signing keystore —
+# it is the root of trust for Play Store updates). Keep the keystore backed up out-of-band.
+*.keystore
+*.jks
+android-twa/.gradle/
+android-twa/app/build/
+android-twa/build/
+
 # Test coverage
 coverage/
 **/coverage/
