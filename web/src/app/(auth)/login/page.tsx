@@ -91,7 +91,7 @@ function LoginForm() {
       }
     } else {
       setCodeSent(true);
-      setInfo(`We emailed a 6-digit code to ${email}. Enter it below to sign in.`);
+      setInfo(`We emailed a code to ${email}. Enter it below to sign in.`);
     }
   };
 
@@ -99,7 +99,7 @@ function LoginForm() {
     e.preventDefault();
     const token = code.trim();
     if (token.length < 6) {
-      setError('Enter the 6-digit code from your email.');
+      setError('Enter the full code from your email.');
       return;
     }
     setLoading(true);
@@ -237,12 +237,12 @@ function LoginForm() {
                 type="text"
                 inputMode="numeric"
                 autoComplete="one-time-code"
-                maxLength={6}
+                maxLength={10}
                 required
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-                className={`${inputClass} text-center font-mono tracking-[0.4em]`}
-                placeholder="000000"
+                className={`${inputClass} text-center font-mono tracking-[0.3em]`}
+                placeholder="Enter code"
               />
             </div>
           </div>

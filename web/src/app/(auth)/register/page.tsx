@@ -73,7 +73,7 @@ export default function RegisterPage() {
     e.preventDefault();
     const token = code.trim();
     if (token.length < 6) {
-      setError('Enter the 6-digit code from your email.');
+      setError('Enter the full code from your email.');
       return;
     }
     setLoading(true);
@@ -123,7 +123,7 @@ export default function RegisterPage() {
           </div>
           <h2 className={`font-bold text-foreground ${isElderly ? 'text-2xl' : 'text-xl'}`}>Enter your code</h2>
           <p className={`text-muted-foreground ${isElderly ? 'text-lg' : 'text-sm'}`}>
-            We emailed a 6-digit code to <b>{email}</b>. Enter it below to activate your account.
+            We emailed a code to <b>{email}</b>. Enter it below to activate your account.
           </p>
         </div>
 
@@ -140,12 +140,12 @@ export default function RegisterPage() {
               type="text"
               inputMode="numeric"
               autoComplete="one-time-code"
-              maxLength={6}
+              maxLength={10}
               required
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-              className={`${inputClass} text-center font-mono tracking-[0.4em]`}
-              placeholder="000000"
+              className={`${inputClass} text-center font-mono tracking-[0.3em]`}
+              placeholder="Enter code"
             />
           </div>
 
