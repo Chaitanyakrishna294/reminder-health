@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import LoadingMark from './loading-mark';
 
 /**
  * The loading state Next renders while a route's server component streams in.
@@ -42,10 +42,11 @@ export default function RouteLoading({
       role="status"
       aria-live="polite"
     >
-      {/* text-primary measures 2.9:1 on our surfaces; -strong is the variant that
-          carries. `motion-reduce:animate-none` leaves a static mark rather than
-          spinning for anyone who has asked the OS for less motion. */}
-      <Loader2 className="w-8 h-8 text-primary-strong animate-spin motion-reduce:animate-none" aria-hidden />
+      {/* The launch screen's clock→pill mark, looping — one loading idea app-wide
+          instead of a stock spinner. text-primary measures 2.9:1 on our surfaces;
+          -strong is the variant that carries. Reduced motion is handled inside the
+          mark (it holds the resolved pill instead of moving). */}
+      <LoadingMark size={48} className="text-primary-strong" />
       <p className="text-sm text-muted-foreground font-semibold">{label}</p>
     </div>
   );

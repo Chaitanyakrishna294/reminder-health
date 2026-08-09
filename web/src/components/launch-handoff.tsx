@@ -2,47 +2,52 @@
 
 import { useEffect } from 'react';
 
+/** Length of the brand assembly. MUST match `--dur` in public/launch.html AND the
+ *  clamp in the root layout's pre-paint seek script. */
+const DURATION = 1400;
+
 /**
  * The second half of the PWA launch animation.
  *
- * /launch.html (the installed app's start_url, served from the service-worker cache)
- * plays the splash and, on cold opens, forwards to /dashboard?launch=1. A pre-paint
- * inline script in the root layout sees the param and sets `data-launching` on <html>,
- * so this overlay — THE SAME SCENE — is visible from the dashboard's very first frame
- * with no gap, and it lifts as soon as the page is interactive (hydration), not at
- * window.load: the flight only needs the dock's geometry, and waiting for every image
- * and font kept the opaque overlay up for seconds on phone connections. Warm opens
- * (within an hour of the last) skip the overlay entirely — see launch.html.
+ * /launch.html (the installed app's start_url, served from the service-worker
+ * cache) plays a Gmail/Docs-class brand assembly — a clock face draws itself, its
+ * hand sweeps one turn and stays as the pill's score line while the circle
+ * stretches into a capsule and tilts into the app's Medications icon — then
+ * forwards to /dashboard?launch=1&s=<start>. A pre-paint script in the root layout
+ * sets `data-launching` and `--lh-seek` from `s`, so THIS overlay — THE SAME SCENE,
+ * SEEKED to wherever the splash had got to — is visible from the dashboard's very
+ * first frame with no restart and no gap.
  *
- * The lift ends with the capsule FLYING HOME into the dock's centre Medications slot
- * and the icon answering with its existing press squash. Design decisions there, each
- * from an adversarial review that caught the naive version being wrong:
+ * It lifts once BOTH the page is interactive and the assembly has finished (a
+ * splash that flashes for 200ms is worse than one that completes its beat; on cold
+ * opens the load dominates anyway, and warm opens skip the overlay entirely).
+ *
+ * The lift ends with the finished mark FLYING HOME into the dock's centre
+ * Medications slot — the storyboard's last beat — and the icon answering with its
+ * existing press squash. Design decisions there, each from an adversarial review
+ * that caught the naive version being wrong:
  *
  * - The visible nav link is found by iterating candidates and testing
  *   getClientRects().length — querySelector alone returns the HIDDEN desktop rail
- *   first on mobile (document order), whose 0x0 rect at (0,0) would send the capsule
+ *   first on mobile (document order), whose 0x0 rect at (0,0) would send the mark
  *   to the top-left corner. offsetParent is useless here: both navs are fixed.
- * - The flying capsule is a bare CLONE parented to document.body. Inside the overlay
- *   it would inherit the 350ms fade (child opacity multiplies) and be display:none'd
- *   mid-flight by the attribute teardown.
- * - The flight is driven by WAAPI, which supersedes CSS animations — the source
- *   pill's infinite hop would win the cascade over any inline transform. The source
- *   is measured only after its animations are cancelled and a frame has passed, so
- *   the start rect is the rest pose, not a mid-hop snapshot.
+ * - The flier is BUILT FRESH as standalone SVG markup rather than cloned: a clone
+ *   parented to document.body would lose the component-scoped styles that give the
+ *   mark its resolved geometry, and would inherit the overlay's 350ms fade.
+ * - The flight is driven by WAAPI, which supersedes CSS animations in the cascade.
  * - The landing squash is fire-and-forget: pointerdown is dispatched on the icon's
- *   <svg> and bubbles to NavIcon's wrapper handler. If hydration hasn't attached the
- *   handler yet, the event is dropped and the teardown proceeds unchanged.
+ *   <svg> and bubbles to NavIcon's wrapper handler. If hydration hasn't attached
+ *   the handler yet, the event is dropped and the teardown proceeds unchanged.
  * - Plain-fade fallbacks: reduced motion, ELDERLY MODE (this app's own accessibility
- *   mode — its users are the least likely to have OS-level reduced-motion set and the
- *   most likely to be vestibularly sensitive, so the app's setting outranks the OS
- *   default), monitoring mode (no Medications link), document hidden, and the 2.5s cap
- *   (readyState 'loading' means the server is still streaming — the dock may not have
- *   arrived and layout can't be trusted for a measured flight).
+ *   mode — its users are the least likely to have OS-level reduced-motion set and
+ *   the most likely to be vestibularly sensitive, so the app's setting outranks the
+ *   OS default), monitoring mode (no Medications link), document hidden, and the
+ *   stall cap (readyState 'loading' means the server is still streaming — the dock
+ *   may not have arrived and layout can't be trusted for a measured flight).
  *
  * THE SCENE IS A DELIBERATE DUPLICATE of public/launch.html — that file must stay
- * self-contained to render from cache alone. Change one, change both. (One known
- * divergence: launch.html fakes the colour fields with pre-blurred radial-gradients
- * for instant first paint; here the real blur() matches the med-due gate.)
+ * self-contained to render from cache alone. Change one, change both, including
+ * DURATION above.
  */
 export default function LaunchHandoff() {
   useEffect(() => {
@@ -54,6 +59,14 @@ export default function LaunchHandoff() {
     const timers: ReturnType<typeof setTimeout>[] = [];
     const later = (fn: () => void, ms: number) => { timers.push(setTimeout(fn, ms)); };
 
+    /** How far into the assembly the splash page had already played. */
+    const elapsed = () => {
+      const m = /[?&]s=(\d+)/.exec(window.location.search);
+      if (!m) return DURATION; // no stamp (direct hit) — treat as already finished
+      const e = Date.now() - Number(m[1]);
+      return e > 0 ? Math.min(e, DURATION) : 0;
+    };
+
     const teardown = () => {
       // The warm-open stamp, written ONLY when a launch reached a rendered page —
       // launch.html reads it to skip the overlay for the next hour. Stamping on
@@ -61,9 +74,11 @@ export default function LaunchHandoff() {
       // from exactly the launches that need it.
       try { localStorage.setItem('remind-last-launch', String(Date.now())); } catch { /* fine */ }
       root.removeAttribute('data-launching');
-      // Strip ?launch=1 so a reload or share of the URL doesn't replay the splash.
+      root.style.removeProperty('--lh-seek');
+      // Strip the launch params so a reload or share of the URL doesn't replay it.
       const url = new URL(window.location.href);
       url.searchParams.delete('launch');
+      url.searchParams.delete('s');
       window.history.replaceState(null, '', url.pathname + url.search + url.hash);
     };
 
@@ -73,7 +88,7 @@ export default function LaunchHandoff() {
     };
 
     const flight = () => {
-      const source = document.querySelector<HTMLElement>('#launch-handoff .lh-capsule');
+      const source = document.querySelector<HTMLElement>('#launch-handoff .lh-mark');
       // The FIRST match can be the hidden desktop rail (document order); take the
       // one that actually has a rendered box.
       const link = [...document.querySelectorAll<HTMLElement>(
@@ -82,98 +97,96 @@ export default function LaunchHandoff() {
       const iconRect = link?.querySelector('svg')?.getBoundingClientRect();
       if (!source || !link || !iconRect || iconRect.width === 0) { plainFade(); return; }
 
-      // Rest-pose measurement: cancel the hop first, give the engine one frame.
-      source.getAnimations({ subtree: true }).forEach(a => a.cancel());
-      requestAnimationFrame(() => {
-        const from = source.getBoundingClientRect();
-        source.style.visibility = 'hidden';
+      const from = source.getBoundingClientRect();
+      const dark = root.classList.contains('dark');
+      const markFill = dark ? '#F583A0' : '#CC3D64';
+      const scoreFill = dark ? '#0F1C5A' : '#FFFFFF';
 
-        const clone = source.cloneNode(true) as HTMLElement;
-        clone.className = '';
-        clone.setAttribute('aria-hidden', 'true');
-        Object.assign(clone.style, {
-          position: 'fixed',
-          left: `${from.left}px`, top: `${from.top}px`,
-          width: `${from.width}px`, height: `${from.height}px`,
-          margin: '0', zIndex: '201', pointerEvents: 'none',
-          borderRadius: '8px',
-          background: 'linear-gradient(90deg, #CC3D64 50%, #FDEEF2 50%)',
-          border: '2px solid #CC3D64',
-          boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.4)',
-        });
-        document.body.appendChild(clone);
-
-        // Overlay (mascot, fields, caption) fades out UNDER the flying clone; the
-        // page beneath is already interactive — 'lifting' sets pointer-events: none.
-        root.setAttribute('data-launching', 'lifting');
-        later(teardown, 350);
-
-        const dx = (iconRect.left + iconRect.width / 2) - (from.left + from.width / 2);
-        const dy = (iconRect.top + iconRect.height / 2) - (from.top + from.height / 2);
-        const scale = Math.min(iconRect.width / from.width, 1);
-        const anim = clone.animate(
-          [
-            { transform: 'translate(0, 0) scale(1) rotate(0deg)', opacity: 1 },
-            { transform: `translate(${dx * 0.75}px, ${dy * 0.75}px) scale(${(1 + scale) / 2}) rotate(15deg)`, opacity: 1, offset: 0.75 },
-            { transform: `translate(${dx}px, ${dy}px) scale(${scale}) rotate(20deg)`, opacity: 0 },
-          ],
-          { duration: 600, easing: 'cubic-bezier(0.32, 0.72, 0, 1)', fill: 'forwards' }
-        );
-
-        const land = () => {
-          if (!clone.isConnected) return;
-          clone.remove();
-          // Restore the hidden source: a real launch never re-shows the overlay, but
-          // anything that re-flags data-launching must find the scene whole.
-          source.style.visibility = '';
-          // "The dock catches the pill": bubbles to NavIcon's onPointerDown. A
-          // pointerdown alone can't navigate, so this is side-effect-free.
-          link.querySelector('svg')?.dispatchEvent(
-            new PointerEvent('pointerdown', { bubbles: true })
-          );
-          // Debug/verification hook: what flew, from where, to where.
-          (window as any).__launchHandoffLast = {
-            flew: true, dx: Math.round(dx), dy: Math.round(dy),
-            target: { x: Math.round(iconRect.left), y: Math.round(iconRect.top) },
-          };
-        };
-        anim.finished.then(land).catch(() => clone.remove());
-        later(() => { anim.cancel(); land(); }, 900); // safety: never leave a stray clone
+      // Standalone markup in the mark's RESOLVED state — no scoped CSS needed.
+      const flier = document.createElement('div');
+      flier.setAttribute('aria-hidden', 'true');
+      flier.innerHTML =
+        `<svg viewBox="0 0 120 120" width="${from.width}" height="${from.height}">` +
+        `<g transform="rotate(-45 60 60)">` +
+        `<rect x="18" y="36" width="84" height="48" rx="24" fill="${markFill}"/>` +
+        `<rect x="56" y="36" width="8" height="48" rx="4" fill="${scoreFill}"/>` +
+        `</g></svg>`;
+      Object.assign(flier.style, {
+        position: 'fixed',
+        left: `${from.left}px`, top: `${from.top}px`,
+        width: `${from.width}px`, height: `${from.height}px`,
+        margin: '0', zIndex: '201', pointerEvents: 'none',
       });
+      document.body.appendChild(flier);
+      source.style.visibility = 'hidden';
+
+      // Overlay (mark, wordmark) fades out UNDER the flying mark; the page beneath
+      // is already interactive — 'lifting' sets pointer-events: none.
+      root.setAttribute('data-launching', 'lifting');
+      later(teardown, 350);
+
+      const dx = (iconRect.left + iconRect.width / 2) - (from.left + from.width / 2);
+      const dy = (iconRect.top + iconRect.height / 2) - (from.top + from.height / 2);
+      // The mark's visible capsule is ~70% of its 120px box; match the 24px icon.
+      const scale = Math.min((iconRect.width / from.width) / 0.7, 1);
+      const anim = flier.animate(
+        [
+          { transform: 'translate(0, 0) scale(1)', opacity: 1 },
+          { transform: `translate(${dx * 0.75}px, ${dy * 0.75}px) scale(${(1 + scale) / 2})`, opacity: 1, offset: 0.75 },
+          { transform: `translate(${dx}px, ${dy}px) scale(${scale})`, opacity: 0 },
+        ],
+        { duration: 520, easing: 'cubic-bezier(0.32, 0.72, 0, 1)', fill: 'forwards' }
+      );
+
+      const land = () => {
+        if (!flier.isConnected) return;
+        flier.remove();
+        // Restore the hidden source: a real launch never re-shows the overlay, but
+        // anything that re-flags data-launching must find the scene whole.
+        source.style.visibility = '';
+        // "The dock catches the pill": bubbles to NavIcon's onPointerDown. A
+        // pointerdown alone can't navigate, so this is side-effect-free.
+        link.querySelector('svg')?.dispatchEvent(
+          new PointerEvent('pointerdown', { bubbles: true })
+        );
+        // Debug/verification hook: what flew, from where, to where.
+        (window as unknown as Record<string, unknown>).__launchHandoffLast = {
+          flew: true, dx: Math.round(dx), dy: Math.round(dy),
+          target: { x: Math.round(iconRect.left), y: Math.round(iconRect.top) },
+        };
+      };
+      anim.finished.then(land).catch(() => flier.remove());
+      later(() => { anim.cancel(); land(); }, 820); // safety: never leave a stray flier
     };
 
     const lift = () => {
       if (done) return;           // the cap and DOMContentLoaded both route here — run once
       done = true;
       if (capTimer) clearTimeout(capTimer);
-      // Let the newly interactive frame paint under the overlay before anything moves.
+      // Let the assembly finish before anything moves: flying a half-drawn mark
+      // reads as a glitch, and on cold opens the load overlaps this anyway.
       later(() => {
-        // If the 8s CSS failsafe already retired the overlay (hydration arrived
-        // very late), the user is looking at — possibly using — the page. No fade,
-        // no flight: a full-opacity capsule clone materialising over an in-use
-        // dashboard is a ghost, not a handoff. Just clean up the attribute.
-        const overlay = document.getElementById('launch-handoff');
-        if (overlay && getComputedStyle(overlay).visibility === 'hidden') {
-          teardown();
-          return;
-        }
         const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         let elderly = false;
         try { elderly = localStorage.getItem('ui-mode') === 'elderly'; } catch { /* fade */ }
-        if (reduced || elderly || document.hidden || document.readyState === 'loading') {
+        // If the 8s CSS failsafe already retired the overlay (hydration arrived
+        // very late), the user is looking at — possibly using — the page. No fade,
+        // no flight: a mark materialising over an in-use dashboard is a ghost.
+        const overlay = document.getElementById('launch-handoff');
+        if (overlay && getComputedStyle(overlay).visibility === 'hidden') {
+          teardown();
+        } else if (reduced || elderly || document.hidden || document.readyState === 'loading') {
           plainFade();
         } else {
           flight();
         }
-      }, 250);
+      }, Math.max(0, DURATION - elapsed()) + 120);
     };
 
     // Hydration is the readiness signal: this effect running means React has made
     // the page interactive, and the flight only needs the dock's geometry — not
-    // images or fonts. Waiting for window.load here kept the opaque overlay up
-    // through seconds of image/font traffic on phone connections. 'loading' means
-    // the server is still streaming HTML (the dock may not have arrived yet), so
-    // wait for the parser to finish.
+    // images or fonts. 'loading' means the server is still streaming HTML (the
+    // dock may not have arrived yet), so wait for the parser to finish.
     if (document.readyState !== 'loading') {
       lift();
     } else {
@@ -195,12 +208,16 @@ export default function LaunchHandoff() {
       <style>{`
         #launch-handoff { display: none; }
         html[data-launching] #launch-handoff {
+          --ink: #0F1C5A; --lh-bg: #F6F2F5; --mark: #CC3D64; --score: #FFFFFF;
           display: flex; position: fixed; inset: 0; z-index: 200;
           flex-direction: column; align-items: center; justify-content: center;
-          gap: 14px; padding: 24px; text-align: center; overflow: hidden;
-          background: #F8F9FB; color: #0F1C5A;
+          gap: 20px; padding: 24px; text-align: center; overflow: hidden;
+          background: var(--lh-bg); color: var(--ink);
           font-family: ui-monospace, 'JetBrains Mono', Consolas, monospace;
           opacity: 1; transition: opacity 350ms ease;
+        }
+        html.dark[data-launching] #launch-handoff {
+          --ink: #EAF0FF; --lh-bg: #0F1C5A; --mark: #F583A0; --score: #0F1C5A;
         }
         html[data-launching='lifting'] #launch-handoff { opacity: 0; pointer-events: none; }
         /* No-JS escape hatch. If hydration never completes (stalled bundle download,
@@ -209,99 +226,89 @@ export default function LaunchHandoff() {
            only: the moment the real lift starts ('lifting') the selector stops
            matching, the animation resets, and the normal 350ms transition takes over.
            visibility:hidden also drops the overlay's hit-testing, so the page under
-           it becomes usable even though the attribute is still set. Kept OUTSIDE the
-           reduced-motion guard on purpose — it is an escape hatch, and it only fades. */
+           it becomes usable even though the attribute is still set. */
         html[data-launching='1'] #launch-handoff { animation: lhFailsafe 350ms ease 8s forwards; }
         @keyframes lhFailsafe { to { opacity: 0; visibility: hidden; } }
-        html.dark #launch-handoff { background: #0F1C5A; color: #EAF0FF; }
-        /* Blur sits on each FIELD, never the container: a filtered container becomes
-           a containing block that breaks position:fixed and repaints enormously. */
-        #launch-handoff .lh-field { position: absolute; border-radius: 50%; filter: blur(72px); opacity: 0.7; pointer-events: none; }
-        #launch-handoff .lh-f1 { width: 24rem; height: 24rem; top: -7rem; left: -8rem; background: #F7CCDB; }
-        #launch-handoff .lh-f2 { width: 21rem; height: 21rem; bottom: -6rem; right: -7rem; background: #CBDCF2; }
-        #launch-handoff .lh-f3 { width: 18rem; height: 18rem; top: 38%; right: -6rem; background: #F6E3CA; }
-        html.dark #launch-handoff .lh-field { opacity: 0.5; }
-        html.dark #launch-handoff .lh-f1 { background: #24378F; }
-        html.dark #launch-handoff .lh-f2 { background: #1B3A78; }
-        html.dark #launch-handoff .lh-f3 { background: #3A2A6B; }
-        #launch-handoff .lh-scene { position: relative; display: flex; flex-direction: column; align-items: center; gap: 14px; }
-        #launch-handoff .lh-brain {
-          width: 96px; height: 96px; object-fit: contain;
-          animation: lhBreathe 1.6s ease-in-out infinite;
+
+        /* --- The scene. Duplicate of public/launch.html; change one, change both. ---
+           --lh-seek is a NEGATIVE delay set pre-paint by the root layout, which
+           fast-forwards every animation to wherever the splash page had got to. */
+        #launch-handoff .lh-mark { width: 120px; height: 120px; }
+        #launch-handoff .lh-tilt,
+        #launch-handoff .lh-body,
+        #launch-handoff .lh-hour,
+        #launch-handoff .lh-score { transform-box: view-box; transform-origin: 60px 60px; }
+        #launch-handoff .lh-tilt  { animation: lhTilt 1400ms both var(--lh-seek, 0ms); }
+        #launch-handoff .lh-body  { fill: var(--mark); fill-opacity: 0; stroke: var(--ink);
+                                    stroke-width: 6; stroke-dasharray: 1; stroke-dashoffset: 1;
+                                    animation: lhBody 1400ms both var(--lh-seek, 0ms); }
+        /* The hour hand exists purely for legibility: a circle with ONE sweeping
+           line reads as a loading spinner, two hands read as a clock. It retires
+           during the morph, leaving the minute hand to become the score line. */
+        #launch-handoff .lh-hour  { fill: var(--ink); animation: lhHour 1400ms both var(--lh-seek, 0ms); }
+        #launch-handoff .lh-score { fill: var(--ink); animation: lhScore 1400ms both var(--lh-seek, 0ms); }
+        #launch-handoff .lh-name  { font-size: 22px; font-weight: 800; letter-spacing: -0.02em;
+                                    opacity: 0; animation: lhName 1400ms both var(--lh-seek, 0ms); }
+        @keyframes lhBody {
+          0%   { stroke-dashoffset: 1; x: 36px; width: 48px; fill-opacity: 0; stroke-opacity: 1;
+                 animation-timing-function: cubic-bezier(0.05, 0.7, 0.1, 1); }
+          36%  { stroke-dashoffset: 0; x: 36px; width: 48px; fill-opacity: 0; stroke-opacity: 1;
+                 animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1); }
+          /* dashoffset repeated to the end on purpose: CSS synthesises the missing
+             100% frame from the base value (1), which would visibly ERASE the
+             outline again while it fades out. */
+          62%  { stroke-dashoffset: 0; x: 21.9px; width: 76.1px; fill-opacity: 1; stroke-opacity: 0; }
+          73%  { stroke-dashoffset: 0; x: 16px;   width: 88px;   fill-opacity: 1; stroke-opacity: 0;
+                 animation-timing-function: cubic-bezier(0.34, 1.2, 0.64, 1); }
+          86%  { stroke-dashoffset: 0; x: 18px;   width: 84px;   fill-opacity: 1; stroke-opacity: 0; }
+          100% { stroke-dashoffset: 0; x: 18px;   width: 84px;   fill-opacity: 1; stroke-opacity: 0; }
         }
-        #launch-handoff .lh-name { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
-        #launch-handoff .lh-choreo { display: flex; align-items: flex-end; gap: 14px; height: 40px; margin-top: 2px; }
-        #launch-handoff .lh-slot { display: flex; flex-direction: column; align-items: center; gap: 3px; }
-        #launch-handoff .lh-pill { animation: lhHop 1.35s cubic-bezier(0.34, 1.56, 0.64, 1) infinite; }
-        #launch-handoff .lh-pill-shadow {
-          width: 14px; height: 3px; border-radius: 50%;
-          background: rgba(15, 28, 90, 0.18);
-          animation: lhSquash 1.35s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+        @keyframes lhScore {
+          0%   { transform: rotate(0deg);   y: 40px;   height: 20px;   fill: var(--ink);
+                 animation-timing-function: cubic-bezier(0.05, 0.7, 0.1, 1); }
+          36%  { transform: rotate(360deg); y: 40px;   height: 20px;   fill: var(--ink);
+                 animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1); }
+          62%  { transform: rotate(360deg); y: 37.2px; height: 39.7px; fill: var(--score); }
+          73%  { transform: rotate(360deg); y: 36px;   height: 48px;   fill: var(--score); }
+          100% { transform: rotate(360deg); y: 36px;   height: 48px;   fill: var(--score); }
         }
-        /* NOT the --warning token: warning means low stock / skipped, and the next
-           screen can be the med-due gate where that orange is the overdue ring. */
-        #launch-handoff .lh-tablet {
-          width: 18px; height: 18px; border-radius: 50%;
-          background: #FDF1DF; border: 2px solid #B36B00; position: relative;
+        @keyframes lhHour {
+          0%   { transform: rotate(-60deg); opacity: 1;
+                 animation-timing-function: cubic-bezier(0.05, 0.7, 0.1, 1); }
+          36%  { transform: rotate(-28deg); opacity: 1; }
+          52%  { transform: rotate(-28deg); opacity: 0; }
+          100% { transform: rotate(-28deg); opacity: 0; }
         }
-        #launch-handoff .lh-tablet::after {
-          content: ''; position: absolute; left: 2px; right: 2px; top: 50%;
-          height: 2px; margin-top: -1px; border-radius: 1px; background: #B36B00; opacity: .6;
+        @keyframes lhTilt {
+          0%   { transform: rotate(0deg); }
+          48%  { transform: rotate(0deg); animation-timing-function: cubic-bezier(0.34, 1.4, 0.64, 1); }
+          100% { transform: rotate(-45deg); }
         }
-        html.dark #launch-handoff .lh-tablet { background: #3A2F1E; border-color: #E8A13D; }
-        html.dark #launch-handoff .lh-tablet::after { background: #E8A13D; }
-        #launch-handoff .lh-capsule {
-          width: 30px; height: 15px; border-radius: 8px;
-          background: linear-gradient(90deg, #CC3D64 50%, #FDEEF2 50%);
-          border: 2px solid #CC3D64;
-          box-shadow: inset 0 1px 1px rgba(255,255,255,0.4);
-        }
-        html.dark #launch-handoff .lh-capsule { background: linear-gradient(90deg, #F26B8A 50%, #2A3B7E 50%); }
-        #launch-handoff .lh-softgel {
-          width: 15px; height: 15px; border-radius: 50%;
-          background: #34C759; border: 2px solid #1B7A3A;
-          box-shadow: inset 0 1px 1px rgba(255,255,255,0.35);
-        }
-        #launch-handoff .lh-slot:nth-child(2) .lh-pill,
-        #launch-handoff .lh-slot:nth-child(2) .lh-pill-shadow { animation-delay: 0.15s; }
-        #launch-handoff .lh-slot:nth-child(3) .lh-pill,
-        #launch-handoff .lh-slot:nth-child(3) .lh-pill-shadow { animation-delay: 0.3s; }
-        /* 0.75, not 0.65: where two mesh fields overlap, 0.65 measured 4.48:1 —
-           under the floor. Keep in lockstep with launch.html's .hint. */
-        #launch-handoff .lh-hint { font-size: 12px; font-weight: 600; opacity: 0.75; }
-        @keyframes lhBreathe {
-          0%, 100% { transform: scale(1) translateY(0); }
-          50%      { transform: scale(1.07) translateY(-4px); }
-        }
-        @keyframes lhHop {
-          0%, 55%, 100% { transform: translateY(0) rotate(0deg); }
-          25%           { transform: translateY(-12px) rotate(-10deg); }
-          40%           { transform: translateY(-2px) rotate(6deg); }
-        }
-        @keyframes lhSquash {
-          0%, 55%, 100% { transform: scaleX(1); opacity: 1; }
-          25%           { transform: scaleX(0.55); opacity: 0.55; }
-          40%           { transform: scaleX(0.85); opacity: 0.8; }
+        @keyframes lhName {
+          0%   { opacity: 0; transform: translateY(6px); letter-spacing: 0.35em; }
+          73%  { opacity: 0; transform: translateY(6px); letter-spacing: 0.35em;
+                 animation-timing-function: cubic-bezier(0.05, 0.7, 0.1, 1); }
+          100% { opacity: 1; transform: translateY(0);   letter-spacing: -0.02em; }
         }
         @media (prefers-reduced-motion: reduce) {
-          #launch-handoff .lh-brain, #launch-handoff .lh-pill, #launch-handoff .lh-pill-shadow { animation: none; }
+          #launch-handoff .lh-tilt, #launch-handoff .lh-body, #launch-handoff .lh-hour,
+          #launch-handoff .lh-score, #launch-handoff .lh-name { animation: none; }
+          #launch-handoff .lh-tilt  { transform: rotate(-45deg); }
+          #launch-handoff .lh-body  { x: 18px; width: 84px; fill-opacity: 1; stroke-opacity: 0; stroke-dashoffset: 0; }
+          #launch-handoff .lh-score { y: 36px; height: 48px; fill: var(--score); }
+          #launch-handoff .lh-hour  { opacity: 0; }
+          #launch-handoff .lh-name  { opacity: 1; letter-spacing: -0.02em; }
         }
       `}</style>
       <div id="launch-handoff" aria-hidden="true">
-        <span className="lh-field lh-f1" />
-        <span className="lh-field lh-f2" />
-        <span className="lh-field lh-f3" />
-        <div className="lh-scene">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className="lh-brain" src="/mascot/reminder.png" alt="" width={96} height={96} />
-          <div className="lh-name">Re&#8209;MIND&#8209;e&#1071;</div>
-          <div className="lh-choreo">
-            <span className="lh-slot"><span className="lh-pill lh-tablet" /><span className="lh-pill-shadow" /></span>
-            <span className="lh-slot"><span className="lh-pill lh-capsule" /><span className="lh-pill-shadow" /></span>
-            <span className="lh-slot"><span className="lh-pill lh-softgel" /><span className="lh-pill-shadow" /></span>
-          </div>
-          <p className="lh-hint">Opening your medications…</p>
-        </div>
+        <svg className="lh-mark" viewBox="0 0 120 120" aria-hidden="true">
+          <g className="lh-tilt">
+            <rect className="lh-body" x={36} y={36} width={48} height={48} rx={24} pathLength={1} />
+            <rect className="lh-hour" x={57} y={46} width={6} height={14} rx={3} />
+            <rect className="lh-score" x={56} y={40} width={8} height={20} rx={4} />
+          </g>
+        </svg>
+        <div className="lh-name">Re&#8209;MIND&#8209;e&#1071;</div>
       </div>
     </>
   );

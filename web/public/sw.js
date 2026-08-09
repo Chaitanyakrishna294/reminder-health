@@ -9,8 +9,10 @@
 // API calls, everything — falls through to the network untouched, so this can
 // never serve a stale page or interfere with auth.
 // ---------------------------------------------------------------------------
-const LAUNCH_CACHE = 'remind-launch-v4';
-const LAUNCH_ASSETS = ['/launch.html', '/mascot/reminder.png'];
+// The splash is now pure inline SVG/CSS — no image to precache, so the installed
+// app's first paint costs exactly one ~6KB HTML read from disk.
+const LAUNCH_CACHE = 'remind-launch-v7';
+const LAUNCH_ASSETS = ['/launch.html'];
 
 self.addEventListener('install', function(event) {
   event.waitUntil(

@@ -5,196 +5,198 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Re-MIND-eЯ</title>
 <!--
-  The installed app's launch screen. start_url points here, and sw.js pre-caches this
-  file plus the mascot — so it opens INSTANTLY from disk, with no network involved,
-  and plays while the real dashboard is server-rendered behind it.
+  The installed app's launch screen. start_url points here and sw.js pre-caches it,
+  so the app OPENS INSTANTLY from disk with no network involved.
 
-  Cold opens forward with ?launch=1, and the dashboard renders an IDENTICAL overlay
-  scene (components/launch-handoff.tsx) that lifts as soon as the page is interactive.
-  Opens within an hour of the last launch skip the overlay entirely: the server is
-  warm and the page paints fast, so it streams in progressively like the browser.
+  The scene is a Gmail/Docs-class brand assembly, not a loading screen: a clock face
+  draws itself, its hand sweeps one full turn and then STAYS as the pill's score line
+  while the circle stretches into a capsule and tilts into the app's own Medications
+  icon. One continuous 1150ms motion, then it holds. No spinner, no dots — the
+  animation is the wait.
+
+  Zero images by design: the whole splash is ~5KB of self-contained HTML, so first
+  paint from cache is as fast as the platform allows.
+
+  Cold opens forward to /dashboard?launch=1&s=<start>, where launch-handoff.tsx
+  renders an IDENTICAL scene and uses `s` to SEEK the animation to wherever this page
+  had got to — otherwise the story would visibly restart at the handover. Opens
+  within an hour of the last completed launch skip the overlay entirely.
   THE SCENE IS DUPLICATED THERE ON PURPOSE: this file must stay self-contained to
-  render from cache alone. Change one, change both.
-
-  One deliberate divergence: the colour fields here are pre-blurred radial-gradients,
-  not filter: blur() — a static blur forces a multi-pass GPU raster at first paint,
-  and this file's entire reason to exist is instant first paint from cache. The
-  handoff overlay uses the real blur for pixel parity with the med-due gate.
+  render from cache alone. Change one, change both — including the 1150ms duration.
 -->
+<script>
+  // Theme before paint, from the SAME source the app uses (localStorage 'theme',
+  // default light). prefers-color-scheme would contradict the in-app toggle and
+  // flash the wrong theme — the app deliberately stopped seeding theme from the OS.
+  try { if (localStorage.getItem('theme') === 'dark') document.documentElement.className = 'dark'; } catch (e) {}
+</script>
 <style>
+  :root {
+    --ink: #0F1C5A; --bg: #F6F2F5; --mark: #CC3D64; --score: #FFFFFF;
+    --dur: 1400ms;
+  }
+  :root.dark { --ink: #EAF0FF; --bg: #0F1C5A; --mark: #F583A0; --score: #0F1C5A; }
+
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { height: 100%; }
   body {
-    position: relative; overflow: hidden;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 14px;
+    gap: 20px; overflow: hidden;
+    background: var(--bg); color: var(--ink);
     font-family: ui-monospace, 'JetBrains Mono', Consolas, monospace;
-    background: #F8F9FB; color: #0F1C5A;
     padding: 24px; text-align: center;
+    -webkit-font-smoothing: antialiased;
   }
-  /* Soft colour fields, same family as the med-due gate's mesh. Static, so they cost
-     one raster and nothing per frame. */
-  .field { position: absolute; border-radius: 50%; pointer-events: none; }
-  .f1 { width: 24rem; height: 24rem; top: -7rem; left: -8rem;
-        background: radial-gradient(closest-side, rgba(247,204,219,0.7) 0%, transparent 70%); }
-  .f2 { width: 21rem; height: 21rem; bottom: -6rem; right: -7rem;
-        background: radial-gradient(closest-side, rgba(203,220,242,0.7) 0%, transparent 70%); }
-  .f3 { width: 18rem; height: 18rem; top: 38%; right: -6rem;
-        background: radial-gradient(closest-side, rgba(246,227,202,0.7) 0%, transparent 70%); }
-  @media (prefers-color-scheme: dark) {
-    body { background: #0F1C5A; color: #EAF0FF; }
-    .f1 { background: radial-gradient(closest-side, rgba(36,55,143,0.5) 0%, transparent 70%); }
-    .f2 { background: radial-gradient(closest-side, rgba(27,58,120,0.5) 0%, transparent 70%); }
-    .f3 { background: radial-gradient(closest-side, rgba(58,42,107,0.5) 0%, transparent 70%); }
-    .tablet { background: #3A2F1E; border-color: #E8A13D; }
-    .tablet::after { background: #E8A13D; }
-    .capsule { background: linear-gradient(90deg, #F26B8A 50%, #2A3B7E 50%); }
-  }
-  .scene { position: relative; display: flex; flex-direction: column; align-items: center; gap: 14px; }
-  .brain {
-    width: 96px; height: 96px; object-fit: contain;
-    animation: breathe 1.6s ease-in-out infinite;
-  }
-  .name { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
 
-  /* The choreography: tablet, capsule, softgel hopping in sequence — the medication
-     cabinet as the loading dots. Each sits on a grounded shadow that flattens as its
-     pill leaves the floor. Transform/opacity only.
-     Tablet amber is deliberately NOT the --warning token (#FF9500): warning means
-     low stock / skipped, and the next screen can be the med-due gate where that hue
-     is the overdue ring. Pharmaceutical amber instead, with a border that clears
-     3:1 for low-contrast-sensitivity vision. */
-  .choreo { display: flex; align-items: flex-end; gap: 14px; height: 40px; margin-top: 2px; }
-  .slot { display: flex; flex-direction: column; align-items: center; gap: 3px; }
-  .pill { animation: hop 1.35s cubic-bezier(0.34, 1.56, 0.64, 1) infinite; }
-  .pill-shadow {
-    width: 14px; height: 3px; border-radius: 50%;
-    background: rgba(15, 28, 90, 0.18);
-    animation: squash 1.35s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+  .mark { width: 120px; height: 120px; }
+  /* transform-box: view-box so transform-origin is in viewBox units (60,60 = centre). */
+  .tilt, .body, .score, .hour { transform-box: view-box; transform-origin: 60px 60px; }
+  .tilt  { animation: tilt  var(--dur) both; }
+  /* The hour hand exists purely for legibility: a circle with ONE sweeping line
+     reads as a loading spinner, two hands at different angles read as a clock.
+     It retires during the morph, leaving the minute hand to become the score line. */
+  .hour  { fill: var(--ink); animation: hour var(--dur) both; }
+  /* pathLength="1" normalises the outline so the draw-on works in the same units
+     before AND after the geometry morph.
+     NOTE: animating x/width (SVG geometry properties) via CSS needs Chrome/Firefox
+     or Safari 17.4+. Older Safari degrades to "circle fills and tilts" — the mark
+     still resolves, it just doesn't stretch. Acceptable; never broken. */
+  .body  { fill: var(--mark); fill-opacity: 0; stroke: var(--ink); stroke-width: 6;
+           stroke-dasharray: 1; stroke-dashoffset: 1; animation: body var(--dur) both; }
+  .score { fill: var(--ink); animation: score var(--dur) both; }
+  .name  { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; opacity: 0;
+           animation: name var(--dur) both; }
+
+  /* Beats (1400ms): 0-36% the face draws while the minute hand sweeps a full turn
+     and the hour hand creeps · 36-73% the circle stretches into a capsule — past
+     its final width and back, so it lands with spring rather than stopping dead —
+     ink becomes fill, the hour hand retires and the minute hand grows into the
+     score line · 48-100% the tilt runs UNDER the stretch (deliberately overlapped:
+     two sequential moves read as a checklist, one overlapped move reads as a single
+     gesture) · 73-100% the wordmark rises as its tracking settles.
+     Emphasized-decelerate throughout. */
+  @keyframes body {
+    0%   { stroke-dashoffset: 1; x: 36px; width: 48px; fill-opacity: 0; stroke-opacity: 1;
+           animation-timing-function: cubic-bezier(0.05, 0.7, 0.1, 1); }
+    36%  { stroke-dashoffset: 0; x: 36px; width: 48px; fill-opacity: 0; stroke-opacity: 1;
+           animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1); }
+    /* dashoffset is repeated to the end on purpose: CSS synthesises the missing
+       100% frame from the base value (1), which would visibly ERASE the outline
+       again while it fades out. */
+    62%  { stroke-dashoffset: 0; x: 21.9px; width: 76.1px; fill-opacity: 1; stroke-opacity: 0; }
+    73%  { stroke-dashoffset: 0; x: 16px;   width: 88px;   fill-opacity: 1; stroke-opacity: 0;
+           animation-timing-function: cubic-bezier(0.34, 1.2, 0.64, 1); }
+    86%  { stroke-dashoffset: 0; x: 18px;   width: 84px;   fill-opacity: 1; stroke-opacity: 0; }
+    100% { stroke-dashoffset: 0; x: 18px;   width: 84px;   fill-opacity: 1; stroke-opacity: 0; }
   }
-  .tablet {
-    width: 18px; height: 18px; border-radius: 50%;
-    background: #FDF1DF; border: 2px solid #B36B00; position: relative;
+  @keyframes score {
+    0%   { transform: rotate(0deg);   y: 40px;   height: 20px;   fill: var(--ink);
+           animation-timing-function: cubic-bezier(0.05, 0.7, 0.1, 1); }
+    36%  { transform: rotate(360deg); y: 40px;   height: 20px;   fill: var(--ink);
+           animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1); }
+    62%  { transform: rotate(360deg); y: 37.2px; height: 39.7px; fill: var(--score); }
+    73%  { transform: rotate(360deg); y: 36px;   height: 48px;   fill: var(--score); }
+    100% { transform: rotate(360deg); y: 36px;   height: 48px;   fill: var(--score); }
   }
-  .tablet::after {
-    content: ''; position: absolute; left: 2px; right: 2px; top: 50%;
-    height: 2px; margin-top: -1px; border-radius: 1px; background: #B36B00; opacity: .6;
+  @keyframes hour {
+    0%   { transform: rotate(-60deg); opacity: 1;
+           animation-timing-function: cubic-bezier(0.05, 0.7, 0.1, 1); }
+    36%  { transform: rotate(-28deg); opacity: 1; }
+    52%  { transform: rotate(-28deg); opacity: 0; }
+    100% { transform: rotate(-28deg); opacity: 0; }
   }
-  .capsule {
-    width: 30px; height: 15px; border-radius: 8px;
-    background: linear-gradient(90deg, #CC3D64 50%, #FDEEF2 50%);
-    border: 2px solid #CC3D64;
-    box-shadow: inset 0 1px 1px rgba(255,255,255,0.4);
+  @keyframes tilt {
+    0%   { transform: rotate(0deg); }
+    48%  { transform: rotate(0deg); animation-timing-function: cubic-bezier(0.34, 1.4, 0.64, 1); }
+    100% { transform: rotate(-45deg); }
   }
-  .softgel {
-    width: 15px; height: 15px; border-radius: 50%;
-    background: #34C759; border: 2px solid #1B7A3A;
-    box-shadow: inset 0 1px 1px rgba(255,255,255,0.35);
+  /* letter-spacing is a layout property, not a compositor one — deliberate here:
+     it is one short centred word for 240ms, and the tracking settling is what
+     makes the lockup feel drawn rather than dropped in. */
+  @keyframes name {
+    0%   { opacity: 0; transform: translateY(6px); letter-spacing: 0.35em; }
+    73%  { opacity: 0; transform: translateY(6px); letter-spacing: 0.35em;
+           animation-timing-function: cubic-bezier(0.05, 0.7, 0.1, 1); }
+    100% { opacity: 1; transform: translateY(0);   letter-spacing: -0.02em; }
   }
-  .slot:nth-child(2) .pill, .slot:nth-child(2) .pill-shadow { animation-delay: 0.15s; }
-  .slot:nth-child(3) .pill, .slot:nth-child(3) .pill-shadow { animation-delay: 0.3s; }
-  /* 0.75, not 0.65: the mesh fields lighten the ground, and where two overlap the
-     old value measured 4.48:1 — under the floor. Keep in lockstep with .lh-hint. */
-  .hint { font-size: 12px; font-weight: 600; opacity: 0.75; }
-  .dots::after {
-    content: ''; display: inline-block; width: 1.2em; text-align: left;
-    animation: dots 1.5s steps(4, end) infinite;
-  }
-  @keyframes breathe {
-    0%, 100% { transform: scale(1) translateY(0); }
-    50%      { transform: scale(1.07) translateY(-4px); }
-  }
-  @keyframes hop {
-    0%, 55%, 100% { transform: translateY(0) rotate(0deg); }
-    25%           { transform: translateY(-12px) rotate(-10deg); }
-    40%           { transform: translateY(-2px) rotate(6deg); }
-  }
-  /* 0% is the rest pose, so a reduced-motion freeze reads as a normal shadow. */
-  @keyframes squash {
-    0%, 55%, 100% { transform: scaleX(1); opacity: 1; }
-    25%           { transform: scaleX(0.55); opacity: 0.55; }
-    40%           { transform: scaleX(0.85); opacity: 0.8; }
-  }
-  @keyframes dots {
-    0%   { content: ''; }
-    25%  { content: '.'; }
-    50%  { content: '..'; }
-    75%  { content: '...'; }
-  }
+
+  /* Reduced motion: the resolved mark, no assembly. Values mirror the 100% frames. */
   @media (prefers-reduced-motion: reduce) {
-    .brain, .pill, .pill-shadow { animation: none; }
-    .dots::after { content: '…'; animation: none; }
+    .tilt, .body, .score, .hour, .name { animation: none; }
+    .tilt  { transform: rotate(-45deg); }
+    .body  { x: 18px; width: 84px; fill-opacity: 1; stroke-opacity: 0; stroke-dashoffset: 0; }
+    .score { y: 36px; height: 48px; fill: var(--score); }
+    .hour  { opacity: 0; }
+    .name  { opacity: 1; letter-spacing: -0.02em; }
   }
-  #offline, #stuck { display: none; }
+
+  #offline, #stuck { display: none; margin-top: 4px; }
+  .hint { font-size: 12px; font-weight: 600; opacity: 0.7; max-width: 20rem; }
   #offline button, #stuck button {
-    margin-top: 10px; min-height: 44px; padding: 0 20px;
-    border: 0; border-radius: 12px; cursor: pointer;
+    margin-top: 12px; min-height: 44px; padding: 0 20px;
+    border: 0; border-radius: 14px; cursor: pointer;
     font: inherit; font-weight: 800; font-size: 14px;
-    background: #CC3D64; color: #fff;
+    background: var(--mark); color: var(--bg);
   }
 </style>
 </head>
 <body>
-  <span class="field f1"></span><span class="field f2"></span><span class="field f3"></span>
-  <div class="scene">
-    <img class="brain" src="/mascot/reminder.png" alt="" width="96" height="96" />
-    <div class="name">Re&#8209;MIND&#8209;e&#1071;</div>
-    <div class="choreo" aria-hidden="true">
-      <span class="slot"><span class="pill tablet"></span><span class="pill-shadow"></span></span>
-      <span class="slot"><span class="pill capsule"></span><span class="pill-shadow"></span></span>
-      <span class="slot"><span class="pill softgel"></span><span class="pill-shadow"></span></span>
-    </div>
-    <p class="hint dots" id="opening">Opening your medications</p>
-    <div id="offline" role="alert">
-      <p class="hint">You're offline. Re-MIND-eЯ needs a connection to load your medications.</p>
-      <button onclick="go()">Try again</button>
-    </div>
-    <div id="stuck" role="alert">
-      <p class="hint">Taking longer than usual&hellip;</p>
-      <button onclick="go()">Try again</button>
-    </div>
+  <svg class="mark" viewBox="0 0 120 120" aria-hidden="true">
+    <g class="tilt">
+      <rect class="body" x="36" y="36" width="48" height="48" rx="24" pathLength="1" />
+      <rect class="hour" x="57" y="46" width="6" height="14" rx="3" />
+      <rect class="score" x="56" y="40" width="8" height="20" rx="4" />
+    </g>
+  </svg>
+  <div class="name">Re&#8209;MIND&#8209;e&#1071;</div>
+
+  <div id="offline" role="alert">
+    <p class="hint">You're offline. Re-MIND-eЯ needs a connection to load your medications.</p>
+    <button onclick="go()">Try again</button>
   </div>
+  <div id="stuck" role="alert">
+    <p class="hint">Taking longer than usual&hellip;</p>
+    <button onclick="go()">Try again</button>
+  </div>
+
 <script>
   // location.replace keeps this page out of history, so Back from the dashboard
   // never lands on the splash.
   //
-  // Cold open → /dashboard?launch=1: the dashboard keeps an identical overlay up
-  //   until it is interactive, then the capsule flies home (launch-handoff.tsx).
+  // Cold open → /dashboard?launch=1&s=<start>: the dashboard holds an identical
+  //   scene, SEEKED to this page's elapsed time, then flies the finished mark into
+  //   the dock's Medications slot (launch-handoff.tsx).
   // Warm open (a launch COMPLETED within the last hour) → /dashboard, no overlay:
   //   the server is warm (~80ms TTFB vs ~4s cold, measured) and the page paints
-  //   fast — let it stream in progressively like the browser instead of hiding it.
+  //   fast — let it stream in progressively like the browser.
   //   The stamp is written by launch-handoff.tsx's teardown, i.e. only when a
   //   launch actually reached a rendered page. Stamping HERE would mark stalled
-  //   attempts warm, stripping the overlay from exactly the launches that need it
-  //   (the retry after a cold-server stall). Warm opens don't refresh the stamp,
-  //   so after a quiet hour the flow self-corrects back to the cold path.
+  //   attempts warm, stripping the overlay from exactly the launches that need it.
   var WARM_WINDOW_MS = 60 * 60 * 1000;
+  var START = Date.now();
   var stuckTimer = null;
   function go() {
     if (!navigator.onLine) {
       clearTimeout(stuckTimer);
-      document.getElementById('opening').style.display = 'none';
       document.getElementById('stuck').style.display = 'none';
       document.getElementById('offline').style.display = 'block';
       return;
     }
     document.getElementById('offline').style.display = 'none';
     document.getElementById('stuck').style.display = 'none';
-    document.getElementById('opening').style.display = '';
     // Every attempt arms a fresh stall watchdog: if the navigation hangs (cold
     // server, flaky network) this page stays visible — after 12s say so and offer
-    // a retry instead of looping the animation forever. The timer dies with the
-    // page once navigation commits, so it only ever fires while genuinely stuck.
+    // a retry instead of sitting on a finished logo forever. The timer dies with
+    // the page once navigation commits, so it only fires while genuinely stuck.
     clearTimeout(stuckTimer);
     stuckTimer = setTimeout(function () {
-      document.getElementById('opening').style.display = 'none';
       document.getElementById('stuck').style.display = 'block';
     }, 12000);
     var warm = false;
     try {
       warm = Date.now() - (Number(localStorage.getItem('remind-last-launch')) || 0) < WARM_WINDOW_MS;
     } catch (e) { /* storage unavailable: always take the splash path */ }
-    location.replace(warm ? '/dashboard' : '/dashboard?launch=1');
+    location.replace(warm ? '/dashboard' : '/dashboard?launch=1&s=' + START);
   }
   // Auto-retry ONLY the offline bail-out. Re-running go() on every 'online' event
   // would abort and restart the in-flight navigation on each wifi↔cellular flap.

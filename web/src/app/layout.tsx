@@ -72,15 +72,17 @@ export default async function RootLayout({
           }}
         />
         {/* PWA launch handoff, before paint for the same reason as the theme script:
-            /launch.html forwards here with ?launch=1, and this attribute makes the
-            LaunchHandoff overlay (the same splash scene) visible from the FIRST frame —
-            no gap between the splash page and the still-loading dashboard. The overlay
-            removes the attribute once the window has fully loaded. */}
+            /launch.html forwards here with ?launch=1&s=<start>. The attribute makes
+            the LaunchHandoff overlay (the same brand-assembly scene) visible from the
+            FIRST frame, and --lh-seek is a NEGATIVE animation-delay that fast-forwards
+            it to wherever the splash page had got to — without it the animation would
+            visibly restart at the handover. 1400ms must match DURATION in
+            launch-handoff.tsx and --dur in launch.html. */}
         <script
           nonce={nonce}
           suppressHydrationWarning
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{if(/[?&]launch=1(&|$)/.test(location.search))document.documentElement.setAttribute('data-launching','1');}catch(e){}})();`,
+            __html: `(function(){try{if(!/[?&]launch=1(&|$)/.test(location.search))return;var d=document.documentElement;d.setAttribute('data-launching','1');var m=/[?&]s=(\\d+)/.exec(location.search);if(m){var e=Date.now()-Number(m[1]);if(e>0)d.style.setProperty('--lh-seek',(-Math.min(e,1400))+'ms');}}catch(e){}})();`,
           }}
         />
       </head>

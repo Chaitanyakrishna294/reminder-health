@@ -17,10 +17,43 @@
 // clock / dot) and its own words in the aria-label, per DESIGN_SYSTEM.md.
 
 import React from 'react';
-import { Check, X, AlertTriangle, Clock, Circle } from 'lucide-react';
+import { Check, X, AlertTriangle } from 'lucide-react';
 import { doseTone, doseLabel, type Tone } from '@/lib/design/semantics';
+import { getUnitIcon } from '@/components/ui/custom-icons';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import type { ReminderEvent } from '@/components/dashboard/todays-schedule';
+
+// ── The physical model ───────────────────────────────────────────────────────
+// A pocket is DOMED while the pill is still in it, and PRESSED IN once you have
+// pushed the pill out. That is the whole idea, and it maps exactly onto dose state:
+//
+//   domed   → upcoming, due now, missed   (the pill is still sitting there)
+//   pressed → taken, skipped              (the pocket has been emptied)
+//
+// So the strip's state is readable from the SURFACE, not only from colour — which
+// is worth real money for an audience with age-related colour vision changes, and
+// is why "missed" stays domed rather than borrowing the emptied look.
+//
+// Both effects are pure box-shadow + a gradient sheen: no extra elements, nothing
+// animated, and they composite fine inside a horizontal scroller.
+
+/** Convex: a light sheen off the top-left, shadow gathering at the bottom.
+ *  The sheen is kept to ~40% — at 55% it washed the pale neutral tint of an upcoming
+ *  pocket out to near-white and the dome stopped reading as form at all. The bottom
+ *  shadow does most of the work; the highlight only has to say where the light is. */
+const DOMED: React.CSSProperties = {
+  backgroundImage:
+    'radial-gradient(110% 85% at 30% 16%, rgba(255,255,255,0.42), rgba(255,255,255,0) 58%)',
+  boxShadow:
+    'inset 0 1px 1px rgba(255,255,255,0.55), inset 0 -5px 8px rgba(0,0,0,0.17), 0 1px 1.5px rgba(0,0,0,0.06)',
+};
+
+/** Concave: the highlight moves to the bottom lip and the shadow falls inside the
+ *  top edge — the same trick, inverted, which is what makes it read as pushed-in. */
+const PRESSED: React.CSSProperties = {
+  boxShadow:
+    'inset 0 3px 6px rgba(0,0,0,0.16), inset 0 -1px 1px rgba(255,255,255,0.35)',
+};
 
 /** Per-pocket presentation. Derived from the dose's tone so it can never drift from
  *  the rest of the app's status colours, plus the glyph that carries the same meaning
@@ -31,9 +64,10 @@ function pocketFace(tone: Tone, isDue: boolean) {
       // The one pocket asking for something right now. Solid enough to find at a
       // glance on a page of tints, but it is NOT the page's CTA — the hero card is.
       shell: 'border-primary/45 bg-primary-soft',
-      well: 'border-primary/40 bg-primary/15 text-primary-strong',
+      well: 'border-primary/40 bg-primary/20 text-primary-strong',
       label: 'text-primary-strong',
-      glyph: <Clock className="w-5 h-5" aria-hidden />,
+      filled: true,
+      glyph: null,
     };
   }
   switch (tone) {
@@ -42,6 +76,7 @@ function pocketFace(tone: Tone, isDue: boolean) {
         shell: 'border-success/30 bg-success/8',
         well: 'border-success/35 bg-success/20 text-success-strong',
         label: 'text-success-strong',
+        filled: false,
         glyph: <Check className="w-5 h-5" aria-hidden />,
       };
     case 'warning':
@@ -49,30 +84,35 @@ function pocketFace(tone: Tone, isDue: boolean) {
         shell: 'border-warning/30 bg-warning/8',
         well: 'border-warning/35 bg-warning/20 text-warning-strong',
         label: 'text-warning-strong',
+        filled: false,
         glyph: <X className="w-5 h-5" aria-hidden />,
       };
     case 'danger':
+      // Missed. The dose was never taken, so the pill is still in there — this one
+      // stays domed and keeps its pill, and the alarm rides on top of it.
       return {
         shell: 'border-danger/35 bg-danger/8',
         well: 'border-danger/40 bg-danger/20 text-danger-strong',
         label: 'text-danger-strong',
-        glyph: <AlertTriangle className="w-5 h-5" aria-hidden />,
+        filled: true,
+        glyph: <AlertTriangle className="w-4 h-4 absolute -right-0.5 -top-0.5" aria-hidden />,
       };
     case 'info':
       return {
         shell: 'border-info/30 bg-info/8',
         well: 'border-info/35 bg-info/20 text-info-strong',
         label: 'text-info-strong',
-        glyph: <Clock className="w-5 h-5" aria-hidden />,
+        filled: true,
+        glyph: null,
       };
     default:
-      // Not due yet. An unpunched pocket: empty well, dashed edge, nothing to read
-      // into. Deliberately the quietest thing in the strip.
+      // Not due yet: a full pocket, quietly. Neutral tint, pill still visible.
       return {
         shell: 'border-border bg-card',
-        well: 'border-dashed border-input bg-muted/60 text-muted-foreground',
+        well: 'border-input bg-muted text-muted-foreground',
         label: 'text-muted-foreground',
-        glyph: <Circle className="w-4 h-4 opacity-60" aria-hidden />,
+        filled: true,
+        glyph: null,
       };
   }
 }
@@ -169,10 +209,21 @@ export default function DoseStrip({
                               ${face.shell} ${isSelected ? 'ring-2 ring-ring ring-offset-2 ring-offset-background' : ''}`}
                 >
                   {/* The well. Concentric radius: 18px shell − 6px padding = 12px inner,
-                      which is what stops nested rounded shapes from looking wrong. */}
+                      which is what stops nested rounded shapes from looking wrong.
+
+                      Domed while the pill is still in it, pressed in once the pocket has
+                      been emptied — see the note at the top of this file. A full pocket
+                      shows the medication's OWN unit glyph (tablet / capsule / drops), so
+                      you can see what is in there the way you can through real foil. */}
                   <span
-                    className={`w-full h-12 rounded-[12px] border flex items-center justify-center shadow-inner ${face.well}`}
+                    className={`relative w-full h-12 rounded-[12px] border flex items-center justify-center overflow-visible ${face.well}`}
+                    style={face.filled ? DOMED : PRESSED}
                   >
+                    {face.filled && (
+                      <span aria-hidden className="[&_svg]:w-5 [&_svg]:h-5 opacity-90">
+                        {getUnitIcon(event.medications.unit_type, 'w-5 h-5')}
+                      </span>
+                    )}
                     {face.glyph}
                   </span>
                   <span className={`text-[11px] font-black tabular-nums leading-none whitespace-nowrap ${face.label}`}>
