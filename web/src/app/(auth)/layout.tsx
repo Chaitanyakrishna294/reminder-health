@@ -55,8 +55,9 @@ export default function AuthLayout({
           hang below the brain's straight bottom line — measured 14px at the
           asset's 672px width ⇒ ~4px at the ~206px render (-mb-1). That puts
           the brain's edge line ON the strip edge with only the fingers curling
-          onto its face. Re-measure if the asset changes (scratchpad
-          measure-hang.mjs). Decorative only, hence alt="" + aria-hidden. */}
+          onto its face. Re-measure if the asset changes
+          (scratch/mascot-measure-hang.mjs). Decorative only, hence
+          alt="" + aria-hidden. */}
       <footer className="relative mt-auto">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
