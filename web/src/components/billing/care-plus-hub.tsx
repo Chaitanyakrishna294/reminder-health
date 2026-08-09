@@ -45,7 +45,7 @@ export default function CarePlusHub({ telegramId, memberName }: { telegramId: st
   if (!isMember) {
     return (
       <div className="max-w-md mx-auto space-y-5">
-        <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-primary transition-colors">
+        <Link href="/dashboard" className="-ml-2 px-2 h-11 inline-flex items-center gap-1.5 rounded-lg text-sm font-semibold text-muted-foreground hover:text-primary hover:bg-muted transition-colors w-fit">
           <ArrowLeft className="w-4 h-4" /> Back to dashboard
         </Link>
         <CarePlusCard telegramId={telegramId} />
@@ -58,7 +58,7 @@ export default function CarePlusHub({ telegramId, memberName }: { telegramId: st
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-primary transition-colors">
+      <Link href="/dashboard" className="-ml-2 px-2 h-11 inline-flex items-center gap-1.5 rounded-lg text-sm font-semibold text-muted-foreground hover:text-primary hover:bg-muted transition-colors w-fit">
         <ArrowLeft className="w-4 h-4" /> Back to dashboard
       </Link>
 

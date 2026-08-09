@@ -313,6 +313,29 @@ body:has(nav[data-tour="dash-nav"]) .floating-bottom {
   --animate-fade-in: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* ── Entrance choreography ─────────────────────────────────────────────────
+   ONE curve, ONE distance, ONE stagger unit for every section of a page, so a
+   screen reads as a single cascade instead of N unrelated fades.
+
+   Usage: put `.rise-in` on each section and set `--rise-delay` per element
+   (60ms apart; keep the whole cascade under ~400ms — past that the last card
+   arrives after the user has already started reading).
+
+   14px, not 24: the distance a card travels should read as "settling into
+   place", not "flying in". Curve is a strong ease-OUT — the first frame moves
+   most, which is the frame the user is actually watching. Never ease-in here.
+
+   prefers-reduced-motion is handled by the global rule at the foot of this
+   file (it zeroes duration AND delay), so there is no override to maintain. */
+@keyframes rise-in {
+  from { opacity: 0; transform: translate3d(0, 14px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+.rise-in {
+  animation: rise-in 420ms cubic-bezier(0.23, 1, 0.32, 1) both;
+  animation-delay: var(--rise-delay, 0ms);
+}
+
 /* Timeline card flip-in for stacked same-time dose groups */
 @keyframes card-flip-in {
   0%   { transform: rotateY(-72deg) scale(0.9); opacity: 0; }
@@ -391,6 +414,10 @@ body:has(nav[data-tour="dash-nav"]) .floating-bottom {
   from { opacity: 0; transform: translateY(4px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+/* The loading mark's keyframes deliberately do NOT live here — see the comment in
+   components/ui/loading-mark.tsx. Tailwind/Lightning silently dropped them from
+   this file, so they ship as an inline <style> with the component instead. */
 
 /* Luxe (Care+ premium) — a slow gold light-sweep across dark gold surfaces. */
 @keyframes luxeSheen {

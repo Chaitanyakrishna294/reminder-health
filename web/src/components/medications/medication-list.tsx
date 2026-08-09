@@ -385,7 +385,10 @@ export default function MedicationList({
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search your list or the medicine directory"
+              /* Was "Search your list or the medicine directory", which ran past the
+                 right edge of a 326px field and got clipped mid-word. The full sentence
+                 stays as the accessible name below. */
+              placeholder="Search medicines"
               aria-label="Search your medications or the medicine directory"
               className={`w-full rounded-2xl bg-card border border-border pl-10 pr-4 font-semibold text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors ${
                 isElderly ? 'h-14 text-base' : 'h-11 text-[13px]'
@@ -714,8 +717,10 @@ export default function MedicationList({
               <div
                 key={med.id}
                 data-tour={idx === 0 ? 'med-card-first' : undefined}
-                className={`relative bg-white rounded-[22px] overflow-hidden transition-all duration-200 hover:-translate-y-0.5 ${!med.active ? 'opacity-70' : ''}`}
-                style={{ boxShadow: cardShadow }}
+                className={`rise-in relative bg-card rounded-[22px] overflow-hidden transition-transform duration-200 ease-out hover:-translate-y-0.5 ${!med.active ? 'opacity-70' : ''}`}
+                /* Same 60ms cascade the dashboard uses (`.rise-in` in globals.css),
+                   capped at 6 so a long list still finishes inside ~360ms. */
+                style={{ boxShadow: cardShadow, ['--rise-delay' as string]: `${Math.min(idx, 6) * 60}ms` }}
               >
                 {/* Header region */}
                 <div className="px-5 pt-5 pb-4">
@@ -730,8 +735,12 @@ export default function MedicationList({
 
                     {/* Name + meta */}
                     <div className="flex-1 min-w-0">
+                      {/* The name is what you scan this list FOR, so it takes the display
+                          size. It was 18px semibold next to a 32px stock figure — the
+                          count was the loudest thing on every card, which inverts what
+                          the page is for. */}
                       <h3
-                        className={`font-bold tracking-tight text-foreground ${isElderly ? 'text-2xl break-words' : 'text-lg truncate'}`}
+                        className={`font-black tracking-[-0.01em] text-foreground ${isElderly ? 'text-2xl break-words' : 'text-xl truncate'}`}
                       >
                         {med.drug_name}
                       </h3>
@@ -783,24 +792,6 @@ export default function MedicationList({
                           </span>
                         </div>
                       )}
-                      {/* Category + frequency pills */}
-                      <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                        <span
-                          className="inline-flex items-center gap-1 font-semibold rounded-full px-2.5 py-1 text-[11px]"
-                          style={{ background: t.tint, color: t.color }}
-                        >
-                          <span className="w-1.5 h-1.5 rounded-full" style={{ background: t.color }} />
-                          {priorityMeta(med.priority_level).label}
-                        </span>
-                        <span className="inline-flex items-center font-semibold capitalize rounded-full px-2.5 py-1 text-[11px] bg-[#F2F2F7] text-muted-foreground">
-                          {med.frequency.replace(/_/g, ' ')}
-                        </span>
-                        {!med.active && (
-                          <span className="inline-flex items-center font-semibold rounded-full px-2.5 py-1 text-[11px] bg-[#F2F2F7] text-muted-foreground">
-                            Paused
-                          </span>
-                        )}
-                      </div>
                     </div>
 
                     {/* Stock */}
@@ -812,8 +803,13 @@ export default function MedicationList({
                     <div data-tour={idx === 0 ? 'med-stock' : undefined} className="shrink-0 text-right max-w-[76px]">
                       {displayStock !== null ? (
                         <>
+                          {/* Demoted from 32px. Stock is a secondary metric on a page you
+                              came to for the medication list — at display size it beat the
+                              drug name for attention on every card, and it also stole the
+                              width that pushed the priority/frequency pills onto two rows.
+                              Still colour-coded, so a low count is found just as fast. */}
                           <p
-                            className={`font-bold tabular-nums leading-none ${isElderly ? 'text-4xl' : 'text-[32px]'}`}
+                            className={`font-black tabular-nums leading-none ${isElderly ? 'text-3xl' : 'text-xl'}`}
                             style={{ color: stockColor }}
                           >
                             {displayStock}
@@ -839,10 +835,34 @@ export default function MedicationList({
                       )}
                     </div>
                   </div>
+
+                  {/* Category + frequency pills.
+                      These live on their OWN full-width row rather than inside the name
+                      column. Nested beside the icon tile and the stock column they had
+                      ~151px to work with, so "Important" and "Once Daily" — 178px of
+                      pills — wrapped onto two rows on every single card. Out here they
+                      get the full 287px and sit on one line. */}
+                  <div className="flex items-center gap-1.5 mt-3 flex-wrap">
+                    <span
+                      className="inline-flex items-center gap-1 font-semibold rounded-full px-2.5 py-1 text-[11px]"
+                      style={{ background: t.tint, color: t.color }}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: t.color }} />
+                      {priorityMeta(med.priority_level).label}
+                    </span>
+                    <span className="inline-flex items-center font-semibold capitalize rounded-full px-2.5 py-1 text-[11px] bg-muted text-muted-foreground">
+                      {med.frequency.replace(/_/g, ' ')}
+                    </span>
+                    {!med.active && (
+                      <span className="inline-flex items-center font-semibold rounded-full px-2.5 py-1 text-[11px] bg-muted text-muted-foreground">
+                        Paused
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Divider */}
-                <div className="h-px bg-[#0F1C5A]/[0.06] mx-5" />
+                <div className="h-px bg-border mx-5" />
 
                 {/* Footer region.
                     Times and the four action buttons used to share one row. Once the
@@ -929,7 +949,7 @@ export default function MedicationList({
       {/* Add-stock modal */}
       {stockModalMed && (
         <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in" onClick={() => stockBusyId === null && setStockModalMed(null)}>
-          <div className="bg-white rounded-[22px] max-w-sm w-full p-6 space-y-5" style={{ boxShadow: '0 8px 40px rgba(16, 28, 90, 0.18)' }} onClick={(e) => e.stopPropagation()}>
+          <div className="bg-card rounded-[22px] max-w-sm w-full p-6 space-y-5" style={{ boxShadow: '0 8px 40px rgba(16, 28, 90, 0.18)' }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0" style={{ background: cardTheme(stockModalMed).tint, color: cardTheme(stockModalMed).color }}>
@@ -940,7 +960,7 @@ export default function MedicationList({
                   <h3 className="text-base font-bold tracking-tight text-foreground truncate">{stockModalMed.drug_name}</h3>
                 </div>
               </div>
-              <button onClick={() => setStockModalMed(null)} disabled={stockBusyId !== null} className="w-8 h-8 rounded-full flex items-center justify-center bg-[#F2F2F7] hover:bg-[#E5E5EA] text-muted-foreground cursor-pointer transition-all disabled:opacity-50 shrink-0">
+              <button onClick={() => setStockModalMed(null)} disabled={stockBusyId !== null} className="w-8 h-8 rounded-full flex items-center justify-center bg-muted hover:bg-input text-muted-foreground cursor-pointer transition-all disabled:opacity-50 shrink-0">
                 <X className="w-4 h-4" strokeWidth={2.5} />
               </button>
             </div>
@@ -958,7 +978,7 @@ export default function MedicationList({
                 onChange={(e) => { setStockInput(e.target.value); setStockError(''); }}
                 onKeyDown={(e) => { if (e.key === 'Enter') confirmAddStock(); }}
                 placeholder="0"
-                className="mt-1.5 w-full px-4 py-3 bg-[#F2F2F7] rounded-2xl text-sm font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                className="mt-1.5 w-full px-4 py-3 bg-muted rounded-2xl text-sm font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
               />
               {(stockModalMed.current_stock ?? stockModalMed.tablet_count ?? null) !== null && (
                 <span className="block mt-1.5 text-[11px] font-medium text-muted-foreground">
@@ -974,7 +994,7 @@ export default function MedicationList({
               <button
                 onClick={() => setStockModalMed(null)}
                 disabled={stockBusyId !== null}
-                className="flex-1 py-3 bg-[#F2F2F7] text-muted-foreground hover:bg-[#E5E5EA] text-sm font-semibold rounded-full cursor-pointer transition-all disabled:opacity-50"
+                className="flex-1 py-3 bg-muted text-muted-foreground hover:bg-input text-sm font-semibold rounded-full cursor-pointer transition-all disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -994,7 +1014,7 @@ export default function MedicationList({
       {/* Delete confirmation modal */}
       {deleteModalMed && (
         <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in" onClick={() => loadingId === null && setDeleteModalMed(null)}>
-          <div className="bg-white rounded-[22px] max-w-sm w-full p-6 space-y-5 text-center" style={{ boxShadow: '0 8px 40px rgba(16, 28, 90, 0.18)' }} onClick={(e) => e.stopPropagation()}>
+          <div className="bg-card rounded-[22px] max-w-sm w-full p-6 space-y-5 text-center" style={{ boxShadow: '0 8px 40px rgba(16, 28, 90, 0.18)' }} onClick={(e) => e.stopPropagation()}>
             <div className="w-14 h-14 rounded-full bg-danger/10 flex items-center justify-center mx-auto">
               <Trash2 className="w-6 h-6 text-danger-strong" strokeWidth={2.2} />
             </div>
@@ -1008,7 +1028,7 @@ export default function MedicationList({
               <button
                 onClick={() => setDeleteModalMed(null)}
                 disabled={loadingId !== null}
-                className="flex-1 py-3 bg-[#F2F2F7] text-muted-foreground hover:bg-[#E5E5EA] text-sm font-semibold rounded-full cursor-pointer transition-all disabled:opacity-50"
+                className="flex-1 py-3 bg-muted text-muted-foreground hover:bg-input text-sm font-semibold rounded-full cursor-pointer transition-all disabled:opacity-50"
               >
                 Cancel
               </button>

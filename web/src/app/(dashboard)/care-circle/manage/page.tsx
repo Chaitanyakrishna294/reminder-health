@@ -446,7 +446,14 @@ export default function SharedTrustCenter() {
       {/* Header bar */}
       <div className="flex items-center justify-between border-b border-border pb-6">
         <div className="flex items-center gap-3">
-          <Link href="/care-circle" className="p-2 hover:bg-muted rounded-xl transition-all border border-transparent hover:border-border text-muted-foreground hover:text-foreground">
+          {/* Was `p-2` around a 20px icon — a 37px target with no accessible name, so a
+              screen reader announced it as a bare link. The sibling page's back control
+              is already 44px with a label; matched here. */}
+          <Link
+            href="/care-circle"
+            aria-label="Back to Care Circle"
+            className="w-11 h-11 shrink-0 flex items-center justify-center hover:bg-muted rounded-xl transition-all border border-transparent hover:border-border text-muted-foreground hover:text-foreground"
+          >
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
@@ -513,37 +520,49 @@ export default function SharedTrustCenter() {
                   
                   return (
                     <div key={conn.connection_id} className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-5">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold border border-primary/20">
+                      {/* Stacks below sm. Side by side at 375px this row asked an
+                          identity block AND three buttons to share 287px, so the
+                          "Primary Coordinator" badge wrapped to two lines inside a 73px
+                          box and "Edit Access" wrapped inside a 56px one. */}
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="shrink-0 w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold border border-primary/20">
                             {conn.resolved_name?.substring(0, 2).toUpperCase() || 'CG'}
                           </div>
-                          <div>
-                            <div className="flex items-center gap-2">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <h3 className="font-black text-foreground text-sm tracking-tight">{conn.resolved_name}</h3>
                               {conn.is_primary && (
-                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-bold border border-primary/20">
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-bold border border-primary/20 whitespace-nowrap">
                                   Primary Coordinator
                                 </span>
                               )}
                             </div>
-                            <p className="text-[10px] text-muted-foreground font-semibold mt-0.5 capitalize">
+                            <p className="text-[11px] text-muted-foreground font-semibold mt-0.5 capitalize">
                               {caregiverRoleLabel(conn.relationship_type)} • Caring together for {daysCaring} day{daysCaring !== 1 ? 's' : ''}
                             </p>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-1.5">
+                        {/* 44px targets throughout. These were 42px and 28px tall — under
+                            the WCAG floor, and under the 44px the medication list already
+                            standardised on. `title` is NOT announced on touch, so each
+                            button carries a real accessible name that says WHO it acts on. */}
+                        <div className="flex items-center gap-1.5 shrink-0">
                           <button
                             onClick={() => handleOpenEdit(conn)}
-                            className="px-2.5 py-1.5 text-[10px] font-bold text-primary bg-primary/10 hover:bg-primary/20 rounded-lg cursor-pointer transition-all"
+                            aria-label={`Edit what ${conn.resolved_name || 'this caregiver'} can access`}
+                            className="h-11 px-3 text-[11px] font-bold text-primary-strong bg-primary/10 hover:bg-primary/20 rounded-lg cursor-pointer transition-all whitespace-nowrap"
                           >
                             Edit Access
                           </button>
                           {!conn.is_primary && (
                             <button
                               onClick={() => handlePromotePrimary(conn)}
-                              className="px-2.5 py-1.5 text-[10px] font-bold text-muted-foreground bg-muted hover:bg-slate-100 rounded-lg cursor-pointer transition-all border border-border"
+                              aria-label={`Make ${conn.resolved_name || 'this caregiver'} the primary coordinator`}
+                              /* `hover:bg-slate-100` was a raw palette colour — near-white,
+                                 so in dark mode this button flashed white on hover. */
+                              className="h-11 px-3 text-[11px] font-bold text-muted-foreground bg-muted hover:bg-input rounded-lg cursor-pointer transition-all border border-border whitespace-nowrap"
                               title="Promote Coordinator"
                             >
                               Make Primary
@@ -551,7 +570,8 @@ export default function SharedTrustCenter() {
                           )}
                           <button
                             onClick={() => handleRevokeConnection(conn, false)}
-                            className="p-1.5 text-danger bg-danger/10 hover:bg-danger/20 rounded-lg cursor-pointer transition-all"
+                            aria-label={`Revoke ${conn.resolved_name || 'this caregiver'}'s access`}
+                            className="w-11 h-11 flex items-center justify-center text-danger-strong bg-danger/10 hover:bg-danger/20 rounded-lg cursor-pointer transition-all"
                             title="Revoke Access"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -632,27 +652,37 @@ export default function SharedTrustCenter() {
                 {peopleISupport.map((conn) => {
                   const preset = resolvePreset(conn);
                   return (
-                    <div key={conn.connection_id} className="bg-card border border-border rounded-2xl p-5 shadow-sm flex justify-between items-center">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold border border-primary/20">
+                    <div key={conn.connection_id} className="bg-card border border-border rounded-2xl p-5 shadow-sm flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="shrink-0 w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold border border-primary/20">
                           {conn.resolved_name?.substring(0, 2).toUpperCase() || 'PT'}
                         </div>
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <h3 className="font-bold text-foreground text-sm">{conn.resolved_name}</h3>
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-semibold border border-border capitalize">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {/* A connection whose name has not resolved rendered an EMPTY
+                                heading, so the row showed a bare relationship badge and
+                                no indication of who it belonged to. */}
+                            <h3 className="font-bold text-foreground text-sm">
+                              {conn.resolved_name || 'Unnamed patient'}
+                            </h3>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-semibold border border-border capitalize whitespace-nowrap">
                               {patientRoleLabel(conn.relationship_type)}
                             </span>
                           </div>
-                          <p className="text-[10px] text-muted-foreground font-semibold mt-0.5">
+                          <p className="text-[11px] text-muted-foreground font-semibold mt-0.5">
                             Role: {conn.is_primary ? 'Primary Coordinator' : 'Secondary Caregiver'} • Preset: {PERMISSION_PRESETS[preset].name}
                           </p>
                         </div>
                       </div>
 
+                      {/* Was 81x28 — a destructive control at well under half the 44px
+                          touch floor, wearing a tinted fill that made it as loud as
+                          anything else on the row. Ghost treatment and a real target,
+                          matching the patient cards on /care-circle. */}
                       <button
                         onClick={() => handleRevokeConnection(conn, true)}
-                        className="px-3 py-1.5 text-[10px] font-bold text-danger bg-danger/10 hover:bg-danger/20 rounded-lg cursor-pointer transition-all border border-danger/20 shrink-0"
+                        aria-label={`Disconnect from ${conn.resolved_name || 'this patient'}`}
+                        className="self-start sm:self-auto h-11 px-3 text-[11px] font-bold text-danger-strong bg-transparent hover:bg-danger/10 rounded-lg cursor-pointer transition-all border border-transparent hover:border-danger/25 shrink-0 whitespace-nowrap"
                       >
                         Disconnect
                       </button>
@@ -705,7 +735,11 @@ export default function SharedTrustCenter() {
               <select
                 value={editRelationship}
                 onChange={(e) => setEditRelationship(e.target.value)}
-                className="w-full h-10 px-3 bg-white border border-border rounded-xl focus:outline-none focus:border-primary text-xs font-bold"
+                /* Was `bg-white`, which globals.css rewrites to `--card` in dark mode —
+                   the same colour as the modal behind it, so the field vanished. `muted`
+                   stays a distinct surface in both themes, matching the medication
+                   list's modal input. */
+                className="w-full h-11 px-3 bg-muted border border-border rounded-xl focus:outline-none focus:border-primary text-xs font-bold"
               >
                 <option value="SON">Son</option>
                 <option value="DAUGHTER">Daughter</option>

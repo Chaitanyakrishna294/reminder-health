@@ -181,7 +181,10 @@ export default function MedicalProfileClientView({ userId, fullName, email, init
   };
 
   const label = `block font-semibold text-foreground ${isElderly ? 'text-base mb-1.5' : 'text-xs mb-1'}`;
-  const input = `w-full px-3 py-2 rounded-xl bg-background border border-border text-foreground focus:outline-none focus:border-primary transition-all ${isElderly ? 'text-lg py-3' : 'text-sm'}`;
+  // Every control on this form measured 37px tall (35px for the selects) — under the
+  // 44px touch floor the rest of the app now holds to. Height is set explicitly rather
+  // than via padding so the selects match the inputs exactly.
+  const input = `w-full px-3 rounded-xl bg-background border border-border text-foreground focus:outline-none focus:border-primary transition-all ${isElderly ? 'h-14 text-lg' : 'h-11 text-sm'}`;
   const card = 'bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4';
   const sectionTitle = `font-black text-foreground ${isElderly ? 'text-xl' : 'text-sm'}`;
 
@@ -238,29 +241,29 @@ export default function MedicalProfileClientView({ userId, fullName, email, init
           />
         </label>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className={label}>Full Name</label>
+          <label className="block">
+            <span className={label}>Full Name</span>
             <input className={`${input} opacity-70`} value={fullName} disabled readOnly />
-          </div>
-          <div>
-            <label className={label}>Email</label>
+          </label>
+          <label className="block">
+            <span className={label}>Email</span>
             <input className={`${input} opacity-70`} value={email} disabled readOnly />
-          </div>
-          <div>
-            <label className={label}>Date of Birth</label>
+          </label>
+          <label className="block">
+            <span className={label}>Date of Birth</span>
             <input type="date" className={input} value={dob} onChange={(e) => setDob(e.target.value)} />
-          </div>
-          <div>
-            <label className={label}>Age{age !== null ? '' : ' (auto)'}</label>
+          </label>
+          <label className="block">
+            <span className={label}>Age{age !== null ? '' : ' (auto)'}</span>
             <input className={`${input} opacity-70`} value={age !== null ? `${age} years` : '—'} disabled readOnly />
-          </div>
-          <div>
-            <label className={label}>Gender</label>
+          </label>
+          <label className="block">
+            <span className={label}>Gender</span>
             <select className={input} value={gender} onChange={(e) => setGender(e.target.value)}>
               <option value="">Select…</option>
               {GENDERS.map((g) => <option key={g} value={g}>{g}</option>)}
             </select>
-          </div>
+          </label>
         </div>
       </div>
 
@@ -268,25 +271,25 @@ export default function MedicalProfileClientView({ userId, fullName, email, init
       <div className={card}>
         <h3 className={sectionTitle}>Medical Identity</h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div>
-            <label className={label}>Blood Group</label>
+          <label className="block">
+            <span className={label}>Blood Group</span>
             <select className={input} value={bloodGroup} onChange={(e) => setBloodGroup(e.target.value)}>
               <option value="">—</option>
               {BLOOD_GROUPS.map((b) => <option key={b} value={b}>{b}</option>)}
             </select>
-          </div>
-          <div>
-            <label className={label}>Height (cm)</label>
+          </label>
+          <label className="block">
+            <span className={label}>Height (cm)</span>
             <input type="number" className={input} value={height} onChange={(e) => setHeight(e.target.value)} />
-          </div>
-          <div>
-            <label className={label}>Weight (kg)</label>
+          </label>
+          <label className="block">
+            <span className={label}>Weight (kg)</span>
             <input type="number" className={input} value={weight} onChange={(e) => setWeight(e.target.value)} />
-          </div>
-          <div>
-            <label className={label}>BMI (auto)</label>
+          </label>
+          <label className="block">
+            <span className={label}>BMI (auto)</span>
             <input className={`${input} opacity-70`} value={bmi ?? '—'} disabled readOnly />
-          </div>
+          </label>
         </div>
       </div>
 
@@ -295,22 +298,22 @@ export default function MedicalProfileClientView({ userId, fullName, email, init
         <h3 className={sectionTitle}>Health Information</h3>
         <p className="text-xs text-muted-foreground -mt-2">Separate multiple entries with commas.</p>
         <div className="grid grid-cols-1 gap-4">
-          <div>
-            <label className={label}>Drug Allergies</label>
+          <label className="block">
+            <span className={label}>Drug Allergies</span>
             <input className={input} value={drugAllergies} onChange={(e) => setDrugAllergies(e.target.value)} placeholder="Penicillin, Aspirin" />
-          </div>
-          <div>
-            <label className={label}>Food Allergies</label>
+          </label>
+          <label className="block">
+            <span className={label}>Food Allergies</span>
             <input className={input} value={foodAllergies} onChange={(e) => setFoodAllergies(e.target.value)} placeholder="Peanuts, Shellfish" />
-          </div>
-          <div>
-            <label className={label}>Other Allergies</label>
+          </label>
+          <label className="block">
+            <span className={label}>Other Allergies</span>
             <input className={input} value={otherAllergies} onChange={(e) => setOtherAllergies(e.target.value)} placeholder="Latex, Pollen" />
-          </div>
-          <div>
-            <label className={label}>Chronic Conditions</label>
+          </label>
+          <label className="block">
+            <span className={label}>Chronic Conditions</span>
             <input className={input} value={conditions} onChange={(e) => setConditions(e.target.value)} placeholder="Diabetes, Hypertension, Asthma" />
-          </div>
+          </label>
         </div>
       </div>
 
@@ -318,18 +321,18 @@ export default function MedicalProfileClientView({ userId, fullName, email, init
       <div className={card}>
         <h3 className={sectionTitle}>Emergency Information</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div>
-            <label className={label}>Emergency Contact</label>
+          <label className="block">
+            <span className={label}>Emergency Contact</span>
             <input className={input} value={ecName} onChange={(e) => setEcName(e.target.value)} placeholder="Name" />
-          </div>
-          <div>
-            <label className={label}>Emergency Phone</label>
+          </label>
+          <label className="block">
+            <span className={label}>Emergency Phone</span>
             <input className={input} value={ecPhone} onChange={(e) => setEcPhone(e.target.value)} placeholder="+91…" />
-          </div>
-          <div>
-            <label className={label}>Relationship</label>
+          </label>
+          <label className="block">
+            <span className={label}>Relationship</span>
             <input className={input} value={ecRel} onChange={(e) => setEcRel(e.target.value)} placeholder="Spouse, Son…" />
-          </div>
+          </label>
         </div>
       </div>
 
@@ -337,18 +340,18 @@ export default function MedicalProfileClientView({ userId, fullName, email, init
       <div className={card}>
         <h3 className={sectionTitle}>Medical Preferences</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div>
-            <label className={label}>Primary Language</label>
+          <label className="block">
+            <span className={label}>Primary Language</span>
             <input className={input} value={primaryLang} onChange={(e) => setPrimaryLang(e.target.value)} placeholder="English" />
-          </div>
-          <div>
-            <label className={label}>Preferred Reminder Language</label>
+          </label>
+          <label className="block">
+            <span className={label}>Preferred Reminder Language</span>
             <input className={input} value={reminderLang} onChange={(e) => setReminderLang(e.target.value)} placeholder="English" />
-          </div>
-          <div>
-            <label className={label}>Time Zone</label>
+          </label>
+          <label className="block">
+            <span className={label}>Time Zone</span>
             <input className={input} value={timezone} onChange={(e) => setTimezone(e.target.value)} placeholder="Asia/Kolkata" />
-          </div>
+          </label>
         </div>
       </div>
 

@@ -157,7 +157,7 @@ export default function Navbar({ user }: NavbarProps) {
                         onClick={() => setUserDropdownOpen(false)}
                         className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted font-medium transition-colors cursor-pointer flex items-center gap-2 font-mono border-b border-border"
                       >
-                        <Siren className="w-3.5 h-3.5 text-red-500" />
+                        <Siren className="w-3.5 h-3.5 text-danger" />
                         <span>Emergency Card</span>
                       </Link>
                     </>

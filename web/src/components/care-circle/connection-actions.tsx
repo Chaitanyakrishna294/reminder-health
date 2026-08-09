@@ -154,12 +154,19 @@ export function PatientConnectionActions({
             <span>Monitor dashboard</span>
           </button>
         )}
+        {/* Destructive, so it is deliberately NOT a peer of the primary action.
+            In the `flex-col` mobile layout the default `align-items: stretch` made this
+            a FULL-WIDTH tinted red button sitting directly under "Monitor dashboard" —
+            three same-sized stacked blocks where the third one disconnects a patient.
+            `self-center` takes it back to its own width, and the fill drops to a ghost,
+            matching the `danger-ghost` treatment the medication list already uses for
+            delete. Still a 44px target, still red, still labelled. */}
         <button
           onClick={disconnect}
           disabled={processing}
           title={isPending ? 'Reject request' : 'Disconnect patient'}
           aria-label={isPending ? `Reject request from ${patientName}` : `Disconnect from ${patientName}`}
-          className={`shrink-0 font-bold rounded-xl bg-danger/10 text-danger-strong border border-danger/25 hover:bg-danger/15 transition-all cursor-pointer flex items-center justify-center gap-1.5 px-4 disabled:opacity-50 ${h}`}
+          className={`shrink-0 self-center sm:self-auto font-bold rounded-xl bg-transparent text-danger-strong border border-transparent hover:bg-danger/10 hover:border-danger/25 transition-all cursor-pointer flex items-center justify-center gap-1.5 px-4 disabled:opacity-50 ${h}`}
         >
           <Trash2 className="w-4 h-4" />
           <span>{isPending ? 'Reject' : 'Remove'}</span>

@@ -41,12 +41,23 @@ export default async function EmergencyPage() {
 
   return (
     <div className="max-w-xl mx-auto">
-      <div className="rounded-3xl bg-red-600 text-white shadow-2xl p-6 sm:p-8">
+      {/* This panel is shown to paramedics, so it stays a committed red in BOTH themes —
+          that is exactly what `--danger-solid` is for (see globals.css; `--danger` is too
+          light to carry white, and `--danger-strong` deliberately flips lightness between
+          modes, which a fill must never do). Was the raw `red-600`. */}
+      <div className="rounded-3xl bg-danger-solid text-danger-solid-foreground shadow-2xl p-6 sm:p-8">
         <div className="flex items-center justify-between">
           <span className="inline-flex items-center gap-2 text-sm font-black uppercase tracking-widest bg-white/15 px-3 py-1 rounded-full">
             <Siren className="w-4 h-4" /> Emergency Card
           </span>
-          <Link href="/medical-profile" className="text-white/80 hover:text-white" aria-label="Edit medical profile">
+          {/* Icon-only, so it gets a real 44px target — it was the bare 20px glyph.
+              (The "Medical Profile" link at the foot of this page stays as-is: it sits
+              inline in a sentence, which WCAG 2.5.8 exempts.) */}
+          <Link
+            href="/medical-profile"
+            className="-mr-2 w-11 h-11 flex items-center justify-center rounded-full text-white/80 hover:text-white hover:bg-white/15 transition-colors"
+            aria-label="Edit medical profile"
+          >
             <Pencil className="w-5 h-5" />
           </Link>
         </div>
@@ -89,7 +100,12 @@ export default async function EmergencyPage() {
               {medical.emergency_contact_phone && (
                 <a
                   href={`tel:${medical.emergency_contact_phone.replace(/[^\d+]/g, '')}`}
-                  className="inline-flex items-center gap-1.5 bg-white text-red-700 font-black rounded-xl px-3 py-1.5 text-sm shrink-0"
+                  /* Sits ON the committed-red panel, so it must be theme-independent too.
+                     `bg-white` was NOT: globals.css rewrites `.bg-white` to `--card` in
+                     dark mode, which turned this into dark-red text on a navy pill over a
+                     red card. The two `danger-solid` tokens are #fff / #B3261E in both
+                     modes, so the pairing holds either way. Also now a 44px target. */
+                  className="inline-flex items-center justify-center gap-1.5 bg-danger-solid-foreground text-danger-solid font-black rounded-xl px-3 h-11 text-sm shrink-0"
                 >
                   <Phone className="w-4 h-4" /> Call
                 </a>

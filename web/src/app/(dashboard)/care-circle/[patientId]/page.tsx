@@ -149,8 +149,12 @@ export default async function PatientConsolePage({ params }: PageProps) {
 
   // Story color styling mapping
   const storyStyles = {
-    danger: 'bg-red-500/10 border-red-500/20 text-red-700 dark:text-red-400',
-    warning: 'bg-amber-500/10 border-amber-500/20 text-amber-700 dark:text-amber-400',
+    // Were raw palette reds/ambers with a hand-written `dark:` override, while the two
+    // entries below them already used tokens. The `-strong` variants are the app's
+    // documented text-on-tint colours and flip for dark mode on their own, so the manual
+    // override goes away with them (DESIGN_SYSTEM.md).
+    danger: 'bg-danger/10 border-danger/20 text-danger-strong',
+    warning: 'bg-warning/10 border-warning/20 text-warning-strong',
     success: 'bg-success/10 border-success/20 text-success',
     info: 'bg-primary/10 border-primary/20 text-primary'
   }[healthStory.type];
@@ -209,7 +213,7 @@ export default async function PatientConsolePage({ params }: PageProps) {
       
       {/* 1. Header Navigation */}
       <div className="flex justify-start">
-        <Link href="/care-circle" className="flex items-center gap-2 text-xs font-bold text-muted-foreground hover:text-foreground transition-all">
+        <Link href="/care-circle" className="-ml-2 px-2 h-11 inline-flex items-center gap-2 rounded-lg text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-muted transition-all w-fit">
           <ArrowLeft className="w-4 h-4" /> Back to Care Circle
         </Link>
       </div>
@@ -430,7 +434,7 @@ export default async function PatientConsolePage({ params }: PageProps) {
                 <Clock className="w-4 h-4 text-primary" /> Schedule List
               </h3>
               {connection.can_edit_medications && (
-                <button className="flex items-center gap-1 px-2.5 py-1 rounded bg-primary/10 text-primary border border-primary/20 text-[10px] font-bold hover:bg-primary/20 transition-all">
+                <button className="inline-flex items-center gap-1 h-11 px-3 rounded-lg bg-primary/10 text-primary-strong border border-primary/20 text-[11px] font-bold hover:bg-primary/20 transition-all whitespace-nowrap">
                   <Plus className="w-3.5 h-3.5" /> Add Medication
                 </button>
               )}

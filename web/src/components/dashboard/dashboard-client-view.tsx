@@ -16,12 +16,13 @@ import GuideButton from '@/components/guide/guide-button';
 import GuideAutoStart from '@/components/guide/guide-auto-start';
 import moment from 'moment-timezone';
 import { type OverrideEntry, findOverride, toOverrideDateStr } from '@/lib/schedule/dose-engine';
-import { isPendingStatus, isAttentionStatus, isEscalatedStatus, partitionDoseAttention, buildGateQueue } from '@/lib/schedule/dose-attention';
+import { isPendingStatus, isAttentionStatus, partitionDoseAttention, buildGateQueue } from '@/lib/schedule/dose-attention';
 import MissedDoseStrip from '@/components/dashboard/missed-dose-strip';
 import RefillStrip from '@/components/dashboard/refill-strip';
 import RefillGate from '@/components/dashboard/refill-gate';
 import type { LowStockMed } from '@/lib/medications/stock';
 import MedicationSlider from '@/components/dashboard/medication-slider';
+import DoseStrip from '@/components/dashboard/dose-strip';
 import { getUnitIcon, getCountdownText, PinkBubbles } from '@/components/dashboard/dashboard-helpers';
 
 import { createClient } from '@/lib/supabase/client';
@@ -55,7 +56,6 @@ import {
   Sun,
   CloudSun,
   Moon,
-  Circle,
   Lock,
   ChevronDown,
   Utensils,
@@ -707,35 +707,6 @@ export default function DashboardClientView({
     return <Moon className="w-5 h-5 text-primary shrink-0" />;
   };
 
-  const getPeriodStatus = (startHour: number, endHour: number) => {
-    const periodEvents = events.filter(e => {
-      const date = new Date(e.scheduled_for);
-      const hour = date.getHours();
-      if (startHour < endHour) {
-        return hour >= startHour && hour < endHour;
-      } else {
-        // Over midnight (Night: 9:00 PM to 4:59 AM)
-        return hour >= startHour || hour < endHour;
-      }
-    });
-
-    if (periodEvents.length === 0) return 'empty';
-
-    // Alarm = missed backlog (MISSED / PENDING_REVIEW / UNCONFIRMED) or live
-    // caregiver escalation. Checked first: escalated doses are also "pending".
-    const hasActiveAlarm = periodEvents.some(e => isAttentionStatus(e.reminder_status) || isEscalatedStatus(e.reminder_status));
-    if (hasActiveAlarm) return 'missed';
-
-    // Pending = shared dose-attention set (virtual FUTURE_SCHEDULED plus the
-    // real fired-but-unresolved statuses: SENT/DISPLAYED/OPENED/GENTLE_REMINDER/…).
-    const hasPending = periodEvents.some(e => isPendingState(e.reminder_status));
-    const allTaken = periodEvents.every(e => ['TAKEN', 'RESOLVED_BY_CG'].includes(e.reminder_status));
-    
-    if (allTaken) return 'taken';
-    if (hasPending) return 'pending';
-    return 'empty';
-  };
-
   // Was a private palette of pastel hexes — "Critical Coral" #FF9FA5 for a missed dose
   // sat right next to the brand pink, and none of the four values matched the tokens the
   // rest of the app uses for the same states. It also didn't follow dark mode.
@@ -1130,11 +1101,14 @@ export default function DashboardClientView({
         </div>
       )}
 
-      {/* Welcome Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-transparent border-none shadow-none p-0">
-        <div className="flex items-center gap-4 w-full sm:w-auto">
+      {/* Welcome Header.
+          Deliberately quieter than the hero card below it: a greeting is context, not
+          content. It used to run a 48px avatar beside a 20px black title, which made
+          "Good Morning, Priya" compete with the dose you came here to take. */}
+      <div className="rise-in flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-transparent border-none shadow-none p-0">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
           {/* Profile photo (falls back to initials) */}
-          <div className="w-12 h-12 rounded-full bg-primary/10 text-foreground border border-primary/20 flex items-center justify-center font-mono font-black text-lg shadow-inner shrink-0 overflow-hidden">
+          <div className="w-10 h-10 rounded-full bg-primary/10 text-foreground border border-primary/20 flex items-center justify-center font-mono font-black text-sm shadow-inner shrink-0 overflow-hidden">
             {avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={avatarUrl} alt="Profile photo" className="w-full h-full object-cover" />
@@ -1143,7 +1117,7 @@ export default function DashboardClientView({
             )}
           </div>
           <div className="min-w-0">
-            <h1 className="text-xl font-black text-foreground tracking-tight flex items-center gap-2">
+            <h1 className="text-lg font-black text-foreground tracking-[-0.01em] flex items-center gap-2">
               {getGreetingIcon()}
               <span>{getGreeting()}, {userName}</span>
               <GuideButton tour="dashboard" />
@@ -1231,7 +1205,7 @@ export default function DashboardClientView({
       {/* First Viewport: Top Row split layout (Left: Next Medication card, Right: Compliance Ring) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
         {/* Left: Next/Missed Medication summary card */}
-        <div data-tour="dash-next-med" className={`lg:col-span-7 rounded-3xl p-5 sm:p-6 shadow-sm flex flex-col justify-start gap-4 relative overflow-hidden isolate border transition-colors ${
+        <div data-tour="dash-next-med" className={`rise-in lg:col-span-7 rounded-3xl p-5 sm:p-6 shadow-sm flex flex-col justify-start gap-4 relative overflow-hidden isolate border transition-colors ${
           isMissed
             ? 'border-danger/50 shadow-danger/5 shadow-md bg-danger/[0.02]'
             : nextPendingEvent
@@ -1240,13 +1214,37 @@ export default function DashboardClientView({
         }`}>
           {nextPendingEvent && !isMissed && <PinkBubbles />}
           <div>
-            <div className="flex justify-between items-start gap-4">
+            {/* The eyebrow and the countdown share the top rail; everything below runs
+                FULL WIDTH. This card used to be two side-by-side columns (details |
+                time), which at 375px left the detail column ~110px wide — enough to
+                break "Dosage: 1.5 tablets · 10mg" across three lines while the time
+                column sat half empty beside it. */}
+            <div className="flex items-center justify-between gap-3">
+              <Eyebrow className={
+                isMissed ? 'text-danger-strong' : onGradient ? 'text-white/90' : ''
+              }>
+                {isMissed ? 'Missed Medication' : 'Next Medication'}
+              </Eyebrow>
+              {nextPendingEvent && (
+                /* 9px was too small to clear 4.5:1 on a tint, and this is the one
+                   line that says how late you are. Solid fill when missed, and a
+                   readable size. */
+                <span className={`shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-black font-mono border transition-colors ${
+                  isMissed
+                    /* Solid #FF3B30 with white text is only 3.55:1 — iOS system red
+                       is too light to carry white. An opaque card-coloured pill with
+                       the dark red ink clears 7:1 on any background this card takes. */
+                    ? 'bg-card text-danger-strong border-danger'
+                    : onGradient
+                      ? 'bg-black/25 text-white border-white/45'
+                      : 'bg-primary/15 text-primary border-primary/25'
+                }`}>
+                  {mounted ? getCountdownText(nextPendingEvent.scheduled_for) : 'UPCOMING'}
+                </span>
+              )}
+            </div>
+            <div>
               <div className="min-w-0 flex-1">
-                <Eyebrow className={
-                  isMissed ? 'text-danger-strong' : onGradient ? 'text-white/90' : ''
-                }>
-                  {isMissed ? 'Missed Medication' : 'Next Medication'}
-                </Eyebrow>
                 {nextPendingEvent ? (
                   <div className="mt-4 flex items-start gap-4">
                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-colors ${
@@ -1259,10 +1257,21 @@ export default function DashboardClientView({
                       {getUnitIcon(nextPendingEvent.medications.unit_type, "w-6 h-6")}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <h3 className={`text-2xl font-black tracking-tight leading-tight break-words ${onGradient ? 'text-white' : 'text-foreground'}`}>
+                      {/* The page's focal element, so it gets the display size — 26px
+                          against a 14px body, with negative tracking so it reads as
+                          composed rather than merely large. */}
+                      <h3 className={`text-[26px] sm:text-3xl font-black tracking-[-0.02em] leading-[1.08] text-balance break-words ${onGradient ? 'text-white' : 'text-foreground'}`}>
                         {nextPendingEvent.medications.drug_name}
                       </h3>
-                      <div className={`text-xs mt-1 space-y-1 font-sans ${onGradient ? 'text-white/85' : 'text-muted-foreground'}`}>
+                      {/* "What" and "when" are one pair, so the time sits directly under
+                          the name rather than in its own column. Second-loudest thing on
+                          the card; tabular-nums so digits don't shift as the clock ticks. */}
+                      <p className={`text-2xl font-black font-mono tabular-nums tracking-[-0.02em] leading-none mt-1.5 transition-colors ${
+                        isMissed ? 'text-danger-strong' : onGradient ? 'text-white' : 'text-primary'
+                      }`} suppressHydrationWarning>
+                        {mounted ? new Date(nextPendingEvent.scheduled_for).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                      </p>
+                      <div className={`text-xs mt-2 space-y-1 font-sans ${onGradient ? 'text-white/85' : 'text-muted-foreground'}`}>
                         {/* Was "1 tablet(s) - N/A" when no strength was recorded — the
                             placeholder leaked straight onto the hero card. */}
                         <p>
@@ -1295,31 +1304,6 @@ export default function DashboardClientView({
                   </div>
                 )}
               </div>
-              
-              {nextPendingEvent && (
-                <div className="flex flex-col items-end gap-1 shrink-0 font-mono text-right">
-                  {/* 9px was too small to clear 4.5:1 on a tint, and this is the one
-                      line that says how late you are. Solid fill when missed, and a
-                      readable size. */}
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-black border transition-colors ${
-                    isMissed
-                      /* Solid #FF3B30 with white text is only 3.55:1 — iOS system red
-                         is too light to carry white. An opaque card-coloured pill with
-                         the dark red ink clears 7:1 on any background this card takes. */
-                      ? 'bg-card text-danger-strong border-danger'
-                      : onGradient
-                        ? 'bg-black/25 text-white border-white/45'
-                        : 'bg-primary/15 text-primary border-primary/25'
-                  }`}>
-                    {mounted ? getCountdownText(nextPendingEvent.scheduled_for) : 'UPCOMING'}
-                  </span>
-                  <span className={`text-lg font-black mt-1 transition-colors ${
-                    isMissed ? 'text-danger-strong' : onGradient ? 'text-white' : 'text-primary'
-                  }`} suppressHydrationWarning>
-                    {mounted ? new Date(nextPendingEvent.scheduled_for).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
-                  </span>
-                </div>
-              )}
             </div>
           </div>
  
@@ -1342,11 +1326,15 @@ export default function DashboardClientView({
                   />
                 </div>
               ) : (
+                /* "Take Now" grows to fill the row on a phone and Skip stays at its
+                   intrinsic width, so ONE thing reads as the action. Both were equal
+                   5px-padded pills before, which made confirming a dose look exactly as
+                   important as skipping it. */
                 <div className="mt-6 flex flex-wrap items-center gap-2.5">
                   <button
                     onClick={() => handleElderlyTakeNow(nextPendingEvent, 'TAKEN')}
                     disabled={updatingId !== null}
-                    className="inline-flex items-center gap-1.5 h-11 px-5 bg-success/20 backdrop-blur-md border border-success/40 text-success-strong text-xs font-black rounded-full hover:bg-success/30 active:scale-[0.98] transition-all cursor-pointer shadow-sm disabled:opacity-50"
+                    className="inline-flex flex-1 min-w-[150px] items-center justify-center gap-1.5 h-12 px-5 bg-success/20 backdrop-blur-md border border-success/40 text-success-strong text-sm font-black rounded-full hover:bg-success/30 active:scale-[0.97] transition-[transform,background-color] duration-150 ease-out cursor-pointer shadow-sm disabled:opacity-50"
                   >
                     <Check className="w-4 h-4" /> Take Now
                   </button>
@@ -1357,7 +1345,7 @@ export default function DashboardClientView({
                        text-foreground is near-white, so this was white text on a
                        near-white pill. Mirrors the neutral form of its Take Now
                        sibling's tint + on-tint-text pattern, which reads in both. */
-                    className="inline-flex items-center gap-1.5 h-11 px-4 bg-foreground/10 backdrop-blur-md border border-foreground/25 text-foreground text-xs font-bold rounded-full hover:bg-foreground/20 active:scale-[0.98] transition-all cursor-pointer shadow-sm disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 h-12 px-5 bg-foreground/10 backdrop-blur-md border border-foreground/25 text-foreground text-sm font-bold rounded-full hover:bg-foreground/20 active:scale-[0.97] transition-[transform,background-color] duration-150 ease-out cursor-pointer shadow-sm disabled:opacity-50"
                   >
                     <X className="w-4 h-4" /> Skip
                   </button>
@@ -1374,9 +1362,13 @@ export default function DashboardClientView({
                 </div>
               )
             ) : (
-              <div className={`mt-6 p-4 rounded-2xl text-xs font-semibold w-fit flex items-center gap-1.5 ${onGradient ? 'bg-black/25 border border-white/25 text-white' : 'bg-muted/50 border border-border/80 text-muted-foreground'}`}>
-                <Clock className="w-3.5 h-3.5 shrink-0 animate-pulse" />
-                <span>{nextPendingEvent && isAttentionStatus(nextPendingEvent.reminder_status) ? 'Log this dose in the red missed panel above.' : `Options will become available at ${mounted ? new Date(nextPendingEvent.scheduled_for).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}`}</span>
+              /* The scheduled time is already stated twice above this — as the countdown
+                 pill and as the 24px time — so "Options will become available at 09:30
+                 PM" said it a THIRD time and wrapped to two lines doing it. Say only what
+                 those two don't: that the buttons are coming. */
+              <div className={`mt-5 px-3 py-2 rounded-xl text-xs font-semibold w-fit flex items-center gap-1.5 ${onGradient ? 'bg-black/25 border border-white/25 text-white' : 'bg-muted/50 border border-border/80 text-muted-foreground'}`}>
+                <Clock className="w-3.5 h-3.5 shrink-0" />
+                <span>{nextPendingEvent && isAttentionStatus(nextPendingEvent.reminder_status) ? 'Log this dose in the red panel above.' : 'Confirm buttons appear when it’s due.'}</span>
               </div>
             )
           )}
@@ -1388,9 +1380,12 @@ export default function DashboardClientView({
             so the two things you check at a glance were never on screen together. */}
         {/* Compliance takes the wider share: the ring is w-full, so its size is decided by
             the column, not by any max-width. Raising the cap alone measured no change. */}
-        {/* `order-first` lifts the pair above Next Medication in the STACKED layout only;
-            from lg the grid returns to source order, so the desktop split is unchanged. */}
-        <div className="order-first lg:order-none lg:col-span-5 grid grid-cols-[1.1fr_1fr] lg:grid-cols-1 gap-3 sm:gap-6 items-stretch">
+        {/* This pair used to carry `order-first`, which lifted it ABOVE Next Medication on
+            a phone — so the first thing on the screen was an abstract donut, and the dose
+            you opened the app to take sat below it. The pair only ever needed to be near
+            the top (Care Circle was ~1500px down before); it does not need to outrank the
+            page's focal element. Source order now: hero, then the pair. */}
+        <div className="rise-in lg:col-span-5 grid grid-cols-[1.1fr_1fr] lg:grid-cols-1 gap-3 sm:gap-6 items-stretch" style={{ ['--rise-delay' as string]: '60ms' }}>
         <div data-tour="dash-compliance" className="bg-card border border-border rounded-3xl p-4 sm:p-6 shadow-sm flex flex-col justify-between text-center relative min-h-0 sm:min-h-[300px]">
           {/* Half-width now, so the title has to fit one line: "Daily Compliance" wrapped
               to two and the "Daily dose cycle progress" subtitle took two more, spending
@@ -1639,73 +1634,35 @@ export default function DashboardClientView({
         </div>
       </div>
 
-      {/* The four period tiles, no longer wrapped in a pink gradient panel with its own
-          "Daily Compliance Timeline" heading. The tiles already say Morning/Afternoon/
-          Evening/Night and carry their own status, so the panel was a saturated box
-          restating them — and it was the loudest surface on a page of white cards. */}
-      <div className="grid grid-cols-4 gap-1.5 text-center">
-          {[
-            { label: 'Morning', icon: <Sun className="w-3.5 h-3.5 shrink-0" />, period: getPeriodStatus(5, 12) },
-            { label: 'Afternoon', icon: <CloudSun className="w-3.5 h-3.5 shrink-0" />, period: getPeriodStatus(12, 17) },
-            { label: 'Evening', icon: <Moon className="w-3.5 h-3.5 shrink-0" />, period: getPeriodStatus(17, 21) },
-            { label: 'Night', icon: <Moon className="w-3.5 h-3.5 opacity-75 shrink-0" />, period: getPeriodStatus(21, 5) },
-          ].map((item, idx) => {
-            // These tiles used to be white text on `bg-white/20` over the pink gradient —
-            // a white veil over pink lands close enough to white that the label measured
-            // 1.77:1, i.e. barely visible. Lightening the tile and putting the navy ink
-            // ON it inverts the problem instead of stacking two pale layers.
-            let bgClass = 'bg-card backdrop-blur-md text-muted-foreground border-border';
-            let statusIcon = <Circle className="w-5 h-5 opacity-50 shrink-0" />;
-            let statusWord = 'Nothing due';
-
-            if (item.period === 'taken') {
-              bgClass = 'bg-card backdrop-blur-md text-foreground border-card';
-              statusIcon = <Check className="w-5 h-5 shrink-0 text-success-strong" />;
-              statusWord = 'All taken';
-            } else if (item.period === 'pending') {
-              bgClass = 'bg-card backdrop-blur-md text-foreground border-card';
-              statusIcon = <Clock className="w-5 h-5 animate-pulse shrink-0 text-primary" />;
-              statusWord = 'Still due';
-            } else if (item.period === 'missed') {
-              bgClass = 'bg-card backdrop-blur-md text-foreground border-card';
-              statusIcon = <X className="w-5 h-5 shrink-0 text-danger-strong" />;
-              statusWord = 'Missed';
-            }
-
-            return (
-              // Slanted left/right edges, flat top/bottom: skew the tile, counter-skew
-              // the contents. clip-path would give the same silhouette but throws away
-              // the rounded corners, so it's a transform on both layers instead.
-              <div
-                key={idx}
-                className={`px-1 py-2 rounded-2xl border flex min-h-[78px] [transform:skewX(-6deg)] ${bgClass}`}
-                title={`${item.label}: ${statusWord}`}
-              >
-                <div className="flex flex-1 flex-col items-center justify-center gap-2 [transform:skewX(6deg)]">
-                  {/* `truncate` clipped "Afternoon" to "Afternoo" and `break-words` then
-                      split it across two lines ("Afterno/on"). Dropping the wide mono
-                      face and pinning it to one line fits all four words at 11px. */}
-                  <span className="text-[11px] font-black tracking-tight flex flex-col items-center gap-1 w-full">
-                    {item.icon}
-                    <span className="text-center leading-tight whitespace-nowrap">{item.label}</span>
-                  </span>
-                  {/* The icon alone carried the state; screen readers got nothing. */}
-                  <span aria-hidden="true">{statusIcon}</span>
-                  <span className="sr-only">{statusWord}</span>
-                </div>
-              </div>
-            );
-          })}
+      {/* Replaced the four Morning/Afternoon/Evening/Night tiles. Those spent ~78px of
+          the phone's first screen on one word per quarter-day, and they AGGREGATED —
+          three morning doses collapsed into a single "Still due", so the tile could not
+          tell you which one you had missed. The strip shows every dose individually, in
+          time order, and each pocket is a real touch target. */}
+      <div className="rise-in" style={{ ['--rise-delay' as string]: '120ms' }}>
+        <DoseStrip
+          events={events}
+          mounted={mounted}
+          now={currentTime.getTime()}
+          selectedId={selectedEvent?.id ?? null}
+          onSelect={(event) =>
+            setSelectedEvent((prev) => (prev?.id === event.id ? null : event))
+          }
+        />
       </div>
 
       {/* Main Workspace Layout Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
         {/* Layer 2: Today's Medication Timeline (Main Content Zone) */}
-        <div data-tour="dash-today" className="lg:col-span-8 space-y-6">
-          <div className="flex justify-between items-center px-1">
-            <div>
-              <h2 className="text-xl font-black text-foreground tracking-tight">Today's Schedule</h2>
+        <div data-tour="dash-today" className="rise-in lg:col-span-8 space-y-6" style={{ ['--rise-delay' as string]: '180ms' }}>
+          {/* Stacks on a phone. Side by side at 375px, "Today's Schedule" wrapped to two
+              lines AND "Manage Inventory" wrapped to two lines, and the two collided —
+              neither had room, because a 2-line heading and a 2-line button cannot share
+              327px. The button keeps its own line and never wraps. */}
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 px-1">
+            <div className="min-w-0">
+              <h2 className="text-xl font-black text-foreground tracking-tight">Today&apos;s Schedule</h2>
               <p className="text-xs text-muted-foreground font-semibold">Keep track of your medication requirements</p>
             </div>
             {/* The dashboard's one solid-primary CTA. Refill and Open Hub used to be
@@ -1713,7 +1670,7 @@ export default function DashboardClientView({
                 action. Both are secondary now. */}
             <Link
               href="/medications"
-              className="h-11 px-4 text-xs font-black rounded-full bg-primary-strong text-primary-strong-foreground hover:bg-primary-strong-hover active:scale-[0.98] transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+              className="shrink-0 self-start h-11 px-4 text-xs font-black whitespace-nowrap rounded-full bg-primary-strong text-primary-strong-foreground hover:bg-primary-strong-hover active:scale-[0.98] transition-all shadow-md inline-flex items-center gap-1.5 cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" /> Manage Inventory
             </Link>
@@ -1734,8 +1691,10 @@ export default function DashboardClientView({
         </div>
 
         {/* Side Workspaces (Insights, Inventory) */}
-        <div className="lg:col-span-4 space-y-8">
-          
+        {/* Tail of the cascade. 240ms is the last delay — anything later and the card
+            arrives after the user has already started reading the page. */}
+        <div className="rise-in lg:col-span-4 space-y-8" style={{ ['--rise-delay' as string]: '240ms' }}>
+
           {/* Layer 3: Health Insights */}
           <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4">
             <div>

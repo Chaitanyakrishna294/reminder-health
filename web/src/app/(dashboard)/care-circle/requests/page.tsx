@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import LoadingMark from '@/components/ui/loading-mark';
 import { 
   ArrowLeft, 
   Heart, 
@@ -237,8 +238,8 @@ export default function CareCircleRequestsPage() {
   if (loading) {
     return (
       <div className="max-w-2xl mx-auto mt-16 flex flex-col items-center gap-4">
-        <Loader2 className="w-8 h-8 text-primary animate-spin" />
-        <p className="text-sm text-muted-foreground font-semibold">Loading requests...</p>
+        <LoadingMark size={48} className="text-primary-strong" />
+        <p className="text-sm text-muted-foreground font-semibold">Loading requests…</p>
       </div>
     );
   }
@@ -249,7 +250,10 @@ export default function CareCircleRequestsPage() {
       <div className="space-y-4">
         <Link 
           href="/care-circle" 
-          className="flex items-center gap-2 text-xs font-semibold text-muted-foreground hover:text-foreground transition-all w-fit"
+          /* Standalone navigation, not a link inside a sentence, so the WCAG 2.5.8
+             inline exception does not apply — it was a 16px-tall target. `-ml-2` keeps
+             the text optically aligned with the content below despite the new padding. */
+          className="-ml-2 px-2 h-11 inline-flex items-center gap-2 rounded-lg text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted transition-all w-fit"
         >
           <ArrowLeft className="w-4 h-4" /> Back to Care Circle
         </Link>

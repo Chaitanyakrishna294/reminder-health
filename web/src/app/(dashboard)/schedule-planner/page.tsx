@@ -19,6 +19,7 @@ import {
   Info,
 } from 'lucide-react';
 import { useUiMode } from '@/context/ui-mode-context';
+import LoadingMark from '@/components/ui/loading-mark';
 import { createClient } from '@/lib/supabase/client';
 import {
   type OverrideEntry,
@@ -607,20 +608,22 @@ export default function SchedulePlannerPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+        <LoadingMark size={48} className="text-primary-strong" />
       </div>
     );
   }
 
   return (
     <div className={'max-w-6xl mx-auto space-y-5 ' + (isElderly ? 'text-[1.05rem]' : '')}>
-      {/* Header — plain Apple large title */}
-      <div className="flex items-end justify-between gap-3">
+      {/* Header — plain Apple large title.
+          `.rise-in` + `--rise-delay` is the app's shared section entrance (globals.css);
+          same 60ms cascade the dashboard and medication list use. */}
+      <div className="rise-in flex items-end justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-[26px] font-bold tracking-tight text-foreground flex items-center gap-2">
             <span className="whitespace-nowrap">Schedule</span>
             {isReadOnly && (
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#F2F2F7] text-muted-foreground uppercase tracking-wide shrink-0">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-muted text-muted-foreground uppercase tracking-wide shrink-0">
                 Read Only
               </span>
             )}
@@ -633,7 +636,7 @@ export default function SchedulePlannerPage() {
         </div>
 
         <div
-          className="shrink-0 w-fit flex items-center gap-2.5 rounded-[22px] bg-white px-3.5 py-2"
+          className="shrink-0 w-fit flex items-center gap-2.5 rounded-[22px] bg-card px-3.5 py-2"
           style={{ boxShadow: CARD_SHADOW }}
         >
           <Clock className="w-4 h-4 shrink-0 text-primary" strokeWidth={2.5} />
@@ -660,11 +663,11 @@ export default function SchedulePlannerPage() {
       </div>
 
       {/* Week navigator */}
-      <div className="bg-white rounded-[22px] p-4" style={{ boxShadow: CARD_SHADOW }}>
+      <div className="rise-in bg-card rounded-[22px] p-4" style={{ boxShadow: CARD_SHADOW, ['--rise-delay' as string]: '60ms' }}>
         <div className="flex items-center justify-between mb-3">
           <button
             onClick={() => shiftWeek(-1)}
-            className="w-11 h-11 shrink-0 rounded-full flex items-center justify-center bg-[#F2F2F7] hover:bg-[#E5E5EA] text-foreground transition-all cursor-pointer"
+            className="w-11 h-11 shrink-0 rounded-full flex items-center justify-center bg-muted hover:bg-input text-foreground transition-all cursor-pointer"
             aria-label="Previous week"
           >
             <ChevronLeft className="w-4 h-4" strokeWidth={2.5} />
@@ -681,7 +684,7 @@ export default function SchedulePlannerPage() {
                 'inline-flex items-center gap-1 h-11 px-3.5 rounded-full text-[11px] font-semibold cursor-pointer transition-all ' +
                 (showMonth
                   ? 'bg-primary-strong text-primary-strong-foreground'
-                  : 'bg-[#F2F2F7] text-muted-foreground hover:text-foreground')
+                  : 'bg-muted text-muted-foreground hover:text-foreground')
               }
             >
               <Grid3x3 className="w-3 h-3" strokeWidth={2.5} /> Month
@@ -689,7 +692,7 @@ export default function SchedulePlannerPage() {
           </div>
           <button
             onClick={() => shiftWeek(1)}
-            className="w-11 h-11 shrink-0 rounded-full flex items-center justify-center bg-[#F2F2F7] hover:bg-[#E5E5EA] text-foreground transition-all cursor-pointer"
+            className="w-11 h-11 shrink-0 rounded-full flex items-center justify-center bg-muted hover:bg-input text-foreground transition-all cursor-pointer"
             aria-label="Next week"
           >
             <ChevronRight className="w-4 h-4" strokeWidth={2.5} />
@@ -713,7 +716,7 @@ export default function SchedulePlannerPage() {
                     ? 'bg-gradient-to-b from-[#CC3D64] to-[#B52A52] text-white z-10'
                     : isTod
                       ? 'bg-primary-soft text-foreground'
-                      : 'bg-[#F2F2F5] text-foreground hover:bg-[#EAEAEF]')
+                      : 'bg-muted text-foreground hover:bg-input')
                 }
                 style={{
                   flexGrow: isSel ? 2.1 : 1,
@@ -759,11 +762,11 @@ export default function SchedulePlannerPage() {
         </div>
 
         {showMonth && (
-          <div className="mt-4 pt-4 border-t border-[#0F1C5A]/[0.06] animate-fade-in">
+          <div className="mt-4 pt-4 border-t border-border animate-fade-in">
             <div className="flex items-center justify-between mb-3">
               <button
                 onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))}
-                className="w-8 h-8 rounded-full flex items-center justify-center bg-[#F2F2F7] hover:bg-[#E5E5EA] text-foreground cursor-pointer transition-all"
+                className="w-8 h-8 rounded-full flex items-center justify-center bg-muted hover:bg-input text-foreground cursor-pointer transition-all"
               >
                 <ChevronLeft className="w-3.5 h-3.5" strokeWidth={2.5} />
               </button>
@@ -772,7 +775,7 @@ export default function SchedulePlannerPage() {
               </span>
               <button
                 onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))}
-                className="w-8 h-8 rounded-full flex items-center justify-center bg-[#F2F2F7] hover:bg-[#E5E5EA] text-foreground cursor-pointer transition-all"
+                className="w-8 h-8 rounded-full flex items-center justify-center bg-muted hover:bg-input text-foreground cursor-pointer transition-all"
               >
                 <ChevronRight className="w-3.5 h-3.5" strokeWidth={2.5} />
               </button>
@@ -792,7 +795,7 @@ export default function SchedulePlannerPage() {
                   ? 'bg-primary-strong text-primary-strong-foreground'
                   : isTod
                     ? 'bg-primary-soft text-foreground'
-                    : 'hover:bg-[#F2F2F7] text-foreground';
+                    : 'hover:bg-muted text-foreground';
                 return (
                   <button
                     key={idx}
@@ -817,7 +820,7 @@ export default function SchedulePlannerPage() {
 
       {/* Main: timeline + summary */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        <div className="lg:col-span-8 bg-white rounded-[22px] overflow-hidden" style={{ boxShadow: CARD_SHADOW }}>
+        <div className="rise-in lg:col-span-8 bg-card rounded-[22px] overflow-hidden" style={{ boxShadow: CARD_SHADOW, ['--rise-delay' as string]: '120ms' }}>
           <div className="flex items-center justify-between px-6 py-4">
             <div>
               <h3 className="text-sm font-bold tracking-tight text-foreground">{selectedDateLong}</h3>
@@ -827,10 +830,10 @@ export default function SchedulePlannerPage() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-0.5 bg-[#F2F2F7] rounded-full px-1 py-1">
+              <div className="flex items-center gap-0.5 bg-muted rounded-full px-1 py-1">
                 <button
                   onClick={() => setZoom(z => Math.max(0.5, +(z - 0.25).toFixed(2)))}
-                  className="w-11 h-11 rounded-full flex items-center justify-center hover:bg-white text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+                  className="w-11 h-11 rounded-full flex items-center justify-center hover:bg-card text-muted-foreground hover:text-foreground transition-all cursor-pointer"
                   aria-label="Zoom out"
                 >
                   <Minus className="w-3 h-3" strokeWidth={2.5} />
@@ -838,7 +841,7 @@ export default function SchedulePlannerPage() {
                 <span className="text-[11px] font-bold text-foreground w-8 text-center tabular-nums">{Math.round(zoom * 100)}%</span>
                 <button
                   onClick={() => setZoom(z => Math.min(3, +(z + 0.25).toFixed(2)))}
-                  className="w-11 h-11 rounded-full flex items-center justify-center hover:bg-white text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+                  className="w-11 h-11 rounded-full flex items-center justify-center hover:bg-card text-muted-foreground hover:text-foreground transition-all cursor-pointer"
                   aria-label="Zoom in"
                 >
                   <Plus className="w-3 h-3" strokeWidth={2.5} />
@@ -858,11 +861,11 @@ export default function SchedulePlannerPage() {
               )}
             </div>
           </div>
-          <div className="h-px bg-[#0F1C5A]/[0.06] mx-6" />
+          <div className="h-px bg-border mx-6" />
 
           {groupedByTime.length === 0 ? (
             <div className="flex flex-col items-center justify-center text-center py-16 px-6">
-              <div className="w-16 h-16 rounded-full bg-[#F2F2F7] flex items-center justify-center mb-3">
+              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-3">
                 <Sun className="w-8 h-8 text-muted-foreground/50" strokeWidth={2} />
               </div>
               <p className="text-sm font-bold text-foreground">A clear day</p>
@@ -898,13 +901,26 @@ export default function SchedulePlannerPage() {
                   </div>
                 ))}
 
-                {/* Now line */}
+                {/* Now line.
+                    The NOW pill lives in the hour gutter on the LEFT, centred on the
+                    line. It used to sit at `right-0 -top-4` — the same span the dose
+                    cards occupy (`left-12 right-2`) — so any dose scheduled near the
+                    present time had the badge sitting on its top-right corner. Which is
+                    precisely when you are looking at this screen. The gutter is free
+                    space, and the red dot plus dashed rule already mark the line, so the
+                    pill only has to name it. */}
+                {/* z-[5], BELOW the dose cards (z-10). At z-20 the dashed rule drew
+                    straight through the medication name of any dose near the present
+                    time — and a line through a drug name is this app's own visual for a
+                    SKIPPED dose (see `line-through` in DoseCard). A decoration that
+                    imitates a status is worse than one you cannot see: the gutter pill
+                    and the dot still mark where now is. */}
                 {isToday && (
-                  <div className="absolute left-12 right-2 z-20 pointer-events-none" style={{ top: (nowMinutes / 60) * hourHeight }}>
+                  <div className="absolute left-12 right-2 z-[5] pointer-events-none" style={{ top: (nowMinutes / 60) * hourHeight }}>
                     <div className="relative flex items-center">
                       <span className="absolute -left-1 w-2.5 h-2.5 rounded-full bg-danger ring-2 ring-white" />
                       <div className="w-full border-t-2 border-danger/70 border-dashed" />
-                      <span className="absolute right-0 -top-4 text-[11px] font-black text-danger-strong bg-card border border-danger px-2 py-0.5 rounded-full">NOW</span>
+                      <span className="absolute -left-12 top-1/2 -translate-y-1/2 w-11 text-center text-[10px] font-black text-danger-strong bg-card border border-danger py-0.5 rounded-full">NOW</span>
                     </div>
                   </div>
                 )}
@@ -957,9 +973,9 @@ export default function SchedulePlannerPage() {
         </div>
 
         {/* Summary rail */}
-        <div className="lg:col-span-4 space-y-5">
+        <div className="rise-in lg:col-span-4 space-y-5" style={{ ['--rise-delay' as string]: '180ms' }}>
           <div className="grid grid-cols-2 gap-3">
-            <div className="bg-white rounded-[22px] p-4" style={{ boxShadow: CARD_SHADOW }}>
+            <div className="bg-card rounded-[22px] p-4" style={{ boxShadow: CARD_SHADOW }}>
               <p className="text-2xl font-bold text-foreground leading-none">{activeDoses.length}</p>
               {/* Was a flat "DOSES TODAY" — plural for a count of 1, and still "today"
                   while you were looking at next Thursday. */}
@@ -967,7 +983,7 @@ export default function SchedulePlannerPage() {
                 {activeDoses.length === 1 ? 'Dose' : 'Doses'} {isToday ? 'today' : 'that day'}
               </p>
             </div>
-            <div className="bg-white rounded-[22px] p-4" style={{ boxShadow: CARD_SHADOW }}>
+            <div className="bg-card rounded-[22px] p-4" style={{ boxShadow: CARD_SHADOW }}>
               <p className="text-2xl font-bold leading-none" style={{ color: criticalCount > 0 ? 'var(--danger-strong)' : 'var(--foreground)' }}>{criticalCount}</p>
               <p className="text-[11px] font-semibold text-muted-foreground mt-1 uppercase tracking-wide">Critical</p>
             </div>
@@ -976,7 +992,7 @@ export default function SchedulePlannerPage() {
           {/* Labels and colors both come from the shared map now. This legend used to
               hardcode its own hexes AND call the lowest level "Routine" while the wizard
               you set it in called it "Normal" — so the key did not explain the app. */}
-          <div className="bg-white rounded-[22px] p-5 space-y-3" style={{ boxShadow: CARD_SHADOW }}>
+          <div className="bg-card rounded-[22px] p-5 space-y-3" style={{ boxShadow: CARD_SHADOW }}>
             <h4 className="text-xs font-bold tracking-tight text-foreground">Priority key</h4>
             {(['critical', 'important', 'normal'] as const).map((level) => {
               const meta = PRIORITY[level];
@@ -993,7 +1009,7 @@ export default function SchedulePlannerPage() {
 
           {/* Time-of-day legend. The rail's bands only carried tiny in-chart labels, so
               the shading read as decoration. */}
-          <div className="bg-white rounded-[22px] p-5 space-y-3" style={{ boxShadow: CARD_SHADOW }}>
+          <div className="bg-card rounded-[22px] p-5 space-y-3" style={{ boxShadow: CARD_SHADOW }}>
             <h4 className="text-xs font-bold tracking-tight text-foreground">Time of day</h4>
             <div className="grid grid-cols-2 gap-2">
               {DAY_BANDS.filter((b) => b.showLabel).map((band) => {
@@ -1024,7 +1040,7 @@ export default function SchedulePlannerPage() {
             </a>
           )}
 
-          <div className="bg-[#F2F2F7] rounded-[22px] p-4">
+          <div className="bg-muted rounded-[22px] p-4">
             <p className="text-[11px] font-medium text-muted-foreground leading-relaxed">
               Adjusting a time or skipping a dose here only affects <b className="text-foreground font-semibold">{selectedDateLong}</b>. Your recurring routine stays exactly as it is.
             </p>
@@ -1118,14 +1134,14 @@ export default function SchedulePlannerPage() {
 
       {showOverrideModal && selectedMedForOverride && (
         <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="bg-white rounded-[22px] max-w-md w-full p-6 space-y-5" style={{ boxShadow: '0 8px 40px rgba(16, 28, 90, 0.18)' }}>
+          <div className="bg-card rounded-[22px] max-w-md w-full p-6 space-y-5" style={{ boxShadow: '0 8px 40px rgba(16, 28, 90, 0.18)' }}>
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-[11px] uppercase tracking-widest font-semibold text-muted-foreground">Adjust dose</p>
                 <h3 className="text-base font-bold tracking-tight text-foreground mt-0.5">{selectedMedForOverride.drug_name}</h3>
                 <p className="text-[11px] font-semibold text-primary mt-0.5">{selectedDateLong}</p>
               </div>
-              <button onClick={closeModal} className="w-8 h-8 rounded-full flex items-center justify-center bg-[#F2F2F7] hover:bg-[#E5E5EA] text-muted-foreground cursor-pointer transition-all">
+              <button onClick={closeModal} className="w-8 h-8 rounded-full flex items-center justify-center bg-muted hover:bg-input text-muted-foreground cursor-pointer transition-all">
                 <X className="w-4 h-4" strokeWidth={2.5} />
               </button>
             </div>
@@ -1160,7 +1176,7 @@ export default function SchedulePlannerPage() {
             <div className="flex gap-2">
               <button
                 onClick={closeModal}
-                className="flex-1 py-3 bg-[#F2F2F7] text-muted-foreground hover:bg-[#E5E5EA] text-sm font-semibold rounded-full cursor-pointer transition-all"
+                className="flex-1 py-3 bg-muted text-muted-foreground hover:bg-input text-sm font-semibold rounded-full cursor-pointer transition-all"
               >
                 Cancel
               </button>

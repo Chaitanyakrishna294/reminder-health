@@ -83,12 +83,14 @@ async function PatientStatusCard({ id, name, relationship, isPrimary, telegramId
 
   const statusColor = metrics
     ? metrics.complianceStatus === 'missed'
-      ? 'text-red-600 bg-red-500/10 border-red-500/20'
+      ? 'text-danger-strong bg-danger/10 border-danger/20'
       : 'text-success bg-success/10 border-success/20'
     : 'text-muted-foreground bg-muted border-border';
 
+  // Hover was `slate-200`/`slate-50` — near-white raw palette, so on dark the whole
+  // patient card lit up almost white under the cursor.
   return (
-    <div className="group relative bg-card border border-border rounded-3xl p-6 hover:border-slate-200 hover:bg-slate-50/40 transition-all flex flex-col justify-between shadow-sm">
+    <div className="group relative bg-card border border-border rounded-3xl p-6 hover:border-input hover:bg-muted/40 transition-all flex flex-col justify-between shadow-sm">
       {/* Arrow Accent */}
       <div className="absolute top-5 right-5 text-muted-foreground group-hover:text-primary transition-colors">
         <ArrowUpRight className="w-5 h-5" />
@@ -140,7 +142,8 @@ async function PatientStatusCard({ id, name, relationship, isPrimary, telegramId
         <div className="grid grid-cols-2 gap-3 text-xs">
           <div className="flex items-center gap-2 text-foreground">
             <Pill className="w-4 h-4 text-muted-foreground shrink-0" />
-            <span>{metrics?.activeMedicationsCount || 0} Medications</span>
+            {/* Was a flat "Medications", so a patient on one drug read "1 Medications". */}
+            <span>{metrics?.activeMedicationsCount || 0} {(metrics?.activeMedicationsCount || 0) === 1 ? 'medication' : 'medications'}</span>
           </div>
           <div className="flex items-center gap-2 text-foreground">
             <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
@@ -232,10 +235,14 @@ export default async function CareCirclePage() {
           </Link>
           <div>
             <div className="flex items-center gap-2">
-              <div className="p-1 rounded-lg bg-primary/10 text-primary border border-primary/20">
+              {/* The tile is decorative — the heading names the page, and the dock below
+                  already shows this same Users glyph lit. On a phone it cost 40px of the
+                  ~231px the title had left after the back button, which is what broke
+                  "Care Circle / Shared Trust" across two lines at the slash. */}
+              <div className="hidden sm:block p-1 rounded-lg bg-primary/10 text-primary border border-primary/20">
                 <Users className="w-5 h-5" />
               </div>
-              <h1 className="text-2xl font-black tracking-tight text-foreground">Care Circle / Shared Trust</h1>
+              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-balance text-foreground">Care Circle / Shared Trust</h1>
             </div>
             <p className="text-xs text-muted-foreground font-semibold mt-1">
               Manage who helps support your health journey.
@@ -289,9 +296,14 @@ export default async function CareCirclePage() {
             {peopleCaringForMe.map((conn) => (
               <div
                 key={conn.connection_id}
-                className="bg-card border border-border rounded-2xl p-5 flex justify-between items-center shadow-sm"
+                /* Stacks below sm. Side by side, the right-hand group (status badge +
+                   44px settings + 44px disconnect + gaps = ~185px) left ~100px for the
+                   avatar AND the name, so the disconnect button pushed 1px past the card
+                   and got clipped by the rounded edge, while the name sat flush against
+                   the badge with no gap between them. */
+                className="bg-card border border-border rounded-2xl p-5 flex flex-col items-start gap-3 sm:flex-row sm:justify-between sm:items-center shadow-sm"
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 min-w-0 w-full sm:w-auto">
                   <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold border border-primary/20 text-sm overflow-hidden">
                     {conn.caregiver_chat_id && caregiverAvatars[conn.caregiver_chat_id] ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -300,14 +312,14 @@ export default async function CareCirclePage() {
                     conn.resolved_name?.substring(0, 2).toUpperCase() || 'CG'
                     )}
                   </div>
-                  <div>
-                    <h3 className="font-bold text-foreground text-sm">{conn.resolved_name}</h3>
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-foreground text-sm truncate">{conn.resolved_name}</h3>
                     {/* A caregiver's name, so the stored value reads correctly as-is. */}
-                    <p className="text-[11px] text-muted-foreground font-semibold mt-0.5">{caregiverRoleLabel(conn.relationship_type)}</p>
+                    <p className="text-[11px] text-muted-foreground font-semibold mt-0.5 truncate">{caregiverRoleLabel(conn.relationship_type)}</p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   {/* Was hardcoded success-green, so a PENDING link showed up as a green
                       "PENDING" pill — the badge said the opposite of the word inside it. */}
                   <Badge tone={isLiveConnection(conn) ? 'success' : isPendingConnection(conn) ? 'warning' : 'neutral'}>
