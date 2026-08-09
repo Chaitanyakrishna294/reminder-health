@@ -9,8 +9,10 @@
   file plus the mascot — so it opens INSTANTLY from disk, with no network involved,
   and plays while the real dashboard is server-rendered behind it.
 
-  It forwards with ?launch=1, and the dashboard renders an IDENTICAL overlay scene
-  (components/launch-handoff.tsx) that only lifts once the page has fully loaded.
+  Cold opens forward with ?launch=1, and the dashboard renders an IDENTICAL overlay
+  scene (components/launch-handoff.tsx) that lifts as soon as the page is interactive.
+  Opens within an hour of the last launch skip the overlay entirely: the server is
+  warm and the page paints fast, so it streams in progressively like the browser.
   THE SCENE IS DUPLICATED THERE ON PURPOSE: this file must stay self-contained to
   render from cache alone. Change one, change both.
 
@@ -123,8 +125,8 @@
     .brain, .pill, .pill-shadow { animation: none; }
     .dots::after { content: '…'; animation: none; }
   }
-  #offline { display: none; }
-  #offline button {
+  #offline, #stuck { display: none; }
+  #offline button, #stuck button {
     margin-top: 10px; min-height: 44px; padding: 0 20px;
     border: 0; border-radius: 12px; cursor: pointer;
     font: inherit; font-weight: 800; font-size: 14px;
@@ -147,23 +149,58 @@
       <p class="hint">You're offline. Re-MIND-eЯ needs a connection to load your medications.</p>
       <button onclick="go()">Try again</button>
     </div>
+    <div id="stuck" role="alert">
+      <p class="hint">Taking longer than usual&hellip;</p>
+      <button onclick="go()">Try again</button>
+    </div>
   </div>
 <script>
   // location.replace keeps this page out of history, so Back from the dashboard
-  // never lands on the splash. ?launch=1 tells the dashboard to keep an identical
-  // overlay up until it has FULLY loaded — including the capsule's flight home into
-  // the dock's Medications slot (see launch-handoff.tsx).
+  // never lands on the splash.
+  //
+  // Cold open → /dashboard?launch=1: the dashboard keeps an identical overlay up
+  //   until it is interactive, then the capsule flies home (launch-handoff.tsx).
+  // Warm open (a launch COMPLETED within the last hour) → /dashboard, no overlay:
+  //   the server is warm (~80ms TTFB vs ~4s cold, measured) and the page paints
+  //   fast — let it stream in progressively like the browser instead of hiding it.
+  //   The stamp is written by launch-handoff.tsx's teardown, i.e. only when a
+  //   launch actually reached a rendered page. Stamping HERE would mark stalled
+  //   attempts warm, stripping the overlay from exactly the launches that need it
+  //   (the retry after a cold-server stall). Warm opens don't refresh the stamp,
+  //   so after a quiet hour the flow self-corrects back to the cold path.
+  var WARM_WINDOW_MS = 60 * 60 * 1000;
+  var stuckTimer = null;
   function go() {
     if (!navigator.onLine) {
+      clearTimeout(stuckTimer);
       document.getElementById('opening').style.display = 'none';
+      document.getElementById('stuck').style.display = 'none';
       document.getElementById('offline').style.display = 'block';
       return;
     }
     document.getElementById('offline').style.display = 'none';
+    document.getElementById('stuck').style.display = 'none';
     document.getElementById('opening').style.display = '';
-    location.replace('/dashboard?launch=1');
+    // Every attempt arms a fresh stall watchdog: if the navigation hangs (cold
+    // server, flaky network) this page stays visible — after 12s say so and offer
+    // a retry instead of looping the animation forever. The timer dies with the
+    // page once navigation commits, so it only ever fires while genuinely stuck.
+    clearTimeout(stuckTimer);
+    stuckTimer = setTimeout(function () {
+      document.getElementById('opening').style.display = 'none';
+      document.getElementById('stuck').style.display = 'block';
+    }, 12000);
+    var warm = false;
+    try {
+      warm = Date.now() - (Number(localStorage.getItem('remind-last-launch')) || 0) < WARM_WINDOW_MS;
+    } catch (e) { /* storage unavailable: always take the splash path */ }
+    location.replace(warm ? '/dashboard' : '/dashboard?launch=1');
   }
-  window.addEventListener('online', go);
+  // Auto-retry ONLY the offline bail-out. Re-running go() on every 'online' event
+  // would abort and restart the in-flight navigation on each wifi↔cellular flap.
+  window.addEventListener('online', function () {
+    if (document.getElementById('offline').style.display === 'block') go();
+  });
   go();
 </script>
 </body>

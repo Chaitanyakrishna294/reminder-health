@@ -6,10 +6,13 @@ import { useEffect } from 'react';
  * The second half of the PWA launch animation.
  *
  * /launch.html (the installed app's start_url, served from the service-worker cache)
- * plays the splash and forwards to /dashboard?launch=1. A pre-paint inline script in
- * the root layout sees the param and sets `data-launching` on <html>, so this overlay
- * — THE SAME SCENE — is visible from the dashboard's very first frame with no gap,
- * and it lifts only once the window has fully loaded.
+ * plays the splash and, on cold opens, forwards to /dashboard?launch=1. A pre-paint
+ * inline script in the root layout sees the param and sets `data-launching` on <html>,
+ * so this overlay — THE SAME SCENE — is visible from the dashboard's very first frame
+ * with no gap, and it lifts as soon as the page is interactive (hydration), not at
+ * window.load: the flight only needs the dock's geometry, and waiting for every image
+ * and font kept the opaque overlay up for seconds on phone connections. Warm opens
+ * (within an hour of the last) skip the overlay entirely — see launch.html.
  *
  * The lift ends with the capsule FLYING HOME into the dock's centre Medications slot
  * and the icon answering with its existing press squash. Design decisions there, each
@@ -32,8 +35,9 @@ import { useEffect } from 'react';
  * - Plain-fade fallbacks: reduced motion, ELDERLY MODE (this app's own accessibility
  *   mode — its users are the least likely to have OS-level reduced-motion set and the
  *   most likely to be vestibularly sensitive, so the app's setting outranks the OS
- *   default), monitoring mode (no Medications link), document hidden, and the 6s cap
- *   (readyState !== 'complete' means layout can't be trusted for a measured flight).
+ *   default), monitoring mode (no Medications link), document hidden, and the 2.5s cap
+ *   (readyState 'loading' means the server is still streaming — the dock may not have
+ *   arrived and layout can't be trusted for a measured flight).
  *
  * THE SCENE IS A DELIBERATE DUPLICATE of public/launch.html — that file must stay
  * self-contained to render from cache alone. Change one, change both. (One known
@@ -51,6 +55,11 @@ export default function LaunchHandoff() {
     const later = (fn: () => void, ms: number) => { timers.push(setTimeout(fn, ms)); };
 
     const teardown = () => {
+      // The warm-open stamp, written ONLY when a launch reached a rendered page —
+      // launch.html reads it to skip the overlay for the next hour. Stamping on
+      // the splash side would mark stalled attempts warm and strip the overlay
+      // from exactly the launches that need it.
+      try { localStorage.setItem('remind-last-launch', String(Date.now())); } catch { /* fine */ }
       root.removeAttribute('data-launching');
       // Strip ?launch=1 so a reload or share of the URL doesn't replay the splash.
       const url = new URL(window.location.href);
@@ -134,15 +143,24 @@ export default function LaunchHandoff() {
     };
 
     const lift = () => {
-      if (done) return;           // the 6s cap and `load` both route here — run once
+      if (done) return;           // the cap and DOMContentLoaded both route here — run once
       done = true;
       if (capTimer) clearTimeout(capTimer);
-      // Let the loaded frame paint under the overlay before anything moves.
+      // Let the newly interactive frame paint under the overlay before anything moves.
       later(() => {
+        // If the 8s CSS failsafe already retired the overlay (hydration arrived
+        // very late), the user is looking at — possibly using — the page. No fade,
+        // no flight: a full-opacity capsule clone materialising over an in-use
+        // dashboard is a ghost, not a handoff. Just clean up the attribute.
+        const overlay = document.getElementById('launch-handoff');
+        if (overlay && getComputedStyle(overlay).visibility === 'hidden') {
+          teardown();
+          return;
+        }
         const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         let elderly = false;
         try { elderly = localStorage.getItem('ui-mode') === 'elderly'; } catch { /* fade */ }
-        if (reduced || elderly || document.hidden || document.readyState !== 'complete') {
+        if (reduced || elderly || document.hidden || document.readyState === 'loading') {
           plainFade();
         } else {
           flight();
@@ -150,17 +168,23 @@ export default function LaunchHandoff() {
       }, 250);
     };
 
-    if (document.readyState === 'complete') {
+    // Hydration is the readiness signal: this effect running means React has made
+    // the page interactive, and the flight only needs the dock's geometry — not
+    // images or fonts. Waiting for window.load here kept the opaque overlay up
+    // through seconds of image/font traffic on phone connections. 'loading' means
+    // the server is still streaming HTML (the dock may not have arrived yet), so
+    // wait for the parser to finish.
+    if (document.readyState !== 'loading') {
       lift();
     } else {
-      window.addEventListener('load', lift, { once: true });
+      document.addEventListener('DOMContentLoaded', lift, { once: true });
     }
-    // Hard cap: if `load` never fires, the overlay must never trap someone on a
-    // splash over a usable page. readyState won't be 'complete', so this fades.
-    capTimer = setTimeout(lift, 6000);
+    // Hard cap: if the stream stalls, fade out over whatever has arrived (the
+    // route's loading skeleton at worst) — never trap someone on a splash.
+    capTimer = setTimeout(lift, 2500);
 
     return () => {
-      window.removeEventListener('load', lift);
+      document.removeEventListener('DOMContentLoaded', lift);
       if (capTimer) clearTimeout(capTimer);
       timers.forEach(clearTimeout);
     };
@@ -179,6 +203,16 @@ export default function LaunchHandoff() {
           opacity: 1; transition: opacity 350ms ease;
         }
         html[data-launching='lifting'] #launch-handoff { opacity: 0; pointer-events: none; }
+        /* No-JS escape hatch. If hydration never completes (stalled bundle download,
+           script error), nothing in the effect above can run and data-launching would
+           stay set forever — so CSS itself retires the overlay after 8s. Keyed to '1'
+           only: the moment the real lift starts ('lifting') the selector stops
+           matching, the animation resets, and the normal 350ms transition takes over.
+           visibility:hidden also drops the overlay's hit-testing, so the page under
+           it becomes usable even though the attribute is still set. Kept OUTSIDE the
+           reduced-motion guard on purpose — it is an escape hatch, and it only fades. */
+        html[data-launching='1'] #launch-handoff { animation: lhFailsafe 350ms ease 8s forwards; }
+        @keyframes lhFailsafe { to { opacity: 0; visibility: hidden; } }
         html.dark #launch-handoff { background: #0F1C5A; color: #EAF0FF; }
         /* Blur sits on each FIELD, never the container: a filtered container becomes
            a containing block that breaks position:fixed and repaints enormously. */

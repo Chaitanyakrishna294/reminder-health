@@ -43,8 +43,14 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
+     * - launch.html (the installed app's static splash — its inline forwarding
+     *   script CANNOT carry the per-request nonce, and 'strict-dynamic' ignores
+     *   'self', so the CSP built above would block it outright: the PWA froze on
+     *   the splash forever. It is self-contained static HTML with no user input —
+     *   there is nothing for a CSP to protect, and skipping the proxy also skips a
+     *   pointless session refresh on every app open.
      * - public folder files (images, SVGs etc.)
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|launch\\.html$|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };

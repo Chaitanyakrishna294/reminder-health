@@ -9,13 +9,17 @@
 // API calls, everything — falls through to the network untouched, so this can
 // never serve a stale page or interfere with auth.
 // ---------------------------------------------------------------------------
-const LAUNCH_CACHE = 'remind-launch-v3';
+const LAUNCH_CACHE = 'remind-launch-v4';
 const LAUNCH_ASSETS = ['/launch.html', '/mascot/reminder.png'];
 
 self.addEventListener('install', function(event) {
   event.waitUntil(
     caches.open(LAUNCH_CACHE)
-      .then(cache => cache.addAll(LAUNCH_ASSETS))
+      // cache: 'reload' bypasses the browser's HTTP cache, so a version bump can
+      // never re-precache a stale copy (or one stored with obsolete headers — a
+      // launch.html cached WITH the strict CSP header once froze installed apps
+      // on the splash even after the server stopped sending it).
+      .then(cache => cache.addAll(LAUNCH_ASSETS.map(u => new Request(u, { cache: 'reload' }))))
       .then(() => self.skipWaiting())
   );
 });
@@ -28,6 +32,17 @@ self.addEventListener('activate', function(event) {
             .map(k => caches.delete(k))
       ))
       .then(() => self.clients.claim())
+      // Heal any window still sitting on the splash. A broken cached copy (e.g.
+      // one stored WITH the strict CSP header, whose forwarding script the browser
+      // then blocks) cannot recover by itself, and without this it stays frozen
+      // until the user somehow knows to fully close and relaunch the app.
+      // Re-navigating to the same URL serves the fresh copy this worker just
+      // precached, so recovery happens on the FIRST open after a deploy.
+      .then(() => self.clients.matchAll({ type: 'window' }))
+      .then(wins => Promise.all(
+        wins.filter(w => new URL(w.url).pathname === '/launch.html')
+            .map(w => w.navigate(w.url).catch(() => {}))
+      ))
   );
 });
 
