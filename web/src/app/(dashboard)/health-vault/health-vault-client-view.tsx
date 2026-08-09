@@ -617,6 +617,9 @@ export default function HealthVaultClientView({
     return (category.health_records as any)?.count || 0;
   };
 
+  /** Total across every folder, for the header's one-line summary. */
+  const totalDocuments = displayCategories.reduce((sum, c) => sum + getRecordCount(c), 0);
+
   // Every folder used to be the same pink icon, so at a glance the vault was four
   // identical tiles and you had to read each label. A distinct hue per category makes
   // them scannable. These are deliberately drawn from the neutral/brand family, NOT the
@@ -836,14 +839,24 @@ export default function HealthVaultClientView({
               title, a three-line paragraph, a full-width CTA and a privacy card — before a
               single document appeared. The paragraph explained what a vault is to someone
               already standing in it; upload moved to the FAB below. */}
-          <div className="flex items-start justify-between gap-3">
+          {/* The title carried the whole header at 20px, with nothing under it — the page
+              opened without telling you what was in the vault. 26px matches the other
+              page titles, and the line beneath answers "is there anything in here?"
+              before you have scrolled anything. */}
+          <div className="rise-in flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h1 className={`font-extrabold text-foreground tracking-tight ${isElderly ? 'text-3xl' : 'text-xl'}`}>
+              <h1 className={`font-extrabold text-foreground tracking-[-0.02em] ${isElderly ? 'text-3xl' : 'text-[26px]'}`}>
                 {userRole === 'CAREGIVER' ? `${patientName}'s documents` : 'Health Vault'}
               </h1>
-              {userRole === 'CAREGIVER' && (
+              {userRole === 'CAREGIVER' ? (
                 <p className="text-[11px] text-primary-strong font-bold mt-1">
                   Shared through Care Circle · read-only
+                </p>
+              ) : (
+                <p className={`text-muted-foreground font-semibold mt-1 ${isElderly ? 'text-base' : 'text-[13px]'}`}>
+                  {totalDocuments === 0
+                    ? 'Nothing stored yet — your records stay private to you.'
+                    : `${totalDocuments} ${totalDocuments === 1 ? 'document' : 'documents'} in ${displayCategories.length} folders`}
                 </p>
               )}
             </div>
@@ -884,6 +897,7 @@ export default function HealthVaultClientView({
                       ? `Add your first ${singularCategory(category.name)}`
                       : `${count} ${count === 1 ? 'file' : 'files'}`,
                   icon: getCategoryIcon(category.name, true),
+                  count,
                   disabled: category.id.startsWith('default-'),
                 };
               })}
@@ -919,13 +933,27 @@ export default function HealthVaultClientView({
               </div>
             ) : (
               <ul className="space-y-2">
-                {recentRecords.map((item) => {
+                {recentRecords.map((item, idx) => {
                   const ext = (getExt(item.file_name) || 'file').toUpperCase();
                   const folder = categories.find(c => c.id === item.category_id);
+                  // The folder's identity hue, shown as a DOT beside the folder name so a
+                  // document and the folder it came from read as the same colour.
+                  //
+                  // It is not used to tint the file-type chip: the four --category tokens
+                  // deliberately have no `-strong` partner (globals.css says so outright)
+                  // because they are built to be SOLID covers carrying white text, not
+                  // text-on-tint. Measured as chip ink it lands at 1.8:1 on dark. A dot
+                  // carries no text, so it has no contrast floor to clear.
+                  const folderIdx = folder ? displayCategories.findIndex(c => c.id === folder.id) : -1;
+                  const hue = folderIdx >= 0 ? `var(--category-${(folderIdx % 4) + 1})` : null;
                   return (
-                    <li key={item.id} className="flex items-center gap-3 bg-card border border-border rounded-2xl p-3 shadow-sm">
-                      {/* File type is metadata, not a status, so it takes the info tint —
-                          a red PDF badge would read as "missed dose" in this palette. */}
+                    <li
+                      key={item.id}
+                      className="rise-in flex items-center gap-3 bg-card border border-border rounded-2xl p-3 shadow-sm transition-colors hover:border-input"
+                      style={{ ['--rise-delay' as string]: `${Math.min(idx, 6) * 60}ms` }}
+                    >
+                      {/* File type is metadata, not a status — a red PDF badge would read
+                          as "missed dose" in this palette. */}
                       <span className={`shrink-0 flex items-center justify-center rounded-xl bg-info/15 text-info-strong font-black ${
                         isElderly ? 'w-12 h-12 text-xs' : 'w-10 h-10 text-[11px]'
                       }`}>
@@ -939,9 +967,18 @@ export default function HealthVaultClientView({
                         <span className={`block font-black text-foreground truncate ${isElderly ? 'text-base' : 'text-sm'}`}>
                           {item.title}
                         </span>
-                        <span className={`block font-semibold text-muted-foreground truncate ${isElderly ? 'text-sm' : 'text-[11px]'}`}>
-                          {folder?.name ? `${folder.name} · ` : ''}
-                          {item.record_date ? new Date(item.record_date).toLocaleDateString() : ''}
+                        <span className={`flex items-center gap-1.5 font-semibold text-muted-foreground truncate ${isElderly ? 'text-sm' : 'text-[11px]'}`}>
+                          {hue && (
+                            <span
+                              aria-hidden
+                              className="shrink-0 w-2 h-2 rounded-full"
+                              style={{ backgroundColor: hue }}
+                            />
+                          )}
+                          <span className="truncate">
+                            {folder?.name ? `${folder.name} · ` : ''}
+                            {item.record_date ? new Date(item.record_date).toLocaleDateString() : ''}
+                          </span>
                         </span>
                       </button>
                       <button
