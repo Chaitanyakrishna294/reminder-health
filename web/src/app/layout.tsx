@@ -60,8 +60,13 @@ export default async function RootLayout({
             context/theme-context.tsx, which also defaults to light. Only a saved
             'dark' choice paints dark; anything else paints light.
             nonce: required so the strict CSP (no 'unsafe-inline') allows this inline script. */}
+        {/* suppressHydrationWarning on BOTH nonce'd scripts: browsers hide the
+            nonce content attribute (it reads back as ""), so React's hydration
+            diff always sees client "" vs server nonce and logs a false
+            mismatch. Nothing is actually wrong — the scripts already ran. */}
         <script
           nonce={nonce}
+          suppressHydrationWarning
           dangerouslySetInnerHTML={{
             __html: `(function(){try{if(localStorage.getItem('theme')==='dark'){document.documentElement.classList.add('dark');document.documentElement.style.colorScheme='dark';}else{document.documentElement.style.colorScheme='light';}}catch(e){}})();`,
           }}
@@ -73,6 +78,7 @@ export default async function RootLayout({
             removes the attribute once the window has fully loaded. */}
         <script
           nonce={nonce}
+          suppressHydrationWarning
           dangerouslySetInnerHTML={{
             __html: `(function(){try{if(/[?&]launch=1(&|$)/.test(location.search))document.documentElement.setAttribute('data-launching','1');}catch(e){}})();`,
           }}

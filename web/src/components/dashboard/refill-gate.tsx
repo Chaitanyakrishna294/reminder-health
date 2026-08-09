@@ -19,10 +19,20 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useUiMode } from '@/context/ui-mode-context';
+import { useTheme } from '@/context/theme-context';
 import { addStock } from '@/lib/medications/add-stock';
 import { lowStockReasonText, type LowStockMed } from '@/lib/medications/stock';
 import { unitPhrase } from '@/components/medications/medication-form-options';
 import { PackagePlus, Clock } from 'lucide-react';
+
+/** Same three-field placement as MedDueGate's MESH_FIELDS (med-due-gate.tsx:87) —
+ *  the two gates are siblings and must feel like the same room. Kept as a copy
+ *  because neither export is worth a shared module for three style objects. */
+const MESH_FIELDS = [
+  { width: '24rem', height: '24rem', top: '-7rem', left: '-8rem' },
+  { width: '21rem', height: '21rem', bottom: '-6rem', right: '-7rem' },
+  { width: '18rem', height: '18rem', top: '38%', right: '-6rem' },
+] as const;
 
 interface RefillGateProps {
   meds: LowStockMed[];
@@ -36,6 +46,14 @@ export default function RefillGate({ meds, canEdit, onSnooze }: RefillGateProps)
   const supabase = createClient();
   const router = useRouter();
   const { isElderly } = useUiMode();
+  const { theme } = useTheme();
+
+  // Same palette discipline as MedDueGate: base is the app's own background
+  // token, mood comes from blurred tints of the navy/pink family (see
+  // med-due-gate.tsx:262 for the full rationale).
+  const mesh = theme === 'dark'
+    ? ['#24378F', '#1B3A78', '#3A2A6B']
+    : ['#F7CCDB', '#CBDCF2', '#F6E3CA'];
   const [amounts, setAmounts] = useState<Record<number, string>>({});
   const [busyId, setBusyId] = useState<number | null>(null);
   const [doneIds, setDoneIds] = useState<number[]>([]);
@@ -132,8 +150,37 @@ export default function RefillGate({ meds, canEdit, onSnooze }: RefillGateProps)
       aria-label="Medications needing a refill"
       className="fixed inset-0 z-[110] overflow-y-auto bg-background flex flex-col items-center justify-center px-4 py-10 outline-none"
     >
-      <div className="w-full max-w-md space-y-5">
+      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+        {mesh.map((c, i) => (
+          <span
+            key={i}
+            className="absolute rounded-full"
+            style={{
+              background: c,
+              filter: 'blur(72px)',
+              opacity: theme === 'dark' ? 0.5 : 0.7,
+              ...MESH_FIELDS[i],
+            }}
+          />
+        ))}
+      </div>
+
+      <div className="relative w-full max-w-md space-y-5">
         <div className="text-center space-y-1">
+          {/* Concerned, not alarmed — a refill is an errand, not an emergency.
+              Bespoke art: the mascot peering into an upside-down empty bottle
+              (generated 2026-08-09, trimmed tight — no BrainMascot size-box). */}
+          <div className="flex justify-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/mascot/refill-gate-mascot.png"
+              alt=""
+              aria-hidden
+              width={420}
+              height={434}
+              className={`h-auto select-none pointer-events-none ${isElderly ? 'w-40' : 'w-32'}`}
+            />
+          </div>
           <p className="text-[11px] font-black uppercase tracking-[0.12em] text-muted-foreground">
             Before you carry on
           </p>
@@ -157,7 +204,7 @@ export default function RefillGate({ meds, canEdit, onSnooze }: RefillGateProps)
           {remaining.map((med) => {
             const unit = unitPhrase(med.unit_type ?? undefined, med.stock);
             return (
-              <li key={med.id} className="bg-card border border-border rounded-2xl p-4 space-y-3 shadow-sm">
+              <li key={med.id} className="bg-card/80 backdrop-blur-xl border border-border/70 rounded-2xl p-4 space-y-3 shadow-sm">
                 <div>
                   <p className={`font-black text-foreground ${isElderly ? 'text-xl' : 'text-base'}`}>
                     {med.drug_name}
@@ -205,7 +252,7 @@ export default function RefillGate({ meds, canEdit, onSnooze }: RefillGateProps)
 
         <button
           onClick={onSnooze}
-          className={`w-full inline-flex items-center justify-center gap-2 font-bold rounded-2xl bg-card border border-border text-foreground hover:bg-muted transition-all cursor-pointer ${
+          className={`w-full inline-flex items-center justify-center gap-2 font-bold rounded-2xl bg-card/80 backdrop-blur-xl border border-border/70 text-foreground hover:bg-muted transition-all cursor-pointer ${
             isElderly ? 'h-16 text-lg' : 'h-12 text-sm'
           }`}
         >

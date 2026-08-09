@@ -1,12 +1,14 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { useUiMode } from '@/context/ui-mode-context';
 import { Lock, AlertCircle, CheckCircle, Eye, EyeOff } from 'lucide-react';
+import { buttonClasses } from '@/components/ui/button';
 
+// Restyled 2026-08-09 to the redesigned (auth) system — the login page is the
+// reference implementation. Update logic unchanged.
 export default function UpdatePasswordPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -48,20 +50,28 @@ export default function UpdatePasswordPage() {
     }
   };
 
+  const inputClass = `w-full pl-12 rounded-2xl bg-white border border-border text-foreground shadow-sm placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all ${isElderly ? 'py-5 text-lg' : 'py-4 text-[15px]'}`;
+  const iconClass = 'absolute left-4 top-1/2 -translate-y-1/2 text-primary pointer-events-none w-[18px] h-[18px]';
+  const labelClass = `block font-bold text-foreground mb-1.5 ${isElderly ? 'text-base' : 'text-xs'}`;
+  const eyeClass =
+    'absolute right-1.5 w-11 h-11 flex items-center justify-center rounded-xl text-muted-foreground hover:text-primary-strong transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer';
+
   if (success) {
     return (
-      <div className={`space-y-6 text-center transition-all duration-300 ${isElderly ? 'max-w-2xl space-y-8' : ''}`}>
+      <div className="space-y-5 text-center">
         <div className={`inline-flex items-center justify-center bg-success/10 text-success rounded-full ${isElderly ? 'w-16 h-16' : 'w-12 h-12'}`}>
-          <CheckCircle className={isElderly ? 'w-8 h-8' : 'w-6 h-6'} />
+          <CheckCircle className={isElderly ? 'w-8 h-8' : 'w-6 h-6'} aria-hidden />
         </div>
-        <h2 className={`font-bold text-foreground ${isElderly ? 'text-2xl' : 'text-xl'}`}>Password Updated</h2>
-        <p className={`text-muted-foreground ${isElderly ? 'text-lg mt-2' : 'text-sm'}`}>
-          Your password has been successfully updated. You can now access your dashboard.
+        <h1 className={`font-mono font-black tracking-tight text-foreground ${isElderly ? 'text-4xl' : 'text-[2rem]'}`}>
+          Password updated
+        </h1>
+        <p className={`text-muted-foreground ${isElderly ? 'text-lg' : 'text-sm'}`}>
+          Your new password is saved. You can head straight to your dashboard.
         </p>
-        <div className="pt-4">
+        <div className="pt-2">
           <Link
             href="/dashboard"
-            className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-2xl shadow-sm font-semibold text-primary-strong-foreground bg-primary-strong hover:bg-primary-strong-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all active:scale-[0.98] cursor-pointer text-center ${isElderly ? 'py-4 text-xl' : 'text-sm'}`}
+            className={buttonClasses({ variant: 'primary', size: 'lg', isElderly, fullWidth: true })}
           >
             Go to Dashboard
           </Link>
@@ -70,72 +80,70 @@ export default function UpdatePasswordPage() {
     );
   }
 
-  const labelClass = `block font-bold text-foreground ${isElderly ? 'text-lg mb-2' : 'text-xs font-semibold mb-1'}`;
-  const inputClass = `mt-1 block w-full px-4 border border-input rounded-2xl bg-background text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all ${isElderly ? 'py-4 text-lg border-2' : 'py-3 text-sm'}`;
-
   return (
-    <div className={`space-y-6 transition-all duration-300 ${isElderly ? 'max-w-2xl space-y-8' : ''}`}>
-      <div className="text-center">
-        <h2 className={`font-bold text-foreground ${isElderly ? 'text-2xl' : 'text-xl'}`}>Update Password</h2>
-        <p className={`text-muted-foreground mt-1 ${isElderly ? 'text-lg' : 'text-xs'}`}>
-          Enter a secure new password for your Re-MIND-eЯ account.
+    <div className="space-y-5">
+      <header>
+        <h1 className={`font-mono font-black tracking-tight text-foreground ${isElderly ? 'text-4xl' : 'text-[2rem]'}`}>
+          New password{' '}
+          <Lock className="inline-block w-7 h-7 text-primary align-[-0.1em]" aria-hidden />
+        </h1>
+        <p className={`mt-2 text-muted-foreground ${isElderly ? 'text-lg' : 'text-sm'}`}>
+          Choose a secure new password for your Re-MIND-eЯ account.
         </p>
-      </div>
+      </header>
 
       {error && (
-        <div className="bg-danger/10 text-danger text-sm p-3 rounded-2xl border border-danger/20 flex items-center gap-2">
-          <AlertCircle className="w-5 h-5 flex-shrink-0" />
+        <div className="bg-danger/10 text-danger-strong text-sm p-3 rounded-2xl border border-danger/20 flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
           <span>{error}</span>
         </div>
       )}
 
       <form onSubmit={handleUpdatePassword} className="space-y-4">
         <div>
-          <label className={labelClass}>New Password</label>
+          <label htmlFor="new-password" className={labelClass}>New password</label>
           <div className="relative flex items-center">
+            <Lock className={iconClass} aria-hidden />
             <input
+              id="new-password"
               type={showPassword ? 'text' : 'password'}
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className={`${inputClass} pr-12`}
-              placeholder="••••••••"
+              className={`${inputClass} pr-14`}
+              placeholder="At least 6 characters"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className={`absolute right-4 text-muted-foreground hover:text-primary transition-colors focus:outline-none flex items-center justify-center ${isElderly ? 'w-10 h-10' : 'w-6 h-6'}`}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              className={eyeClass}
             >
-              {showPassword ? (
-                <EyeOff className={isElderly ? 'w-6 h-6' : 'w-4 h-4'} />
-              ) : (
-                <Eye className={isElderly ? 'w-6 h-6' : 'w-4 h-4'} />
-              )}
+              {showPassword ? <EyeOff className="w-[18px] h-[18px]" aria-hidden /> : <Eye className="w-[18px] h-[18px]" aria-hidden />}
             </button>
           </div>
         </div>
 
         <div>
-          <label className={labelClass}>Confirm New Password</label>
+          <label htmlFor="confirm-password" className={labelClass}>Confirm new password</label>
           <div className="relative flex items-center">
+            <Lock className={iconClass} aria-hidden />
             <input
+              id="confirm-password"
               type={showConfirmPassword ? 'text' : 'password'}
               required
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className={`${inputClass} pr-12`}
-              placeholder="••••••••"
+              className={`${inputClass} pr-14`}
+              placeholder="Type it again"
             />
             <button
               type="button"
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              className={`absolute right-4 text-muted-foreground hover:text-primary transition-colors focus:outline-none flex items-center justify-center ${isElderly ? 'w-10 h-10' : 'w-6 h-6'}`}
+              aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+              className={eyeClass}
             >
-              {showConfirmPassword ? (
-                <EyeOff className={isElderly ? 'w-6 h-6' : 'w-4 h-4'} />
-              ) : (
-                <Eye className={isElderly ? 'w-6 h-6' : 'w-4 h-4'} />
-              )}
+              {showConfirmPassword ? <EyeOff className="w-[18px] h-[18px]" aria-hidden /> : <Eye className="w-[18px] h-[18px]" aria-hidden />}
             </button>
           </div>
         </div>
@@ -143,18 +151,15 @@ export default function UpdatePasswordPage() {
         <button
           type="submit"
           disabled={loading}
-          className={`w-full flex justify-center items-center gap-2 border border-transparent rounded-2xl shadow-sm font-semibold text-primary-strong-foreground bg-primary-strong hover:bg-primary-strong-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 transition-all active:scale-[0.98] cursor-pointer ${isElderly ? 'py-4 text-xl' : 'py-3 text-sm'}`}
+          className={buttonClasses({ variant: 'primary', size: 'lg', isElderly, fullWidth: true })}
         >
-          <Lock className={isElderly ? 'w-6 h-6' : 'w-4 h-4'} />
-          {loading ? 'Updating...' : 'Update Password'}
+          <Lock className="w-4 h-4" aria-hidden />
+          {loading ? 'Updating…' : 'Update password'}
         </button>
       </form>
 
-      <div className="text-center">
-        <Link 
-          href="/login" 
-          className={`font-semibold text-primary hover:underline ${isElderly ? 'text-lg' : 'text-sm'}`}
-        >
+      <div className={`text-center ${isElderly ? 'text-base' : 'text-sm'}`}>
+        <Link href="/login" className="font-semibold text-primary-strong hover:underline">
           Back to Sign In
         </Link>
       </div>

@@ -5,8 +5,10 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useUiMode } from '@/context/ui-mode-context';
-import { Eye, EyeOff, User, Mail, Lock, AlertTriangle, KeyRound, MailWarning } from 'lucide-react';
+import { Eye, EyeOff, User, Mail, Lock, AlertTriangle, Heart } from 'lucide-react';
 import Turnstile, { captchaEnabled } from '@/components/turnstile';
+import { buttonClasses } from '@/components/ui/button';
+import { CodeInput, SpamCallout } from '@/components/auth/code-entry';
 
 export default function RegisterPage() {
   const [fullName, setFullName] = useState('');
@@ -105,65 +107,65 @@ export default function RegisterPage() {
     if (resendErr) setError(resendErr.message);
   };
 
-  const inputClass = `w-full pl-11 pr-4 rounded-2xl bg-white border border-border text-foreground shadow-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all ${isElderly ? 'py-4 text-lg' : 'py-3.5 text-sm'}`;
-  const iconClass = 'absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none w-4 h-4';
+  // Kept identical to the login page — the two screens sit one tap apart.
+  const inputClass = `w-full pl-12 pr-4 rounded-2xl bg-white border border-border text-foreground shadow-sm placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all ${isElderly ? 'py-5 text-lg' : 'py-4 text-[15px]'}`;
+  const iconClass = 'absolute left-4 top-1/2 -translate-y-1/2 text-primary pointer-events-none w-[18px] h-[18px]';
+  const labelClass = `block font-bold text-foreground mb-1.5 ${isElderly ? 'text-base' : 'text-xs'}`;
 
   if (success) {
     return (
       <div className={`space-y-5 ${isElderly ? 'max-w-2xl' : ''}`}>
         {error && (
-          <div className="bg-danger/10 text-danger text-sm p-3 rounded-2xl border border-danger/20 flex items-start gap-2">
+          <div className="bg-danger/10 text-danger-strong text-sm p-3 rounded-2xl border border-danger/20 flex items-start gap-2">
             <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /> <span>{error}</span>
           </div>
         )}
 
-        <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-12 h-12 bg-success/10 text-success rounded-full">
-            <Mail className="w-6 h-6" />
-          </div>
-          <h2 className={`font-bold text-foreground ${isElderly ? 'text-2xl' : 'text-xl'}`}>Enter your code</h2>
-          <p className={`text-muted-foreground ${isElderly ? 'text-lg' : 'text-sm'}`}>
-            We emailed a code to <b>{email}</b>. Enter it below to activate your account.
-          </p>
-        </div>
-
-        <div className="bg-warning/10 border border-warning/35 p-3 rounded-2xl flex items-start gap-2 text-warning-strong text-xs font-semibold">
-          <MailWarning className="w-4 h-4 shrink-0 mt-0.5" />
-          <span>Not in your inbox? <b>Check your Spam / Junk folder</b> — and mark it &quot;Not spam&quot; so future codes arrive on time.</span>
-        </div>
-
-        <form onSubmit={handleVerifyCode} className="space-y-3">
-          <div className="relative">
-            <KeyRound className={iconClass} />
-            <input
-              id="reg-code"
-              type="text"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={10}
-              required
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-              className={`${inputClass} text-center font-mono tracking-[0.3em]`}
-              placeholder="Enter code"
+        <header className="text-center">
+          {/* Same hero-tile treatment as the login page's code screen. */}
+          <div className="mx-auto mb-6 w-28 h-28 rounded-[32px] bg-white shadow-xl ring-1 ring-primary/15 flex items-center justify-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/mascot/login-hero.png"
+              alt=""
+              aria-hidden
+              width={88}
+              height={88}
+              className="w-[88px] h-[88px] object-contain"
             />
           </div>
+          <h1 className={`font-mono font-black tracking-tight text-foreground text-center ${isElderly ? 'text-4xl' : 'text-[2rem]'}`}>
+            Check your email{' '}
+            <Heart className="inline-block w-7 h-7 text-primary align-[-0.1em]" aria-hidden />
+          </h1>
+          <p className={`mt-2 text-muted-foreground ${isElderly ? 'text-lg' : 'text-sm'}`}>
+            We emailed a code to <b className="text-foreground break-all">{email}</b>. Enter it
+            below to activate your account.
+          </p>
+        </header>
+
+        <form onSubmit={handleVerifyCode} className="space-y-4">
+          <div>
+            <label htmlFor="reg-code" className={labelClass}>Confirmation code</label>
+            <CodeInput id="reg-code" value={code} onChange={setCode} autoFocus />
+          </div>
+
+          <SpamCallout />
 
           <button
             type="submit"
             disabled={loading}
-            style={{ background: 'linear-gradient(180deg, #F8839E 0%, #F26B8A 100%)' }}
-            className={`w-full flex justify-center rounded-2xl shadow-md font-black text-white hover:brightness-[0.97] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 transition-all active:scale-[0.98] cursor-pointer ${isElderly ? 'py-4 text-xl' : 'py-3.5 text-base'}`}
+            className={buttonClasses({ variant: 'primary', size: 'lg', isElderly, fullWidth: true })}
           >
             {loading ? 'Verifying…' : 'Verify & Continue'}
           </button>
 
-          <div className="flex items-center justify-center gap-3 text-xs text-muted-foreground">
-            <button type="button" disabled={loading} onClick={handleResendCode} className="hover:text-primary disabled:opacity-50 transition-colors cursor-pointer">
+          <div className={`flex items-center justify-center gap-3 text-muted-foreground ${isElderly ? 'text-base' : 'text-xs'}`}>
+            <button type="button" disabled={loading} onClick={handleResendCode} className="font-semibold hover:text-primary-strong disabled:opacity-50 transition-colors cursor-pointer">
               Resend code
             </button>
-            <span>·</span>
-            <Link href="/login" className="hover:text-primary transition-colors">
+            <span aria-hidden>·</span>
+            <Link href="/login" className="font-semibold hover:text-primary-strong transition-colors">
               Back to Sign In
             </Link>
           </div>
@@ -174,15 +176,27 @@ export default function RegisterPage() {
 
   return (
     <div className="space-y-5">
+      {/* Headline matches the redesigned login page — the (auth) layout no longer
+          renders a big brand hero, so each page owns its own heading. */}
+      <header>
+        <h1 className={`font-mono font-black tracking-tight text-foreground ${isElderly ? 'text-4xl' : 'text-[2rem]'}`}>
+          Create account{' '}
+          <Heart className="inline-block w-7 h-7 text-primary align-[-0.1em]" aria-hidden />
+        </h1>
+        <p className={`mt-2 text-muted-foreground ${isElderly ? 'text-lg' : 'text-sm'}`}>
+          A few details and your medication companion is ready.
+        </p>
+      </header>
+
       {error && (
-        <div className="bg-danger/10 text-danger text-sm p-3 rounded-2xl border border-danger/20 flex items-start gap-2">
+        <div className="bg-danger/10 text-danger-strong text-sm p-3 rounded-2xl border border-danger/20 flex items-start gap-2">
           <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /> <span>{error}</span>
         </div>
       )}
 
       <form onSubmit={handleRegister} className="space-y-3">
         <div>
-          <label htmlFor="reg-name" className={`block font-bold text-foreground mb-1.5 ${isElderly ? 'text-base' : 'text-xs'}`}>Full name</label>
+          <label htmlFor="reg-name" className={labelClass}>Full name</label>
           <div className="relative">
             <User className={iconClass} />
             <input
@@ -198,7 +212,7 @@ export default function RegisterPage() {
         </div>
 
         <div>
-          <label htmlFor="reg-email" className={`block font-bold text-foreground mb-1.5 ${isElderly ? 'text-base' : 'text-xs'}`}>Email</label>
+          <label htmlFor="reg-email" className={labelClass}>Email</label>
           <div className="relative">
             <Mail className={iconClass} />
             <input
@@ -214,7 +228,7 @@ export default function RegisterPage() {
         </div>
 
         <div>
-          <label htmlFor="reg-password" className={`block font-bold text-foreground mb-1.5 ${isElderly ? 'text-base' : 'text-xs'}`}>Password</label>
+          <label htmlFor="reg-password" className={labelClass}>Password</label>
           <div className="relative flex items-center">
           <Lock className={iconClass} />
           <input
@@ -223,32 +237,32 @@ export default function RegisterPage() {
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className={`${inputClass} pr-12`}
+            className={`${inputClass} pr-14`}
             placeholder="Choose a password"
           />
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
             aria-label={showPassword ? 'Hide password' : 'Show password'}
-            className="absolute right-4 text-muted-foreground hover:text-primary transition-colors focus:outline-none flex items-center justify-center"
+            className="absolute right-1.5 w-11 h-11 flex items-center justify-center rounded-xl text-muted-foreground hover:text-primary-strong transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
           >
-            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            {showPassword ? <EyeOff className="w-[18px] h-[18px]" aria-hidden /> : <Eye className="w-[18px] h-[18px]" aria-hidden />}
           </button>
           </div>
         </div>
 
-        <label className="flex items-start gap-2 text-xs text-muted-foreground cursor-pointer pt-1">
+        <label className={`flex items-start gap-2.5 text-muted-foreground cursor-pointer pt-1 ${isElderly ? 'text-base' : 'text-xs'}`}>
           <input
             type="checkbox"
             checked={agreed}
             onChange={(e) => setAgreed(e.target.checked)}
-            className="mt-0.5 shrink-0 cursor-pointer"
+            className="mt-0.5 shrink-0 w-4 h-4 accent-primary cursor-pointer"
           />
           <span>
             I am 18 or older and I agree to the{' '}
-            <Link href="/terms" target="_blank" className="text-primary font-semibold hover:underline">Terms of Service</Link>{' '}
+            <Link href="/terms" target="_blank" className="text-primary-strong font-semibold hover:underline">Terms of Service</Link>{' '}
             and{' '}
-            <Link href="/privacy" target="_blank" className="text-primary font-semibold hover:underline">Privacy Policy</Link>.
+            <Link href="/privacy" target="_blank" className="text-primary-strong font-semibold hover:underline">Privacy Policy</Link>.
           </span>
         </label>
 
@@ -257,16 +271,15 @@ export default function RegisterPage() {
         <button
           type="submit"
           disabled={loading}
-          style={{ background: 'linear-gradient(180deg, #F8839E 0%, #F26B8A 100%)' }}
-          className={`w-full flex justify-center rounded-2xl shadow-md font-black text-white hover:brightness-[0.97] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 transition-all active:scale-[0.98] cursor-pointer ${isElderly ? 'py-4 text-xl' : 'py-3.5 text-base'}`}
+          className={buttonClasses({ variant: 'primary', size: 'lg', isElderly, fullWidth: true })}
         >
           {loading ? 'Creating account…' : 'Create account'}
         </button>
       </form>
 
-      <div className="text-center text-sm">
+      <div className={`text-center ${isElderly ? 'text-base' : 'text-sm'}`}>
         <span className="text-muted-foreground">Already have an account? </span>
-        <Link href="/login" className="font-medium text-primary hover:underline">
+        <Link href="/login" className="font-semibold text-primary-strong hover:underline">
           Sign In
         </Link>
       </div>

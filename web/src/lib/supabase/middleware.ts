@@ -96,8 +96,8 @@ export async function updateSession(request: NextRequest, nonce: string, cspHead
         return withCsp(NextResponse.redirect(url));
       }
 
-      // Prevent accessing auth pages
-      if (isAuthPage || url.pathname === '/') {
+      // Prevent accessing auth pages (and the signed-out welcome screen)
+      if (isAuthPage || url.pathname === '/' || url.pathname === '/welcome') {
         url.pathname = '/dashboard';
         return withCsp(NextResponse.redirect(url));
       }

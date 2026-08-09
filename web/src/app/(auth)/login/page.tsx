@@ -5,9 +5,27 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useUiMode } from '@/context/ui-mode-context';
-import { Eye, EyeOff, Sparkles, AlertTriangle, Info, Mail, Lock, KeyRound, MailWarning } from 'lucide-react';
+import { buttonClasses } from '@/components/ui/button';
+import {
+  Eye,
+  EyeOff,
+  AlertTriangle,
+  Info,
+  Mail,
+  Lock,
+  Heart,
+  Send,
+} from 'lucide-react';
 import Turnstile, { captchaEnabled } from '@/components/turnstile';
+import { CodeInput, SpamCallout } from '@/components/auth/code-entry';
 
+/**
+ * Redesigned 2026-08-09 from the generated mockups ("Welcome back" form-first
+ * screen + the code-entry screen). Two visual states that SWAP instead of
+ * stacking: the password form with the emailed-code option, and — once a code
+ * is sent — a focused code-entry screen with the hero mascot tile and the
+ * spam callout. All auth logic is unchanged from the pre-redesign page.
+ */
 function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -18,7 +36,7 @@ function LoginForm() {
   const [codeSent, setCodeSent] = useState(false);
   const [code, setCode] = useState('');
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-  
+
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
@@ -28,6 +46,11 @@ function LoginForm() {
     const errorParam = searchParams.get('error');
     if (errorParam) {
       setError(errorParam);
+    }
+    // /welcome hands its email field off here so nobody types it twice.
+    const emailParam = searchParams.get('email');
+    if (emailParam) {
+      setEmail(emailParam);
     }
   }, [searchParams]);
 
@@ -56,7 +79,7 @@ function LoginForm() {
     }
   };
 
-  // Email a 6-digit code (NOT a link). Omitting emailRedirectTo makes Supabase send the
+  // Email a sign-in code (NOT a link). Omitting emailRedirectTo makes Supabase send the
   // {{ .Token }} code; a typed code has no PKCE verifier cookie, so it works no matter which
   // app/browser opens the email (the magic *link* broke when Gmail opened it in its own
   // in-app browser). shouldCreateUser:false keeps this a LOGIN — new users use "Create account".
@@ -85,13 +108,17 @@ function LoginForm() {
       if (m.includes('not allowed') || m.includes('signups')) {
         setError('No account found for that email. Tap "Create account" below to sign up first.');
       } else if (m.includes('rate limit') || m.includes('security purposes') || m.includes('too many')) {
-        setError('Too many email requests — please wait a minute, or sign in with your password above.');
+        setError('Too many email requests — please wait a minute, or sign in with your password.');
       } else {
         setError(otpErr.message);
       }
     } else {
+      const resending = codeSent;
       setCodeSent(true);
-      setInfo(`We emailed a code to ${email}. Enter it below to sign in.`);
+      // First send: the code screen's own heading says where the code went, so a
+      // banner would say it twice. On a RESEND the screen doesn't change, so the
+      // banner is the only feedback that anything happened.
+      setInfo(resending ? `A fresh code is on its way to ${email}.` : null);
     }
   };
 
@@ -123,160 +150,199 @@ function LoginForm() {
     }
   };
 
-  const inputClass = `w-full pl-11 pr-4 rounded-2xl bg-white border border-border text-foreground shadow-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all ${isElderly ? 'py-4 text-lg' : 'py-3.5 text-sm'}`;
-  const iconClass = 'absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none';
+  const inputClass = `w-full pl-12 pr-4 rounded-2xl bg-white border border-border text-foreground shadow-sm placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all ${isElderly ? 'py-5 text-lg' : 'py-4 text-[15px]'}`;
+  // Pink icons are decorative accents (mockup direction) — labels carry the meaning.
+  const iconClass = 'absolute left-4 top-1/2 -translate-y-1/2 text-primary pointer-events-none';
+  const labelClass = `block font-bold text-foreground mb-1.5 ${isElderly ? 'text-base' : 'text-xs'}`;
 
   return (
     <div className="space-y-5">
+      <header>
+        {codeSent && (
+          <div className="mx-auto mb-6 w-28 h-28 rounded-[32px] bg-white shadow-xl ring-1 ring-primary/15 flex items-center justify-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/mascot/login-hero.png"
+              alt=""
+              aria-hidden
+              width={88}
+              height={88}
+              className="w-[88px] h-[88px] object-contain"
+            />
+          </div>
+        )}
+        {/* The heart is INLINE, not a flex sibling — a flex heart detaches and
+            floats beside the text block whenever the title wraps to two lines. */}
+        <h1
+          className={`font-mono font-black tracking-tight text-foreground ${codeSent ? 'text-center' : ''} ${isElderly ? 'text-4xl' : 'text-[2rem]'}`}
+        >
+          {codeSent ? 'Check your email' : 'Welcome back'}{' '}
+          <Heart className="inline-block w-7 h-7 text-primary align-[-0.1em]" aria-hidden />
+        </h1>
+        <p
+          className={`mt-2 text-muted-foreground ${codeSent ? 'text-center' : ''} ${isElderly ? 'text-lg' : 'text-sm'}`}
+        >
+          {codeSent ? (
+            <>
+              We emailed a sign-in code to{' '}
+              <b className="text-foreground break-all">{email}</b>.
+            </>
+          ) : (
+            'Sign in to continue your journey towards better health.'
+          )}
+        </p>
+      </header>
+
       {error && (
-        <div className="bg-danger/10 text-danger text-sm p-3 rounded-2xl border border-danger/20 flex items-start gap-2">
-          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /> <span>{error}</span>
+        <div className="bg-danger/10 text-danger-strong text-sm p-3 rounded-2xl border border-danger/20 flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden /> <span>{error}</span>
         </div>
       )}
 
       {info && (
-        <div className="bg-primary/10 text-primary text-sm p-3 rounded-2xl border border-primary/20 flex items-start gap-2">
-          <Info className="w-4 h-4 shrink-0 mt-0.5" /> <span>{info}</span>
+        <div className="bg-primary/10 text-primary-strong text-sm p-3 rounded-2xl border border-primary/20 flex items-start gap-2">
+          <Info className="w-4 h-4 shrink-0 mt-0.5" aria-hidden /> <span>{info}</span>
         </div>
       )}
 
-      <form onSubmit={handlePasswordLogin} className="space-y-3">
-        <div>
-          <label htmlFor="login-email" className={`block font-bold text-foreground mb-1.5 ${isElderly ? 'text-base' : 'text-xs'}`}>Email</label>
-          <div className="relative">
-            <Mail className={`${iconClass} w-4 h-4`} />
-            <input
-              id="login-email"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className={inputClass}
-              placeholder="you@example.com"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label htmlFor="login-password" className={`block font-bold text-foreground mb-1.5 ${isElderly ? 'text-base' : 'text-xs'}`}>Password</label>
-          <div className="relative flex items-center">
-            <Lock className={`${iconClass} w-4 h-4`} />
-            <input
-              id="login-password"
-              type={showPassword ? 'text' : 'password'}
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className={`${inputClass} pr-12`}
-              placeholder="Your password"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              aria-label={showPassword ? 'Hide password' : 'Show password'}
-              className="absolute right-4 text-muted-foreground hover:text-primary transition-colors focus:outline-none flex items-center justify-center"
-            >
-              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
-          </div>
-          <div className="flex justify-end mt-1.5">
-            <Link href="/forgot-password" className={`text-muted-foreground hover:text-primary transition-colors ${isElderly ? 'text-base' : 'text-xs'}`}>
-              Forgot password?
-            </Link>
-          </div>
-        </div>
-
-        <Turnstile onVerify={setCaptchaToken} />
-
-        <button
-          type="submit"
-          disabled={loading}
-          style={{ background: 'linear-gradient(180deg, #F8839E 0%, #F26B8A 100%)' }}
-          className={`w-full flex justify-center rounded-2xl shadow-md font-black text-white hover:brightness-[0.97] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 transition-all active:scale-[0.98] cursor-pointer ${isElderly ? 'py-4 text-xl' : 'py-3.5 text-base'}`}
-        >
-          {loading ? 'Signing In…' : 'Sign In'}
-        </button>
-      </form>
-
-      <div className="relative flex items-center">
-        <div className="flex-grow border-t border-border"></div>
-        <span className="flex-shrink mx-4 text-muted-foreground text-xs">or</span>
-        <div className="flex-grow border-t border-border"></div>
-      </div>
-
-      <Link
-        href="/register"
-        className="w-full flex items-center justify-center gap-1.5 py-3.5 rounded-2xl bg-white border border-border shadow-sm text-sm text-muted-foreground hover:border-primary/40 transition-all cursor-pointer"
-      >
-        New to Re-MIND-eЯ? <span className="font-black text-primary">Create account</span>
-      </Link>
-
       {!codeSent ? (
-        <div className="text-center">
+        <>
+          <form onSubmit={handlePasswordLogin} className="space-y-4">
+            <div>
+              <label htmlFor="login-email" className={labelClass}>
+                Email
+              </label>
+              <div className="relative">
+                <Mail className={`${iconClass} w-[18px] h-[18px]`} aria-hidden />
+                <input
+                  id="login-email"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className={inputClass}
+                  placeholder="you@example.com"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="login-password" className={labelClass}>
+                Password
+              </label>
+              <div className="relative flex items-center">
+                <Lock className={`${iconClass} w-[18px] h-[18px]`} aria-hidden />
+                <input
+                  id="login-password"
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className={`${inputClass} pr-14`}
+                  placeholder="Your password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  className="absolute right-1.5 w-11 h-11 flex items-center justify-center rounded-xl text-muted-foreground hover:text-primary-strong transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+                >
+                  {showPassword ? <EyeOff className="w-[18px] h-[18px]" aria-hidden /> : <Eye className="w-[18px] h-[18px]" aria-hidden />}
+                </button>
+              </div>
+              <div className="flex justify-end mt-2">
+                <Link
+                  href="/forgot-password"
+                  className={`font-semibold text-muted-foreground hover:text-primary-strong underline decoration-dashed decoration-muted-foreground/50 underline-offset-4 transition-colors ${isElderly ? 'text-base' : 'text-xs'}`}
+                >
+                  Forgot password?
+                </Link>
+              </div>
+            </div>
+
+            <Turnstile onVerify={setCaptchaToken} />
+
+            <button
+              type="submit"
+              disabled={loading}
+              className={buttonClasses({ variant: 'primary', size: 'lg', isElderly, fullWidth: true })}
+            >
+              <Lock className="w-4 h-4" aria-hidden />
+              {loading ? 'Signing in…' : 'Sign in'}
+            </button>
+          </form>
+
+          <div className="relative flex items-center" aria-hidden>
+            <div className="flex-grow border-t border-border"></div>
+            <span className="flex-shrink mx-4 text-muted-foreground text-xs font-semibold">or</span>
+            <div className="flex-grow border-t border-border"></div>
+          </div>
+
+          {/* One-off outline treatment (mockup): a real action, but visually quieter
+              than the solid primary so only ONE thing on screen reads as "the" action. */}
           <button
             type="button"
             disabled={loading}
             onClick={handleSendCode}
-            className="inline-flex items-center justify-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-primary disabled:opacity-50 transition-colors cursor-pointer"
+            className={`w-full inline-flex items-center justify-center gap-2 font-bold rounded-2xl border border-primary/35 text-primary-strong hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none cursor-pointer ${isElderly ? 'h-16 text-lg' : 'h-14 text-sm'}`}
           >
-            <Sparkles className="w-3.5 h-3.5 shrink-0" /> No password? Email me a sign-in code
+            <Send className="w-4 h-4" aria-hidden />
+            Email me a sign-in code
           </button>
-        </div>
+
+          {/* A text row, not a third button-shaped block: it mirrors register's
+              "Already have an account?" line and buys back ~32px of the one-screen
+              vertical budget (see the layout's header comment). */}
+          <p className={`text-center ${isElderly ? 'text-base' : 'text-sm'}`}>
+            <span className="text-muted-foreground">New here? </span>
+            <Link href="/register" className="font-semibold text-primary-strong hover:underline">
+              Create account
+            </Link>
+          </p>
+        </>
       ) : (
-        <form onSubmit={handleVerifyCode} className="space-y-3">
-          <div className="bg-warning/10 border border-warning/35 p-3 rounded-2xl flex items-start gap-2 text-warning-strong text-xs font-semibold">
-            <MailWarning className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>Not in your inbox? <b>Check your Spam / Junk folder</b> — and mark it &quot;Not spam&quot;.</span>
-          </div>
+        <form onSubmit={handleVerifyCode} className="space-y-4">
           <div>
-            <label htmlFor="login-code" className={`block font-bold text-foreground mb-1.5 ${isElderly ? 'text-base' : 'text-xs'}`}>Sign-in code</label>
-            <div className="relative">
-              <KeyRound className={`${iconClass} w-4 h-4`} />
-              <input
-                id="login-code"
-                type="text"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                maxLength={10}
-                required
-                value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-                className={`${inputClass} text-center font-mono tracking-[0.3em]`}
-                placeholder="Enter code"
-              />
-            </div>
+            <label htmlFor="login-code" className={labelClass}>
+              Sign-in code
+            </label>
+            <CodeInput id="login-code" value={code} onChange={setCode} autoFocus />
           </div>
+
+          <SpamCallout />
+
+          <Turnstile onVerify={setCaptchaToken} />
 
           <button
             type="submit"
             disabled={loading}
-            style={{ background: 'linear-gradient(180deg, #F8839E 0%, #F26B8A 100%)' }}
-            className={`w-full flex justify-center rounded-2xl shadow-md font-black text-white hover:brightness-[0.97] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 transition-all active:scale-[0.98] cursor-pointer ${isElderly ? 'py-4 text-xl' : 'py-3.5 text-base'}`}
+            className={buttonClasses({ variant: 'primary', size: 'lg', isElderly, fullWidth: true })}
           >
-            {loading ? 'Verifying…' : 'Verify & Sign In'}
+            {loading ? 'Verifying…' : 'Verify & Sign in'}
           </button>
 
-          <div className="flex items-center justify-center gap-3 text-xs text-muted-foreground">
-            <button type="button" disabled={loading} onClick={handleSendCode} className="hover:text-primary disabled:opacity-50 transition-colors cursor-pointer">
+          <div
+            className={`flex items-center justify-center gap-3 text-muted-foreground ${isElderly ? 'text-base' : 'text-xs'}`}
+          >
+            <button
+              type="button"
+              disabled={loading}
+              onClick={handleSendCode}
+              className="font-semibold hover:text-primary-strong disabled:opacity-50 transition-colors cursor-pointer"
+            >
               Resend code
             </button>
-            <span>·</span>
+            <span aria-hidden>·</span>
             <button
               type="button"
               onClick={() => { setCodeSent(false); setCode(''); setInfo(null); setError(null); }}
-              className="hover:text-primary transition-colors cursor-pointer"
+              className="font-semibold hover:text-primary-strong transition-colors cursor-pointer"
             >
               Use a different email
             </button>
           </div>
         </form>
       )}
-
-      <div className="text-center text-xs text-muted-foreground pt-1">
-        <Link href="/privacy" className="hover:underline">Privacy Policy</Link>
-        <span className="mx-2">·</span>
-        <Link href="/terms" className="hover:underline">Terms of Service</Link>
-      </div>
     </div>
   );
 }

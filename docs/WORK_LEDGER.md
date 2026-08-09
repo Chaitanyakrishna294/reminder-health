@@ -104,7 +104,8 @@ bare node:assert scripts.
 | Route | Notes |
 |---|---|
 | `/` → redirect `/dashboard` | |
-| `/login` `/register` `/forgot-password` `/update-password` | `(auth)` group; Turnstile optional |
+| `/login` `/register` `/forgot-password` `/update-password` | `(auth)` group; Turnstile optional. Redesigned 2026-08-09 from generated mockups: layout = small brand row + fields directly on `--auth-radial` + peek-mascot trust strip (no frosted card, each page owns its `<h1>`); login swaps between password and code screens, and register/forgot/update follow the same system (no hex-gradient buttons — `buttonClasses()` only); `components/auth/code-entry.tsx` owns the shared `CodeInput` (inline letter-spacing: unlayered `.font-mono` in globals beats Tailwind utilities) + `SpamCallout`; assets `mascot/login-hero.png` + `login-peek.png` (sharp-compressed from 1.4MB originals) |
+| `/welcome` | Signed-out front door (2026-08-09, mockup "Never miss a dose"): hero mascot + pink sweep, email field hands off to `/login?email=…` (login prefills it). `/` routes signed-out here (app/page.tsx); proxy bounces signed-in users to `/dashboard`. Theme-FIXED illustration colours on purpose (see file comment) |
 | `/link-account` | Redeem Telegram code or skip (synthetic `WEB-<uid>` id); outside route groups |
 | `/install` `/privacy` `/terms` | Standalone/static |
 | `/dashboard` | Server aggregates meds+events+logs → `DashboardClientView` (88 KB) |

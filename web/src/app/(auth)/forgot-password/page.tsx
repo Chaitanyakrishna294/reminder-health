@@ -3,8 +3,13 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { Mail, AlertTriangle } from 'lucide-react';
+import { useUiMode } from '@/context/ui-mode-context';
+import { Mail, AlertTriangle, KeyRound, Send } from 'lucide-react';
+import { buttonClasses } from '@/components/ui/button';
+import { SpamCallout } from '@/components/auth/code-entry';
 
+// Restyled 2026-08-09 to the redesigned (auth) system — the login page is the
+// reference implementation. Reset logic unchanged.
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
@@ -12,6 +17,7 @@ export default function ForgotPasswordPage() {
   const [success, setSuccess] = useState(false);
 
   const supabase = createClient();
+  const { isElderly } = useUiMode();
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,19 +36,29 @@ export default function ForgotPasswordPage() {
     }
   };
 
+  const inputClass = `w-full pl-12 pr-4 rounded-2xl bg-white border border-border text-foreground shadow-sm placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all ${isElderly ? 'py-5 text-lg' : 'py-4 text-[15px]'}`;
+  const iconClass = 'absolute left-4 top-1/2 -translate-y-1/2 text-primary pointer-events-none w-[18px] h-[18px]';
+  const labelClass = `block font-bold text-foreground mb-1.5 ${isElderly ? 'text-base' : 'text-xs'}`;
+
   if (success) {
     return (
-      <div className="space-y-6 text-center">
-        <div className="inline-flex items-center justify-center w-12 h-12 bg-success/10 text-success rounded-full">
-          <Mail className="w-6 h-6" />
+      <div className="space-y-5 text-center">
+        <div className={`inline-flex items-center justify-center bg-success/10 text-success rounded-full ${isElderly ? 'w-16 h-16' : 'w-12 h-12'}`}>
+          <Mail className={isElderly ? 'w-8 h-8' : 'w-6 h-6'} aria-hidden />
         </div>
-        <h2 className="text-xl font-bold text-foreground">Email Sent</h2>
-        <p className="text-sm text-muted-foreground">
-          We have sent a password reset link to <b>{email}</b>.<br />
-          Please follow the instructions in the email to reset your password.
+        <h1 className={`font-mono font-black tracking-tight text-foreground ${isElderly ? 'text-4xl' : 'text-[2rem]'}`}>
+          Check your email
+        </h1>
+        <p className={`text-muted-foreground ${isElderly ? 'text-lg' : 'text-sm'}`}>
+          We sent a password reset link to <b className="text-foreground break-all">{email}</b>.
+          Follow it to choose a new password.
         </p>
-        <div className="pt-4">
-          <Link href="/login" className="text-sm text-primary font-medium hover:underline">
+        <SpamCallout noun="link" />
+        <div className="pt-2">
+          <Link
+            href="/login"
+            className={`font-semibold text-primary-strong hover:underline ${isElderly ? 'text-lg' : 'text-sm'}`}
+          >
             Back to Sign In
           </Link>
         </div>
@@ -51,44 +67,52 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="text-center">
-        <h2 className="text-xl font-bold text-foreground">Reset Password</h2>
-        <p className="text-xs text-muted-foreground mt-1">
-          Enter your email address and we'll send you a password reset link.
+    <div className="space-y-5">
+      <header>
+        <h1 className={`font-mono font-black tracking-tight text-foreground ${isElderly ? 'text-4xl' : 'text-[2rem]'}`}>
+          Reset password{' '}
+          <KeyRound className="inline-block w-7 h-7 text-primary align-[-0.1em]" aria-hidden />
+        </h1>
+        <p className={`mt-2 text-muted-foreground ${isElderly ? 'text-lg' : 'text-sm'}`}>
+          Enter your email and we&apos;ll send you a link to choose a new one.
         </p>
-      </div>
+      </header>
 
       {error && (
-        <div className="bg-danger/10 text-danger text-sm p-3 rounded-2xl border border-danger/20 flex items-start gap-2">
-          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /> <span>{error}</span>
+        <div className="bg-danger/10 text-danger-strong text-sm p-3 rounded-2xl border border-danger/20 flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden /> <span>{error}</span>
         </div>
       )}
 
       <form onSubmit={handleReset} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-foreground">Email address</label>
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 block w-full px-4 py-3 border border-input rounded-2xl bg-background text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm transition-shadow"
-            placeholder="you@example.com"
-          />
+          <label htmlFor="forgot-email" className={labelClass}>Email</label>
+          <div className="relative">
+            <Mail className={iconClass} aria-hidden />
+            <input
+              id="forgot-email"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className={inputClass}
+              placeholder="you@example.com"
+            />
+          </div>
         </div>
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full flex justify-center py-3 px-4 border border-transparent rounded-2xl shadow-sm text-sm font-semibold text-primary-strong-foreground bg-primary-strong hover:bg-primary-strong-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 transition-all active:scale-[0.98] cursor-pointer"
+          className={buttonClasses({ variant: 'primary', size: 'lg', isElderly, fullWidth: true })}
         >
-          {loading ? 'Sending...' : 'Send Reset Link'}
+          <Send className="w-4 h-4" aria-hidden />
+          {loading ? 'Sending…' : 'Send reset link'}
         </button>
       </form>
 
-      <div className="text-center text-sm">
-        <Link href="/login" className="font-medium text-primary hover:underline">
+      <div className={`text-center ${isElderly ? 'text-base' : 'text-sm'}`}>
+        <Link href="/login" className="font-semibold text-primary-strong hover:underline">
           Back to Sign In
         </Link>
       </div>
