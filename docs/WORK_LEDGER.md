@@ -24,8 +24,13 @@ Failover: the bot upserts `scheduler_heartbeat` every minute-tick; `web/src/app/
 the same `minute_tick` lease and sends **push + Telegram** (Telegram via `lib/telegram.ts`, needs
 `TELEGRAM_BOT_TOKEN` on Vercel — set 07-26; degrades to push-only without it).
 
-Deploy: web → `npx vercel deploy --prod --yes` **from repo root** (project `reminder-health`;
-`web/.vercel` points at the wrong project). Worker → Render auto-deploy from git.
+Deploy: web → `npx vercel deploy --prod --yes --scope chaitanya-krishnas-projects-397d3a53`
+**from repo root** (project `reminder-health`, linked via root `.vercel/repo.json` with
+`directory: web`; never deploy from `web/`). **`--scope` is required** — without it the CLI fails
+with `Not authorized` even though `vercel whoami` succeeds, because the `orgId` pinned in
+`repo.json` no longer resolves for the logged-in user (hit 08-10; re-linking would also fix it).
+Vercel deploys the **working tree, not the commit** — `git status` before shipping, or
+uncommitted work goes to prod. Worker → Render auto-deploy from git.
 Migrations → pasted **manually into the Supabase SQL editor** by the maintainer; agents must
 never attempt to apply one.
 
