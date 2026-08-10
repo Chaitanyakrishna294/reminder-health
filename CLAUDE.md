@@ -115,10 +115,15 @@ gitignored; may be deleted once the fresh keystore is backed up.
 **Milestones (revised):**
 - **M0 — Groundwork.** Full pre-code checklist above, plus the schedule-test-vector fixture wired
   into bot + web tests with the empty-input drift resolved.
-- **M1 — Shell.** Capacitor project in `android-app/` (fresh, not derived from `android-twa/`),
-  `server.url` pointed at the deployed site, icon/splash, proof the remote page can call a
-  trivial native plugin. Deliverable: APK on a real phone showing the live app with a working
-  bridge.
+- **M1 — Shell. ✅ DONE 2026-08-10.** Capacitor project in `android-app/` (fresh, not derived from
+  the old TWA), `server.url` pointed at the deployed site, icon/splash, proof the remote page can
+  call a trivial native plugin. **Verified on a real device (vivo I2202):** app built, installed,
+  and launched; logcat showed the Ping bridge round-trip (`[Ping] native replied: pong: hello from
+  webview`) multiple times; the live site loads in the webview with the full flow working end to
+  end (Turnstile renders and executes, login, dashboard, guest login all work). Bonus finding:
+  **Turnstile works fine inside the Capacitor webview** — the M0 checklist's "may need to drop it
+  on the app build" concern is closed; keep the onerror/timeout fallback (2026-08-10) as insurance
+  regardless.
 - **M2 — Alarm core.** Kotlin module: local schedule store, `syncSchedule` bridge, exact alarms
   passing the shared fixture, full-screen alarm activity with Taken/Skip/Snooze, boot receiver,
   offline action queue calling `resolve_reminder_event` via the bridged session. Server pipeline

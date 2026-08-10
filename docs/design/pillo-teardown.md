@@ -252,6 +252,55 @@ Nearly every screen uses the same five-band vertical structure:
 | Tertiary | Plain text, `text-primary` or `text-secondary` | Centred under primary | `Later`, `No thanks`, `Import/Restore Data` |
 | Destructive-ish | Grey pill | Pinned bottom | `Cancel` on Stock Calculator |
 
+### 3.17 Ring countdown timer
+
+The single most sophisticated component in the app.
+
+```
+                 ╭──────────────────╮
+            ╭────┤  MASCOT HEAD     ├────╮   ← rides the leading edge
+          ╭─┘    ╰──────────────────╯    └─╮
+         │                                  │
+        │            04 : 53                 │  ← 40 dp / 700, centred
+        │          ┌───────────┐             │
+        │          │  + 1 min  │             │  ← 40 dp pill, primary-subtle
+         │         └───────────┘            │
+          ╰─╮                            ╭─╯
+            ╰────────────────────────────╯
+```
+
+- **Ring:** ~300 dp outer diameter, ~34 dp stroke, centred at ~42% screen height. Track `#E0E0E0`, progress fill drawn clockwise from 12 o'clock.
+- **Mascot as progress head:** a ~72 dp mascot face sits on the ring's leading edge and travels around it as time depletes. This is the whole design in one move — the character *is* the progress indicator, so watching the clock and watching the character are the same act.
+- **Two-state colour + expression, switched together:**
+
+  | State | Ring fill | Mascot face |
+  |---|---|---|
+  | On time | `primary-subtle` `#AEC3FF` | Happy, open mouth, wide eyes |
+  | Overdue | Coral `#F9A3A3` | Angry — furrowed brows, frown, hair spiked |
+
+  The ring also *reverses direction of meaning* when overdue: pre-expiry it depletes a full blue ring; post-expiry a coral arc grows from 12 o'clock as the restart timer counts down.
+- **Centre stack:** `MM : SS` in 40 dp/700 with a spaced colon, then a `+ 1 min` pill (~120 × 44 dp, `primary-subtle` fill, `primary` label) directly below.
+- **Auxiliary:** `👁 View meds due now` tinted pill above the action row; 2-dot page indicator top-centre; speaker toggle top-right (shows `🔇×` when muted).
+- **Action row:** 48 dp circular back (left) — 200 dp `Taken` primary (centre) — 48 dp circular note button (right). One thumb-sized primary flanked by two secondaries.
+
+### 3.18 Tooltip coach-mark (speech bubble)
+
+Distinct from the dark modal coach-mark (§3.11) and used only inside the timer.
+
+- White card, radius 16, ~264 dp wide, with a **downward-pointing tail** aimed at the element being explained.
+- `1/2` counter in `primary` at the top, 20 dp/700 headline below, white `Next` button rendered as a separate card beneath the highlighted element.
+- Scrim dims everything except the ring and the `Taken` button.
+- Two steps: `Take your meds before time's up` → `If you're late, the alarm will restart`. The second one is shown against the *overdue* ring state, so the warning is demonstrated rather than described.
+
+### 3.19 Celebration / reward screen
+
+- **Full-bleed `primary` background** — the only screen in the app that floods the accent colour edge to edge. Colour alone signals "this is different."
+- X close top-left in a translucent white rounded square.
+- Green gradient heart (`#22C55E → #A3E635`), ~200 dp, centred at ~38% height, with a soft double-layer offset for depth.
+- Headline `You earned a Heart!` 34 dp/700 white.
+- Subcopy with an **underlined inline link** on `at no cost` — the phrase that defuses the obvious objection is the one made tappable.
+- Actions inverted for the dark ground: **white** primary (`Donate a Heart`) + white-text tertiary (`Save it for later`).
+
 ---
 
 ## 4. Screen-by-Screen Specification
@@ -419,6 +468,19 @@ Nearly every screen uses the same five-band vertical structure:
 - `+ Log` FAB.
 - *Note:* every metric renders even when empty, with a per-card `+`. The empty state **is** the call to action — no separate onboarding needed.
 
+#### Progress
+- Title `Progress` + a white **`🌳 Giving`** pill + share icon.
+- **Streak card** — full-width, radius 16, `primary` fill:
+  - `Adherence Streak >` (22 dp/700 white) top-left, `⚙ Setup` translucent pill top-right.
+  - `1` at ~56 dp/700 with `day` baseline-aligned beside it, bottom-left.
+  - Green gradient heart, ~110 dp, right side, with a white outline stroke.
+  - **Bottom strip** in a lighter blue→cyan gradient: `Free Donation | 1 💚`, centred. Physically attached to the streak card — adherence and donation are one object.
+- **Monthly adherence card** — white, radius 16:
+  - `August` (26 dp/700) + `Monthly adherence` sub-label; `<` `>` month arrows top-right as 48 dp grey rounded squares (forward is disabled/greyed at the current month).
+  - 1 dp rule, then SUN–SAT column headers in `text-secondary` caps.
+  - 7-column date grid. Today = blue numeral inside a 2 dp `primary` ring. Past dates black, **future dates `text-disabled`**.
+  - **Density legend** along the bottom: five dots stepping `100% / ~75% / ~50% / ~25% / 0%` from full `primary` to near-white. Each day cell fills with the corresponding tint — a heatmap calendar with a legend, not a chart.
+
 ### PHASE 6 — The alarm (the moment that matters)
 
 #### S30 · Full-screen alarm
@@ -440,6 +502,60 @@ Nearly every screen uses the same five-band vertical structure:
 - White result card: grey status icon → `Skipped` (24 dp/700) → med name (`text-secondary`).
 - Circular back + `Close` with a **countdown numeral** — auto-dismisses so a half-asleep user doesn't leave the screen open.
 - Status icon colour is the state signal: grey for skipped (presumably green for taken).
+
+### PHASE 6B — The `Take now` branch (Countdown Timer)
+
+This is where Pillo does its most interesting work, and it is a **feature, not a confirmation**.
+
+#### S33 · Countdown upsell (bottom sheet)
+- Rises over the dimmed alarm screen — the alarm stays visible above it (`10:15PM Meds` still legible), so context is never lost.
+- Cream illustration card, radius 20: a woman drinking water, with an Rx bottle beside her and **the mascot perched on the bottle cap**, arms out, with `×××` motion marks. The mascot is inserted into the user's real-world scene.
+- Headline `Take your meds now with Countdown timer ⏱` (28 dp/700, centred, emoji inline in the headline).
+- Subcopy, 3 lines, `text-secondary`: *"Delay is the main reason for missed doses. Countdown timer helps you take your med on time, without distractions."* — **states the behavioural problem before offering the fix.** This is the only place in the app that justifies a feature with a claim about behaviour rather than convenience.
+- `Try Countdown timer →` primary, pinned.
+
+#### S34–S35 · Timer coach-marks
+- `1/2 Take your meds before time's up` — shown against a **blue, on-time** ring at `04:59`.
+- `2/2 If you're late, the alarm will restart` — shown against a **coral, overdue** ring at `01:00` with the angry mascot.
+- The two states are taught by showing both, back to back, before the user experiences either. Costs two taps, saves an entire support article.
+
+#### S36–S37 · The running timer
+- Headline `Tap the button below when you have taken` — instruction-first, no med name shown. The screen's whole job is a single action.
+- Ring component (§3.17) at `04:53` (on time, blue, happy) then `01:43` (overdue, coral, angry).
+- Default duration: **5 minutes**. Extension: `+ 1 min`, unlimited taps.
+- `👁 View meds due now` for multi-med time slots.
+- `Taken` (primary) / back (left circle) / note (right circle).
+- **On expiry the alarm restarts** rather than auto-logging as missed — the timer is a nag loop, not a deadline.
+
+#### S38 · Add Note
+- Reached from the note icon on the timer row — so a symptom can be captured *at the moment of dosing*, which is exactly when recall is best.
+- Back arrow, `Add Note` headline (28 dp/700, left).
+- White card: a row of two chips — **`⬤ General`** category chip (with a colour dot) + **`Aug 10, 10:15PM`** timestamp chip (pre-filled, editable) — above a `Tap here to type` area.
+- Three white expander rows below, each with a leading `+`: `Severity Level`, `Condition`, `Measurement`. Same progressive-disclosure logic as Optional Details — structured clinical fields exist but never block a quick free-text note.
+- `Next` primary, pinned.
+
+#### S39 · Reward (Hearts)
+- Celebration screen (§3.19): `You earned a Heart!` → `Donate a Heart` / `Save it for later`.
+- **The reward loop:** take a dose on time → earn a Heart → donate it to a charity at no cost to you.
+- *Why this is smart:* it converts adherence into **altruistic** motivation rather than points or badges. A streak you keep for yourself is easy to abandon when you feel bad; a streak that funds a charity is harder to drop, and it dodges the infantilising tone that gamification usually brings to a health app. The cost is presumably borne by a sponsor — hence `at no cost` being the underlined phrase.
+- Hearts surface again on the Progress streak card (`Free Donation | 1 💚`) and in the `🌳 Giving` header pill, so the loop is closed and visible.
+
+**Full branch map from the alarm:**
+
+```
+ALARM
+ ├─ Take now ──→ Countdown upsell (first run only)
+ │                └─ Timer (5:00, +1 min, restart on expiry)
+ │                     ├─ Taken ──→ Log complete ──→ You earned a Heart!
+ │                     │                                ├─ Donate a Heart
+ │                     │                                └─ Save it for later
+ │                     └─ Note icon ──→ Add Note (category, timestamp,
+ │                                      severity, condition, measurement)
+ ├─ Skipped ──→ Reason chips / free text ──→ Log complete (grey, no Heart)
+ └─ Reschedule ──→ snooze picker
+```
+
+**The asymmetry is the point:** the taken path ends in colour, a green heart, and a charitable act. The skipped path ends in a grey icon and silence. No scolding copy anywhere — the reward's *absence* does all the work.
 
 ---
 
@@ -468,7 +584,11 @@ Splash
                  │                                ├─ Rx Label (toggle)
                  │                                └─ Prescribing Doctor
                  └─ ALARM (system overlay)
-                            ├─ Take now → (confirmation)
+                            ├─ Take now → Countdown timer → Taken
+                            │                → Log complete → Heart reward
+                            │                                   ├─ Donate
+                            │                                   └─ Save
+                            │             └─ Add Note
                             ├─ Skipped → reason capture → Log complete
                             └─ Reschedule → snooze picker
 ```
@@ -491,6 +611,12 @@ Splash
 | **Deferred permission** | S12 | Asked at maximum sunk cost, minimum abandonment. |
 | **Value before data entry** | A working reminder exists before the med is named | The user sees the product working before they've typed a character. |
 | **Auto-dismiss confirmation** | Countdown on `Close` | Respects that the user is mid-routine and may not be looking at the screen. |
+| **Character as data visualisation** | Mascot rides the timer ring | The progress indicator and the emotional feedback are the same pixel. No second element needed to convey urgency. |
+| **Teach both states before either happens** | Timer coach-marks 1/2 and 2/2 | The overdue state is demonstrated on a coral ring with an angry face, so the consequence is understood in advance. |
+| **Reward asymmetry, not punishment** | Heart on taken, grey icon on skipped | Motivation comes from what you miss out on, never from being told off. |
+| **Altruistic gamification** | Hearts → charity donation | Sidesteps the infantilising tone of points and badges in a medical context, and makes the streak socially costly to break. |
+| **Capture at the moment of truth** | Add Note lives on the timer | Symptom recall is best while the dose is in hand. |
+| **Justify with the behaviour, not the feature** | Countdown upsell copy | *"Delay is the main reason for missed doses"* — states the problem, then sells the fix. |
 
 ---
 
@@ -528,10 +654,14 @@ Splash
 
 ### Adapt
 - **Your slot-tint idea replaces the mascot as the mood layer.** Warm amber for Morning, neutral bright for Noon, deep indigo for Evening, near-dark for Bedtime. This does the emotional work Pillo does with characters, without a mascot's art budget, and it doubles as a legibility win (a bedtime alarm on a dark ground at 11 pm).
-- **Your 5-minute counter + dose-form instruction.** This is genuinely better than Pillo's flow, which ends at "Take now." Spec:
+- **Your 5-minute counter — with an important correction.** Pillo **already ships this**, almost exactly as you described it: a 5-minute default, a `+ 1 min` extension, the mascot riding the ring, and an alarm restart on expiry. Your idea is validated but it is not a differentiator on its own, and if you build only what's above you'll ship a straight copy of S36.
+
+  What Pillo does **not** do is vary the instruction by dose form — its timer screen says nothing about *how* to take the med. That gap is your actual edge, and it's a real one: a countdown that says "grab your inhaler — 2 pumps" is doing clinical work, not just applying time pressure. Build the timer, but make the instruction the headline of the screen rather than an afterthought.
+
+  Spec:
   - On `Take now`, transition to a countdown state on the *same* screen (don't navigate).
-  - Slot tint stays; add a 5:00 ring or bar.
-  - Instruction copy switches on `dose_form`:
+  - Slot tint stays; add a 5:00 ring or bar. **Don't copy the mascot-on-the-ring device** — that's Pillo's signature and you have no mascot. Use the slot tint's colour as the ring fill instead, deepening as time runs out.
+  - Instruction copy switches on `dose_form` — this is the screen's headline, not a caption:
     - `tablet` / `capsule` → "Grab your tablet and a glass of water"
     - `inhaler` → "Grab your inhaler — 2 pumps"
     - `injection` → "Get your shot ready"
@@ -540,6 +670,9 @@ Splash
   - End state: auto-log as taken on countdown completion, with a `Didn't take it` escape available for the full 5 minutes.
 - **Role split at screen 1.** Pillo has no caregiver concept, so it doesn't need one. You do — `I'm managing my own meds` / `I'm helping someone else` at the top turns Care Circle from a feature you explain into a path they chose.
 - **Elderly Mode inherits the good bones:** 44 dp+ targets, one question per screen, tap-only input, emoji labels. Add a larger type scale and drop the mascot personality escalation (an angry face is a poor choice for an anxious elderly user).
+- **The reward loop is the strongest idea in the app — but Care Circle gives you a better version.** Pillo motivates with a charity donation because it has no social layer. You do. A taken dose that notifies a caregiver ("Mum took her 8am") is a stronger and more honest motivator than an abstract Heart, and it costs you no sponsor relationship. Keep the asymmetry, though: reward the taken path visibly, and let the skipped path be quiet rather than scolding.
+- **Add Note on the dosing screen.** Trivial to build on your existing schema and it feeds both adherence analytics and the Health Vault. Copy the structure: free text first, with `Severity` / `Condition` / `Measurement` as `+` expanders that never block a quick note.
+- **The heatmap calendar with a legend.** Your adherence analytics almost certainly have this data already; Pillo's 5-step density scale with an explicit legend is a cheap, readable way to render a month at a glance.
 
 ### Reject
 - **The interstitial encouragement screens.** Pacing padding at 6 am.
@@ -549,4 +682,4 @@ Splash
 
 ---
 
-*Compiled from 32 captured screens of the Pillo Android app. Measurements are derived from 1080 × 2400 screenshots and should be verified before being committed as design tokens.*
+*Compiled from 42 captured screens of the Pillo Android app. Measurements are derived from 1080 × 2400 screenshots and should be verified before being committed as design tokens. Not yet captured: the `Me` tab, the Reschedule/snooze picker, the Log complete screen on the taken path, Safety Reports, and the Adherence Streak detail view behind `Setup`.*

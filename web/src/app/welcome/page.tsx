@@ -199,8 +199,20 @@ export default function WelcomePage() {
         />
       </div>
 
-      {/* The pink sweep. */}
-      <section className="relative rounded-t-[2.5rem] bg-[#F59FB4] px-7 pt-8 pb-[max(1.25rem,env(safe-area-inset-bottom))] text-[#0F1C5A] shadow-[0_-12px_40px_rgba(15,28,90,0.10)]">
+      {/* The pink sweep. Normally sized to its content — the hero (flex-1)
+          soaks up any leftover viewport height above it. But once the hero
+          collapses (showCaptcha), nothing is left to absorb that space, so
+          the sheet must grow to fill it itself — otherwise the root
+          wrapper's own min-h-screen background shows through as a bare gap
+          below the sheet on any viewport taller than the collapsed content
+          (found on a real device; not visible on a viewport that happens to
+          match the content height exactly, like the one this was fixed
+          against before). */}
+      <section
+        className={`relative rounded-t-[2.5rem] bg-[#F59FB4] px-7 pt-8 pb-[max(1.25rem,env(safe-area-inset-bottom))] text-[#0F1C5A] shadow-[0_-12px_40px_rgba(15,28,90,0.10)] ${
+          showCaptcha ? 'flex-1' : ''
+        }`}
+      >
         <h1 className="font-mono font-black text-4xl leading-tight tracking-tight">
           Never miss a dose{' '}
           <Heart className="inline-block w-8 h-8 text-white align-[-0.12em]" strokeWidth={2.5} aria-hidden />
@@ -283,7 +295,7 @@ export default function WelcomePage() {
             component itself also renders nothing until
             NEXT_PUBLIC_TURNSTILE_SITE_KEY is set. */}
         {showCaptcha && captchaEnabled && (
-          <div ref={captchaRef} className="mt-3">
+          <div ref={captchaRef} className="mt-3 rise-in">
             {/* Hint ABOVE the widget: the widget is then the last element on the
                 page, so scrolling to the end lands it flush against the bottom
                 edge instead of leaving its tail clipped. */}
