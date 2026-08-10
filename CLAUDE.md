@@ -132,6 +132,64 @@ gitignored; may be deleted once the fresh keystore is backed up.
 - **M5 (optional, later).** Per-device suppression of duplicate server sends; static export or
   RN migration only if the remote-webview model proves limiting.
 
+## UI Redesign (planned — not started, do not begin without explicit go-ahead)
+Recorded 2026-08-10. Design-inspired by **"Pillo: Pill Reminder & Alarm"** (Play Store,
+pillo.care) — calm card-based UI, soft colors + one strong accent, a today-timeline of dose
+cards, huge one-tap Take/Skip, visible pill counts, alarm-first identity. Build OUR identity
+around the cartoon-brain mascot on top of that feeling — **inspired by, never a copy of**: no
+similar name/icon, no near-identical screens. Pillo is a direct competitor in our Play Store
+category, so this matters beyond taste — general UX patterns (card layouts, timelines, big tap
+targets) aren't ownable, but specific screens/icons/copy/art must stay clearly our own.
+
+**Reference:** [`docs/design/pillo-teardown.md`](docs/design/pillo-teardown.md) — a 32-screenshot
+UI/UX teardown of Pillo, added 2026-08-10. Standing rules for using it:
+- **§8 (Adopt / Adapt / Reject) is pre-approved** — those are already-made design decisions for
+  this redesign, not options to re-litigate when design work starts.
+- **§7 (Pillo's own defects) is a do-not-inherit list** — every ranked issue there (progress bar
+  not advancing, no back button on the first question, `Done` overlapping the last settings row,
+  etc.) is a mistake to design around from the start, not something to discover independently.
+- **§1's color/typography tokens are approximations of THEIR design, for inspiration only.** We
+  define our own palette and identity around our brain mascot — same discipline (one accent hue
+  doing all the interactive work, calm cards, big one-tap actions), different look. Never clone
+  their screens, name, icon, or colors — direct Play Store competitor, this matters beyond taste.
+- **§4's S30 (full-screen alarm) breakdown is the reference blueprint for M2's native Kotlin
+  full-screen alarm activity** — same hierarchy (primary action big and on top, honest decline
+  grey below, deferral smallest), styled with our own tokens once the redesign defines them.
+- **Known gaps in the teardown** (fill later, not blockers): Pillo's "Taken" confirmation screen,
+  the snooze/reschedule picker, what the alarm does when ignored (re-fire timing), the Progress
+  and Me tabs, and dark-mode values. The teardown's own §8 "Adapt" section already improves on
+  the biggest gap (Pillo's flow ends at "Take now") with a 5-minute countdown + dose-form
+  instruction spec — that's pre-approved too, per §8 above.
+
+**Rules for when this starts:**
+1. Web-side only. Because M1's Capacitor shell loads the deployed site (`server.url` mode), a
+   web redesign *is* the app redesign — no separate native UI work needed for this. Do not touch
+   the bot, scheduler, RPCs, or database.
+2. Every existing feature keeps working: elderly mode, guest mode, guided tour, care circle,
+   dose gate, health vault, settings.
+3. Mobile-first stays the priority (renders inside the Android webview) — the current dashboard
+   nav's rail/dock breakpoint-switch pattern is the kind of thing to preserve, not something this
+   redesign is expected to replace wholesale.
+4. Tailwind v4 stays, config-free, through the existing `@theme inline` setup in `globals.css` —
+   redesign happens through tokens + components, not a new styling system.
+5. The native full-screen alarm activity (M2) is out of scope here, but the color/typography
+   tokens chosen in this redesign **will** define its look — document them somewhere the Kotlin
+   side can reuse (not just as CSS vars). Practically: lock the token decisions before M2's
+   alarm-UI visuals are built, even if the rest of the redesign ships later.
+6. First deliverable when this starts is a **design proposal, not code**: palette, typography,
+   a visual mock of the redesigned Today screen. No changes to any of the 27 pages until approved.
+
+**Sequencing:** M1 (Capacitor shell) first, so every design deploy shows up instantly inside the
+app once it starts. Redesign begins after M1 — see the token-lock caveat in rule 5 above re: M2.
+
+**Carries over unchanged:** all existing Hard rules still bind during the redesign, especially
+**exactly 5 nav icons** and **medication-catalog links stay human-select-only** — a calm
+card-based visual direction doesn't relax either.
+
+**Conflict check against the Android plan (v2) above: none found.** The remote-webview
+architecture is what makes "web redesign = app redesign" true, rather than a coincidence to
+reconcile. The only real interaction is the M2 token-reuse dependency captured in rule 5.
+
 ## Commands
 - Worker tests: `npm test` (node:test). Web: no test script; `web/src/lib/schedule/*.test.ts` and `web/src/lib/medication-utils.test.ts` run via `node --experimental-strip-types`. CI (`.github/workflows/ci.yml`) runs both on every push.
 - `test/schedule-test-vectors.json` is the shared `calculateNextReminder` fixture (bot + web + future Kotlin port) — add cases there, not ad hoc in either test file.
