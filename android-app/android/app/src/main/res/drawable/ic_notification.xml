@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Notification small icon. MUST be a white-on-transparent silhouette: Android
+  ignores the colours in a small icon and re-tints the alpha channel, so a
+  coloured or opaque icon renders as a solid blob (or, on some OEM ROMs,
+  causes the notification to be dropped entirely).
+
+  App-owned on purpose. A framework drawable (android.R.drawable.*) is not
+  guaranteed to exist or to be a valid notification icon across OEM ROMs —
+  vivo/Xiaomi/Oppo skins are exactly the ones CLAUDE.md flags as hostile.
+
+  Placeholder art: a plain bell. Real branding lands with the UI redesign,
+  which owns the visual tokens.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,22c1.1,0 2,-0.9 2,-2h-4c0,1.1 0.89,2 2,2zM18,16v-5c0,-3.07 -1.64,-5.64 -4.5,-6.32V4c0,-0.83 -0.67,-1.5 -1.5,-1.5s-1.5,0.67 -1.5,1.5v0.68C7.63,5.36 6,7.92 6,11v5l-2,2v1h16v-1l-2,-2z" />
+</vector>

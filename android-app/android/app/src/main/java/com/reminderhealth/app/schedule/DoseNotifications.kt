@@ -7,7 +7,9 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.util.Log
 import com.reminderhealth.app.MainActivity
+import com.reminderhealth.app.R
 
 /**
  * Dose-reminder notifications.
@@ -32,10 +34,15 @@ object DoseNotifications {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
         if (manager.getNotificationChannel(CHANNEL_ID) != null) return
 
+        // No setBypassDnd(true) here: that silently does nothing without
+        // ACCESS_NOTIFICATION_POLICY, which is NOT on CLAUDE.md's allowed
+        // permission list — so it would have been misleading code implying a
+        // guarantee the app cannot make. IMPORTANCE_HIGH is what actually buys
+        // the heads-up + sound, and step 4's full-screen intent is what makes a
+        // dose alarm genuinely hard to miss.
         val channel = NotificationChannel(CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH).apply {
             description = "Alerts when it is time to take a medication"
             enableVibration(true)
-            setBypassDnd(true)
         }
         manager.createNotificationChannel(channel)
     }
@@ -67,11 +74,8 @@ object DoseNotifications {
             Notification.Builder(context)
         }
 
-        // Placeholder icon: a built-in platform alarm/reminder glyph, so this
-        // step needs no new art. Real branding lands with the UI redesign
-        // (CLAUDE.md's redesign section owns the visual tokens).
         val notification = builder
-            .setSmallIcon(android.R.drawable.ic_popup_reminder)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("Time to take $drugName")
             .setContentText(doseLabel ?: "Tap to open Re-MIND-eЯ")
             .setAutoCancel(true)
@@ -88,7 +92,24 @@ object DoseNotifications {
             }
             .build()
 
-        val manager = context.getSystemService(NotificationManager::class.java) ?: return
+        val manager = context.getSystemService(NotificationManager::class.java) ?: run {
+            Log.e(AlarmScheduler.TAG, "NotificationManager unavailable; cannot show dose reminder")
+            return
+        }
+
+        // The single most useful line when "the alarm fired but I saw nothing":
+        // on Android 13+ a denied POST_NOTIFICATIONS (or an OEM battery/
+        // notification restriction) makes notify() a silent no-op, which is
+        // indistinguishable from a broken alarm without this.
+        if (!manager.areNotificationsEnabled()) {
+            Log.e(
+                AlarmScheduler.TAG,
+                "ALARM FIRED but notifications are DISABLED for this app at the OS level — " +
+                    "notify() will be silently dropped. Check Settings > Apps > Re-MIND-eЯ > Notifications.",
+            )
+        }
+
         manager.notify(medicationId.toInt(), notification)
+        Log.i(AlarmScheduler.TAG, "notification posted for med $medicationId ($drugName)")
     }
 }
