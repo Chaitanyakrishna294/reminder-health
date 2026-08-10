@@ -58,6 +58,8 @@ object DoseNotifications {
         drugName: String,
         doseLabel: String?,
         scheduledForIso: String?,
+        audioPath: String? = null,
+        photoPath: String? = null,
     ) {
         ensureChannel(context)
 
@@ -73,6 +75,8 @@ object DoseNotifications {
             putExtra(AlarmScheduler.EXTRA_DRUG_NAME, drugName)
             putExtra(AlarmScheduler.EXTRA_DOSE_LABEL, doseLabel)
             putExtra(AlarmScheduler.EXTRA_SCHEDULED_FOR, scheduledForIso)
+            putExtra(AlarmScheduler.EXTRA_AUDIO_PATH, audioPath)
+            putExtra(AlarmScheduler.EXTRA_PHOTO_PATH, photoPath)
         }
         val fullScreen = PendingIntent.getActivity(
             context,

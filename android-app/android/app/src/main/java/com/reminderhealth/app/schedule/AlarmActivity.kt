@@ -2,9 +2,12 @@ package com.reminderhealth.app.schedule
 
 import android.app.Activity
 import android.app.NotificationManager
+import android.graphics.BitmapFactory
+import android.graphics.Color
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.RingtoneManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -14,10 +17,13 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.util.Log
+import android.view.View
 import android.view.WindowManager
 import android.widget.Button
+import android.widget.ImageView
 import android.widget.TextView
 import com.reminderhealth.app.R
+import java.io.File
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -64,6 +70,14 @@ class AlarmActivity : Activity() {
     private var doseLabel: String? = null
     private var scheduledFor: String? = null
 
+    /**
+     * Family voice alarms (CLAUDE.md "Post-M2 features"). Null until that
+     * feature ships; both are LOCAL paths, verified readable before use, so a
+     * missing or deleted file falls back instead of breaking the alarm.
+     */
+    private var audioFile: File? = null
+    private var photoFile: File? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -74,8 +88,14 @@ class AlarmActivity : Activity() {
         drugName = intent.getStringExtra(AlarmScheduler.EXTRA_DRUG_NAME) ?: drugName
         doseLabel = intent.getStringExtra(AlarmScheduler.EXTRA_DOSE_LABEL)
         scheduledFor = intent.getStringExtra(AlarmScheduler.EXTRA_SCHEDULED_FOR)
+        audioFile = readableFileOrNull(intent.getStringExtra(AlarmScheduler.EXTRA_AUDIO_PATH), "audio")
+        photoFile = readableFileOrNull(intent.getStringExtra(AlarmScheduler.EXTRA_PHOTO_PATH), "photo")
 
-        Log.i(AlarmScheduler.TAG, "AlarmActivity shown for med $medicationId ($drugName)")
+        Log.i(
+            AlarmScheduler.TAG,
+            "AlarmActivity shown for med $medicationId ($drugName) " +
+                "[voice=${audioFile != null}, photo=${photoFile != null}]",
+        )
 
         bindContent()
         acquireWakeLock()
@@ -92,9 +112,23 @@ class AlarmActivity : Activity() {
         findViewById<Button>(R.id.alarm_snooze).setOnClickListener { snooze() }
     }
 
+    /**
+     * A path is only usable if the file is actually there and readable — the
+     * alarm must never wait on a download or show a broken frame, so anything
+     * unverifiable degrades to the default immediately and says so in the log.
+     */
+    private fun readableFileOrNull(path: String?, kind: String): File? {
+        if (path.isNullOrBlank()) return null
+        val file = File(path)
+        if (file.isFile && file.canRead() && file.length() > 0L) return file
+        Log.w(AlarmScheduler.TAG, "local alarm $kind missing/unreadable at $path — using default")
+        return null
+    }
+
     private fun bindContent() {
         findViewById<TextView>(R.id.alarm_drug_name).text = drugName
         findViewById<TextView>(R.id.alarm_dose).text = doseLabel ?: ""
+        bindPhoto()
 
         // Eyebrow shows the dose's own scheduled LOCAL time, not "now" — if the
         // phone was asleep and the alarm is a moment late, the honest answer is
@@ -112,6 +146,32 @@ class AlarmActivity : Activity() {
         } else {
             getString(R.string.alarm_eyebrow_prefix)
         }
+    }
+
+    /**
+     * Shows the care-circle photo full-screen when one is present, and flips the
+     * text to white over the scrim so it stays readable against an arbitrary
+     * photo. With no photo, nothing changes — the default alarm keeps its own
+     * light palette.
+     */
+    private fun bindPhoto() {
+        val file = photoFile ?: return
+        val bitmap = runCatching { BitmapFactory.decodeFile(file.absolutePath) }.getOrNull()
+        if (bitmap == null) {
+            Log.w(AlarmScheduler.TAG, "photo at ${file.absolutePath} could not be decoded — using default")
+            return
+        }
+
+        findViewById<ImageView>(R.id.alarm_photo).apply {
+            setImageBitmap(bitmap)
+            visibility = View.VISIBLE
+        }
+        findViewById<View>(R.id.alarm_photo_scrim).visibility = View.VISIBLE
+
+        val onPhoto = Color.WHITE
+        findViewById<TextView>(R.id.alarm_eyebrow).setTextColor(onPhoto)
+        findViewById<TextView>(R.id.alarm_drug_name).setTextColor(onPhoto)
+        findViewById<TextView>(R.id.alarm_dose).setTextColor(onPhoto)
     }
 
     /** Turns the screen on and draws over the keyguard without any extra permission. */
@@ -142,9 +202,17 @@ class AlarmActivity : Activity() {
     }
 
     private fun startAlarmSound() {
-        val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-            ?: return
+        // A care-circle voice recording wins over the default tone when one is
+        // on disk. Local file only — never a stream, so this works in airplane
+        // mode (CLAUDE.md's non-negotiable for the voice feature).
+        val localVoice = audioFile
+        val uri = if (localVoice != null) {
+            Uri.fromFile(localVoice)
+        } else {
+            RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                ?: return
+        }
         player = runCatching {
             MediaPlayer().apply {
                 setDataSource(this@AlarmActivity, uri)

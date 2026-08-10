@@ -33,6 +33,14 @@ object AlarmScheduler {
     const val EXTRA_SCHEDULED_FOR = "scheduledFor"
 
     /**
+     * Family voice alarms (CLAUDE.md "Post-M2 features"). LOCAL file paths only —
+     * carried through the alarm so [AlarmActivity] needs no DB read and no
+     * network to personalise the alarm.
+     */
+    const val EXTRA_AUDIO_PATH = "alarmAudioPath"
+    const val EXTRA_PHOTO_PATH = "alarmPhotoPath"
+
+    /**
      * False only on Android 12+ when the user has revoked exact-alarm access.
      * The app declares `USE_EXACT_ALARM` (auto-granted on 13+ for alarm-class
      * apps — medication reminders qualify, see CLAUDE.md), so this is expected
@@ -95,7 +103,15 @@ object AlarmScheduler {
             medication.dosage?.takeIf { it.isNotBlank() && it != "N/A" },
         ).firstOrNull()
 
-        scheduleAt(context, medication.id, medication.drugName, doseLabel, fireAt)
+        scheduleAt(
+            context = context,
+            medicationId = medication.id,
+            drugName = medication.drugName,
+            doseLabel = doseLabel,
+            fireAt = fireAt,
+            audioPath = medication.alarmAudioPath,
+            photoPath = medication.alarmPhotoPath,
+        )
         Log.i(
             TAG,
             "med ${medication.id} (${medication.drugName}) next dose $fireAt " +
@@ -116,6 +132,8 @@ object AlarmScheduler {
         drugName: String,
         doseLabel: String?,
         fireAt: Instant,
+        audioPath: String? = null,
+        photoPath: String? = null,
     ) {
         val manager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: run {
             Log.e(TAG, "AlarmManager unavailable; cannot schedule med $medicationId")
@@ -132,6 +150,8 @@ object AlarmScheduler {
             putExtra(EXTRA_DRUG_NAME, drugName)
             putExtra(EXTRA_DOSE_LABEL, doseLabel)
             putExtra(EXTRA_SCHEDULED_FOR, fireAt.toString())
+            putExtra(EXTRA_AUDIO_PATH, audioPath)
+            putExtra(EXTRA_PHOTO_PATH, photoPath)
         }
 
         val pendingIntent = PendingIntent.getBroadcast(

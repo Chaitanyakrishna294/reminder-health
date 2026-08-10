@@ -32,7 +32,15 @@ class AlarmReceiver : BroadcastReceiver() {
             "ALARM FIRED for med $medicationId ($drugName) — scheduled for $scheduledFor, now ${Instant.now()}",
         )
 
-        DoseNotifications.showDoseReminder(context, medicationId, drugName, doseLabel, scheduledFor)
+        DoseNotifications.showDoseReminder(
+            context = context,
+            medicationId = medicationId,
+            drugName = drugName,
+            doseLabel = doseLabel,
+            scheduledForIso = scheduledFor,
+            audioPath = intent.getStringExtra(AlarmScheduler.EXTRA_AUDIO_PATH),
+            photoPath = intent.getStringExtra(AlarmScheduler.EXTRA_PHOTO_PATH),
+        )
 
         if (medicationId <= 0L) {
             // Debug/test alarm (see ScheduleBridgePlugin.scheduleTestAlarm) —

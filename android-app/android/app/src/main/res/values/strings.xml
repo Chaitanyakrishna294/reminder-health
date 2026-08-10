@@ -12,4 +12,5 @@
     <string name="alarm_skip">Skip</string>
     <string name="alarm_snooze">Snooze 10 min</string>
     <string name="alarm_eyebrow_prefix">Dose due</string>
+    <string name="alarm_photo_description">Photo from your care circle</string>
 </resources>

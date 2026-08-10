@@ -56,6 +56,21 @@ interface MedicationPayload {
 }
 ```
 
+**Reserved for family voice alarms** (CLAUDE.md "Post-M2 features" — native side is already
+built, web side is not). When that ships, `syncSchedule` gains two more fields *plus* a download
+step, because these must be **local device paths, never URLs**:
+
+```ts
+  alarmAudioUrl: string | null;   // Supabase Storage path to the care-circle voice message
+  alarmPhotoUrl: string | null;   // Supabase Storage path to their photo
+```
+
+Native downloads them during sync and stores the resulting local paths in
+`medications.alarmAudioPath` / `alarmPhotoPath` (Room v2). `AlarmActivity` already reads those,
+verifies the file is present and readable, and falls back to the default tone / no photo
+otherwise — **so the alarm never waits on a network fetch at fire time**, which is what keeps it
+working in airplane mode. Do not "simplify" this by passing a URL straight through to the alarm.
+
 **Deliberately excluded** from this payload: stock fields (`current_stock`, `stock_threshold`,
 `low_stock_*`), catalog link fields (`catalog_id`, `linked_*`), `priority_level`,
 `retry_count`/`retry_reminder_at`/`last_sent_at`/`last_reminder_scheduled_at`. None of those

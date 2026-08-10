@@ -160,6 +160,43 @@ obligation. Back up the *new* Capacitor app's keystore per the paragraph above o
 - **M5 (optional, later).** Per-device suppression of duplicate server sends; static export or
   RN migration only if the remote-webview model proves limiting.
 
+## Post-M2 features (decided 2026-08-11 — do not start before M2 is done)
+
+### 1. Family voice alarms — flagship differentiator, build immediately after M2
+A care-circle member records a short voice message (**~30s hard cap**) and sets a photo from the
+web app; the dose alarm then plays *that person's voice* and shows their face instead of a generic
+tone. This is the feature the product is differentiated on, not a nice-to-have.
+
+- **Files live in Supabase Storage**, uploaded from the web (care circle side).
+- **The app downloads them to LOCAL device storage during `ScheduleSync`.** Non-negotiable:
+  the alarm must work in airplane mode, so it **must never stream at fire time** — if the file
+  isn't already on disk when the alarm fires, the alarm falls back rather than waiting on network.
+- **The native alarm activity plays the local audio and shows the photo full-screen**, falling
+  back to the default alarm tone + mascot art when either is absent or unreadable.
+- **Storage RLS: only the patient's own care circle may upload for them.** Add this to the
+  **M3 RLS audit scope** — and note it interacts with the already-flagged legacy `caregiver_info`
+  dual-read branch that bypasses the `can_*` flags, since "who counts as this patient's care
+  circle" is exactly the question that branch answers inconsistently today.
+- Health-data sensitivity: a voice recording of a family member is personal data. Same
+  on-device-encryption and private-bucket discipline as the vault.
+- ✅ **Step 4 is already built to receive this** (2026-08-11): `AlarmActivity` accepts an optional
+  local photo path and optional local audio path per medication, with verified-readable checks and
+  clean fallbacks, and the Room store carries `alarmAudioPath`/`alarmPhotoPath`. So the voice
+  feature plugs in by populating those two columns + adding the download step — **the alarm screen
+  does not need rebuilding.**
+
+### 2. Multi-language — phased, deliberately
+- **Phase 1 is the voice feature itself.** A recorded message in the patient's own language from
+  their own family solves the alarm-language problem *without any translation work*. This is why
+  voice comes first.
+- **Phase 2 translates only patient-facing surfaces** — the native alarm screen's buttons, elderly
+  mode, onboarding — into **Hindi + Telugu** plus 1-2 more, via **next-intl**.
+- **Full-app i18n only if demand shows.** Do not translate the caregiver console, settings, vault,
+  or admin surfaces on spec; that is a large ongoing cost for an unproven need.
+- Practical note for phase 2: the alarm screen's strings already live in
+  `android-app/android/app/src/main/res/values/strings.xml`, so its translation is a `values-hi/`
+  `values-te/` drop, independent of the web's next-intl work.
+
 ## UI Redesign (planned — not started, do not begin without explicit go-ahead)
 Recorded 2026-08-10. Design-inspired by **"Pillo: Pill Reminder & Alarm"** (Play Store,
 pillo.care) — calm card-based UI, soft colors + one strong accent, a today-timeline of dose

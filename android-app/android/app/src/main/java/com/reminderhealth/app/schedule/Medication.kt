@@ -24,4 +24,14 @@ data class Medication(
     val nextReminderAt: String, // ISO 8601 UTC — server-computed seed value
     val active: Boolean, // inactive medications get no alarms
     val medicationReason: String?,
+
+    /**
+     * Family voice alarms (see CLAUDE.md "Post-M2 features"). Absolute paths to
+     * files ALREADY DOWNLOADED to local device storage — never remote URLs: the
+     * alarm has to work in airplane mode, so nothing may be fetched at fire
+     * time. Null (the default until that feature ships) means the alarm uses
+     * the default tone and no photo.
+     */
+    val alarmAudioPath: String? = null,
+    val alarmPhotoPath: String? = null,
 )
