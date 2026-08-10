@@ -1,14 +1,14 @@
 package com.reminderhealth.app.schedule
 
-import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.util.Log
-import com.reminderhealth.app.MainActivity
+import androidx.core.app.NotificationCompat
 import com.reminderhealth.app.R
 
 /**
@@ -29,6 +29,7 @@ object DoseNotifications {
      * required for a heads-up notification now, and is also the minimum the
      * full-screen intent in step 4 will need.
      */
+    @JvmStatic
     fun ensureChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
@@ -60,41 +61,62 @@ object DoseNotifications {
     ) {
         ensureChannel(context)
 
-        val openApp = PendingIntent.getActivity(
+        // The full-screen intent: this is what makes the alarm take over the
+        // screen (and show over the keyguard) WITHOUT SYSTEM_ALERT_WINDOW.
+        // Android treats it as "launch this if the device is locked/idle,
+        // otherwise show a heads-up notification" — so the notification is
+        // still the fallback, never a dead end.
+        val alarmIntent = Intent(context, AlarmActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            data = Uri.parse("reminderhealth://alarm/$medicationId")
+            putExtra(AlarmScheduler.EXTRA_MEDICATION_ID, medicationId)
+            putExtra(AlarmScheduler.EXTRA_DRUG_NAME, drugName)
+            putExtra(AlarmScheduler.EXTRA_DOSE_LABEL, doseLabel)
+            putExtra(AlarmScheduler.EXTRA_SCHEDULED_FOR, scheduledForIso)
+        }
+        val fullScreen = PendingIntent.getActivity(
             context,
             medicationId.toInt(),
-            Intent(context, MainActivity::class.java),
+            alarmIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
-        @Suppress("DEPRECATION") // Notification.Builder(Context) — needed for minSdk 23; channel set below on O+.
-        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Notification.Builder(context, CHANNEL_ID)
-        } else {
-            Notification.Builder(context)
-        }
-
-        val notification = builder
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("Time to take $drugName")
             .setContentText(doseLabel ?: "Tap to open Re-MIND-eЯ")
-            .setAutoCancel(true)
-            .setCategory(Notification.CATEGORY_ALARM)
-            .setContentIntent(openApp)
-            .also { b ->
-                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-                    @Suppress("DEPRECATION")
-                    b.setPriority(Notification.PRIORITY_HIGH)
-                }
-                if (scheduledForIso != null) {
-                    b.setSubText(scheduledForIso)
-                }
-            }
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            // Shows content (not "contents hidden") on the lock screen, which is
+            // where a dose alarm most needs to be readable.
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            // Tapping opens the alarm screen itself, not the webview — so alarm
+            // interaction never depends on the network. This is the real fix for
+            // the offline white-screen found in step-3 testing.
+            .setContentIntent(fullScreen)
+            .setFullScreenIntent(fullScreen, true)
+            // Not auto-cancel / not dismissible by swipe: a dose alarm should be
+            // answered. AlarmActivity cancels it on action or auto-timeout.
+            .setAutoCancel(false)
+            .setOngoing(true)
+            .also { b -> if (scheduledForIso != null) b.setSubText(scheduledForIso) }
             .build()
 
         val manager = context.getSystemService(NotificationManager::class.java) ?: run {
             Log.e(AlarmScheduler.TAG, "NotificationManager unavailable; cannot show dose reminder")
             return
+        }
+
+        // Android 14+ gates full-screen intents behind a permission that is
+        // auto-granted only to alarm-class apps. If it is ever denied the alarm
+        // degrades to a heads-up notification rather than failing — worth
+        // knowing which of the two the user is actually getting.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE && !manager.canUseFullScreenIntent()) {
+            Log.w(
+                AlarmScheduler.TAG,
+                "USE_FULL_SCREEN_INTENT not granted — alarm will show as a heads-up " +
+                    "notification instead of taking over the screen",
+            )
         }
 
         // The single most useful line when "the alarm fired but I saw nothing":

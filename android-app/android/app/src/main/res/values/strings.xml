@@ -4,4 +4,12 @@
     <string name="title_activity_main">Re-MIND-eЯ</string>
     <string name="package_name">com.reminderhealth.app</string>
     <string name="custom_url_scheme">com.reminderhealth.app</string>
+
+    <!-- Full-screen dose alarm (M2 step 4). Copy follows the Pillo teardown's
+         zero-blame framing: the decline action is honest ("Skip"), never
+         guilt-worded. -->
+    <string name="alarm_taken">Taken</string>
+    <string name="alarm_skip">Skip</string>
+    <string name="alarm_snooze">Snooze 10 min</string>
+    <string name="alarm_eyebrow_prefix">Dose due</string>
 </resources>

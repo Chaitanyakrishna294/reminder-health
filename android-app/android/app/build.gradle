@@ -41,6 +41,9 @@ dependencies {
     implementation project(':capacitor-android')
 
     // M2 alarm core — local schedule store (see BRIDGE_CONTRACT.md).
+    // core-ktx is declared explicitly (not relied on transitively via appcompat)
+    // because DoseNotifications uses NotificationCompat directly.
+    implementation "androidx.core:core-ktx:$androidxCoreVersion"
     implementation "androidx.room:room-runtime:$roomVersion"
     implementation "androidx.room:room-ktx:$roomVersion"
     kapt "androidx.room:room-compiler:$roomVersion"

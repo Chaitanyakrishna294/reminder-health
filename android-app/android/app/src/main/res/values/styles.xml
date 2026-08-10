@@ -19,4 +19,14 @@
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
     </style>
+
+    <!-- Full-screen dose alarm (M2 step 4).
+         A PLATFORM theme, not an AppCompat one: AlarmActivity is a plain
+         Activity, and the app's other themes are DayNight — which would invert
+         the alarm's deliberately fixed colours in dark mode. An alarm screen
+         must look identical every time; recognising it at 3am matters more than
+         theme-following. -->
+    <style name="AlarmTheme" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/alarm_bg</item>
+    </style>
 </resources>

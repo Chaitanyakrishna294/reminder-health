@@ -1,0 +1,83 @@
+<!doctype html>
+<!--
+  Offline fallback for the remote webview.
+
+  In Capacitor server.url mode the webview loads the deployed Vercel site, so
+  with no network it renders a blank white screen — which is what a user saw on
+  2026-08-11 after tapping a dose notification while airplane mode was still
+  recovering. MainActivity's WebViewClient swaps to this page on a main-frame
+  load error instead.
+
+  Deliberately self-contained: lives in assets/ (NOT assets/public/, which
+  `npx cap sync` regenerates and .gitignore excludes), no external CSS, fonts,
+  images or scripts — anything remote would fail for the exact reason this page
+  is showing. Retry navigates to reminderhealth://retry, which MainActivity
+  intercepts and turns into a reload of the URL that failed, so the site URL is
+  not duplicated here.
+
+  Colours are the fixed brand poster values from web/src/app/welcome/page.tsx,
+  intentionally hardcoded the same way that page hardcodes them.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>You're offline</title>
+    <style>
+      :root {
+        --ink: #0f1c5a;
+        --pink: #f59fb4;
+        --rose: #cc3d64;
+        --paper: #fbf7f8;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; }
+      body {
+        background: var(--paper);
+        color: var(--ink);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        text-align: center;
+      }
+      .card {
+        background: var(--pink);
+        border-radius: 28px;
+        padding: 32px 24px;
+        max-width: 380px;
+        width: 100%;
+      }
+      h1 { margin: 0 0 12px; font-size: 26px; line-height: 1.25; }
+      p { margin: 0 0 20px; font-size: 15px; line-height: 1.5; opacity: 0.85; }
+      a.retry {
+        display: block;
+        background: var(--rose);
+        color: #fff;
+        text-decoration: none;
+        font-weight: 700;
+        font-size: 17px;
+        padding: 16px;
+        border-radius: 18px;
+      }
+      .note {
+        margin: 18px 0 0;
+        font-size: 12px;
+        line-height: 1.5;
+        opacity: 0.8;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <h1>You're offline</h1>
+      <p>Re-MIND-e&#1071; needs a connection to load your medicines, care circle and vault.</p>
+      <a class="retry" href="reminderhealth://retry">Retry</a>
+      <p class="note">
+        Your reminders still work. Dose alarms are stored on this phone and will
+        ring on time with no connection at all.
+      </p>
+    </main>
+  </body>
+</html>

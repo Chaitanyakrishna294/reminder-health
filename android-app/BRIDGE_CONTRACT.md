@@ -17,8 +17,11 @@ device (vivo I2202, 2026-08-11)** across five scenarios: fired 21ms and 25ms lat
 **fired with the process DEAD — logcat shows the process cold-started at 01:35:00.912 purely to
 deliver the alarm, then ALARM FIRED at 01:35:01.025**; fired during/after airplane mode and
 appeared on the lock screen, persisting until tapped; POST_NOTIFICATIONS prompt granted. Each
-firing re-registered the following dose. `setSession` and `getPendingActions`/the offline action
-queue are still spec-only, below — not built yet. The throwaway `Ping` plugin from M1 is deleted,
+firing re-registered the following dose. The full-screen alarm activity
+(`AlarmActivity.kt` + `res/layout/activity_alarm.xml`, launched via the notification's
+full-screen intent) is implemented with Taken/Skip/Snooze — on-device verification pending.
+`setSession` and `getPendingActions`/the offline action queue are still spec-only, below — not
+built yet, so **Taken/Skip currently stop the alarm but are not persisted or synced** (step 6). The throwaway `Ping` plugin from M1 is deleted,
 superseded by `ScheduleBridge`.
 
 **Debug helper (temporary, remove after M2):** `ScheduleBridge.scheduleTestAlarm({ seconds })`

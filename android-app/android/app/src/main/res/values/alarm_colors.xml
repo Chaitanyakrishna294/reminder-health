@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  PLACEHOLDER alarm-screen palette.
+
+  These are the fixed brand-poster values already hardcoded in
+  web/src/app/welcome/page.tsx, reused so the alarm doesn't look unrelated to
+  the app. They are NOT the design system: CLAUDE.md's UI Redesign section
+  owns the real tokens, and rule 5 there says the redesign's colour/typography
+  decisions define this screen's final look. This file is the "document them
+  somewhere the Kotlin side can reuse" hook — when the redesign locks tokens,
+  update these values rather than re-theming the layout.
+-->
+<resources>
+    <color name="alarm_bg">#FBF7F8</color>
+    <color name="alarm_ink">#0F1C5A</color>
+    <color name="alarm_ink_muted">#5B6488</color>
+    <!-- Primary/desired action: big, on top, unmistakable. -->
+    <color name="alarm_primary">#CC3D64</color>
+    <color name="alarm_on_primary">#FFFFFF</color>
+    <!-- Honest decline: present and full-size, but grey, never guilt-worded. -->
+    <color name="alarm_secondary">#E3E1E6</color>
+    <!-- Deferral: smallest, tinted. -->
+    <color name="alarm_tertiary">#F59FB4</color>
+</resources>

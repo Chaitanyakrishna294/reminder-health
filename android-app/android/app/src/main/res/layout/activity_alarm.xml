@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Full-screen dose alarm. Hierarchy is taken from the Pillo teardown §4 S30
+  breakdown (docs/design/pillo-teardown.md), which CLAUDE.md names as the
+  reference blueprint for this screen:
+
+    identity block (centred)   eyebrow time -> med name (largest) -> dose
+    action band (pinned)       Taken   (primary, big, ON TOP)
+                               Skip    (grey, full size, honest decline)
+                               Snooze  (smallest, tinted, deferral)
+
+  "Unambiguous" is the whole point: a half-asleep user must not have to read.
+  Styling is placeholder (see values/alarm_colors.xml) — the UI redesign owns
+  the final tokens.
+
+  Touch targets are all >= 56dp, above the 44dp floor the teardown's
+  accessibility notes call out, and generous for elderly users.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/alarm_bg"
+    android:paddingStart="24dp"
+    android:paddingEnd="24dp"
+    android:paddingTop="32dp"
+    android:paddingBottom="24dp">
+
+    <!-- Identity block: takes all the slack so it sits optically centred. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:gravity="center">
+
+        <TextView
+            android:id="@+id/alarm_eyebrow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="16sp"
+            android:textColor="@color/alarm_ink_muted"
+            android:letterSpacing="0.04"
+            android:text="@string/alarm_eyebrow_prefix" />
+
+        <TextView
+            android:id="@+id/alarm_drug_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:textSize="34sp"
+            android:textStyle="bold"
+            android:textColor="@color/alarm_ink"
+            android:gravity="center"
+            android:lineSpacingMultiplier="1.1" />
+
+        <TextView
+            android:id="@+id/alarm_dose"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textSize="20sp"
+            android:textColor="@color/alarm_ink_muted"
+            android:gravity="center" />
+    </LinearLayout>
+
+    <!-- Action band, pinned bottom: thumb reach is sacred (teardown §2). -->
+    <Button
+        android:id="@+id/alarm_taken"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:text="@string/alarm_taken"
+        android:textSize="19sp"
+        android:textStyle="bold"
+        android:textAllCaps="false"
+        android:textColor="@color/alarm_on_primary"
+        android:background="@drawable/bg_alarm_primary" />
+
+    <Button
+        android:id="@+id/alarm_skip"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:layout_marginTop="12dp"
+        android:text="@string/alarm_skip"
+        android:textSize="17sp"
+        android:textStyle="bold"
+        android:textAllCaps="false"
+        android:textColor="@color/alarm_ink"
+        android:background="@drawable/bg_alarm_secondary" />
+
+    <Button
+        android:id="@+id/alarm_snooze"
+        android:layout_width="wrap_content"
+        android:layout_height="56dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="14dp"
+        android:paddingStart="28dp"
+        android:paddingEnd="28dp"
+        android:text="@string/alarm_snooze"
+        android:textSize="15sp"
+        android:textAllCaps="false"
+        android:textColor="@color/alarm_ink"
+        android:background="@drawable/bg_alarm_tertiary" />
+</LinearLayout>

@@ -33,6 +33,24 @@
         <receiver
             android:name=".schedule.AlarmReceiver"
             android:exported="false" />
+
+        <!-- Full-screen dose alarm, launched by the notification's full-screen
+             intent. showOnLockScreen + turnScreenOn are the manifest half of
+             what AlarmActivity also sets in code (the code path covers <27).
+             excludeFromRecents/noHistory: an answered alarm should not linger
+             in the recents list to be reopened out of context.
+             singleInstance: a second alarm for the same dose reuses this window
+             rather than stacking duplicates. -->
+        <activity
+            android:name=".schedule.AlarmActivity"
+            android:exported="false"
+            android:launchMode="singleInstance"
+            android:showOnLockScreen="true"
+            android:turnScreenOn="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@style/AlarmTheme" />
     </application>
 
     <!-- Permissions -->
@@ -55,4 +73,11 @@
         android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Lets the dose notification take over the screen (AlarmActivity) instead
+         of needing SYSTEM_ALERT_WINDOW. Auto-granted on 14+ to alarm-class apps;
+         DoseNotifications logs a warning and degrades to a heads-up notification
+         if it is ever denied. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <!-- Vibration for the alarm. Normal permission, granted at install. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 </manifest>
