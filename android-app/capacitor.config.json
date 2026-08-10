@@ -1,0 +1,9 @@
+{
+  "appId": "com.reminderhealth.app",
+  "appName": "Re-MIND-eЯ",
+  "webDir": "www",
+  "server": {
+    "url": "https://reminder-health.vercel.app",
+    "cleartext": false
+  }
+}

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Re-MIND-eЯ</string>
+    <string name="title_activity_main">Re-MIND-eЯ</string>
+    <string name="package_name">com.reminderhealth.app</string>
+    <string name="custom_url_scheme">com.reminderhealth.app</string>
+</resources>

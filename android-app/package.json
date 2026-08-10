@@ -1,0 +1,20 @@
+{
+  "name": "reminder-health-android",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Capacitor shell for the reminder-health Android app. Loads the deployed web app (server.url) inside a native WebView with a Kotlin bridge for the on-device alarm core (see CLAUDE.md's Android section). No web build lives here — www/ is a required-but-unused Capacitor placeholder.",
+  "scripts": {
+    "sync": "cap sync android",
+    "open": "cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
+    "sharp": "^0.35.3"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^7.0.0",
+    "typescript": "^7.0.2"
+  }
+}
