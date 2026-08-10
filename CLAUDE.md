@@ -37,6 +37,17 @@ service · full-screen alarm activity via **notification full-screen intent** (n
 `BOOT_COMPLETED` receiver re-registers alarms · an offline action queue (Taken/Skip/Snooze
 recorded locally, synced via the existing `resolve_reminder_event` RPC when online).
 
+**Testing on a real device needs BOTH sides shipped, every time.** `server.url` mode means the
+webview always loads the *deployed* Vercel site, never local `web/` source — so a web-side change
+(e.g. a new bridge call in `web/src/lib/native/`) is invisible on-device until it's actually
+deployed to production, even if the APK itself was just rebuilt with the matching native code.
+Conversely a native-only change needs a fresh APK install; the deployed web doesn't change that.
+Concretely: **rebuild+reinstall the APK AND `npx vercel deploy --prod --yes --scope
+chaitanya-krishnas-projects-397d3a53` from repo root** before assuming a webview↔native feature
+is actually testable — mismatched-side testing is a real, already-hit failure mode (2026-08-10:
+`ScheduleSync`'s success log never appeared on-device because only the APK had shipped, not the
+web deploy carrying `schedule-sync.tsx`).
+
 **Bridge contract (webview ↔ native):** `syncSchedule(medications)` — web calls after any
 medication create/edit/delete, native store + alarms update immediately · `setSession(accessToken,
 refreshToken)` — web hands off the Supabase session so native can call RPCs, stored via
