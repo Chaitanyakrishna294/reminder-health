@@ -37,10 +37,18 @@
         <!-- Full-screen dose alarm, launched by the notification's full-screen
              intent. showOnLockScreen + turnScreenOn are the manifest half of
              what AlarmActivity also sets in code (the code path covers <27).
-             excludeFromRecents/noHistory: an answered alarm should not linger
-             in the recents list to be reopened out of context.
-             singleInstance: a second alarm for the same dose reuses this window
-             rather than stacking duplicates. -->
+             taskAffinity="" + singleInstance: the alarm lives in its OWN task,
+             completely separate from MainActivity's, so answering an alarm can
+             never disturb the app's own back stack.
+             excludeFromRecents: an answered alarm should not linger in recents
+             to be reopened out of context.
+
+             No android:noHistory — removed 2026-08-11. It finishes the activity
+             whenever it merely loses focus, which for an alarm is wrong twice
+             over: a momentary system window (an incoming call banner, a vivo
+             overlay) would silently kill a dose alarm mid-ring, and the activity
+             already finishes itself explicitly on every action and on the 60s
+             timeout, so it was buying nothing. -->
         <activity
             android:name=".schedule.AlarmActivity"
             android:exported="false"
@@ -48,7 +56,6 @@
             android:showOnLockScreen="true"
             android:turnScreenOn="true"
             android:excludeFromRecents="true"
-            android:noHistory="true"
             android:taskAffinity=""
             android:theme="@style/AlarmTheme" />
     </application>

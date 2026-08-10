@@ -90,7 +90,13 @@ object DoseNotifications {
         // otherwise show a heads-up notification" — so the notification is
         // still the fallback, never a dead end.
         val alarmIntent = Intent(context, AlarmActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            // NEW_TASK only. FLAG_ACTIVITY_CLEAR_TASK was here and had to go: it
+            // clears the task the activity lands in, and on 2026-08-11 the app
+            // would not reopen at all after an alarm was answered — a cleared
+            // task record the launcher still resolved to. The alarm needs its own
+            // task (taskAffinity="" in the manifest handles that); it has no
+            // business clearing anything, and nothing is ever stacked under it.
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             data = Uri.parse("reminderhealth://alarm/$medicationId")
             putExtra(AlarmScheduler.EXTRA_MEDICATION_ID, medicationId)
             putExtra(AlarmScheduler.EXTRA_DRUG_NAME, drugName)
