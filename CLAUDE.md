@@ -113,7 +113,20 @@ obligation. Back up the *new* Capacitor app's keystore per the paragraph above o
 **Constraints carried over from v1 (still binding):**
 - Permissions: `SCHEDULE_EXACT_ALARM`/`USE_EXACT_ALARM`, `USE_FULL_SCREEN_INTENT`,
   `POST_NOTIFICATIONS`, `RECEIVE_BOOT_COMPLETED` — nothing else, no `SYSTEM_ALERT_WINDOW`.
-- No foreground service, no polling loops; wake locks always released.
+  - **`VIBRATE` added 2026-08-11** (one beyond the original list, flagged rather than slipped in):
+    the alarm activity vibrates in a loop alongside the sound, which is what wakes a sleeping
+    user when the ringer is down. Normal permission — auto-granted at install, no prompt, no
+    privacy surface. If this is unwanted, deleting `startVibration()` in `AlarmActivity` and the
+    manifest line removes it cleanly; the notification channel's own vibration would remain.
+  - **`WAKE_LOCK` is deliberately NOT declared — do not add it.** An earlier `AlarmActivity`
+    acquired a `PARTIAL_WAKE_LOCK` and crashed on launch (`SecurityException: ...has
+    android.permission.WAKE_LOCK`, 2026-08-11). The right fix was removing the lock, not adding
+    the permission: `setTurnScreenOn` + `FLAG_KEEP_SCREEN_ON` already wake the display and hold
+    it while the alarm is visible, and a lit screen keeps the CPU running — so the lock bought
+    nothing. Holding none is also the strongest possible form of the "wake locks always
+    released" rule below: there is nothing that *can* leak.
+- No foreground service, no polling loops; wake locks always released (currently: none held at
+  all — see above).
 - OEM battery managers (Xiaomi/Oppo/Vivo/Realme) kill background alarms — onboarding must detect
   the OEM and walk the user through battery-optimization exemption + autostart; test on a real
   device from one of these brands before release.

@@ -12,7 +12,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -37,12 +36,23 @@ import java.time.format.DateTimeFormatter
  * local Room store, so it works with no network and without the webview ever
  * starting.
  *
- * Lifecycle discipline (CLAUDE.md hard rule — "wake locks released the moment
- * the alarm is dismissed or after ~60s auto-timeout"):
- *  - the wake lock is acquired WITH a 60s OS-level timeout, so even a crash
- *    between here and [releaseEverything] cannot leak it;
+ * **No wake lock, deliberately.** CLAUDE.md's rule is "any wake lock must be
+ * released the moment the alarm is dismissed or auto-times-out" — the cleanest
+ * way to honour that is to hold none at all. An earlier version acquired a
+ * PARTIAL_WAKE_LOCK and crashed on launch (`SecurityException: ...has
+ * android.permission.WAKE_LOCK`, 2026-08-11) because the permission is not
+ * declared, and it should stay undeclared: the wake lock was redundant.
+ * `setTurnScreenOn` + `FLAG_KEEP_SCREEN_ON` already wake the display and hold
+ * it on while this activity is visible, and a lit screen keeps the CPU running
+ * — so the sound plays with no lock, no permission, and nothing that *can* leak.
+ * (Between the alarm firing and this activity starting, the system holds its own
+ * temporary lock for the broadcast, so there is no gap either.)
+ *
+ * Lifecycle discipline:
  *  - [releaseEverything] is called from every exit path (action tap, timeout,
- *    onDestroy) and is idempotent;
+ *    onDestroy) and is idempotent; it stops the looping audio and vibration,
+ *    which ARE things that would otherwise outlive the screen;
+ *  - `FLAG_KEEP_SCREEN_ON` is dropped by the OS when the window goes away;
  *  - no service, no repeating alarm, nothing survives this screen.
  */
 class AlarmActivity : Activity() {
@@ -59,7 +69,6 @@ class AlarmActivity : Activity() {
         private const val AUTO_DISMISS_MS = 60_000L
     }
 
-    private var wakeLock: PowerManager.WakeLock? = null
     private var player: MediaPlayer? = null
     private var vibrator: Vibrator? = null
     private val autoDismiss = Handler(Looper.getMainLooper())
@@ -98,7 +107,6 @@ class AlarmActivity : Activity() {
         )
 
         bindContent()
-        acquireWakeLock()
         startAlarmSound()
         startVibration()
 
@@ -187,18 +195,6 @@ class AlarmActivity : Activity() {
             )
         }
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-    }
-
-    private fun acquireWakeLock() {
-        val manager = getSystemService(POWER_SERVICE) as? PowerManager ?: return
-        // PARTIAL is the right kind: the window flags above own the SCREEN, this
-        // just guarantees the CPU stays up long enough to ring. The timeout is a
-        // hard backstop so the lock cannot outlive the alarm even if something
-        // throws before releaseEverything() runs.
-        wakeLock = manager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "reminderhealth:alarm").apply {
-            setReferenceCounted(false)
-            acquire(AUTO_DISMISS_MS)
-        }
     }
 
     private fun startAlarmSound() {
@@ -298,10 +294,7 @@ class AlarmActivity : Activity() {
         runCatching { vibrator?.cancel() }
         vibrator = null
 
-        wakeLock?.let { if (it.isHeld) runCatching { it.release() } }
-        wakeLock = null
-
-        Log.i(AlarmScheduler.TAG, "alarm resources released (wake lock, sound, vibration)")
+        Log.i(AlarmScheduler.TAG, "alarm resources released (sound, vibration)")
     }
 
     override fun onDestroy() {
