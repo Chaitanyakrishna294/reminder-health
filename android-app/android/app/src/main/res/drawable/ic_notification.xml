@@ -1,23 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Notification small icon. MUST be a white-on-transparent silhouette: Android
-  ignores the colours in a small icon and re-tints the alpha channel, so a
-  coloured or opaque icon renders as a solid blob (or, on some OEM ROMs,
-  causes the notification to be dropped entirely).
+  Notification small icon.
 
-  App-owned on purpose. A framework drawable (android.R.drawable.*) is not
-  guaranteed to exist or to be a valid notification icon across OEM ROMs —
-  vivo/Xiaomi/Oppo skins are exactly the ones CLAUDE.md flags as hostile.
+  Android IGNORES this icon's colours: it keeps only the alpha channel and
+  re-tints it. So the shape must be carried entirely by TRANSPARENCY — any
+  edge-to-edge fill renders as a solid blob, which is exactly the "unreadable
+  white circle" seen in the shade on 2026-08-11.
 
-  Placeholder art: a plain bell. Real branding lands with the UI redesign,
-  which owns the visual tokens.
+  Two rules this file follows as a result:
+  1. Glyph is INSET inside the 24x24 viewport (roughly a 4dp margin). System UI
+     and OEM skins (vivo/Funtouch included) mask small icons into a circle, so
+     a glyph touching the edges gets clipped into that circle.
+  2. Shape reads at ~18dp: a pill capsule with a transparent split line through
+     it. Deliberately not a bell — a bell is fine large, but at status-bar size
+     a capsule silhouette is more distinct and it says "medication" rather than
+     "generic alert".
+
+  App-owned on purpose: a framework drawable (android.R.drawable.*) is not
+  guaranteed to be a valid notification icon across OEM ROMs.
+
+  Placeholder art — the UI redesign owns final branding.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M12,22c1.1,0 2,-0.9 2,-2h-4c0,1.1 0.89,2 2,2zM18,16v-5c0,-3.07 -1.64,-5.64 -4.5,-6.32V4c0,-0.83 -0.67,-1.5 -1.5,-1.5s-1.5,0.67 -1.5,1.5v0.68C7.63,5.36 6,7.92 6,11v5l-2,2v1h16v-1l-2,-2z" />
+    <!-- Capsule body, rotated 45°, inset from every edge. The fillType
+         evenOdd + the inner slot path below punch a transparent line across the
+         middle so the silhouette reads as a pill, not an oval blob. -->
+    <group
+        android:pivotX="12"
+        android:pivotY="12"
+        android:rotation="-45">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:fillType="evenOdd"
+            android:pathData="M8,4.5 L16,4.5 A3.5,3.5 0 0 1 19.5,8 L19.5,16 A3.5,3.5 0 0 1 16,19.5 L8,19.5 A3.5,3.5 0 0 1 4.5,16 L4.5,8 A3.5,3.5 0 0 1 8,4.5 Z M5.9,11.1 L18.1,11.1 L18.1,12.9 L5.9,12.9 Z" />
+    </group>
 </vector>

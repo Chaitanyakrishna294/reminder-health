@@ -57,6 +57,23 @@ object AlarmScheduler {
      * Called after [ScheduleBridgePlugin.syncSchedule] replaces the store, and
      * (from step 5) after boot.
      */
+    /**
+     * Cancels the alarm for every medication currently in the store.
+     *
+     * Must run BEFORE the store is replaced. [rescheduleAll] can only cancel
+     * what it can still see, so a medication that has just been deleted — or an
+     * entire account's worth after a sign-out/account switch — would otherwise
+     * leave an ORPHANED alarm registered with AlarmManager: it still fires, but
+     * [AlarmReceiver] then finds no row behind it. Found 2026-08-11 when a sync
+     * arrived with an empty medication list.
+     */
+    suspend fun cancelAllKnown(context: Context) {
+        val medications = ScheduleDatabase.getInstance(context).medicationDao().getAll()
+        if (medications.isEmpty()) return
+        Log.i(TAG, "cancelling ${medications.size} previously-scheduled alarm(s) before re-sync")
+        medications.forEach { cancel(context, it.id) }
+    }
+
     suspend fun rescheduleAll(context: Context) {
         val medications = ScheduleDatabase.getInstance(context).medicationDao().getAll()
         Log.i(TAG, "rescheduleAll: ${medications.size} medication(s) in the local store")

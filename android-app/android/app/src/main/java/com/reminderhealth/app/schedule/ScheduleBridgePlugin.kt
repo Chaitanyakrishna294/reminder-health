@@ -1,5 +1,6 @@
 package com.reminderhealth.app.schedule
 
+import android.util.Log
 import com.getcapacitor.JSArray
 import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
@@ -72,7 +73,25 @@ class ScheduleBridgePlugin : Plugin() {
         }
 
         scope.launch {
-            ScheduleDatabase.getInstance(context).medicationDao().replaceAll(medications)
+            val dao = ScheduleDatabase.getInstance(context).medicationDao()
+
+            // An empty incoming list is legitimate (all medications deleted) but
+            // is ALSO what a signed-out or guest session looks like, and it wipes
+            // every alarm on this device. Loud, because it is otherwise invisible
+            // and looks exactly like "the alarms just stopped working".
+            if (medications.isEmpty() && dao.getAll().isNotEmpty()) {
+                Log.w(
+                    AlarmScheduler.TAG,
+                    "syncSchedule received ZERO medications while the local store is NOT empty — " +
+                        "clearing every alarm on this device. If this was unexpected, check WHICH " +
+                        "account the webview is signed into (a guest session owns no medications).",
+                )
+            }
+
+            // Cancel the OLD set's alarms before the store is replaced, or
+            // deleted medications leave orphaned alarms behind (see cancelAllKnown).
+            AlarmScheduler.cancelAllKnown(context)
+            dao.replaceAll(medications)
             // Alarms are re-registered from the store immediately, so a
             // medication edit takes effect without waiting for anything.
             AlarmScheduler.rescheduleAll(context)

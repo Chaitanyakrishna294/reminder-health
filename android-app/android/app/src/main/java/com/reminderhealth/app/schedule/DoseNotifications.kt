@@ -10,6 +10,9 @@ import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.reminderhealth.app.R
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 /**
  * Dose-reminder notifications.
@@ -46,6 +49,24 @@ object DoseNotifications {
             enableVibration(true)
         }
         manager.createNotificationChannel(channel)
+    }
+
+    /**
+     * The dose's scheduled instant as a readable LOCAL time ("2:35 AM").
+     *
+     * Everything on the wire is ISO-8601 UTC (`2026-08-10T21:05:00Z`) because
+     * that is the only unambiguous way to carry an instant — but showing that
+     * raw to a patient is useless, and worse, off by the UTC offset so it looks
+     * like the alarm fired at the wrong time. Matches how AlarmActivity formats
+     * the same value, so the notification and the alarm screen never disagree.
+     */
+    private fun localTimeOrNull(iso: String?): String? {
+        if (iso == null) return null
+        return runCatching {
+            DateTimeFormatter.ofPattern("h:mm a")
+                .withZone(ZoneId.systemDefault())
+                .format(Instant.parse(iso))
+        }.getOrNull()
     }
 
     /**
@@ -103,7 +124,7 @@ object DoseNotifications {
             // answered. AlarmActivity cancels it on action or auto-timeout.
             .setAutoCancel(false)
             .setOngoing(true)
-            .also { b -> if (scheduledForIso != null) b.setSubText(scheduledForIso) }
+            .also { b -> localTimeOrNull(scheduledForIso)?.let { b.setSubText(it) } }
             .build()
 
         val manager = context.getSystemService(NotificationManager::class.java) ?: run {
