@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { checkRateLimit, getClientIp, tooManyRequests } from '@/lib/rate-limit';
+import { isGuest } from '@/lib/auth/guest';
 
 const Schema = z.object({ code: z.string().min(1).max(32) });
 
@@ -17,6 +18,19 @@ export async function POST(request: Request) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    // Guests cannot bind a Telegram identity. This route is the ONLY caller of
+    // redeem_link_code, and it runs server-side, so the check belongs here
+    // rather than in a DB trigger — redeem_link_code UPDATEs profiles, and a
+    // trigger there would sit on the hottest table in the schema to guard one
+    // rare write. Refusing is also the kinder answer: linking a real Telegram
+    // account to a session that dies with the browser cookie would strand it.
+    if (isGuest(user)) {
+      return NextResponse.json(
+        { error: 'Save your account with an email before linking Telegram.', code: 'GUEST_ACCOUNT_REQUIRED' },
+        { status: 403 }
+      );
+    }
 
     const parsed = Schema.safeParse(await request.json());
     if (!parsed.success) {

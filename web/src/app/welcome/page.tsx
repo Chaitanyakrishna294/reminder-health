@@ -3,7 +3,9 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Mail, Lock, Heart, UserRound, ShieldCheck } from 'lucide-react';
+import { Mail, Lock, Heart, UserRound, ShieldCheck, Loader2, Sparkles } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
+import Turnstile, { captchaEnabled } from '@/components/turnstile';
 
 /**
  * The signed-out front door (mockup: "Never miss a dose") — a marketing moment,
@@ -20,12 +22,69 @@ import { Mail, Lock, Heart, UserRound, ShieldCheck } from 'lucide-react';
  */
 export default function WelcomePage() {
   const [email, setEmail] = useState('');
+  const [guestLoading, setGuestLoading] = useState(false);
+  const [guestError, setGuestError] = useState<string | null>(null);
+  // Only the guest button needs a token on this screen — the email field is a
+  // hand-off to /login, which renders its own widget.
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const router = useRouter();
 
   const continueToLogin = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = email.trim();
     router.push(trimmed ? `/login?email=${encodeURIComponent(trimmed)}` : '/login');
+  };
+
+  /**
+   * Start a no-signup guest session.
+   *
+   * This creates a REAL Supabase user (is_anonymous = true), so the existing
+   * handle_new_user() trigger gives it a profile with a synthetic WEB-<uuid>
+   * telegram_chat_id — which the proxy already routes straight to /dashboard
+   * rather than the Telegram link page. Nothing else needed.
+   *
+   * router.refresh() before navigating so the server sees the cookie the
+   * browser client just wrote; without it the proxy still reads "signed out"
+   * and bounces straight back here.
+   */
+  const continueAsGuest = async () => {
+    // signInAnonymously() is an auth endpoint, so Supabase's CAPTCHA protection
+    // covers it exactly like signUp/signInWithPassword. Without this the button
+    // dies with "captcha protection: request disallowed" the moment CAPTCHA is
+    // switched on — and it would look like guest mode itself was broken.
+    if (captchaEnabled && !captchaToken) {
+      setGuestError('Please complete the verification challenge below first.');
+      return;
+    }
+
+    setGuestLoading(true);
+    setGuestError(null);
+
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInAnonymously({
+      options: { captchaToken: captchaToken ?? undefined },
+    });
+
+    if (error) {
+      // Two causes worth telling apart, because the fix differs and neither is
+      // the user's fault: the dashboard toggle being off (Authentication ->
+      // Sign In / Providers -> Anonymous sign-ins), or a rejected CAPTCHA token
+      // (single-use — a retry needs a fresh one, hence the reload hint).
+      const m = (error.message || '').toLowerCase();
+      setGuestError(
+        m.includes('captcha')
+          ? 'Verification failed. Please reload the page and try again.'
+          : m.includes('anonymous')
+            ? 'Guest mode is not available right now. Please sign in or create an account.'
+            : 'Could not start a guest session. Please try again.',
+      );
+      setCaptchaToken(null);
+      setGuestLoading(false);
+      return;
+    }
+
+    router.refresh();
+    router.push('/dashboard');
   };
 
   return (
@@ -118,6 +177,41 @@ export default function WelcomePage() {
           <UserRound className="w-5 h-5" aria-hidden />
           Create account
         </Link>
+
+        {/* Guest mode. Deliberately the quietest of the three actions but on the
+            same screen: the point is that a first-time visitor can be adding a
+            medicine in one tap, and be asked for an email only once the app has
+            earned it. */}
+        <button
+          type="button"
+          onClick={continueAsGuest}
+          disabled={guestLoading}
+          className="mt-1 w-full h-12 inline-flex items-center justify-center gap-2 rounded-2xl font-mono font-bold text-base text-[#0F1C5A]/85 underline underline-offset-4 decoration-[#0F1C5A]/30 hover:bg-white/25 hover:decoration-[#0F1C5A]/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-60 disabled:cursor-wait transition-colors cursor-pointer"
+        >
+          {guestLoading ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" aria-hidden />
+              Setting things up…
+            </>
+          ) : (
+            <>
+              <Sparkles className="w-5 h-5" aria-hidden />
+              Try it without an account
+            </>
+          )}
+        </button>
+
+        {/* Renders nothing at all until NEXT_PUBLIC_TURNSTILE_SITE_KEY is set,
+            so this stays invisible until CAPTCHA is actually configured. */}
+        <div className="mt-2 empty:mt-0">
+          <Turnstile onVerify={setCaptchaToken} />
+        </div>
+
+        {guestError && (
+          <p role="alert" className="mt-2 text-center font-mono text-[12px] font-bold text-[#7A1029]">
+            {guestError}
+          </p>
+        )}
 
         <p className="mt-3 flex items-center justify-center gap-1.5 font-mono text-[11px] text-[#0F1C5A]/80">
           <ShieldCheck className="w-4 h-4 shrink-0" aria-hidden />

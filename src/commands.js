@@ -938,9 +938,23 @@ const initCommands = () => {
            }
            
            state.times.sort((a,b) => a.localeCompare(b));
+
+           // Re-read dose_days before recomputing: this medication may have been
+           // given a weekly cadence on the web (the bot has no day picker), and
+           // scheduling the new times without it would drop the next reminder on
+           // a day the patient is not supposed to take the dose. Ownership is
+           // filtered here exactly as in the UPDATE below; a miss (or a row that
+           // predates the column) yields undefined = daily, the old behavior.
+           const { data: medRow } = await supabase
+             .from('medications')
+             .select('dose_days')
+             .eq('id', state.medId)
+             .eq('telegram_id', chatId.toString())
+             .maybeSingle();
+
            // state.timezone is undefined today (no TZ picker) → defaults to IST.
            // When a per-medication timezone is captured in this flow, pass it here.
-           const nextReminderAt = calculateNextReminder(state.times, state.timezone);
+           const nextReminderAt = calculateNextReminder(state.times, state.timezone, medRow?.dose_days);
            
            const updatePayload = { reminder_times: state.times, next_reminder_at: nextReminderAt.toISOString() };
            if (state.frequency) updatePayload.frequency = state.frequency;

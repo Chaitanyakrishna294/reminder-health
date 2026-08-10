@@ -127,7 +127,10 @@ export async function GET(request: Request) {
       }
 
       // Success or duplicate (23505): advance next_reminder_at so it doesn't re-fire.
-      const nextReminder = calculateNextReminder(med.reminder_times, med.timezone);
+      // dose_days skips any weekday the medication is not due on (null/absent =
+      // every day). Mirrors src/scheduler.js step 4 — the due-scan filters only
+      // on next_reminder_at, so a non-due day is expressed by advancing past it.
+      const nextReminder = calculateNextReminder(med.reminder_times, med.timezone, med.dose_days);
       await supabase
         .from('medications')
         .update({

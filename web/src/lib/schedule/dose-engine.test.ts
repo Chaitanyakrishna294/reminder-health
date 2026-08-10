@@ -2,7 +2,7 @@
 //   node --experimental-strip-types src/lib/schedule/dose-engine.test.ts
 // Fails loudly (non-zero exit) if any invariant breaks.
 import assert from 'node:assert';
-import { parseTimeToMinutes, findOverride, toOverrideDateStr, type OverrideEntry } from './dose-engine.ts';
+import { parseTimeToMinutes, findOverride, occursOn, occursOnWeekday, toOverrideDateStr, type OverrideEntry } from './dose-engine.ts';
 
 // ── parseTimeToMinutes: 24h, 12h am/pm, and the classic 12:00 edges ──
 assert.equal(parseTimeToMinutes('08:00'), 8 * 60);
@@ -49,5 +49,48 @@ assert.equal(toOverrideDateStr(new Date(2026, 6, 8, 0, 0, 0, 0)), '2026-07-08');
 assert.equal(toOverrideDateStr(new Date(2026, 6, 7)), toOverrideDateStr(new Date(2026, 6, 7, 14, 5)));
 // Single-digit month/day are zero-padded to a stable YYYY-MM-DD shape.
 assert.equal(toOverrideDateStr(new Date(2026, 0, 3)), '2026-01-03');
+
+// ── occursOn: which DAYS a medication is due (medications.dose_days) ──
+// Absent/null/empty must mean EVERY DAY: that is the state of every medication
+// saved before the column existed, and a stricter default would silently stop
+// reminding real patients. 2026-07-06 is a Monday, so this block walks a known
+// week (Mon=1 .. Sun=0) built from local date parts like the keys above.
+const mon = new Date(2026, 6, 6);
+const tue = new Date(2026, 6, 7);
+const wed = new Date(2026, 6, 8);
+const sat = new Date(2026, 6, 11);
+const sun = new Date(2026, 6, 12);
+assert.equal(mon.getDay(), 1, 'fixture drifted: 2026-07-06 must be a Monday');
+
+// No restriction = due every day.
+for (const d of [mon, tue, wed, sat, sun]) {
+  assert.equal(occursOn(d, null), true);
+  assert.equal(occursOn(d, undefined), true);
+  assert.equal(occursOn(d, []), true);
+}
+
+// Mon/Wed/Fri.
+assert.equal(occursOn(mon, [1, 3, 5]), true);
+assert.equal(occursOn(tue, [1, 3, 5]), false);
+assert.equal(occursOn(wed, [1, 3, 5]), true);
+
+// Weekends only — checks the Sunday=0 end of the range, the easiest to get
+// wrong if anyone ever renumbers the picker to Monday-first.
+assert.equal(occursOn(sat, [0, 6]), true);
+assert.equal(occursOn(sun, [0, 6]), true);
+assert.equal(occursOn(mon, [0, 6]), false);
+
+// All seven listed is identical to unrestricted.
+for (const d of [mon, tue, wed, sat, sun]) {
+  assert.equal(occursOn(d, [0, 1, 2, 3, 4, 5, 6]), true);
+}
+
+// The weekday-keyed form is the same rule — the dashboard uses it because it
+// resolves the weekday in the MEDICATION's timezone, not the browser's.
+for (const d of [mon, tue, wed, sat, sun]) {
+  for (const days of [null, [1, 3, 5], [0, 6], [2]]) {
+    assert.equal(occursOnWeekday(d.getDay(), days), occursOn(d, days));
+  }
+}
 
 console.log('dose-engine: all checks passed');

@@ -62,6 +62,7 @@ export async function updateSession(request: NextRequest, nonce: string, cspHead
     '/admin-diagnostics',
     '/link-account',
     '/update-password',
+    '/save-account',
   ].some(path => url.pathname.startsWith(path));
 
   // Redirect to login if user is not authenticated and attempts to access protected routes

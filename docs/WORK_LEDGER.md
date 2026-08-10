@@ -36,7 +36,25 @@ never attempt to apply one.
 
 Both `src/utils.js` (bot) and `web/src/lib/medication-utils.ts` implement
 `calculateNextReminder` with **moment-timezone** — they must stay in lockstep; do not migrate
-either to Intl (DST math must match or reminders fire at wrong times).
+either to Intl (DST math must match or reminders fire at wrong times). Both take a third
+`doseDays` arg (weekdays the med is due, 0=Sun..6=Sat; null/empty = daily) and walk forward
+day-by-day to the next due weekday — that is the ONLY place the weekly cadence is enforced for
+sending, since the due-scan filters purely on `next_reminder_at`. The projection side of the
+same rule is `occursOn`/`occursOnWeekday` in `web/src/lib/schedule/dose-engine.ts`; all three
+must agree or the UI draws a dose no scheduler sends.
+
+**Guest (anonymous) accounts.** `signInAnonymously()` from `/welcome` creates a REAL auth user
+(`is_anonymous = true`), so the untouched `handle_new_user()` trigger gives it the usual profile
+with a synthetic `WEB-<uuid>` id and the proxy routes it straight to `/dashboard`. Converting a
+guest (`/save-account`: `updateUser({email})` → `verifyOtp({type:'email_change'})`) keeps THE
+SAME `auth.uid()`, so **no data is copied or re-keyed at any point** — that is the whole design.
+Guests are blocked from `caregiver_connections` and `health_records` by BEFORE INSERT triggers
+(`public.guard_guest_write()`), and from Telegram linking in `/api/link-account/redeem`; the
+`GUEST_ACCOUNT_REQUIRED` sentinel is matched client-side by `isGuestGuardError` in
+`web/src/lib/auth/guest.ts`. Everything else (medications, doses, planner) is open — that is the
+product being tried. **Requires the Supabase dashboard toggle** (Authentication → Sign In /
+Providers → Anonymous sign-ins) plus CAPTCHA; with it off, the welcome screen simply says guest
+mode is unavailable.
 
 ---
 
@@ -153,6 +171,7 @@ through RPCs, never raw table writes. `lib/rate-limit.ts` and `lib/medications/c
 | `lib/supabase/care-circle-service.ts` | Connection queries, metrics, permission updates (IST-hardcoded windows) |
 | `lib/reminder-events.ts` | `resolveReminderEvent`/`correctReminderEvent` RPC wrappers — the single dose ledger |
 | `lib/medication-utils.ts` | Web mirror of bot time math (lockstep rule, §1) |
+| `lib/auth/guest.ts` | `isGuest`/`isGuestGuardError`/`GUEST_LOCKED` — guest-session predicate + the copy for each locked surface (§1) |
 | `lib/schedule/dose-engine.ts` · `bot-liveness.ts` | Pure helpers, have tests |
 | `lib/schedule/dose-attention.ts` | Pending-vs-attention (missed) status partition + gate-queue order; shared by gate, missed strip, hero; has test |
 | `lib/push/register-push.ts` (client) · `send-push.ts` (server) | Web-push both directions |
@@ -206,7 +225,10 @@ agent-audited 2026-07-25; `docs/DATABASE_SCHEMA.md` is badly stale (§9).
 
 **Core:** `profiles` (1:1 auth.users; `telegram_chat_id` unique, synthetic `WEB-<uuid>` for web-only;
 `connect_code` RM+6) · `medications` (**no CREATE TABLE in repo** — pre-repo bot table, only ALTERed;
-stock cols BOTH `tablet_count` and `current_stock`, see §8) · `low_stock_notified_at`
+stock cols BOTH `tablet_count` and `current_stock`, see §8; `dose_days SMALLINT[]` = which weekdays
+the med is due, 0=Sun..6=Sat, **NULL means every day** — never backfill it to {0..6} — while
+`reminder_times` stays how many doses fall within a due day and `frequency` is only a label +
+stock math — migration_dose_days_2026_08_10.sql) · `low_stock_notified_at`
 (refill-alert suppression; cleared by `rearm_low_stock_notice()` on any stock increase) ·
 `reminder_events` (per-dose state
 machine; UNIQUE(medication_id, scheduled_for); statuses SENT/DISPLAYED/OPENED/GENTLE_REMINDER/

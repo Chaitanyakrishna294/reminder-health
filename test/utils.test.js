@@ -1,5 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
+const moment = require('moment-timezone');
 const { calculateNextReminder, DEFAULT_TIMEZONE, isValidTime } = require('../src/utils');
 
 // calculateNextReminder is the heart of "when does a dose fire" — guard its
@@ -34,6 +35,75 @@ test('blank timezone falls back to the default', () => {
   const def = calculateNextReminder(['09:00']);
   // Both resolve via IST → identical UTC minute-of-hour.
   assert.strictEqual(blank.getUTCMinutes(), def.getUTCMinutes());
+});
+
+// ── dose_days (non-daily schedules) ─────────────────────────────────────────
+// The weekday rule must agree with occursOn in web/src/lib/schedule/dose-engine.ts
+// and with the web mirror in web/src/lib/medication-utils.ts, or the dashboard
+// draws a dose on a day the scheduler never sends one.
+//
+// These assert on the RESULT's weekday rather than on a fixed date, so they hold
+// whatever day the suite happens to run.
+
+/** Weekday (0=Sun..6=Sat) of a returned UTC Date, read back in the given tz. */
+const weekdayIn = (date, tz) => moment(date).tz(tz).day();
+
+test('dose_days omitted, null or empty all mean every day', () => {
+  const base = calculateNextReminder(['09:00'], DEFAULT_TIMEZONE).getTime();
+  assert.strictEqual(calculateNextReminder(['09:00'], DEFAULT_TIMEZONE, null).getTime(), base);
+  assert.strictEqual(calculateNextReminder(['09:00'], DEFAULT_TIMEZONE, []).getTime(), base);
+  assert.strictEqual(calculateNextReminder(['09:00'], DEFAULT_TIMEZONE, undefined).getTime(), base);
+});
+
+test('lands only on a listed weekday', () => {
+  for (const days of [[1], [1, 3, 5], [0, 6], [2, 4]]) {
+    const next = calculateNextReminder(['09:00'], DEFAULT_TIMEZONE, days);
+    assert.ok(
+      days.includes(weekdayIn(next, DEFAULT_TIMEZONE)),
+      `expected a weekday in ${JSON.stringify(days)}, got ${weekdayIn(next, DEFAULT_TIMEZONE)}`,
+    );
+    assert.ok(next.getTime() > Date.now(), 'must still be in the future');
+  }
+});
+
+test('a once-weekly med never schedules more than 7 days out', () => {
+  // Worst case is "today is the dose day but the time has passed" — that must
+  // land on the SAME weekday next week, not skip a fortnight.
+  const today = moment().tz(DEFAULT_TIMEZONE).day();
+  const next = calculateNextReminder(['00:01'], DEFAULT_TIMEZONE, [today]);
+  assert.strictEqual(weekdayIn(next, DEFAULT_TIMEZONE), today);
+  const daysOut = (next.getTime() - Date.now()) / 86400000;
+  assert.ok(daysOut <= 7.01, `scheduled ${daysOut} days out, expected <= 7`);
+});
+
+test('every weekday selected behaves exactly like daily', () => {
+  const all = calculateNextReminder(['09:00'], DEFAULT_TIMEZONE, [0, 1, 2, 3, 4, 5, 6]);
+  const daily = calculateNextReminder(['09:00'], DEFAULT_TIMEZONE);
+  assert.strictEqual(all.getTime(), daily.getTime());
+});
+
+test('dose_days keeps wall-clock time across zones', () => {
+  // Same guarantee as the timezone tests above, but on the weekday path: 09:00
+  // IST is minute 30 past the hour in UTC, 09:00 New York is on the hour.
+  const ist = calculateNextReminder(['09:00'], 'Asia/Kolkata', [1, 4]);
+  const ny = calculateNextReminder(['09:00'], 'America/New_York', [1, 4]);
+  assert.strictEqual(ist.getUTCMinutes(), 30);
+  assert.strictEqual(ny.getUTCMinutes(), 0);
+});
+
+test('a garbage dose_days set falls back to daily rather than never firing', () => {
+  // The DB CHECK makes this unreachable, but for a medication reminder the
+  // failure mode has to be "one dose too many", never "silently stops".
+  const next = calculateNextReminder(['09:00'], DEFAULT_TIMEZONE, [9]);
+  assert.ok(next.getTime() > Date.now());
+  const daysOut = (next.getTime() - Date.now()) / 86400000;
+  assert.ok(daysOut <= 2, `fallback scheduled ${daysOut} days out, expected within 2`);
+});
+
+test('multiple times on a due day pick the earliest still ahead', () => {
+  const today = moment().tz(DEFAULT_TIMEZONE).day();
+  const next = calculateNextReminder(['23:58', '23:59'], DEFAULT_TIMEZONE, [today]);
+  assert.strictEqual(weekdayIn(next, DEFAULT_TIMEZONE), today);
 });
 
 test('isValidTime accepts HH:MM 24h and rejects malformed input', () => {

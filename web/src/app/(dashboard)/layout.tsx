@@ -6,6 +6,7 @@ import { resolveUserData, getMedicalProfile } from '@/lib/supabase/cached-querie
 import { createClient } from '@/lib/supabase/server';
 import { GuideProvider } from '@/components/guide/guide-context';
 import GuideTour from '@/components/guide/guide-tour';
+import GuestBanner from '@/components/guest/guest-banner';
 
 export default async function DashboardLayout({
   children,
@@ -18,7 +19,7 @@ export default async function DashboardLayout({
     redirect('/login');
   }
 
-  const { user, profile, userRole, myTelegramChatId, targetChatId, patientName, patientPhone } = userData;
+  const { user, profile, userRole, myTelegramChatId, targetChatId, patientName, patientPhone, isGuest } = userData;
 
   if (!profile.telegram_chat_id) {
     redirect('/link-account');
@@ -42,7 +43,10 @@ export default async function DashboardLayout({
         <Navbar
           user={{
             id: user.id,
-            email: user.email!,
+            // A guest has no email at all, so the old non-null assertion handed
+            // the navbar `undefined` and typed it as a string. Empty string
+            // keeps the contract honest until they save the account.
+            email: user.email ?? '',
             fullName: profile.full_name || 'User',
             role: profile.role,
             telegramChatId: profile.telegram_chat_id,
@@ -57,6 +61,7 @@ export default async function DashboardLayout({
           patientPhone={patientPhone}
           patientChatId={targetChatId}
         >
+          {isGuest && <GuestBanner />}
           {children}
         </DashboardMainLayout>
       </div>

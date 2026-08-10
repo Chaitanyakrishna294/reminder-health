@@ -74,7 +74,10 @@ maintainer applies it in the Supabase SQL editor (project `jaflclnakwtikqbfhfdk`
 
 ## PENDING (written, not yet applied)
 
-_None — every written migration is applied. Latest: #61 (`migration_delete_account_storage_fix_2026_08_09.sql`, applied 2026-08-09)._
+| File | Notes |
+| --- | --- |
+| `migration_anonymous_guests_2026_08_10.sql` | Adds `public.is_anonymous_user()` (reads the `is_anonymous` JWT claim; COALESCEs to **false** so service_role and the SQL editor are never treated as guests) and `public.guard_guest_write()` as a BEFORE INSERT trigger on `caregiver_connections` and `health_records` — the two writes that reach another person or cost storage. Deliberately NOT on medications/reminder_events/reminder_logs: those are the product a guest is trying. **Also needs a manual dashboard step**: Authentication → Sign In / Providers → *Anonymous sign-ins* must be ON, plus CAPTCHA (that toggle is the only real rate limit on guest creation). Order-independent w.r.t. the code deploy — with the toggle off, `signInAnonymously()` just errors and the welcome screen says guest mode is unavailable. Has rollback + validation. |
+| `migration_dose_days_2026_08_10.sql` | Adds `medications.dose_days SMALLINT[]` (0=Sun..6=Sat, **NULL = every day**, CHECK `medications_dose_days_valid` bounds it to 1..7 entries within 0..6) so a medication can be due on only some weekdays — "twice a week", "Mon/Wed/Fri". No backfill, no index (nothing queries the column; the cadence is enforced when `next_reminder_at` is advanced). **APPLY THIS BEFORE DEPLOYING THE CODE**: reads degrade safely to daily without it, but the medication add/edit forms name `dose_days` in their INSERT/UPDATE and PostgREST rejects those with PGRST204 until the column exists, so saving a medication would break. Has rollback + validation. |
 
 > Lockdown note: if `try_acquire_scheduler_lock`, `release_scheduler_lock`,
 > `close_daily_medications`, or `scan_and_escalate_overdue_reminders` is ever

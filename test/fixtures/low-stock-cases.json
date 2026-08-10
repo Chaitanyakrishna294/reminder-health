@@ -75,6 +75,36 @@
       "name": "active undefined (column not selected) is treated as active",
       "med": { "low_stock_alert_enabled": true, "current_stock": 1, "stock_threshold": 4, "frequency": "once_daily", "dosage_amount": 1 },
       "expected": { "low": true, "reason": "threshold" }
+    },
+    {
+      "name": "dose_days null means daily -> 3 left is still 3 days, low via days",
+      "med": { "active": true, "low_stock_alert_enabled": true, "current_stock": 3, "stock_threshold": 2, "frequency": "once_daily", "dosage_amount": 1, "dose_days": null },
+      "expected": { "low": true, "reason": "days" }
+    },
+    {
+      "name": "thrice weekly: 3 left is 7 days of stock, NOT low (daily math said 3)",
+      "med": { "active": true, "low_stock_alert_enabled": true, "current_stock": 3, "stock_threshold": 2, "frequency": "once_daily", "dosage_amount": 1, "dose_days": [1, 3, 5] },
+      "expected": { "low": false, "reason": null }
+    },
+    {
+      "name": "once weekly: 1 left is 7 days of stock, NOT low",
+      "med": { "active": true, "low_stock_alert_enabled": true, "current_stock": 1, "stock_threshold": 0, "frequency": "once_daily", "dosage_amount": 1, "dose_days": [0] },
+      "expected": { "low": false, "reason": null }
+    },
+    {
+      "name": "weekly cadence does not defeat the explicit threshold",
+      "med": { "active": true, "low_stock_alert_enabled": true, "current_stock": 2, "stock_threshold": 4, "frequency": "once_daily", "dosage_amount": 1, "dose_days": [1, 3, 5] },
+      "expected": { "low": true, "reason": "threshold" }
+    },
+    {
+      "name": "all seven days listed behaves exactly like daily",
+      "med": { "active": true, "low_stock_alert_enabled": true, "current_stock": 3, "stock_threshold": 2, "frequency": "once_daily", "dosage_amount": 1, "dose_days": [0, 1, 2, 3, 4, 5, 6] },
+      "expected": { "low": true, "reason": "days" }
+    },
+    {
+      "name": "twice weekly, 2 tablets twice a day: 10 left is 8 days, not low",
+      "med": { "active": true, "low_stock_alert_enabled": true, "current_stock": 10, "stock_threshold": 2, "frequency": "twice_daily", "dosage_amount": 2, "dose_days": [2, 5] },
+      "expected": { "low": false, "reason": null }
     }
   ]
 }

@@ -20,8 +20,34 @@ export interface MedicationFormState {
   medicationReason: string;
   priority: string;
   unitType: string;
+  /**
+   * Weekdays this medication is due, 0=Sun..6=Sat. An empty array means every
+   * day — see normalizeDoseDays for how that reaches the column.
+   */
+  doseDays: number[];
   /** Optional, explicit human-selected catalog link. Never auto-populated. */
   catalogLink: CatalogLinkValue | null;
+}
+
+/**
+ * Form selection -> `medications.dose_days` column value.
+ *
+ * Returns NULL for "every day", which is what the column uses to mean daily.
+ * Both the empty selection and all seven days selected normalize to NULL: they
+ * are the same schedule, and storing one of them as {0,1,2,3,4,5,6} would leave
+ * two encodings of "daily" for every reader to handle. The DB CHECK also
+ * forbids an empty array outright (a medication that is never due).
+ *
+ * Sorts and de-duplicates so stored rows are comparable and stable — the CHECK
+ * constraint cannot reject duplicates (no subqueries allowed in CHECK), so this
+ * is where that guarantee is made.
+ */
+export function normalizeDoseDays(days: number[] | null | undefined): number[] | null {
+  if (!days) return null;
+  const clean = [...new Set(days)]
+    .filter((d) => Number.isInteger(d) && d >= 0 && d <= 6)
+    .sort((a, b) => a - b);
+  return clean.length === 0 || clean.length === 7 ? null : clean;
 }
 
 /**
@@ -77,6 +103,9 @@ export function buildSharedMedicationFields(
     dosage: s.strength.trim() || 'N/A',
     frequency: s.frequency,
     reminder_times: sortedTimes,
+    // Which DAYS the med is due (null = every day); reminder_times above is how
+    // many times within each due day. The two are independent.
+    dose_days: normalizeDoseDays(s.doseDays),
     unit_type: s.unitType,
     dosage_amount: Number(s.dosageAmount),
     current_stock: s.enableInventory && s.currentStock !== '' ? Number(s.currentStock) : null,

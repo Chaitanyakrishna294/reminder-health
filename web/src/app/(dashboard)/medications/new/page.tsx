@@ -13,6 +13,8 @@ import {
   stepMeta,
   frequencies,
   priorities,
+  weekdays,
+  describeDoseDays,
   STRENGTH_SUGGESTIONS,
   unitLabel,
   unitPhrase,
@@ -25,7 +27,7 @@ import GuideAutoStart from '@/components/guide/guide-auto-start';
 import { useGuide } from '@/components/guide/guide-context';
 import { TOURS } from '@/components/guide/guide-content';
 import { searchMedicationCatalog, type CatalogLinkValue } from '@/lib/medications/catalog';
-import { validateMedicationStep, buildSharedMedicationFields } from '@/lib/medications/form-logic';
+import { validateMedicationStep, buildSharedMedicationFields, normalizeDoseDays } from '@/lib/medications/form-logic';
 import {
   Pill,
   Clock,
@@ -88,6 +90,10 @@ export default function NewMedicationPage() {
   const [unitOpen, setUnitOpen] = useState(false);
   const [frequency, setFrequency] = useState<'once_daily' | 'twice_daily' | 'thrice_daily'>('once_daily');
   const [times, setTimes] = useState<string[]>(['08:00']);
+  // Weekdays this med is due, 0=Sun..6=Sat. Empty = every day (the default, and
+  // what normalizeDoseDays stores as NULL). `frequency` above is doses per DUE
+  // day; this is which days are due at all — the two are independent.
+  const [doseDays, setDoseDays] = useState<number[]>([]);
   
   // Step 3 states
   const [dosageAmount, setDosageAmount] = useState<number>(1);
@@ -186,6 +192,12 @@ export default function NewMedicationPage() {
     setTimes(prev => prev.map((t, idx) => idx === index ? val : t));
   };
 
+  // Deselecting the last day returns to "every day" rather than leaving a
+  // medication that is never due — the same rule the DB CHECK enforces.
+  const toggleDoseDay = (day: number) => {
+    setDoseDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day].sort((a, b) => a - b));
+  };
+
   const animateStep = (newStep: number, direction: 'forward' | 'backward') => {
     setStepDirection(direction);
     setIsTransitioning(true);
@@ -239,7 +251,10 @@ export default function NewMedicationPage() {
     // Reminder times are wall-clock in the creator's timezone: store it so the
     // scheduler fires at the user's local time (DB default is IST otherwise).
     const timezone = moment.tz.guess();
-    const nextReminder = calculateNextReminder(sortedTimes, timezone);
+    // normalizeDoseDays here too (not just in the row fields): the first reminder
+    // must land on a day the medication is actually due, or a Mon/Wed/Fri med
+    // added on a Tuesday fires once on the Tuesday before settling in.
+    const nextReminder = calculateNextReminder(sortedTimes, timezone, normalizeDoseDays(doseDays));
 
     try {
       const { error: insertErr } = await supabase.from('medications').insert([
@@ -247,7 +262,7 @@ export default function NewMedicationPage() {
           telegram_id: targetTelegramChatId,
           timezone,
           ...buildSharedMedicationFields(
-            { drugName, frequency, times, dosageAmount, strength, enableInventory, currentStock, stockThreshold, medicationReason, priority, unitType, catalogLink },
+            { drugName, frequency, times, doseDays, dosageAmount, strength, enableInventory, currentStock, stockThreshold, medicationReason, priority, unitType, catalogLink },
             sortedTimes,
           ),
           next_reminder_at: nextReminder.toISOString(),
@@ -469,6 +484,40 @@ export default function NewMedicationPage() {
                         </button>
                       ))}
                     </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-[#0F1C5A]/[0.06]">
+                    <label className={labelClass} id="dose-days-label">Which Days?</label>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      For medicines taken only on some days — twice a week, alternate days, Sundays only.
+                      Leave all off for every day.
+                    </p>
+                    <div className="flex gap-2" role="group" aria-labelledby="dose-days-label">
+                      {weekdays.map((d) => {
+                        const on = doseDays.includes(d.id);
+                        return (
+                          <button
+                            key={d.id}
+                            type="button"
+                            onClick={() => toggleDoseDay(d.id)}
+                            aria-pressed={on}
+                            aria-label={d.full}
+                            className={`flex-1 rounded-xl font-bold transition-all duration-200 cursor-pointer ${
+                              isElderly ? 'py-4 text-lg' : 'py-3 text-sm'
+                            } ${
+                              on
+                                ? 'bg-primary text-white ring-2 ring-primary/25'
+                                : 'bg-[#F6F6F9] text-muted-foreground hover:bg-[#EFEFF3]'
+                            }`}
+                          >
+                            {d.short}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs font-semibold text-primary-strong mt-3">
+                      {describeDoseDays(doseDays)}
+                    </p>
                   </div>
 
                   <div data-tour="mednew-times" className="pt-4 border-t border-[#0F1C5A]/[0.06]">
@@ -742,6 +791,7 @@ export default function NewMedicationPage() {
                         { step: 1, icon: stepMeta[0].icon, label: 'Name', value: drugName, mono: true },
                         { step: 1, icon: stepMeta[0].icon, label: 'Form', value: unitLabel(unitType) },
                         { step: 2, icon: stepMeta[1].icon, label: 'Schedule', value: frequency.replace(/_/g, ' '), mono: true, capitalize: true },
+                        { step: 2, icon: stepMeta[1].icon, label: 'Days', value: describeDoseDays(doseDays) },
                         { step: 2, icon: stepMeta[1].icon, label: 'Times', value: times.join(', '), mono: true },
                         { step: 3, icon: stepMeta[2].icon, label: 'Strength', value: strength || 'Not specified', muted: !strength },
                         { step: 3, icon: stepMeta[2].icon, label: 'Each dose', value: `${dosageAmount} ${unitPhrase(unitType, dosageAmount)}`, mono: true },

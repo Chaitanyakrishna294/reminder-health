@@ -104,6 +104,29 @@ export const stepMeta = [
   { label: 'Review', icon: <ClipboardList className="w-4 h-4" /> },
 ];
 
+// Day-of-week picker options. `id` is the value stored in medications.dose_days
+// (0=Sunday..6=Saturday, matching Date#getDay() and moment().day() so nothing
+// remaps). Sunday-first to match the Schedule Planner's month grid and weekOf().
+// `short` is the toggle label; `full` is its accessible name.
+export const weekdays = [
+  { id: 0, short: 'S', full: 'Sunday' },
+  { id: 1, short: 'M', full: 'Monday' },
+  { id: 2, short: 'T', full: 'Tuesday' },
+  { id: 3, short: 'W', full: 'Wednesday' },
+  { id: 4, short: 'T', full: 'Thursday' },
+  { id: 5, short: 'F', full: 'Friday' },
+  { id: 6, short: 'S', full: 'Saturday' },
+];
+
+/** Human summary of a dose_days selection, for review screens and list rows. */
+export function describeDoseDays(days: number[] | null | undefined): string {
+  if (!days || days.length === 0 || days.length === 7) return 'Every day';
+  const sorted = [...days].sort((a, b) => a - b);
+  if (sorted.length === 5 && sorted.every((d) => d >= 1 && d <= 5)) return 'Weekdays';
+  if (sorted.length === 2 && sorted[0] === 0 && sorted[1] === 6) return 'Weekends';
+  return sorted.map((d) => weekdays[d].full.slice(0, 3)).join(', ');
+}
+
 export const frequencies = [
   { id: 'once_daily', title: 'Once Daily', desc: 'One dose per day', icon: <Sun className="w-5 h-5" /> },
   { id: 'twice_daily', title: 'Twice Daily', desc: 'Morning and night', icon: <CloudSun className="w-5 h-5" /> },

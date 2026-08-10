@@ -67,15 +67,22 @@ const buildTakePromptMessage = (drugName, dosage) =>
  * Days of stock remaining for a medication, or null when stock tracking is off
  * (no stock value recorded). Reads current_stock (source of truth; tablet_count
  * is a floored mirror kept by a DB trigger) and accounts for dosage_amount —
- * a med taken 2 tablets × 2 times a day burns 4/day, not 2.
- * @param {{current_stock?: number|null, tablet_count?: number|null, frequency: string, dosage_amount?: number|null}} med
+ * a med taken 2 tablets × 2 times a day burns 4/day, not 2 — and for dose_days,
+ * since a med taken 3 days a week lasts well over twice as long as a daily one.
+ * Without the dose_days factor the 09:00 refill cron would nag a weekly-med
+ * patient every day while they still hold a fortnight of stock.
+ * @param {{current_stock?: number|null, tablet_count?: number|null, frequency: string, dosage_amount?: number|null, dose_days?: number[]|null}} med
  * @returns {number|null}
  */
 const daysOfStockLeft = (med) => {
   const stock = med.current_stock ?? med.tablet_count;
   if (stock === null || stock === undefined) return null;
-  const perDay = dosesPerDay(med.frequency) * (Number(med.dosage_amount) || 1);
-  return Math.floor(stock / perDay);
+  const perDueDay = dosesPerDay(med.frequency) * (Number(med.dosage_amount) || 1);
+  const dueDaysPerWeek =
+    Array.isArray(med.dose_days) && med.dose_days.length > 0 ? med.dose_days.length : 7;
+  // Multiplied out rather than scaling by (7/dueDaysPerWeek) so the daily case
+  // (7/7) stays exactly the old integer division and the shared fixture holds.
+  return Math.floor((stock * 7) / (perDueDay * dueDaysPerWeek));
 };
 
 /** Days of remaining stock at or below which a medication counts as low, when no

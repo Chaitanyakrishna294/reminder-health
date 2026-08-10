@@ -48,6 +48,43 @@ export function findOverride(
 }
 
 /**
+ * Is this medication due on this calendar day?
+ *
+ * `doseDays` is the medication's `dose_days` column: 0=Sunday .. 6=Saturday.
+ * NULL/undefined/empty means EVERY DAY — that is the state of every medication
+ * saved before the feature existed, so this must stay the permissive default or
+ * existing patients silently stop being reminded.
+ *
+ * Weekday is read with `Date#getDay()`, the viewer's LOCAL weekday, to match
+ * `toOverrideDateStr` above — both the planner's month grid and the dashboard
+ * build their Dates at local midnight, so a UTC weekday would disagree for IST
+ * between 00:00 and 05:29 and land the dose on the wrong day.
+ *
+ * This is the day-granularity half of the recurrence rule; the bot's
+ * `calculateNextReminder` (src/utils.js) and its web mirror
+ * (web/src/lib/medication-utils.ts) apply the same rule when advancing
+ * `next_reminder_at`. All three must agree or the projection shows a dose the
+ * schedulers never send.
+ */
+export function occursOn(date: Date, doseDays?: number[] | null): boolean {
+  return occursOnWeekday(date.getDay(), doseDays);
+}
+
+/**
+ * The same rule keyed by an already-resolved weekday (0=Sun..6=Sat).
+ *
+ * The dashboard's virtual-dose generator needs this form: it builds each dose in
+ * the MEDICATION's timezone (`moment().tz(med.timezone).day()`), not the
+ * browser's, so it cannot hand a browser-local Date to `occursOn` without
+ * reintroducing the very off-by-one-day bug `toOverrideDateStr` exists to
+ * prevent. Both entry points share this body so the rule stays in one place.
+ */
+export function occursOnWeekday(weekday: number, doseDays?: number[] | null): boolean {
+  if (!doseDays || doseDays.length === 0) return true;
+  return doseDays.includes(weekday);
+}
+
+/**
  * Parse an HH:MM (optionally with am/pm) time string to minutes-since-midnight,
  * or null if unparseable. Extracted from the planner for reuse/sorting.
  */

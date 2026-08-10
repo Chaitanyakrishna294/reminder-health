@@ -1,6 +1,7 @@
 import { cache } from 'react';
 import { createClient } from './server';
 import { cookies } from 'next/headers';
+import { isGuest } from '@/lib/auth/guest';
 
 // Get authenticated auth user
 export const getCachedUser = cache(async () => {
@@ -127,6 +128,9 @@ export const resolveUserData = cache(async () => {
     targetChatId,
     patientName,
     patientPhone,
+    // No-signup guest session. Surfaced here so every server component reads the
+    // same answer as the DB guard triggers instead of re-deriving it.
+    isGuest: isGuest(user),
   };
 });
 

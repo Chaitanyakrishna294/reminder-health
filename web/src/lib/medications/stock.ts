@@ -19,6 +19,8 @@ export interface StockInput {
   stock_threshold?: number | null;
   frequency?: string | null;
   dosage_amount?: number | null;
+  /** Weekdays the med is due, 0=Sun..6=Sat. Null/absent = every day. */
+  dose_days?: number[] | null;
 }
 
 export interface StockStatus {
@@ -49,12 +51,20 @@ export function dosesPerDay(frequency?: string | null): number {
 }
 
 /** Days of stock left, or null when stock tracking is off. Burn rate includes
- *  dosage_amount — 2 tablets twice a day burns 4/day, not 2. */
+ *  dosage_amount — 2 tablets twice a day burns 4/day, not 2 — and dose_days,
+ *  because a medication taken 3 days a week lasts well over twice as long as the
+ *  same medication taken daily. Without that second factor a weekly med reports
+ *  "2 days left" while the patient still has a fortnight of it, and the refill
+ *  cron nags every single day. */
 export function daysOfStockLeft(med: StockInput): number | null {
   const stock = med.current_stock ?? med.tablet_count ?? null;
   if (stock === null || stock === undefined) return null;
-  const perDay = dosesPerDay(med.frequency) * (Number(med.dosage_amount) || 1);
-  return Math.floor(Number(stock) / perDay);
+  const perDueDay = dosesPerDay(med.frequency) * (Number(med.dosage_amount) || 1);
+  const dueDaysPerWeek =
+    Array.isArray(med.dose_days) && med.dose_days.length > 0 ? med.dose_days.length : 7;
+  // Multiplied out rather than scaling by (7/dueDaysPerWeek) so the daily case
+  // (7/7) stays exactly the old integer division and the shared fixture holds.
+  return Math.floor((Number(stock) * 7) / (perDueDay * dueDaysPerWeek));
 }
 
 export function isLowStock(med: StockInput): StockStatus {

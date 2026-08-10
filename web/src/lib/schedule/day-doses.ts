@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { type OverrideEntry, findOverride, parseTimeToMinutes, toOverrideDateStr } from './dose-engine';
+import { type OverrideEntry, findOverride, occursOn, parseTimeToMinutes, toOverrideDateStr } from './dose-engine';
 
 /**
  * "What doses are there on this day" — shared by the Schedule Planner and the
@@ -41,6 +41,8 @@ export interface DoseSourceMed {
   priority_level: string;
   reminder_times?: string[] | null;
   created_at?: string | null;
+  /** Weekdays the med is due, 0=Sun..6=Sat. Null/absent = every day. */
+  dose_days?: number[] | null;
 }
 
 export type DoseHistory = Record<string, DayDose[]>;
@@ -123,16 +125,19 @@ export function dosesForDate(
     if (logged) return [...logged].sort(byTime);
   }
 
-  // Every active medication has a dose every day: the reminder engine (src/utils.js
-  // calculateNextReminder) expands `reminder_times` daily and does NOT honour
-  // every_other_day/weekly, so those frequencies really do fire daily. This shows what
-  // actually happens rather than a recurrence the engine never follows.
+  // Projection for today and the future. `reminder_times` gives the times within a
+  // due day; `dose_days` gives which days are due at all. Both schedulers apply the
+  // same weekday rule when they advance next_reminder_at (src/utils.js and
+  // web/src/lib/medication-utils.ts, both via the shared rule in dose-engine.ts), so
+  // what is drawn here is what actually gets sent.
   return opts.medications
     // A medication cannot have been due before it existed. Without this, adding a
     // medication today back-projects it across the whole week, so yesterday shows
     // doses for something that was not being taken yet. Compared as day strings so the
     // cutoff follows the same day boundaries as everything else here.
     .filter((med) => !med.created_at || dateStr >= toOverrideDateStr(new Date(med.created_at)))
+    // Not due on this weekday at all (dose_days null/empty = every day).
+    .filter((med) => occursOn(date, med.dose_days))
     .flatMap((med) =>
       (med.reminder_times || []).map((timeStr) => {
         const medOverride = opts.overrides ? findOverride(opts.overrides, med.id, dateStr) : undefined;

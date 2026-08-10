@@ -2,6 +2,8 @@ import React from 'react';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { resolveUserData } from '@/lib/supabase/cached-queries';
+import GuestGate from '@/components/guest/guest-gate';
+import { GUEST_LOCKED } from '@/lib/auth/guest';
 import {
   getCareCircleConnections,
   getPatientHealthMetrics,
@@ -179,7 +181,14 @@ export default async function CareCirclePage() {
     redirect('/login');
   }
 
-  const { profile, myTelegramChatId } = userData;
+  const { profile, myTelegramChatId, isGuest } = userData;
+
+  // A guest cannot form a connection — the caregiver_connections guard trigger
+  // rejects the insert. Say so here rather than letting them search for a
+  // Connect Code and hit a raw error at the last step.
+  if (isGuest) {
+    return <GuestGate title="Care Circle needs a saved account" reason={GUEST_LOCKED.careCircle} />;
+  }
 
   if (!myTelegramChatId) {
     redirect('/link-account');

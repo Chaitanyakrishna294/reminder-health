@@ -324,7 +324,7 @@ const initScheduler = () => {
               if (eventErr && eventErr.code === '23505') {
                 console.log(`[Scheduler] Unique constraint violation: Event already exists for Med ID ${med.id} scheduled at ${scheduledFor}. Advancing next_reminder_at to avoid duplicate loop.`);
                 try {
-                  const nextReminder = calculateNextReminder(med.reminder_times, med.timezone);
+                  const nextReminder = calculateNextReminder(med.reminder_times, med.timezone, med.dose_days);
                   console.log(`[Scheduler] Updating next_reminder_at for Med ID: ${med.id} to ${nextReminder.toISOString()} (recovering from duplicate)`);
                   await supabase
                     .from('medications')
@@ -356,8 +356,13 @@ const initScheduler = () => {
               eventId: eventData[0] ? eventData[0].id : null
             });
 
-            // 4. Calculate next reminder from the JSONB array
-            const nextReminder = calculateNextReminder(med.reminder_times, med.timezone);
+            // 4. Calculate next reminder from the JSONB array, skipping any
+            // weekday this medication is not due on (med.dose_days; null/absent
+            // = every day, which is every row until the user picks days). This
+            // is the ONLY place the weekly cadence is enforced for the bot —
+            // the due-scan above filters purely on next_reminder_at, so a
+            // non-due day is expressed by advancing straight past it.
+            const nextReminder = calculateNextReminder(med.reminder_times, med.timezone, med.dose_days);
 
             console.log(`[Scheduler] Updating next_reminder_at for Med ID: ${med.id} to ${nextReminder.toISOString()}`);
             // 5. Update record with next_reminder_at, reset old retry columns.

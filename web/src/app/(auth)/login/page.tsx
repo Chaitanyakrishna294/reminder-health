@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import Turnstile, { captchaEnabled } from '@/components/turnstile';
 import { CodeInput, SpamCallout } from '@/components/auth/code-entry';
+import LoadingMark from '@/components/ui/loading-mark';
 
 /**
  * Redesigned 2026-08-09 from the generated mockups ("Welcome back" form-first
@@ -349,7 +350,14 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="text-center text-sm text-muted-foreground py-8">Loading sign-in...</div>}>
+    <Suspense
+      fallback={
+        <div className="flex flex-col items-center gap-3 py-10 text-sm text-muted-foreground">
+          <LoadingMark size={44} className="text-primary-strong" />
+          Loading sign-in…
+        </div>
+      }
+    >
       <LoginForm />
     </Suspense>
   );

@@ -15,7 +15,7 @@ import MedDueGate from '@/components/dashboard/med-due-gate';
 import GuideButton from '@/components/guide/guide-button';
 import GuideAutoStart from '@/components/guide/guide-auto-start';
 import moment from 'moment-timezone';
-import { type OverrideEntry, findOverride, toOverrideDateStr } from '@/lib/schedule/dose-engine';
+import { type OverrideEntry, findOverride, occursOnWeekday, toOverrideDateStr } from '@/lib/schedule/dose-engine';
 import { isPendingStatus, isAttentionStatus, partitionDoseAttention, buildGateQueue } from '@/lib/schedule/dose-attention';
 import MissedDoseStrip from '@/components/dashboard/missed-dose-strip';
 import RefillStrip from '@/components/dashboard/refill-strip';
@@ -328,6 +328,13 @@ export default function DashboardClientView({
       medications.forEach((med) => {
         const medTz = med.timezone || refTz;
         const localToday = moment().tz(medTz);
+
+        // Not due today at all (dose_days null/empty = every day). Checked with
+        // the weekday in the MEDICATION's timezone, which is the same boundary
+        // the doses below are built on and the same one the schedulers advance
+        // next_reminder_at against.
+        if (!occursOnWeekday(localToday.day(), med.dose_days)) return;
+
         const times = (med.reminder_times || []) as string[];
         times.forEach((timeStr) => {
           const [baseH, baseM] = timeStr.split(':').map(Number);

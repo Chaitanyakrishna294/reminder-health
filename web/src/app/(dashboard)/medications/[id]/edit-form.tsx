@@ -6,8 +6,8 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { calculateNextReminder } from '@/lib/medication-utils';
 import { useUiMode } from '@/context/ui-mode-context';
-import { type UnitType, unitOptions, stepMeta, frequencies, priorities, unitPhrase } from '@/components/medications/medication-form-options';
-import { validateMedicationStep, buildSharedMedicationFields } from '@/lib/medications/form-logic';
+import { type UnitType, unitOptions, stepMeta, frequencies, priorities, weekdays, describeDoseDays, unitPhrase } from '@/components/medications/medication-form-options';
+import { validateMedicationStep, buildSharedMedicationFields, normalizeDoseDays } from '@/lib/medications/form-logic';
 import { getToneTheme } from '@/lib/severity-theme';
 import MedicationCatalogLink from '@/components/medications/medication-catalog-link';
 import type { CatalogLinkValue } from '@/lib/medications/catalog';
@@ -44,6 +44,8 @@ interface EditMedicationFormProps {
     stock_threshold?: number | null;
     medication_reason?: string | null;
     timezone?: string | null;
+    /** Weekdays the med is due, 0=Sun..6=Sat. Null = every day. */
+    dose_days?: number[] | null;
     catalog_id?: number | null;
     linked_brand_name?: string | null;
     linked_composition?: string | null;
@@ -73,6 +75,9 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
     medication.frequency as any
   );
   const [times, setTimes] = useState<string[]>(medication.reminder_times);
+  // NULL in the column means every day; the picker represents that as no days
+  // selected, so both round-trip back to NULL through normalizeDoseDays.
+  const [doseDays, setDoseDays] = useState<number[]>(medication.dose_days ?? []);
   
   // Step 3 states
   const [dosageAmount, setDosageAmount] = useState<number>(medication.dosage_amount || 1);
@@ -127,6 +132,12 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
     setTimes(prev => prev.map((t, idx) => idx === index ? val : t));
   };
 
+  // Deselecting the last day returns to "every day" rather than leaving a
+  // medication that is never due — the same rule the DB CHECK enforces.
+  const toggleDoseDay = (day: number) => {
+    setDoseDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day].sort((a, b) => a - b));
+  };
+
   const animateStep = (newStep: number, direction: 'forward' | 'backward') => {
     setStepDirection(direction);
     setIsTransitioning(true);
@@ -171,7 +182,9 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
       // Recompute in the medication's OWN timezone: reminder_times are wall-clock
       // in that zone, and the scheduler fires on next_reminder_at. Recalculating
       // without it would silently shift non-IST medications to IST on every edit.
-      nextReminder = calculateNextReminder(sortedTimes, medication.timezone ?? undefined);
+      // dose_days likewise: without it an edit re-arms the next reminder onto
+      // whatever day the edit happened, not the next day the med is actually due.
+      nextReminder = calculateNextReminder(sortedTimes, medication.timezone ?? undefined, normalizeDoseDays(doseDays));
     }
 
     try {
@@ -179,7 +192,7 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
         .from('medications')
         .update({
           ...buildSharedMedicationFields(
-            { drugName, frequency, times, dosageAmount, strength, enableInventory, currentStock, stockThreshold, medicationReason, priority, unitType, catalogLink },
+            { drugName, frequency, times, doseDays, dosageAmount, strength, enableInventory, currentStock, stockThreshold, medicationReason, priority, unitType, catalogLink },
             sortedTimes,
           ),
           ...(nextReminder ? { next_reminder_at: nextReminder.toISOString() } : {}),
@@ -365,6 +378,37 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
                       </button>
                     ))}
                   </div>
+                </div>
+
+                <div className="pt-4 border-t border-border/40">
+                  <label className={labelClass} id="dose-days-label">Which Days?</label>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    For medicines taken only on some days. Leave all off for every day.
+                  </p>
+                  <div className="flex gap-2" role="group" aria-labelledby="dose-days-label">
+                    {weekdays.map((d) => {
+                      const on = doseDays.includes(d.id);
+                      return (
+                        <button
+                          key={d.id}
+                          type="button"
+                          onClick={() => toggleDoseDay(d.id)}
+                          aria-pressed={on}
+                          aria-label={d.full}
+                          className={`flex-1 rounded-xl font-bold transition-all duration-200 cursor-pointer ${
+                            isElderly ? 'py-4 text-lg' : 'py-3 text-sm'
+                          } ${
+                            on
+                              ? 'bg-primary text-white ring-2 ring-primary/25'
+                              : 'bg-muted text-muted-foreground hover:bg-muted/70'
+                          }`}
+                        >
+                          {d.short}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs font-semibold text-primary mt-3">{describeDoseDays(doseDays)}</p>
                 </div>
 
                 <div className="pt-4 border-t border-border/40">

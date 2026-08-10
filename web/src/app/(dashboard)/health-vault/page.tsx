@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { resolveUserData } from '@/lib/supabase/cached-queries';
 import HealthVaultClientView from './health-vault-client-view';
+import GuestGate from '@/components/guest/guest-gate';
+import { GUEST_LOCKED } from '@/lib/auth/guest';
 
 export const revalidate = 0; // Dynamic rendering, always fresh
 
@@ -22,6 +24,14 @@ export default async function HealthVaultPage({ searchParams }: PageProps) {
   }
 
   const { user } = userData;
+
+  // A guest cannot store records — the health_records guard trigger rejects the
+  // insert, and a file uploaded against a session that dies with the browser
+  // cookie would be unreachable anyway.
+  if (userData.isGuest) {
+    return <GuestGate title="Health Vault needs a saved account" reason={GUEST_LOCKED.healthVault} />;
+  }
+
   const supabase = await createClient();
 
   let targetUserId = user.id;

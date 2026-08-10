@@ -20,6 +20,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { CARE_LABELS } from '@/lib/design/semantics';
+import { isGuestGuardError } from '@/lib/auth/guest';
 
 interface SettingsClientViewProps {
   user: {
@@ -199,7 +200,12 @@ export default function SettingsClientView({
 
       if (connErr) {
         const m = (connErr.message || '').toLowerCase();
-        if (m.includes('already connected')) {
+        // The caregiver_connections guard trigger fired: this is a guest session.
+        // Checked FIRST — the generic fallback below would tell them to "try
+        // again", which can never succeed until they save the account.
+        if (isGuestGuardError(connErr)) {
+          setErrorMsg('Save your account with an email before connecting with a caregiver.');
+        } else if (m.includes('already connected')) {
           setErrorMsg('You are already connected with this caregiver.');
         } else if (m.includes('already pending')) {
           setErrorMsg('A connection request is already pending with this caregiver.');

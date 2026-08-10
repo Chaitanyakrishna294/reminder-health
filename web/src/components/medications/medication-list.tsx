@@ -38,6 +38,8 @@ export interface Medication {
   low_stock_alert_enabled?: boolean | null;
   medication_reason?: string | null;
   timezone?: string | null;
+  /** Weekdays the med is due, 0=Sun..6=Sat. Null = every day. */
+  dose_days?: number[] | null;
   catalog_id?: number | null;
   linked_brand_name?: string | null;
   linked_composition?: string | null;
@@ -160,7 +162,7 @@ export default function MedicationList({
 
         const { data, error } = await supabase
           .from('medications')
-          .select('id, telegram_id, drug_name, dosage, frequency, reminder_times, tablet_count, priority_level, next_reminder_at, active, unit_type, dosage_amount, current_stock, stock_threshold, low_stock_alert_enabled, medication_reason, catalog_id, linked_brand_name, linked_composition, linked_manufacturer, linked_snapshot_date, linked_is_discontinued')
+          .select('id, telegram_id, drug_name, dosage, frequency, reminder_times, tablet_count, priority_level, next_reminder_at, active, unit_type, dosage_amount, current_stock, stock_threshold, low_stock_alert_enabled, medication_reason, dose_days, catalog_id, linked_brand_name, linked_composition, linked_manufacturer, linked_snapshot_date, linked_is_discontinued')
           .eq('telegram_id', queryId);
 
         if (!error && data) {
@@ -183,8 +185,10 @@ export default function MedicationList({
 
       if (newActive && med.reminder_times.length > 0) {
         // Recalculate next reminder when resuming, in the med's OWN timezone
-        // (recomputing without it silently shifts non-IST medications to IST).
-        const nextDate = calculateNextReminder(med.reminder_times, med.timezone ?? undefined);
+        // (recomputing without it silently shifts non-IST medications to IST)
+        // and on its OWN weekdays (without dose_days a paused Mon/Wed/Fri med
+        // would resume onto whatever day it happened to be un-paused).
+        const nextDate = calculateNextReminder(med.reminder_times, med.timezone ?? undefined, med.dose_days);
         nextReminder = nextDate.toISOString();
       }
 

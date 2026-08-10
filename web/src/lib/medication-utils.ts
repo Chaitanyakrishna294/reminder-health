@@ -14,13 +14,19 @@ export const DEFAULT_TIMEZONE = 'Asia/Kolkata';
  * behavior unchanged; passing a medication's stored `timezone` keeps the value the
  * web writes to `next_reminder_at` consistent with what the scheduler computes.
  *
+ * `doseDays` is the medication's `dose_days` column: which weekdays it is due
+ * on, 0=Sunday .. 6=Saturday (moment().day() numbering). Null/undefined/empty
+ * means EVERY DAY, which is every medication saved before the column existed.
+ *
  * @param timesArray Array of HH:MM strings (e.g. ['08:00', '20:00'])
  * @param timezone   IANA tz of the medication; defaults to IST
+ * @param doseDays   Weekdays the med is due, 0=Sun..6=Sat; empty/omitted = daily
  * @returns Date in UTC
  */
 export const calculateNextReminder = (
   timesArray: string[],
   timezone?: string,
+  doseDays?: number[] | null,
 ): Date => {
   if (!timesArray || timesArray.length === 0) {
     return new Date();
@@ -32,20 +38,35 @@ export const calculateNextReminder = (
   // Sort times chronologically (e.g. ['08:00', '20:00'])
   const sortedTimes = [...timesArray].sort((a, b) => a.localeCompare(b));
 
-  // Find next future reminder today
-  for (const timeStr of sortedTimes) {
-    const [hours, minutes] = timeStr.split(':').map(Number);
+  const days = Array.isArray(doseDays) && doseDays.length > 0 ? doseDays : null;
 
-    const candidate = moment()
-      .tz(tz)
-      .set({ hour: hours, minute: minutes, second: 0, millisecond: 0 });
+  // Walk forward from today until a due weekday has a time still in the future.
+  // Eight iterations: offset 0 is "later today", offsets 1..7 cover all seven
+  // weekdays, so any non-empty `days` is guaranteed a hit (a once-weekly med
+  // whose time already passed today lands on offset 7). `.add(offset,'day')`
+  // then `.set({hour...})` keeps the wall-clock time stable across a DST
+  // transition — identical to the bot's src/utils.js.
+  for (let offset = 0; offset <= 7; offset++) {
+    const day = moment().tz(tz).add(offset, 'day');
+    if (days && !days.includes(day.day())) continue;
 
-    if (candidate.isAfter(now)) {
-      return candidate.utc().toDate();
+    for (const timeStr of sortedTimes) {
+      const [hours, minutes] = timeStr.split(':').map(Number);
+
+      const candidate = day
+        .clone()
+        .set({ hour: hours, minute: minutes, second: 0, millisecond: 0 });
+
+      if (candidate.isAfter(now)) {
+        return candidate.utc().toDate();
+      }
     }
   }
 
-  // Otherwise schedule first reminder tomorrow
+  // Unreachable for valid data (the DB CHECK constrains dose_days to 1..7
+  // entries within 0..6); reached only for a garbage set such as {9}, which
+  // matches no weekday. Fall back to plain daily scheduling — for a medication
+  // reminder, one dose too many beats a patient who is never reminded again.
   const [firstHours, firstMinutes] = sortedTimes[0].split(':').map(Number);
 
   const tomorrowFirst = moment()

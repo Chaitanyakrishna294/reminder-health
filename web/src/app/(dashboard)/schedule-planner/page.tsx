@@ -363,7 +363,7 @@ export default function SchedulePlannerPage() {
                 .single(),
               supabase
                 .from('medications')
-                .select('id, drug_name, dosage, frequency, reminder_times, priority_level, created_at')
+                .select('id, drug_name, dosage, frequency, reminder_times, priority_level, created_at, dose_days')
                 .eq('telegram_id', targetChatId)
                 .eq('active', true),
             ]);
@@ -380,7 +380,7 @@ export default function SchedulePlannerPage() {
           setPatientName(null);
           const { data: meds } = await supabase
             .from('medications')
-            .select('id, drug_name, dosage, frequency, reminder_times, priority_level, created_at')
+            .select('id, drug_name, dosage, frequency, reminder_times, priority_level, created_at, dose_days')
             .eq('telegram_id', targetChatId)
             .eq('active', true);
           setMedications(meds || []);

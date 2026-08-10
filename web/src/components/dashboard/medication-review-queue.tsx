@@ -7,6 +7,7 @@ import { resolveReminderEvent } from '@/lib/reminder-events';
 import { useUiMode } from '@/context/ui-mode-context';
 import { Pill, Check, SkipForward, AlertCircle, Clock } from 'lucide-react';
 import { PremiumToast } from '@/components/ui/premium-toast';
+import LoadingMark from '@/components/ui/loading-mark';
 import moment from 'moment-timezone';
 
 interface MedicationReviewQueueProps {
@@ -127,8 +128,8 @@ export default function MedicationReviewQueue({
   if (loading) {
     return (
       <div className="bg-card border border-border rounded-3xl p-6 flex items-center justify-center min-h-[120px] shadow-sm">
-        <div className="flex items-center gap-3 text-muted-foreground text-xs font-bold animate-pulse">
-          <Clock className="w-4 h-4 animate-spin text-primary" /> Loading Review Queue...
+        <div className="flex items-center gap-3 text-muted-foreground text-xs font-bold">
+          <LoadingMark size={32} className="text-primary-strong" /> Loading review queue…
         </div>
       </div>
     );
