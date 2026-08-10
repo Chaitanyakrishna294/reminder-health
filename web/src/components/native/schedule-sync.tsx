@@ -45,6 +45,7 @@ export default function ScheduleSync() {
 
       try {
         await syncScheduleToNative(medications);
+        console.log(`[ScheduleSync] synced ${medications.length} medication(s) to the native store`);
       } catch (err) {
         console.error('[ScheduleSync] syncSchedule failed:', err);
       }
