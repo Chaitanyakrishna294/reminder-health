@@ -1,25 +1,11 @@
-// DRAFT — UNVERIFIED. Cannot compile or run on this machine (no JDK/Android
-// SDK installed as of 2026-08-10). Written to consume the SAME fixture the
-// bot (test/utils.test.js) and web (web/src/lib/medication-utils.test.ts)
-// tests already pass — do not hand-write separate Kotlin test cases here;
-// add new cases to test/schedule-test-vectors.json instead, same rule the
-// other two follow.
+// Local JVM unit test (runs on your dev machine, not a device/emulator).
+// Consumes the SAME fixture the bot (test/utils.test.js) and web
+// (web/src/lib/medication-utils.test.ts) engines already pass — do not
+// hand-write separate Kotlin test cases here; add new cases to
+// test/schedule-test-vectors.json instead, same rule the other two follow.
 //
-// Eventual real location once wired in:
-//   android-app/android/app/src/test/java/com/reminderhealth/app/schedule/CalculateNextReminderTest.kt
-// (a local JVM unit test, next to CalculateNextReminder.kt's src/main
-// counterpart). Deliberately NOT there yet — see CalculateNextReminder.kt's
-// header for why.
-//
-// Two things to verify once this is actually wired in and the SDK exists:
-//   1. Requires `testImplementation("org.json:json:20240303")` (or whatever
-//      is current) in android/app/build.gradle — Android's BUNDLED org.json
-//      classes are stubbed out for local (non-instrumented) JVM unit tests
-//      and throw at runtime; the standalone org.json:json Maven artifact is
-//      the standard workaround.
-//   2. FIXTURE_PATH below assumes the Gradle `Test` task's working directory
-//      is the app module root (android/app/) — Gradle's default, but
-//      confirm rather than assume once this actually runs.
+// Run: ./gradlew testDebugUnitTest --tests "*.CalculateNextReminderTest"
+// or right-click this file in Android Studio -> Run.
 package com.reminderhealth.app.schedule
 
 import org.json.JSONObject
@@ -31,6 +17,8 @@ import java.time.Instant
 
 class CalculateNextReminderTest {
 
+    // Gradle's Test task working directory defaults to the module root
+    // (android/app/), three levels below the repo root.
     private val fixturePath = "../../../test/schedule-test-vectors.json"
 
     @Test

@@ -46,6 +46,10 @@ dependencies {
     kapt "androidx.room:room-compiler:$roomVersion"
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:$coroutinesVersion"
     testImplementation "junit:junit:$junitVersion"
+    // CalculateNextReminderTest.kt reads the JSON fixture. Android's org.json
+    // classes are stubbed out (throw at runtime) for local, non-instrumented
+    // JVM unit tests — this standalone artifact is the standard workaround.
+    testImplementation "org.json:json:20240303"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')

@@ -5,12 +5,15 @@ Defines the three bridge calls named in `CLAUDE.md`'s Android section (`syncSche
 `medications`/`reminder_events` schema and the real `resolve_reminder_event` RPC — not
 invented.
 
-**Status (2026-08-10):** `syncSchedule` is implemented — `android/app/src/main/java/com/
+**Status:** `syncSchedule` is implemented (2026-08-10) — `android/app/src/main/java/com/
 reminderhealth/app/schedule/` (Room store + `ScheduleBridgePlugin`) on native,
 `web/src/lib/native/schedule-bridge.ts` + `web/src/components/native/schedule-sync.tsx`
-(mounted in the dashboard layout) on web. `setSession` and `getPendingActions`/the offline
-action queue are still spec-only, below — not built yet. The throwaway `Ping` plugin from M1
-is deleted, superseded by `ScheduleBridge`.
+(mounted in the dashboard layout) on web. Verified on a real device (vivo I2202): 7 real
+medications synced to the local store. `calculateNextReminder` is ported to Kotlin (2026-08-11,
+`schedule/CalculateNextReminder.kt` + `CalculateNextReminderTest.kt`, gated on
+`test/schedule-test-vectors.json` — not yet confirmed compiling/passing on-device). `setSession`
+and `getPendingActions`/the offline action queue are still spec-only, below — not built yet. The
+throwaway `Ping` plugin from M1 is deleted, superseded by `ScheduleBridge`.
 
 ---
 
@@ -33,7 +36,7 @@ interface MedicationPayload {
   nextReminderAt: string;         // medications.next_reminder_at, ISO 8601 UTC — a server-computed
                                    // seed value; native recomputes locally via its own
                                    // calculateNextReminder port once this seed passes, it doesn't
-                                   // trust the server value forever (see draft-m2/)
+                                   // trust the server value forever (schedule/CalculateNextReminder.kt)
   active: boolean;                // medications.active — inactive meds get no alarms
   medicationReason: string | null;// medications.medication_reason, optional context for the alarm UI
 }

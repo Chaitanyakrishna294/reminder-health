@@ -44,6 +44,33 @@
       "expectedUtc": "2026-08-17T03:30:00.000Z"
     },
     {
+      "name": "once-weekly evening dose, different weekday/time from the other offset-7 case — rolls a full 7 days",
+      "reminderTimes": ["21:00"],
+      "timezone": "Asia/Kolkata",
+      "doseDays": [3],
+      "now": "2026-08-12T16:00:00.000Z",
+      "notes": "2026-08-12 and 2026-08-19 are both Wednesdays. Same offset-7 mechanic as the vector above, deliberately at a different weekday + time so the fixture isn't only ever exercising Monday-morning doses.",
+      "expectedUtc": "2026-08-19T15:30:00.000Z"
+    },
+    {
+      "name": "doseDays [0,1,2,3,6] — real-data pattern, skips excluded Thu/Fri to the next included Saturday",
+      "reminderTimes": ["09:00"],
+      "timezone": "Asia/Kolkata",
+      "doseDays": [0, 1, 2, 3, 6],
+      "now": "2026-08-13T04:30:00.000Z",
+      "notes": "2026-08-13/14 (Thu/Fri) are excluded; 2026-08-15 is the next included day (Saturday).",
+      "expectedUtc": "2026-08-15T03:30:00.000Z"
+    },
+    {
+      "name": "Asia/Calcutta (legacy IANA alias) resolves identically to Asia/Kolkata — real-data finding, live medications hold both spellings",
+      "reminderTimes": ["09:00"],
+      "timezone": "Asia/Calcutta",
+      "doseDays": null,
+      "now": "2026-08-10T02:00:00.000Z",
+      "notes": "Asia/Calcutta is the tzdata 'backward' link Asia/Kolkata was renamed from in 2018; both names carry byte-identical DST/offset rules. Verified independently on the JDK (java.time.ZoneId.of(\"Asia/Calcutta\").getRules().equals(ZoneId.of(\"Asia/Kolkata\").getRules()) -> true) as well as via moment-timezone here — expectedUtc is deliberately identical to the very first vector in this file, computed with 'Asia/Kolkata', to prove the alias produces the exact same instant, not just a close one.",
+      "expectedUtc": "2026-08-10T03:30:00.000Z"
+    },
+    {
       "name": "DST spring-forward, America/New_York — after the transition day uses the post-transition (EDT, UTC-4) offset",
       "reminderTimes": ["09:00"],
       "timezone": "America/New_York",

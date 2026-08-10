@@ -1,14 +1,8 @@
-// DRAFT — UNVERIFIED. Cannot compile or run on this machine (no JDK/Android
-// SDK installed as of 2026-08-10). Ported from the algorithm spec documented
-// in src/utils.js's comments and test/schedule-test-vectors.json — NOT by
-// transcribing the JS line-by-line. Do not treat this as correct until it
-// has actually compiled and passed CalculateNextReminderTest.kt.
-//
-// Eventual real location once wired in:
-//   android-app/android/app/src/main/java/com/reminderhealth/app/schedule/CalculateNextReminder.kt
-// Deliberately NOT there yet — this directory (android-app/draft-m2/) sits
-// outside every Gradle source set, so nothing here can be picked up by a
-// build by accident.
+// Ported 2026-08-10/11 from the algorithm spec documented in src/utils.js's
+// comments and test/schedule-test-vectors.json — NOT by transcribing the JS
+// line-by-line. Must pass CalculateNextReminderTest.kt, which runs the exact
+// same fixture the bot (test/utils.test.js) and web
+// (web/src/lib/medication-utils.test.ts) engines already pass.
 package com.reminderhealth.app.schedule
 
 import java.time.Instant
@@ -36,6 +30,14 @@ class EmptyReminderTimesException :
  * Port of calculateNextReminder (src/utils.js / web/src/lib/medication-utils.ts).
  * Must stay in lockstep with both — see test/schedule-test-vectors.json,
  * which all three implementations are expected to pass identically.
+ *
+ * [timezone] is passed straight to `ZoneId.of` with no special-casing: the
+ * JDK's bundled tzdata already resolves legacy IANA aliases (e.g.
+ * "Asia/Calcutta") to byte-identical DST rules as their canonical name
+ * ("Asia/Kolkata") — verified directly against this JDK
+ * (`ZoneId.of("Asia/Calcutta").getRules() == ZoneId.of("Asia/Kolkata").getRules()`
+ * -> true) before relying on it here, since live medication rows hold both
+ * spellings (browser-guessed alias vs. canonical).
  *
  * @param reminderTimes daily reminder times, e.g. ["08:00", "20:00"]. Must be
  *   non-empty — see [EmptyReminderTimesException].
