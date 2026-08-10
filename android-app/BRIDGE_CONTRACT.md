@@ -1,13 +1,16 @@
-# Webview ↔ Native Bridge Contract (M2 groundwork — not implemented yet)
+# Webview ↔ Native Bridge Contract
 
 Defines the three bridge calls named in `CLAUDE.md`'s Android section (`syncSchedule`,
 `setSession`, `getPendingActions`) with exact payload shapes, grounded in the live
 `medications`/`reminder_events` schema and the real `resolve_reminder_event` RPC — not
-invented. Nothing here is wired into any build; this is the spec both the web side and the
-Kotlin side (`draft-m2/`, once real) implement against.
+invented.
 
-Suggested plugin name: **`ScheduleBridge`** (distinct from the throwaway `Ping` plugin from
-M1 — delete `Ping` once this one exists for real).
+**Status (2026-08-10):** `syncSchedule` is implemented — `android/app/src/main/java/com/
+reminderhealth/app/schedule/` (Room store + `ScheduleBridgePlugin`) on native,
+`web/src/lib/native/schedule-bridge.ts` + `web/src/components/native/schedule-sync.tsx`
+(mounted in the dashboard layout) on web. `setSession` and `getPendingActions`/the offline
+action queue are still spec-only, below — not built yet. The throwaway `Ping` plugin from M1
+is deleted, superseded by `ScheduleBridge`.
 
 ---
 

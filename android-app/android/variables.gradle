@@ -13,4 +13,8 @@ ext {
     androidxJunitVersion = '1.2.1'
     androidxEspressoCoreVersion = '3.6.1'
     cordovaAndroidVersion = '10.1.1'
+
+    // M2 alarm core — not in the default Capacitor template.
+    roomVersion = '2.6.1'
+    coroutinesVersion = '1.9.0'
 }

@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/server';
 import { GuideProvider } from '@/components/guide/guide-context';
 import GuideTour from '@/components/guide/guide-tour';
 import GuestBanner from '@/components/guest/guest-banner';
+import ScheduleSync from '@/components/native/schedule-sync';
 
 export default async function DashboardLayout({
   children,
@@ -38,6 +39,7 @@ export default async function DashboardLayout({
 
   return (
     <GuideProvider>
+      <ScheduleSync />
       <div className="min-h-screen flex flex-col bg-background">
         {/* Navbar passing user profile details */}
         <Navbar
