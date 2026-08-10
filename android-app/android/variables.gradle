@@ -15,6 +15,12 @@ ext {
     cordovaAndroidVersion = '10.1.1'
 
     // M2 alarm core — not in the default Capacitor template.
-    roomVersion = '2.6.1'
+    // Room MUST be 2.7.0+ here: 2.6.1's bundled annotation-processor metadata
+    // reader only understands Kotlin metadata up to version 2.0.0, and this
+    // project is on Kotlin 2.1.0 (see android/build.gradle) — kapt fails on
+    // MedicationDao's suspend functions with "Provided Metadata instance has
+    // version 2.1.0, while maximum supported version is 2.0.0" on anything
+    // older. Room 2.7.0 updated that reader; don't downgrade this.
+    roomVersion = '2.7.1'
     coroutinesVersion = '1.9.0'
 }
