@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Mail, Lock, Heart, UserRound, ShieldCheck, Loader2, Sparkles } from 'lucide-react';
@@ -27,7 +27,65 @@ export default function WelcomePage() {
   // Only the guest button needs a token on this screen — the email field is a
   // hand-off to /login, which renders its own widget.
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  // The challenge is revealed ON TAP rather than rendered up front. This screen
+  // is exactly one viewport tall by design, so an always-on 72px widget pushed
+  // itself (and nearly the guest button) below the fold on a 375x812 phone —
+  // measured 132px of overflow — and the pink panel reads as a bottom sheet, so
+  // nobody thinks to scroll. Revealing it on demand keeps the default screen at
+  // its original height and puts the challenge on screen exactly when it is
+  // needed. It is also simply better: people signing in normally never see one.
+  const [showCaptcha, setShowCaptcha] = useState(false);
+  // Bumped to force a fresh Turnstile widget after a burnt token (the component
+  // renders once per mount, so remounting is how you re-arm it).
+  const [captchaNonce, setCaptchaNonce] = useState(0);
+  const captchaRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+
+  /**
+   * The guest button. When CAPTCHA is off this signs in immediately; when it is
+   * on, the first tap reveals the challenge and scrolls it into view, and the
+   * sign-in fires by itself as soon as the token arrives — so it stays a
+   * one-tap action either way.
+   */
+  const handleGuestTap = () => {
+    if (!captchaEnabled) return continueAsGuest(null);
+    if (captchaToken) return continueAsGuest(captchaToken);
+
+    setGuestError(null);
+    setShowCaptcha(true);
+  };
+
+  // Scroll the revealed challenge into view. This has to be an effect, not a
+  // requestAnimationFrame inside the tap handler: rAF fires before React has
+  // committed the state change, so the ref is still null and the scroll is a
+  // silent no-op (measured — the widget mounted at top 811 on an 812px screen
+  // and the page never moved). An effect keyed on showCaptcha runs after the
+  // commit, when the node actually exists.
+  // Instant, not smooth, deliberately: `behavior: 'smooth'` was measured
+  // silently no-oping here (scrollY 52 -> 52, while the same call without it
+  // went 52 -> 176). This scroll is the only thing putting the challenge on
+  // screen, and the challenge is the only path into the app for someone with no
+  // account — so it cannot depend on an animation that might not run. A ~120px
+  // jump needs no easing anyway.
+  useEffect(() => {
+    if (!showCaptcha) return;
+    // Scroll to the very end rather than centring the element. Two reasons:
+    // the challenge is the last thing on the page, so the end IS the target;
+    // and Turnstile grows its own box AFTER this effect runs, which left
+    // `block: 'center'` six pixels short (measured). Repeating on a short timer
+    // catches that late layout without needing to observe the widget.
+    const toBottom = () =>
+      window.scrollTo({ top: document.documentElement.scrollHeight });
+    toBottom();
+    const t = setTimeout(toBottom, 400);
+    return () => clearTimeout(t);
+  }, [showCaptcha]);
+
+  /** Turnstile resolved — continue the tap the user already made. */
+  const handleCaptchaVerify = (token: string | null) => {
+    setCaptchaToken(token);
+    if (token && showCaptcha && !guestLoading) continueAsGuest(token);
+  };
 
   const continueToLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,22 +105,17 @@ export default function WelcomePage() {
    * browser client just wrote; without it the proxy still reads "signed out"
    * and bounces straight back here.
    */
-  const continueAsGuest = async () => {
-    // signInAnonymously() is an auth endpoint, so Supabase's CAPTCHA protection
-    // covers it exactly like signUp/signInWithPassword. Without this the button
-    // dies with "captcha protection: request disallowed" the moment CAPTCHA is
-    // switched on — and it would look like guest mode itself was broken.
-    if (captchaEnabled && !captchaToken) {
-      setGuestError('Please complete the verification challenge below first.');
-      return;
-    }
-
+  const continueAsGuest = async (token: string | null) => {
     setGuestLoading(true);
     setGuestError(null);
 
     const supabase = createClient();
+    // signInAnonymously() is an auth endpoint, so Supabase's CAPTCHA protection
+    // covers it exactly like signUp/signInWithPassword. Without a token it dies
+    // with "captcha protection: request disallowed" the moment CAPTCHA is
+    // switched on — and it would look like guest mode itself was broken.
     const { error } = await supabase.auth.signInAnonymously({
-      options: { captchaToken: captchaToken ?? undefined },
+      options: { captchaToken: token ?? undefined },
     });
 
     if (error) {
@@ -78,7 +131,11 @@ export default function WelcomePage() {
             ? 'Guest mode is not available right now. Please sign in or create an account.'
             : 'Could not start a guest session. Please try again.',
       );
+      // Tokens are single-use, so a failed attempt burns this one. Drop it and
+      // re-arm the challenge rather than leaving a dead token that can only
+      // fail again.
       setCaptchaToken(null);
+      setCaptchaNonce((n) => n + 1);
       setGuestLoading(false);
       return;
     }
@@ -184,7 +241,7 @@ export default function WelcomePage() {
             earned it. */}
         <button
           type="button"
-          onClick={continueAsGuest}
+          onClick={handleGuestTap}
           disabled={guestLoading}
           className="mt-1 w-full h-12 inline-flex items-center justify-center gap-2 rounded-2xl font-mono font-bold text-base text-[#0F1C5A]/85 underline underline-offset-4 decoration-[#0F1C5A]/30 hover:bg-white/25 hover:decoration-[#0F1C5A]/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-60 disabled:cursor-wait transition-colors cursor-pointer"
         >
@@ -201,11 +258,21 @@ export default function WelcomePage() {
           )}
         </button>
 
-        {/* Renders nothing at all until NEXT_PUBLIC_TURNSTILE_SITE_KEY is set,
-            so this stays invisible until CAPTCHA is actually configured. */}
-        <div className="mt-2 empty:mt-0">
-          <Turnstile onVerify={setCaptchaToken} />
-        </div>
+        {/* Mounted only after the guest button is tapped, so the default screen
+            keeps its original height and nothing is pushed below the fold. The
+            component itself also renders nothing until
+            NEXT_PUBLIC_TURNSTILE_SITE_KEY is set. */}
+        {showCaptcha && captchaEnabled && (
+          <div ref={captchaRef} className="mt-3">
+            {/* Hint ABOVE the widget: the widget is then the last element on the
+                page, so scrolling to the end lands it flush against the bottom
+                edge instead of leaving its tail clipped. */}
+            <p className="mb-2 text-center font-mono text-[11px] text-[#0F1C5A]/75">
+              Quick check that you&apos;re not a robot — then you&apos;re in.
+            </p>
+            <Turnstile key={captchaNonce} onVerify={handleCaptchaVerify} />
+          </div>
+        )}
 
         {guestError && (
           <p role="alert" className="mt-2 text-center font-mono text-[12px] font-bold text-[#7A1029]">
