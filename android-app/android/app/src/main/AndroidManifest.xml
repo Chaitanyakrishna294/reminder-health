@@ -27,9 +27,32 @@
             android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- M2 alarm core. exported=false: only this app's own AlarmManager
+             alarms trigger it, never another app. -->
+        <receiver
+            android:name=".schedule.AlarmReceiver"
+            android:exported="false" />
     </application>
 
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- M2 alarm core. This list is deliberately minimal and is capped by
+         CLAUDE.md's hard rule: exact-alarm + full-screen-intent +
+         notifications + boot only. No SYSTEM_ALERT_WINDOW, no location, no
+         storage, nothing else.
+
+         The two exact-alarm permissions are a version split, not a duplicate:
+         SCHEDULE_EXACT_ALARM covers Android 12 (API 31-32) where it is granted
+         at install; USE_EXACT_ALARM covers 13+ (API 33+) where it is
+         auto-granted to alarm-class apps — medication reminders are an
+         explicitly approved use case for it, which is why the app can rely on
+         exact alarms rather than asking the user to grant them by hand. -->
+    <uses-permission
+        android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 </manifest>

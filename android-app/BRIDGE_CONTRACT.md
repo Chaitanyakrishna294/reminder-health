@@ -10,10 +10,17 @@ reminderhealth/app/schedule/` (Room store + `ScheduleBridgePlugin`) on native,
 `web/src/lib/native/schedule-bridge.ts` + `web/src/components/native/schedule-sync.tsx`
 (mounted in the dashboard layout) on web. Verified on a real device (vivo I2202): 7 real
 medications synced to the local store. `calculateNextReminder` is ported to Kotlin (2026-08-11,
-`schedule/CalculateNextReminder.kt` + `CalculateNextReminderTest.kt`, gated on
-`test/schedule-test-vectors.json` — not yet confirmed compiling/passing on-device). `setSession`
-and `getPendingActions`/the offline action queue are still spec-only, below — not built yet. The
-throwaway `Ping` plugin from M1 is deleted, superseded by `ScheduleBridge`.
+`schedule/CalculateNextReminder.kt`), passing all 16 shared fixture vectors via
+`CalculateNextReminderTest.kt` (`./gradlew testDebugUnitTest`). Exact alarms + a basic
+notification are implemented (`AlarmScheduler.kt`, `AlarmReceiver.kt`, `DoseNotifications.kt`) —
+timing verification on-device pending. `setSession` and `getPendingActions`/the offline action
+queue are still spec-only, below — not built yet. The throwaway `Ping` plugin from M1 is deleted,
+superseded by `ScheduleBridge`.
+
+**Debug helper (temporary, remove after M2):** `ScheduleBridge.scheduleTestAlarm({ seconds })`
+fires a real alarm through the same `AlarmManager` path a dose uses, so timing/delivery can be
+verified without waiting for a real dose time. Uses medication id `-1`, which `AlarmReceiver`
+recognises as having no row behind it and therefore skips rescheduling.
 
 ---
 

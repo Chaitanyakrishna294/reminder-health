@@ -26,8 +26,14 @@ declare global {
       isNativePlatform?: () => boolean;
       Plugins?: {
         ScheduleBridge?: {
-          syncSchedule: (options: { medications: MedicationPayload[] }) => Promise<{ synced: number }>;
+          syncSchedule: (options: {
+            medications: MedicationPayload[];
+          }) => Promise<{ synced: number; canScheduleExactAlarms: boolean }>;
           getSchedule: () => Promise<{ medications: MedicationPayload[] }>;
+          /** Step-3 debug helper — see BRIDGE_CONTRACT.md. Not a product feature. */
+          scheduleTestAlarm: (options: {
+            seconds: number;
+          }) => Promise<{ scheduledFor: string; canScheduleExactAlarms: boolean }>;
         };
       };
     };
@@ -44,9 +50,11 @@ export function isNativeApp(): boolean {
  * medication create/edit/delete, and once per app foreground to resync. A
  * no-op (resolves immediately) outside the native app.
  */
-export async function syncScheduleToNative(medications: MedicationPayload[]): Promise<void> {
-  if (!isNativeApp()) return;
+export async function syncScheduleToNative(
+  medications: MedicationPayload[],
+): Promise<{ synced: number; canScheduleExactAlarms: boolean } | null> {
+  if (!isNativeApp()) return null;
   const bridge = window.Capacitor?.Plugins?.ScheduleBridge;
-  if (!bridge) return;
-  await bridge.syncSchedule({ medications });
+  if (!bridge) return null;
+  return bridge.syncSchedule({ medications });
 }

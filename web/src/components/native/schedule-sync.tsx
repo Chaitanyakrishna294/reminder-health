@@ -44,8 +44,11 @@ export default function ScheduleSync() {
       }));
 
       try {
-        await syncScheduleToNative(medications);
-        console.log(`[ScheduleSync] synced ${medications.length} medication(s) to the native store`);
+        const result = await syncScheduleToNative(medications);
+        console.log(
+          `[ScheduleSync] synced ${medications.length} medication(s) to the native store` +
+            ` (exact alarms allowed: ${result?.canScheduleExactAlarms})`,
+        );
       } catch (err) {
         console.error('[ScheduleSync] syncSchedule failed:', err);
       }
