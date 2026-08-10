@@ -1,0 +1,117 @@
+{
+  "_comment": "Shared golden-master fixture for calculateNextReminder (src/utils.js and web/src/lib/medication-utils.ts) — and eventually its Kotlin port. Every 'expectedUtc' was computed independently via moment-timezone (not by calling calculateNextReminder itself) and cross-checked against both JS implementations before being committed here. 'now' overrides the function's 4th parameter; every real production caller omits it. A vector with expectThrow=true must throw, not return a value — that is the deliberate contract for an empty/invalid reminder_times array (src/utils.js's own comment explains why: callers must pre-filter, same as src/scheduler.js's DATA PROBLEM guard). See db/migrations/migration_dose_days_2026_08_10.sql for dose_days semantics (0=Sun..6=Sat, null=daily). Android M0: port this exact set of cases before writing any Kotlin scheduling code (see CLAUDE.md Android section).",
+  "vectors": [
+    {
+      "name": "later today, IST",
+      "reminderTimes": ["09:00"],
+      "timezone": "Asia/Kolkata",
+      "doseDays": null,
+      "now": "2026-08-10T02:00:00.000Z",
+      "expectedUtc": "2026-08-10T03:30:00.000Z"
+    },
+    {
+      "name": "rolls to tomorrow when today's time has passed, IST",
+      "reminderTimes": ["09:00"],
+      "timezone": "Asia/Kolkata",
+      "doseDays": null,
+      "now": "2026-08-10T06:00:00.000Z",
+      "expectedUtc": "2026-08-11T03:30:00.000Z"
+    },
+    {
+      "name": "multi-time day picks the earliest time still ahead",
+      "reminderTimes": ["08:00", "14:00", "21:00"],
+      "timezone": "Asia/Kolkata",
+      "doseDays": null,
+      "now": "2026-08-10T05:00:00.000Z",
+      "expectedUtc": "2026-08-10T08:30:00.000Z"
+    },
+    {
+      "name": "once-weekly, due today and time not yet passed (offset 0)",
+      "reminderTimes": ["09:00"],
+      "timezone": "Asia/Kolkata",
+      "doseDays": [1],
+      "now": "2026-08-10T02:00:00.000Z",
+      "notes": "2026-08-10 is a Monday (weekday 1).",
+      "expectedUtc": "2026-08-10T03:30:00.000Z"
+    },
+    {
+      "name": "once-weekly, due today but time already passed — rolls a full 7 days, not a fortnight (offset 7)",
+      "reminderTimes": ["09:00"],
+      "timezone": "Asia/Kolkata",
+      "doseDays": [1],
+      "now": "2026-08-10T06:00:00.000Z",
+      "notes": "2026-08-10 and 2026-08-17 are both Mondays.",
+      "expectedUtc": "2026-08-17T03:30:00.000Z"
+    },
+    {
+      "name": "DST spring-forward, America/New_York — after the transition day uses the post-transition (EDT, UTC-4) offset",
+      "reminderTimes": ["09:00"],
+      "timezone": "America/New_York",
+      "doseDays": null,
+      "now": "2026-03-07T20:00:00.000Z",
+      "notes": "US DST 2026 starts 2026-03-08 02:00 EST -> 03:00 EDT. 09:00 on the transition day is already EDT.",
+      "expectedUtc": "2026-03-08T13:00:00.000Z"
+    },
+    {
+      "name": "DST spring-forward, America/New_York — day before the transition still uses EST (UTC-5), for offset comparison against the previous vector",
+      "reminderTimes": ["09:00"],
+      "timezone": "America/New_York",
+      "doseDays": null,
+      "now": "2026-03-06T20:00:00.000Z",
+      "expectedUtc": "2026-03-07T14:00:00.000Z"
+    },
+    {
+      "name": "DST fall-back, Europe/London — after the transition day uses the post-transition (GMT, UTC+0) offset",
+      "reminderTimes": ["09:00"],
+      "timezone": "Europe/London",
+      "doseDays": null,
+      "now": "2026-10-25T05:00:00.000Z",
+      "notes": "UK DST 2026 ends 2026-10-25 02:00 BST -> 01:00 GMT. 09:00 on the transition day is already GMT.",
+      "expectedUtc": "2026-10-25T09:00:00.000Z"
+    },
+    {
+      "name": "DST fall-back, Europe/London — day before the transition still uses BST (UTC+1), for offset comparison against the previous vector",
+      "reminderTimes": ["09:00"],
+      "timezone": "Europe/London",
+      "doseDays": null,
+      "now": "2026-10-24T05:00:00.000Z",
+      "expectedUtc": "2026-10-24T08:00:00.000Z"
+    },
+    {
+      "name": "midnight edge — just before local midnight, rolls to the upcoming midnight less than an hour away",
+      "reminderTimes": ["00:00"],
+      "timezone": "Asia/Kolkata",
+      "doseDays": null,
+      "now": "2026-08-10T18:00:00.000Z",
+      "notes": "18:00 UTC = 23:30 IST.",
+      "expectedUtc": "2026-08-10T18:30:00.000Z"
+    },
+    {
+      "name": "midnight edge — now exactly equals a candidate instant; isAfter is strict, so it rolls to the NEXT day, not the same instant",
+      "reminderTimes": ["00:00"],
+      "timezone": "Asia/Kolkata",
+      "doseDays": null,
+      "now": "2026-08-10T18:30:00.000Z",
+      "notes": "18:30 UTC is exactly 2026-08-11 00:00:00.000 IST.",
+      "expectedUtc": "2026-08-11T18:30:00.000Z"
+    },
+    {
+      "name": "garbage dose_days (matches no real weekday) falls back to tomorrow at the first sorted time rather than never firing",
+      "reminderTimes": ["09:00"],
+      "timezone": "Asia/Kolkata",
+      "doseDays": [9],
+      "now": "2026-08-10T02:00:00.000Z",
+      "notes": "The DB CHECK constraint makes this unreachable in practice; the DB write path can never produce it. Exists to lock in the fail-safe behavior if it ever were.",
+      "expectedUtc": "2026-08-11T03:30:00.000Z"
+    },
+    {
+      "name": "empty reminder_times array — must throw, never silently substitute a value",
+      "reminderTimes": [],
+      "timezone": "Asia/Kolkata",
+      "doseDays": null,
+      "now": "2026-08-10T02:00:00.000Z",
+      "expectThrow": true,
+      "notes": "This is the drift that was fixed 2026-08-10: web/src/lib/medication-utils.ts used to silently return `new Date()` here while src/utils.js threw. Every caller of calculateNextReminder must pre-filter an empty/null reminder_times array before calling (see the DATA PROBLEM guards in src/scheduler.js, web/src/app/api/cron/tick/route.ts, and the medications/new and medications/[id] forms) — the throw is a deliberately unreachable backstop, not the primary safety mechanism."
+    }
+  ]
+}

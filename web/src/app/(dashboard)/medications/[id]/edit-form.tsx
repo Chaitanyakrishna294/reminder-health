@@ -179,6 +179,15 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
     
     let nextReminder: Date | null = null;
     if (medication.active) {
+      // calculateNextReminder throws on an empty array (matches src/utils.js).
+      // The wizard's step-2 validation should already block this, but a legacy
+      // row edited without ever revisiting that step could still reach here —
+      // guard rather than let a throw crash the page.
+      if (sortedTimes.length === 0) {
+        setError('Please add at least one reminder time.');
+        setLoading(false);
+        return;
+      }
       // Recompute in the medication's OWN timezone: reminder_times are wall-clock
       // in that zone, and the scheduler fires on next_reminder_at. Recalculating
       // without it would silently shift non-IST medications to IST on every edit.

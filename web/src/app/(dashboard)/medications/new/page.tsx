@@ -248,6 +248,15 @@ export default function NewMedicationPage() {
     setError(null);
 
     const sortedTimes = [...times].sort((a, b) => a.localeCompare(b));
+    // calculateNextReminder throws on an empty array (matches src/utils.js — see
+    // the schedule-test-vectors fixture); the wizard's step-2 validation should
+    // already block this, but guard here too rather than let a throw crash the
+    // page for any path that reaches submit without it (e.g. direct step jump).
+    if (sortedTimes.length === 0) {
+      setError('Please add at least one reminder time.');
+      setLoading(false);
+      return;
+    }
     // Reminder times are wall-clock in the creator's timezone: store it so the
     // scheduler fires at the user's local time (DB default is IST otherwise).
     const timezone = moment.tz.guess();

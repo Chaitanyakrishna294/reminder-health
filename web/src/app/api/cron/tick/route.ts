@@ -82,6 +82,17 @@ export async function GET(request: Request) {
       .or(`last_sent_at.is.null,last_sent_at.lte.${sixtySecondsAgo}`);
 
     for (const med of dueMeds || []) {
+      // Mirrors src/scheduler.js's guard: calculateNextReminder throws on an
+      // empty/null reminder_times array, so a row like this must never reach
+      // it below — pull it out of the due-scan instead, same as the bot does,
+      // so one bad row can't abort the rest of this batch's sends.
+      if (!Array.isArray(med.reminder_times) || med.reminder_times.length === 0) {
+        console.error(
+          `[CronTick] DATA PROBLEM: Med ID ${med.id} (Telegram ${med.telegram_id}) has no usable reminder_times (${JSON.stringify(med.reminder_times)}). Skipping and clearing next_reminder_at so it stops re-selecting every tick.`,
+        );
+        await supabase.from('medications').update({ next_reminder_at: null }).eq('id', med.id);
+        continue;
+      }
       if (isRecentlySent(med.last_sent_at, now.getTime())) continue;
 
       // OCC-lock last_sent_at so only one process sends this dose.

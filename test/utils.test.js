@@ -113,3 +113,22 @@ test('isValidTime accepts HH:MM 24h and rejects malformed input', () => {
   assert.ok(!isValidTime('9:00'));
   assert.ok(!isValidTime('12:60'));
 });
+
+// ── shared fixture ──────────────────────────────────────────────────────────
+// schedule-test-vectors.json is the golden-master fixture shared with the web
+// mirror (web/src/lib/medication-utils.test.ts) and, eventually, the Android
+// Kotlin port — see CLAUDE.md's Android section. Every expectedUtc in it was
+// computed independently via moment-timezone, not by calling this function.
+
+const { vectors } = require('./schedule-test-vectors.json');
+
+for (const v of vectors) {
+  test(`fixture: ${v.name}`, () => {
+    if (v.expectThrow) {
+      assert.throws(() => calculateNextReminder(v.reminderTimes, v.timezone, v.doseDays, v.now));
+      return;
+    }
+    const result = calculateNextReminder(v.reminderTimes, v.timezone, v.doseDays, v.now);
+    assert.strictEqual(result.toISOString(), v.expectedUtc);
+  });
+}

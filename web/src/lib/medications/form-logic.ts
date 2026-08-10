@@ -65,6 +65,9 @@ export function validateMedicationStep(
   if (step === 1) {
     if (!s.drugName.trim()) return 'Please enter a medication name.';
   } else if (step === 2) {
+    if (s.times.length === 0) {
+      return 'Please add at least one reminder time.';
+    }
     for (const t of s.times) {
       if (!TIME_REGEX.test(t)) {
         return 'Invalid time format. Please enter valid hours and minutes.';

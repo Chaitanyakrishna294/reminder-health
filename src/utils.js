@@ -38,11 +38,14 @@ const DEFAULT_TIMEZONE = 'Asia/Kolkata';
  * @param {string[]} timesArray  daily reminder times in 'HH:MM'
  * @param {string} [timezone]    IANA tz of the medication; defaults to IST
  * @param {number[]} [doseDays]  weekdays the med is due, 0=Sun..6=Sat; empty/omitted = daily
+ * @param {Date|string|number} [now]  anything moment() accepts; overrides "now" for
+ *   tests (schedule-test-vectors.json). Omit in production — moment(undefined) is
+ *   the current time, so this is a no-op for every real caller.
  * @returns {Date}
  */
-const calculateNextReminder = (timesArray, timezone, doseDays) => {
+const calculateNextReminder = (timesArray, timezone, doseDays, now) => {
   const tz = timezone && timezone.trim() ? timezone : DEFAULT_TIMEZONE;
-  const now = moment().tz(tz);
+  const nowInTz = moment(now).tz(tz);
 
   // Sort times
   const sortedTimes = [...timesArray].sort((a, b) => a.localeCompare(b));
@@ -57,7 +60,7 @@ const calculateNextReminder = (timesArray, timezone, doseDays) => {
   // semantics: move the calendar day first, then pin the wall-clock time, so a
   // reminder stays at 08:00 local across a transition.
   for (let offset = 0; offset <= 7; offset++) {
-    const day = moment().tz(tz).add(offset, 'day');
+    const day = moment(now).tz(tz).add(offset, 'day');
     if (days && !days.includes(day.day())) continue;
 
     for (const timeStr of sortedTimes) {
@@ -70,7 +73,7 @@ const calculateNextReminder = (timesArray, timezone, doseDays) => {
         millisecond: 0
       });
 
-      if (candidate.isAfter(now)) {
+      if (candidate.isAfter(nowInTz)) {
         return candidate.utc().toDate();
       }
     }
@@ -88,7 +91,7 @@ const calculateNextReminder = (timesArray, timezone, doseDays) => {
   // see the DATA PROBLEM branch) and callers treat a throw as "do not advance".
   const [firstHours, firstMinutes] = sortedTimes[0].split(':').map(Number);
 
-  const tomorrowFirst = moment()
+  const tomorrowFirst = moment(now)
     .tz(tz)
     .add(1, 'day')
     .set({
