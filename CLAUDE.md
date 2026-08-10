@@ -20,8 +20,9 @@ are stale. Keep it updated when you add or move anything.
 ## Android conversion (Capacitor) — plan v2, 2026-08-10
 Supersedes the v1 sketch after a full repo read. Correction from v1: `web/` is Next.js 16 App
 Router (server components, 19 API routes, proxy/middleware) — **cannot be statically bundled**
-into Capacitor. A prior Bubblewrap **TWA** attempt (`android-twa/`, gitignored) was abandoned —
-never published, no obligation to its keystore/fingerprint (see Keystore below) — a TWA can't
+into Capacitor. A prior Bubblewrap **TWA** attempt was abandoned and **deleted 2026-08-10**
+(`android-twa/`, never published, no obligation to its keystore/fingerprint — see Keystore
+below) — a TWA can't
 host native alarms and is not the path forward.
 
 **Architecture: native-first alarm core + remote webview.** Capacitor `server.url` mode — the
@@ -67,8 +68,9 @@ fixture — port from the fixture + algorithm spec, not by transcribing JS from 
 **Keystore decision (resolved).** Generate a **fresh** keystore for the Capacitor app; package
 name `com.reminderhealth.app` may be reused. Back the new keystore + passwords up in ≥2 places
 outside the repo (password manager + cloud drive) **before** the first Play Console upload.
-Delete `web/public/.well-known/assetlinks.json` (TWA-only artifact). `android-twa/` stays
-gitignored; may be deleted once the fresh keystore is backed up.
+`web/public/.well-known/assetlinks.json` (TWA-only artifact) and `android-twa/` (old keystore
+included) were both **deleted 2026-08-10** — the TWA was never published, so neither carried any
+obligation. Back up the *new* Capacitor app's keystore per the paragraph above once it exists.
 
 **Pre-code checklist (before `npm i @capacitor/core`):**
 - [x] Live schema check (done 2026-08-10 via PostgREST OpenAPI introspection, read-only):
