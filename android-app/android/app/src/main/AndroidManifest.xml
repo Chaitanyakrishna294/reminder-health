@@ -34,6 +34,24 @@
             android:name=".schedule.AlarmReceiver"
             android:exported="false" />
 
+        <!-- Re-registers alarms after a reboot or an app update, both of which
+             clear every AlarmManager alarm. exported=true is REQUIRED here: these
+             are system broadcasts, and a non-exported receiver never receives
+             them. directBootAware so LOCKED_BOOT_COMPLETED lands before the user
+             has unlocked. -->
+        <receiver
+            android:name=".schedule.BootReceiver"
+            android:enabled="true"
+            android:exported="true"
+            android:directBootAware="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
+
         <!-- Full-screen dose alarm, launched by the notification's full-screen
              intent. showOnLockScreen + turnScreenOn are the manifest half of
              what AlarmActivity also sets in code (the code path covers <27).
@@ -87,4 +105,8 @@
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <!-- Vibration for the alarm. Normal permission, granted at install. -->
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Lets BootReceiver re-register alarms after a reboot; Android drops every
+         AlarmManager alarm on shutdown, so without this a phone that rebooted
+         overnight would wake with no reminders and no sign anything was wrong. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 </manifest>

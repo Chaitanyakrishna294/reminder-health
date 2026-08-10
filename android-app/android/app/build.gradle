@@ -48,6 +48,10 @@ dependencies {
     implementation "androidx.room:room-ktx:$roomVersion"
     kapt "androidx.room:room-compiler:$roomVersion"
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:$coroutinesVersion"
+    // Offline action queue (step 6): encrypted session storage + a
+    // connectivity-constrained one-shot retry job (never a periodic poll).
+    implementation "androidx.security:security-crypto:$securityCryptoVersion"
+    implementation "androidx.work:work-runtime-ktx:$workVersion"
     testImplementation "junit:junit:$junitVersion"
     // CalculateNextReminderTest.kt reads the JSON fixture. Android's org.json
     // classes are stubbed out (throw at runtime) for local, non-instrumented

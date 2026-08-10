@@ -19,10 +19,11 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * database once per process" — similar in spirit to reusing a single
  * Supabase client instance instead of creating a new one per call.
  */
-@Database(entities = [Medication::class], version = 2, exportSchema = false)
+@Database(entities = [Medication::class, DoseAction::class], version = 3, exportSchema = false)
 @TypeConverters(ScheduleConverters::class)
 abstract class ScheduleDatabase : RoomDatabase() {
     abstract fun medicationDao(): MedicationDao
+    abstract fun doseActionDao(): DoseActionDao
 
     companion object {
         /**
@@ -41,6 +42,33 @@ abstract class ScheduleDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v3 adds the offline action queue (step 6). Migration rather than a
+         * destructive fallback for the same reason as v2 — and more urgently
+         * here: this table holds Taken/Skip taps that have not reached the
+         * server yet, so dropping it would silently lose a patient's answers.
+         */
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS dose_actions (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        medicationId INTEGER NOT NULL,
+                        drugName TEXT NOT NULL,
+                        scheduledFor TEXT NOT NULL,
+                        action TEXT NOT NULL,
+                        recordedAt TEXT NOT NULL,
+                        snoozeMinutes INTEGER,
+                        synced INTEGER NOT NULL DEFAULT 0,
+                        syncError TEXT,
+                        attempts INTEGER NOT NULL DEFAULT 0
+                    )
+                    """.trimIndent(),
+                )
+            }
+        }
+
         @Volatile
         private var INSTANCE: ScheduleDatabase? = null
 
@@ -50,7 +78,7 @@ abstract class ScheduleDatabase : RoomDatabase() {
                     context.applicationContext,
                     ScheduleDatabase::class.java,
                     "schedule.db",
-                ).addMigrations(MIGRATION_1_2).build().also { INSTANCE = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { INSTANCE = it }
             }
     }
 }

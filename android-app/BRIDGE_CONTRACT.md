@@ -20,9 +20,17 @@ appeared on the lock screen, persisting until tapped; POST_NOTIFICATIONS prompt 
 firing re-registered the following dose. The full-screen alarm activity
 (`AlarmActivity.kt` + `res/layout/activity_alarm.xml`, launched via the notification's
 full-screen intent) is implemented with Taken/Skip/Snooze — on-device verification pending.
-`setSession` and `getPendingActions`/the offline action queue are still spec-only, below — not
-built yet, so **Taken/Skip currently stop the alarm but are not persisted or synced** (step 6). The throwaway `Ping` plugin from M1 is deleted,
-superseded by `ScheduleBridge`.
+**Step 4 is VERIFIED on device (2026-08-11):** full-screen alarm rendered with the S30 hierarchy,
+local-time header, Taken dismissed instantly and cleanly, alarm re-registered for the next day, and
+teardown logged `alarm resources released (sound, vibration)` with no wake lock held at all.
+`setSession`, `getPendingActions` and the offline action queue are implemented (step 6):
+Taken/Skip/Snooze are written to a local Room queue the instant they are tapped, then synced to
+`resolve_reminder_event` / `snooze_reminder_event` — immediately if online, otherwise by a
+connectivity-constrained WorkManager one-shot. `BootReceiver` re-registers alarms after a reboot or
+app update (step 5). On-device verification of steps 5-6 pending. **`snooze_reminder_event` needs
+its migration applied** (`db/migrations/migration_snooze_reminder_event_2026_08_11.sql`) before a
+device snooze can reach the server; until then it reschedules locally and its sync stays queued and
+retries. The throwaway `Ping` plugin from M1 is deleted, superseded by `ScheduleBridge`.
 
 **Debug helper (temporary, remove after M2):** `ScheduleBridge.scheduleTestAlarm({ seconds })`
 fires a real alarm through the same `AlarmManager` path a dose uses, so timing/delivery can be

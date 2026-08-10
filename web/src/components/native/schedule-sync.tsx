@@ -3,7 +3,12 @@
 import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { isNativeApp, syncScheduleToNative, type MedicationPayload } from '@/lib/native/schedule-bridge';
+import {
+  isNativeApp,
+  setNativeSession,
+  syncScheduleToNative,
+  type MedicationPayload,
+} from '@/lib/native/schedule-bridge';
 
 const MEDICATION_COLUMNS =
   'id, drug_name, dosage, dosage_amount, unit_type, reminder_times, dose_days, timezone, next_reminder_at, active, medication_reason';
@@ -37,6 +42,38 @@ export default function ScheduleSync() {
 
     const sync = async () => {
       const supabase = createClient();
+
+      // Session FIRST. It is what lets native call resolve_reminder_event /
+      // snooze_reminder_event for any Taken/Skip/Snooze queued while offline, so
+      // handing it over is also what drains that queue. Doing it before the
+      // medication fetch means a returning user's pending actions sync on the
+      // very first render rather than waiting for the next one.
+      const { data: sessionData } = await supabase.auth.getSession();
+      const session = sessionData.session;
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+      if (session?.access_token && url && anonKey) {
+        try {
+          const result = await setNativeSession({
+            accessToken: session.access_token,
+            refreshToken: session.refresh_token ?? '',
+            // Supabase reports expires_at in epoch SECONDS.
+            expiresAt: session.expires_at ?? 0,
+            supabaseUrl: url,
+            supabaseAnonKey: anonKey,
+            userId: session.user.id,
+          });
+          if (result && result.syncedPendingActions > 0) {
+            console.log(`[ScheduleSync] synced ${result.syncedPendingActions} queued dose action(s)`);
+          }
+        } catch (err) {
+          console.error('[ScheduleSync] setSession failed:', err);
+        }
+      }
+
+      if (cancelled) return;
+
       const { data, error } = await supabase.from('medications').select(MEDICATION_COLUMNS);
 
       if (cancelled) return;

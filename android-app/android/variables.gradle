@@ -23,4 +23,11 @@ ext {
     // older. Room 2.7.0 updated that reader; don't downgrade this.
     roomVersion = '2.7.1'
     coroutinesVersion = '1.9.0'
+    // 1.1.0-alpha06 despite the alpha label, and NOT 1.0.0: the MasterKey.Builder
+    // API does not exist in 1.0.0 at all (it has the older, now-deprecated
+    // MasterKeys alias API, which fails to compile against this code), and 1.0.0
+    // also carries keystore bugs on newer Android that the 1.1.0 line fixed. The
+    // 1.1.0 alphas are what production apps actually ship for this library.
+    securityCryptoVersion = '1.1.0-alpha06'
+    workVersion = '2.9.1'
 }

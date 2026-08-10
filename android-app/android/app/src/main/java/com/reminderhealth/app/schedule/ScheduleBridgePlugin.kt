@@ -104,6 +104,76 @@ class ScheduleBridgePlugin : Plugin() {
     }
 
     /**
+     * `setSession({ accessToken, refreshToken, expiresAt, supabaseUrl,
+     * supabaseAnonKey, userId })` — the webview hands over its Supabase session
+     * so native can call RPCs as this user. Stored encrypted (see [SessionStore]).
+     *
+     * Also drains the action queue immediately: this is the moment a previously
+     * un-syncable Taken/Skip becomes syncable, so it is the single most useful
+     * place to retry.
+     */
+    @PluginMethod
+    fun setSession(call: PluginCall) {
+        val accessToken = call.getString("accessToken")
+        val refreshToken = call.getString("refreshToken")
+        val supabaseUrl = call.getString("supabaseUrl")
+        val supabaseAnonKey = call.getString("supabaseAnonKey")
+
+        if (accessToken.isNullOrBlank() || supabaseUrl.isNullOrBlank() || supabaseAnonKey.isNullOrBlank()) {
+            call.reject("setSession requires accessToken, supabaseUrl and supabaseAnonKey")
+            return
+        }
+
+        SessionStore.save(
+            context = context,
+            accessToken = accessToken,
+            refreshToken = refreshToken ?: "",
+            expiresAt = call.getInt("expiresAt")?.toLong() ?: 0L,
+            supabaseUrl = supabaseUrl.trimEnd('/'),
+            supabaseAnonKey = supabaseAnonKey,
+            userId = call.getString("userId"),
+        )
+
+        scope.launch {
+            val synced = runCatching { ActionSync.flush(context) }.getOrDefault(0)
+            val result = JSObject()
+            result.put("stored", true)
+            result.put("syncedPendingActions", synced)
+            call.resolve(result)
+        }
+    }
+
+    /**
+     * `getPendingActions()` — Taken/Skip/Snooze taps not yet accepted by the
+     * server. Exists so the web UI can say "N actions syncing" instead of
+     * silently disagreeing with the server for a while.
+     */
+    @PluginMethod
+    fun getPendingActions(call: PluginCall) {
+        scope.launch {
+            val unsynced = ScheduleDatabase.getInstance(context).doseActionDao().allUnsynced()
+            val arr = JSArray()
+            unsynced.forEach { action ->
+                arr.put(
+                    JSObject().apply {
+                        put("id", action.id)
+                        put("medicationId", action.medicationId)
+                        put("drugName", action.drugName)
+                        put("scheduledFor", action.scheduledFor)
+                        put("action", action.action)
+                        put("recordedAt", action.recordedAt)
+                        put("attempts", action.attempts)
+                        put("syncError", action.syncError)
+                    },
+                )
+            }
+            val result = JSObject()
+            result.put("actions", arr)
+            call.resolve(result)
+        }
+    }
+
+    /**
      * TEST HELPER (step 3) — fires a real alarm `seconds` from now through the
      * exact same AlarmManager path a real dose uses, so alarm timing and
      * delivery can be verified on a device without waiting for a real dose

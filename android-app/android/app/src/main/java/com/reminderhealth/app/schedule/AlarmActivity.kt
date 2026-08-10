@@ -22,8 +22,12 @@ import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
 import com.reminderhealth.app.R
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.io.File
 import java.time.Instant
+import java.util.UUID
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
@@ -244,21 +248,21 @@ class AlarmActivity : Activity() {
     }
 
     /**
-     * Taken / Skip. STEP 4 SCOPE: stops the alarm and dismisses. Recording the
-     * action locally and syncing it to `resolve_reminder_event` is step 6 (the
-     * offline action queue) — until that lands, the server still learns the
-     * outcome only through its own pipeline, so nothing is silently lost from
-     * the patient's record, but the tap itself is not yet persisted.
+     * Taken / Skip. Queued locally FIRST, then synced — see [enqueue].
      */
     private fun resolve(action: String) {
-        Log.i(
-            AlarmScheduler.TAG,
-            "alarm action $action for med $medicationId ($drugName) scheduled $scheduledFor " +
-                "— NOT yet queued for sync (step 6)",
-        )
+        enqueue(action)
         dismiss()
     }
 
+    /**
+     * Snooze does two independent things, and both must happen:
+     *  - reschedules THIS device's alarm, so the patient is asked again;
+     *  - queues a server-side snooze, so `reminder_events.retry_reminder_at`
+     *    moves and the care circle is NOT told the dose was missed. A
+     *    device-only snooze would produce a false escalation alert — which is
+     *    why `snooze_reminder_event` exists at all.
+     */
     private fun snooze() {
         if (medicationId > 0L) {
             AlarmScheduler.scheduleAt(
@@ -267,10 +271,67 @@ class AlarmActivity : Activity() {
                 drugName = drugName,
                 doseLabel = doseLabel,
                 fireAt = Instant.now().plusSeconds(SNOOZE_MINUTES * 60L),
+                audioPath = audioFile?.absolutePath,
+                photoPath = photoFile?.absolutePath,
             )
             Log.i(AlarmScheduler.TAG, "snoozed med $medicationId by $SNOOZE_MINUTES min")
+            enqueue(DoseAction.ACTION_SNOOZE)
         }
         dismiss()
+    }
+
+    /**
+     * Writes the action to the local queue, then asks WorkManager to drain it.
+     *
+     * Local write first, always: if the network is down, the process is killed,
+     * or the phone reboots before it syncs, the tap survives. A discarded
+     * "Taken" is a patient telling the app something and the app forgetting —
+     * data loss in a medication record, not a missing nicety.
+     *
+     * Fire-and-forget on a background scope rather than blocking the tap: the
+     * alarm screen must close instantly, and the queue plus WorkManager already
+     * guarantee delivery without this Activity being alive.
+     */
+    private fun enqueue(action: String) {
+        if (medicationId <= 0L) {
+            // Debug/test alarm — no medication row behind it, nothing to record.
+            Log.i(AlarmScheduler.TAG, "alarm action $action on test alarm; not queued")
+            return
+        }
+        val scheduled = scheduledFor
+        if (scheduled == null) {
+            // Without the dose's scheduled instant the server cannot identify
+            // which dose this answers, so queuing it would be unresolvable.
+            Log.e(AlarmScheduler.TAG, "alarm action $action has no scheduledFor; cannot queue")
+            return
+        }
+
+        val appContext = applicationContext
+        val entry = DoseAction(
+            id = UUID.randomUUID().toString(),
+            medicationId = medicationId,
+            drugName = drugName,
+            scheduledFor = scheduled,
+            action = action,
+            recordedAt = Instant.now().toString(),
+            snoozeMinutes = if (action == DoseAction.ACTION_SNOOZE) SNOOZE_MINUTES else null,
+        )
+
+        CoroutineScope(Dispatchers.IO).launch {
+            runCatching {
+                ScheduleDatabase.getInstance(appContext).doseActionDao().insert(entry)
+                Log.i(
+                    AlarmScheduler.TAG,
+                    "queued $action for med $medicationId ($drugName) scheduled $scheduled",
+                )
+                ActionSync.flush(appContext)
+            }.onFailure {
+                Log.e(AlarmScheduler.TAG, "failed to queue $action for med $medicationId", it)
+            }
+            // Always ask for a constrained retry too: the immediate flush above
+            // fails silently when offline, and this is what delivers it later.
+            runCatching { ActionSyncWorker.enqueue(appContext) }
+        }
     }
 
     private fun dismiss() {

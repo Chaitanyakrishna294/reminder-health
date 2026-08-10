@@ -77,7 +77,14 @@ maintainer applies it in the Supabase SQL editor (project `jaflclnakwtikqbfhfdk`
 
 ## PENDING (written, not yet applied)
 
-(none currently — the two entries previously listed here, `migration_anonymous_guests_2026_08_10.sql` and `migration_dose_days_2026_08_10.sql`, turned out to already be live; see #63–64 above. **This section drifting out of sync with reality is exactly why it's worth a live check before trusting it** — verify against the DB rather than this file alone when in doubt.)
+| File | Notes |
+| --- | --- |
+| `migration_snooze_reminder_event_2026_08_11.sql` | Adds `public.snooze_reminder_event(p_medication_id, p_scheduled_for, p_snooze_minutes DEFAULT 10, p_resolution_channel)` — SECURITY DEFINER, `search_path` pinned, EXECUTE granted to `authenticated` only with `anon` **and PUBLIC** both revoked (revoking anon alone is a no-op when the privilege is held via PUBLIC). Written for the Android full-screen alarm's Snooze: `resolve_reminder_event` only knows TAKEN-vs-SKIPPED, and `reminder_events` is SELECT-only under RLS, so a client had no way to snooze at all. **Why it matters:** a device-only snooze would leave the server thinking the dose was unanswered and escalate to the care circle — a false caregiver alert for a patient who did respond. Mirrors the bot exactly (`src/commands.js` / `src/constants.js`): `SNOOZE_MINUTES=10`, `MAX_SNOOZES=3`, sets `reminder_status='SNOOZED'` + `retry_reminder_at` + increments `snooze_count`; deliberately does NOT stamp `last_prompted_at` (the scheduler stamps that at re-fire, which is what keeps the escalation ladder anchored). Patient-only authorization — narrower than `resolve_reminder_event`'s ReBAC on purpose, since a caregiver deferring someone else's dose would suppress the escalation they are the audience for. Clamps `p_snooze_minutes` to 1..60 so a client can't park a dose indefinitely and dodge escalation. Inserts the `reminder_events` row if the device alarm beat the server to the dose. Uses `CREATE OR REPLACE` (never DROP+CREATE — that resets the ACL to PUBLIC EXECUTE, which has bitten this repo before; see the lockdown note below). Has rollback + validation. **Order-independent w.r.t. the code deploy:** without it a device snooze just fails its sync attempt and stays queued, retrying after the migration lands — nothing is lost. |
+
+> Previously listed here and since resolved: `migration_anonymous_guests_2026_08_10.sql` and
+> `migration_dose_days_2026_08_10.sql` turned out to already be live; see #63–64 above. **This
+> section drifting out of sync with reality is exactly why it's worth a live check before trusting
+> it** — verify against the DB rather than this file alone when in doubt.
 
 > Lockdown note: if `try_acquire_scheduler_lock`, `release_scheduler_lock`,
 > `close_daily_medications`, or `scan_and_escalate_overdue_reminders` is ever
