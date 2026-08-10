@@ -142,6 +142,16 @@ obligation. Back up the *new* Capacitor app's keystore per the paragraph above o
   offline action queue calling `resolve_reminder_event` via the bridged session. Server pipeline
   untouched, running in parallel. Deliverable: phone in airplane mode, app force-closed, reboot —
   alarm still fires full-screen at the right local time; action syncs when back online.
+  - Steps 1-3 ✅ **verified on the real device (vivo I2202, 2026-08-11)**: Room schedule store +
+    `syncSchedule` (7 real medications), Kotlin `calculateNextReminder` passing all 16 shared
+    fixture vectors, and exact alarms firing 21-25ms late — including **with the app process dead**
+    (Android cold-started it purely to deliver the alarm), **in airplane mode**, and **on the lock
+    screen**. Each firing re-registers the following dose, so the chain is self-sustaining with no
+    polling. Steps 4-6 (full-screen activity, boot receiver, offline queue) still to come.
+  - **Known gap found during step-3 testing:** tapping the notification while offline opens the
+    remote webview to a blank white screen (`server.url` mode can't load the site without
+    network). A local `offline.html` fallback now covers that; the deeper answer is step 4 — the
+    full-screen alarm activity is pure native, so alarm *interaction* never depends on the network.
 - **M3 — Hardening.** OEM battery onboarding, RLS audit (incl. legacy `caregiver_info` branch),
   Sentry (webview + native), encryption at rest, Turnstile verified or disabled for app origin,
   disclaimer/policy pages, closed test track.
