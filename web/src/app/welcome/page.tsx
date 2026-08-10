@@ -150,7 +150,19 @@ export default function WelcomePage() {
           launch-splash colour family) — no flat white behind the art. */}
       {/* py-2, not py-6: the padding budget went to the larger artwork so the
           page still fits one 812px screen. */}
-      <div className="relative flex-1 min-h-[30vh] overflow-hidden flex items-center justify-center py-2">
+      {/* The hero collapses while the challenge is up. Measured at 375x640 (a
+          realistic phone once browser chrome is subtracted): the mascot alone
+          takes 308px of a 640px viewport, leaving a panel that needs ~560px
+          with 332px to live in. No amount of scroll-into-view fixes that — the
+          page was simply 349px taller than the screen, and the scroll landed
+          72px short of the bottom, clipping the widget. Reclaiming the hero
+          makes the whole panel fit outright, so the challenge is on screen
+          without depending on scrolling at all. */}
+      <div
+        className={`relative overflow-hidden flex items-center justify-center ${
+          showCaptcha ? 'hidden' : 'flex-1 min-h-[30vh] py-2'
+        }`}
+      >
         <div aria-hidden className="absolute inset-0" style={{ background: 'var(--auth-radial)' }} />
         {/* blur-2xl, not 3xl, and deeper tints — at 3xl the colour spread so
             thin the hero read as flat white (the exact complaint). */}
@@ -197,7 +209,13 @@ export default function WelcomePage() {
           Your friendly reminder to take medicines on time, every time.
         </p>
 
-        <form onSubmit={continueToLogin} className="mt-6 space-y-3.5">
+        {/* Sign-in form, divider and Create account all step aside while the
+            challenge is up. Someone who has tapped "try without an account" is
+            not choosing between three options any more — they are finishing one
+            — and on a 320x560 screen those ~220px are the difference between
+            the challenge fitting and being unreachable. Restored the moment the
+            challenge is dismissed or completed. */}
+        <form onSubmit={continueToLogin} className={`mt-6 space-y-3.5 ${showCaptcha ? 'hidden' : ''}`}>
           <div className="relative">
             <Mail
               className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#0F1C5A] pointer-events-none"
@@ -221,7 +239,7 @@ export default function WelcomePage() {
           </button>
         </form>
 
-        <div className="relative flex items-center my-4" aria-hidden>
+        <div className={`relative flex items-center my-4 ${showCaptcha ? 'hidden' : ''}`} aria-hidden>
           <div className="flex-grow border-t border-[#0F1C5A]/25"></div>
           <span className="flex-shrink mx-4 font-mono font-bold text-sm text-[#0F1C5A]/70">or</span>
           <div className="flex-grow border-t border-[#0F1C5A]/25"></div>
@@ -229,7 +247,9 @@ export default function WelcomePage() {
 
         <Link
           href="/register"
-          className="w-full h-12 inline-flex items-center justify-center gap-2 rounded-2xl font-mono font-bold text-lg text-[#0F1C5A] hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 transition-colors"
+          className={`w-full h-12 inline-flex items-center justify-center gap-2 rounded-2xl font-mono font-bold text-lg text-[#0F1C5A] hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 transition-colors ${
+            showCaptcha ? 'hidden' : ''
+          }`}
         >
           <UserRound className="w-5 h-5" aria-hidden />
           Create account
@@ -271,6 +291,16 @@ export default function WelcomePage() {
               Quick check that you&apos;re not a robot — then you&apos;re in.
             </p>
             <Turnstile key={captchaNonce} onVerify={handleCaptchaVerify} />
+            {/* Without this the focused state is a dead end: the sign-in form
+                and Create account are hidden, so a user who changed their mind
+                would have nothing to tap. */}
+            <button
+              type="button"
+              onClick={() => { setShowCaptcha(false); setGuestError(null); }}
+              className="mt-3 w-full h-10 rounded-2xl font-mono text-[13px] font-bold text-[#0F1C5A]/70 hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 transition-colors cursor-pointer"
+            >
+              Back
+            </button>
           </div>
         )}
 
