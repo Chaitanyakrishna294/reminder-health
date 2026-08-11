@@ -1,0 +1,18 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!--
+  Sentry DSN for the native alarm core (project: reminder-android).
+
+  Committed on purpose. A DSN is NOT a secret: it is write-only, public by
+  design, and ships inside the APK regardless — anyone can unpack the app and
+  read it. Keeping it in the repo means a fresh clone builds a working,
+  reportable app instead of a silently unreported one, which is the whole point
+  of having crash reporting.
+
+  Crash.kt looks this up by name and does nothing if it is absent, and
+  AndroidManifest.xml sets io.sentry.auto-init=false so the SDK never
+  initialises itself behind our back (it crashed the app on launch when it did —
+  see that file's comment).
+-->
+<resources>
+    <string name="sentry_dsn" translatable="false">https://c4a9974abf32f086064d5acbaf04dae7@o4511892965031936.ingest.us.sentry.io/4511892981940224</string>
+</resources>

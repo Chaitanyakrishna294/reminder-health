@@ -1,6 +1,7 @@
 package com.reminderhealth.app;
 
 import android.Manifest;
+import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
@@ -42,6 +43,24 @@ public class MainActivity extends BridgeActivity {
     // init failure is swallowed — a reporting tool must never be the thing that
     // takes down the alarm core it exists to watch.
     Crash.INSTANCE.init(getApplicationContext());
+
+    // Debug-only smoke test for crash reporting, fired from adb:
+    //   adb shell am start -n com.reminderhealth.app/.MainActivity --ez sentry_test true
+    // Kept out of release builds by BuildConfig.DEBUG. It exists because the
+    // only way to trust a crash reporter is to watch one event travel the whole
+    // path — SDK, scrubbing, network, dashboard — rather than assume it does.
+    // FLAG_DEBUGGABLE rather than BuildConfig.DEBUG: AGP 8 no longer generates
+    // BuildConfig unless the build feature is enabled, and turning that on for a
+    // single boolean is not worth the build-surface change.
+    boolean debuggable =
+        (getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+    if (debuggable && getIntent() != null
+        && getIntent().getBooleanExtra("sentry_test", false)) {
+      Crash.INSTANCE.report(
+          "sentry smoke test from MainActivity",
+          0L,
+          new RuntimeException("Sentry smoke test - native alarm core"));
+    }
 
     // Android 13+ needs runtime consent to post notifications at all — without
     // it a dose alarm fires but shows nothing, which would look exactly like a
