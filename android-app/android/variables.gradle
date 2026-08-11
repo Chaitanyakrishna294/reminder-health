@@ -39,8 +39,25 @@ ext {
     sqlcipherVersion = '4.6.1'
     androidxSqliteVersion = '2.4.0'
 
-    // M3 crash reporting for the alarm core. The plain `sentry-android` artifact,
-    // NOT `sentry-android-replay` or any UI-capturing variant — this app's screen
-    // is a list of someone's medications.
+    // M3 crash reporting for the alarm core.
+    //
+    // Used as `sentry-android-CORE` (see app/build.gradle), never the
+    // `sentry-android` bundle and never any replay/UI-capturing variant — this
+    // app's screen is a list of someone's medications.
+    //
+    // The bundle pulls in sentry-android-ndk, and on the vivo test device that
+    // native layer killed the app twice within three minutes:
+    //   Fatal signal 7 (SIGBUS), BUS_ADRALN, in libsentry.so
+    //   at sentry_add_breadcrumb+140, thread SentryExecutorS
+    // SIGBUS is fatal to the whole process, so crash reporting was terminating
+    // the alarm core it exists to watch — at arbitrary moments, not just at
+    // launch. The fault address decoded as ASCII digits, i.e. a text buffer being
+    // dereferenced as a pointer: memory corruption inside Sentry's own C code,
+    // not something callable code could guard against.
+    //
+    // Note it crashed in BREADCRUMB handling even though maxBreadcrumbs = 0 on
+    // the JVM side — the NDK layer keeps its own native buffer via scope sync, so
+    // a JVM option never reached it. Removing the artifact is the only fix that
+    // actually holds; a runtime flag leaves the .so loaded and the code reachable.
     sentryAndroidVersion = '7.20.1'
 }

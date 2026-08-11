@@ -58,6 +58,14 @@ object Crash {
                 // controls whether device/user identifiers ride along.
                 options.isEnableUserInteractionTracing = false
                 options.isSendDefaultPii = false
+                // Belt and braces. The NDK artifact is already excluded at the
+                // Gradle level (app/build.gradle uses sentry-android-core), which
+                // is the fix that actually holds — but if someone ever swaps the
+                // dependency back to the `sentry-android` bundle, these keep the
+                // native layer off rather than silently re-arming a crash that
+                // killed this app twice in three minutes on a real device.
+                options.isEnableNdk = false
+                options.isEnableScopeSync = false
                 // Breadcrumbs would capture activity lifecycle and, worse, our own
                 // logcat lines — which DO contain drug names (AlarmScheduler logs
                 // them deliberately, for on-device debugging).

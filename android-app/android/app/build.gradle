@@ -52,7 +52,11 @@ dependencies {
     // connectivity-constrained one-shot retry job (never a periodic poll).
     implementation "androidx.security:security-crypto:$securityCryptoVersion"
     // M3 encryption at rest for schedule.db (drug names, dosages, timings — health data).
-    implementation "io.sentry:sentry-android:$sentryAndroidVersion"
+    // sentry-android-CORE, not sentry-android. The latter is a bundle that drags
+    // in sentry-android-ndk and ships libsentry.so, whose C code killed this app
+    // with SIGBUS on the vivo (see variables.gradle). Core is pure JVM, which is
+    // all the alarm core needs — Kotlin exceptions, not native signals.
+    implementation "io.sentry:sentry-android-core:$sentryAndroidVersion"
     implementation "net.zetetic:sqlcipher-android:$sqlcipherVersion"
     implementation "androidx.sqlite:sqlite:$androidxSqliteVersion"
     implementation "androidx.work:work-runtime-ktx:$workVersion"
