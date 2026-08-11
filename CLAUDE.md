@@ -118,7 +118,22 @@ obligation. Back up the *new* Capacitor app's keystore per the paragraph above o
     user when the ringer is down. Normal permission — auto-granted at install, no prompt, no
     privacy surface. If this is unwanted, deleting `startVibration()` in `AlarmActivity` and the
     manifest line removes it cleanly; the notification channel's own vibration would remain.
-  - **`WAKE_LOCK` is deliberately NOT declared — do not add it.** An earlier `AlarmActivity`
+  - **Library-merged permissions (audited 2026-08-11 from the manifest-merger report).** The APK's
+    final permission list is LONGER than the list above, and that is expected — Gradle merges
+    permissions from dependencies. Confirmed provenance, so nobody re-litigates it from a Sentry
+    event or a Play listing:
+    - `WAKE_LOCK`, `ACCESS_NETWORK_STATE`, `FOREGROUND_SERVICE` — all three `ADDED from
+      androidx.work:work-runtime` (the offline action queue's `ActionSyncWorker`).
+    - `<applicationId>.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` — from `androidx.core`; a
+      signature-level permission scoped to this app, not a capability.
+    - **This does NOT relax either rule below.** `WAKE_LOCK` being *present* is not the same as
+      holding one: `AlarmActivity` still holds none, which is why nothing can leak. Likewise
+      `FOREGROUND_SERVICE` is WorkManager's, and this app still starts no foreground service —
+      `ActionSyncWorker` is a one-shot with a network constraint. If either rule is ever revisited,
+      revisit it on purpose; do not treat the merged list as prior approval.
+    - Re-check after adding any dependency:
+      `android-app/android/app/build/outputs/logs/manifest-merger-debug-report.txt`.
+  - **`WAKE_LOCK` is deliberately NOT declared BY US — do not add it to our manifest.** An earlier `AlarmActivity`
     acquired a `PARTIAL_WAKE_LOCK` and crashed on launch (`SecurityException: ...has
     android.permission.WAKE_LOCK`, 2026-08-11). The right fix was removing the lock, not adding
     the permission: `setTurnScreenOn` + `FLAG_KEEP_SCREEN_ON` already wake the display and hold
@@ -330,6 +345,21 @@ service). The design consequence is that **the notification must be fully answer
       (a missing `.so` is an environment problem, not corruption, and must never reach the
       delete-and-resync path); a Keystore that cannot supply a key means running unencrypted with a
       loud log rather than encrypting under a key nobody wrote down.
+  - **Turnstile ✅ verified for the app origin 2026-08-11 — no Cloudflare change needed, and the
+    reason matters.** Capacitor runs in `server.url` mode pointed at
+    `https://reminder-health.vercel.app`, so **the webview's origin IS the deployed domain** — the
+    same origin a desktop browser has. Turnstile site keys are domain-locked, and that one domain
+    already covers both surfaces, which is why the widget worked in the app on day one (M1) with
+    no separate app entry. Verified live on that origin: widget renders
+    (`cf-chl-widget-…_response`), a real **794-char token** is issued, no error fallback, submit
+    enabled.
+    - **What would break it:** moving to bundled assets — the M5 "static export or RN migration"
+      option — changes the origin to `capacitor://localhost` / `https://localhost`, which is NOT in
+      the site key's allowed domains. CAPTCHA would then fail on the app while still working on the
+      web, and (per the 2026-08-10 outage) Supabase would reject those logins outright. If that
+      migration is ever attempted, add the localhost origin in Cloudflare **first**.
+    - Timing note for anyone re-testing: the token can take well over 12s on a cold load. Absence
+      of a token is not evidence of failure — check for the app's own error fallback instead.
   - **Sentry ✅ wired 2026-08-11, switched OFF until a DSN is set.** See
     [docs/SENTRY_SETUP.md](docs/SENTRY_SETUP.md) for turning it on. Web via `@sentry/nextjs`
     (`src/instrumentation.ts` + `src/instrumentation-client.ts`, shared scrubbing in
@@ -342,6 +372,14 @@ service). The design consequence is that **the notification must be fully answer
       (it would make the app a proxy for third-party traffic). Web scrubbing drops query strings,
       cookies, request bodies, all headers but `user-agent`, and console breadcrumb text;
       `event.user` is reduced to an opaque id.
+    - **Landmine, paid for once (2026-08-11):** piping the DSN into `vercel env add` from
+      PowerShell prefixed it with a **UTF-8 BOM**, and the SDK rejected it with `Invalid Sentry
+      Dsn` — in a browser console nobody was reading. Web reporting was completely dead while
+      looking correctly configured, which is the worst failure mode a crash reporter has. Re-added
+      via bash (`printf '%s' … | vercel env add`), and `sentry-shared.ts` now strips a leading
+      U+FEFF **by code-point comparison**, never by matching a literal BOM in the source — an
+      invisible character in a source file is one editor save from vanishing and taking the guard
+      with it. Verified live: `hasClient: true`, `enabled: true`, `dsn.charCodeAt(0) === 104`.
     - **The limit worth remembering:** an exception *message* still carries whatever the code put
       in it. No `beforeSend` regex fixes that — which is why `Crash.report()` takes a **medication
       id, never a name**. Keep that habit for new reports.

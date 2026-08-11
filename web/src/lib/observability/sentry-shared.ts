@@ -22,7 +22,22 @@
 
 import type { ErrorEvent, EventHint, Breadcrumb } from '@sentry/nextjs';
 
-export const SENTRY_DSN = process.env.NEXT_PUBLIC_SENTRY_DSN ?? '';
+/**
+ * Trimmed, and the BOM stripped explicitly.
+ *
+ * Not hypothetical: piping the value into `vercel env add` from PowerShell
+ * prefixed it with a UTF-8 BOM (U+FEFF), and the SDK then rejected it with
+ * "Invalid Sentry Dsn" — in a console nobody was reading, so web reporting was
+ * silently dead while looking configured. A crash reporter that fails quietly is
+ * the worst possible failure mode, so the parsing is forgiving here.
+ */
+const RAW_SENTRY_DSN = process.env.NEXT_PUBLIC_SENTRY_DSN ?? '';
+// Compared by CODE POINT rather than matching a literal U+FEFF in this file: an
+// invisible character in source is one editor save or formatter run away from
+// vanishing, silently taking the guard with it.
+export const SENTRY_DSN = (
+  RAW_SENTRY_DSN.charCodeAt(0) === 0xfeff ? RAW_SENTRY_DSN.slice(1) : RAW_SENTRY_DSN
+).trim();
 
 /** Everything is a no-op without a DSN, so shipping this is free and inert. */
 export const SENTRY_ENABLED = SENTRY_DSN.length > 0;
