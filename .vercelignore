@@ -1,0 +1,20 @@
+# Vercel ships the WORKING TREE, not the commit (see CLAUDE.md), so anything
+# large sitting in the repo gets uploaded on every deploy whether the web build
+# needs it or not. The Android module alone is ~300MB once Gradle has run, and
+# uploads were failing part-way on a flaky connection because of it.
+#
+# Only exclude things the Next.js build in web/ provably cannot need.
+
+# Capacitor app + Gradle build outputs (APKs, intermediates, native .so files)
+android-app/
+
+# Medication-catalog source data — already loaded into Postgres
+dataset/
+
+# NOT excluded on purpose: src/ and test/ (the Telegram bot and its tests) are
+# only a few hundred KB, so excluding them saves nothing measurable while adding
+# a real chance of breaking a production build over an import nobody remembered.
+
+# Stale full checkout, excluded from repo-wide greps for the same reason
+.claude/
+.superpowers/
