@@ -79,7 +79,11 @@ maintainer applies it in the Supabase SQL editor (project `jaflclnakwtikqbfhfdk`
 
 ## PENDING (written, not yet applied)
 
-_None._ Both 2026-08-11 migrations were applied and validated the same day — see #65–66 above.
+| File | Notes |
+| --- | --- |
+| `migration_caregiver_legacy_branch_gated_2026_08_11.sql` | **M3 hardening — the legacy `caregiver_info` dual-read flagged in CLAUDE.md.** Three caregiver SELECT policies (`medications`."Caregivers can view patient medications", `reminder_events`."Caregivers view patient events", `reminder_logs`."Caregivers view patient logs") UNION'd a modern `caregiver_connections` branch gated on a `can_*` flag with a legacy `caregiver_info` branch gated on **nothing but ACCEPTED + is_active**. A UNION grants if either side matches, so any caregiver with an accepted legacy row read the patient's medications, dose events and adherence history **regardless of that patient's permission toggles** — the toggles were decorative for those relationships. Audited before touching anything (`db/audits/audit_rls_caregiver_dual_read_2026_08_11.sql`, run 2026-08-11): 3 legacy rows live, **0** without a modern counterpart, **0** currently over-granted on either flag — so the modern branch already grants everything the legacy branch does, with the flags honoured, and removing it is a no-op for every existing relationship while closing the bypass permanently. Not "just gated" because `caregiver_info` has no `can_*` columns; gating it would mean joining back to `caregiver_connections`, which *is* the modern branch. **Self-guarding:** section 1 re-checks at apply time and RAISEs (aborting the transaction, changing nothing) if even one relationship would lose access — deliberately stricter than the audit's Q2, which silently skipped legacy rows whose profiles do not resolve. If it aborts, backfill the missing `caregiver_connections` row rather than forcing it. Patient self-read policies and all write paths untouched. Has rollback + validation. |
+
+> Previously here and now applied: both 2026-08-11 alarm-core migrations — see #65–66 above.
 
 > Previously listed here and since resolved: `migration_anonymous_guests_2026_08_10.sql` and
 > `migration_dose_days_2026_08_10.sql` turned out to already be live; see #63–64 above. **This
