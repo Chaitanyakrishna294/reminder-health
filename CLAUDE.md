@@ -347,6 +347,17 @@ A care-circle member records a short voice message (**~30s hard cap**) and sets 
 web app; the dose alarm then plays *that person's voice* and shows their face instead of a generic
 tone. This is the feature the product is differentiated on, not a nice-to-have.
 
+**UI placement (decided 2026-08-11 — settled, not open for re-litigation):**
+- **Recording UI lives on the Care Circle page**: a per-patient "Voice & Photo reminder" card —
+  record ≤30s, pick a photo, preview, re-record, delete. Care-circle members record *for* the
+  patient; the patient can also record their own.
+- **Phase 1 is ONE voice + photo per patient**, used for all of that patient's alarms.
+- **Per-medication override** ("custom alarm for this medicine") lives in the medication edit
+  form — **phase 2, not the first build.**
+- **Settings holds listener-side controls only**, alongside the planned Alarm-style setting:
+  Family voice vs Default tone · alarm volume · show/hide photo. Nothing is *recorded* from
+  Settings; that would split one feature across two pages.
+
 - **Files live in Supabase Storage**, uploaded from the web (care circle side).
 - **The app downloads them to LOCAL device storage during `ScheduleSync`.** Non-negotiable:
   the alarm must work in airplane mode, so it **must never stream at fire time** — if the file
@@ -376,6 +387,21 @@ tone. This is the feature the product is differentiated on, not a nice-to-have.
 - Practical note for phase 2: the alarm screen's strings already live in
   `android-app/android/app/src/main/res/values/strings.xml`, so its translation is a `values-hi/`
   `values-te/` drop, independent of the web's next-intl work.
+
+**Placement (decided 2026-08-11 — settled):**
+- **Language picker lives in Settings** as a "Language" row, with **every language shown in its
+  own script**: English / తెలుగు / हिन्दी. A language list written only in English is unusable by
+  exactly the person who needs to change it.
+- **Also asked ONCE at first-launch onboarding, before any other screen**, so the permission and
+  setup screens themselves render in the chosen language — those are the screens where a
+  misunderstanding costs the user their alarms.
+- **CRITICAL — the choice must cross the bridge.** `AlarmActivity` is Kotlin, not web, so the
+  native alarm's button labels cannot read a web-side locale. The selected language must sync into
+  the native store the way the session does (add a `language` field to `syncSchedule` and document
+  it in BRIDGE_CONTRACT.md when this is built), or the alarm screen silently stays English — and
+  it is the one screen that must work **offline, at 3am, for the least technical user**. Android
+  resource qualifiers (`values-hi/`) pick up the *device* locale, which is NOT necessarily the
+  language chosen in-app; the bridged value is what makes the two agree.
 
 ## UI Redesign (planned — not started, do not begin without explicit go-ahead)
 Recorded 2026-08-10. Design-inspired by **"Pillo: Pill Reminder & Alarm"** (Play Store,

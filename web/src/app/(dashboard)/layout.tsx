@@ -8,6 +8,7 @@ import { GuideProvider } from '@/components/guide/guide-context';
 import GuideTour from '@/components/guide/guide-tour';
 import GuestBanner from '@/components/guest/guest-banner';
 import ScheduleSync from '@/components/native/schedule-sync';
+import ReliabilityCheck from '@/components/native/reliability-check';
 
 export default async function DashboardLayout({
   children,
@@ -64,6 +65,11 @@ export default async function DashboardLayout({
           patientChatId={targetChatId}
         >
           {isGuest && <GuestBanner />}
+          {/* Android only, and only when this device has a setting that would
+              stop alarms — renders nothing otherwise. Above the page content
+              because a phone that silently kills reminders outranks whatever
+              the user navigated here to do. */}
+          <ReliabilityCheck />
           {children}
         </DashboardMainLayout>
       </div>

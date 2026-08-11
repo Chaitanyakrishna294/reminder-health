@@ -215,6 +215,49 @@ class ScheduleBridgePlugin : Plugin() {
      * server. Exists so the web UI can say "N actions syncing" instead of
      * silently disagreeing with the server for a while.
      */
+    /**
+     * Everything the web needs to tell the user whether alarms will actually
+     * fire on THIS device (M3 OEM onboarding).
+     *
+     * Read-only and permission-free. The web owns the UI because in `server.url`
+     * mode the deployed site *is* the app's interface — native's job here is only
+     * to answer questions the webview cannot.
+     */
+    @PluginMethod
+    fun getReliabilityStatus(call: PluginCall) {
+        val result = JSObject()
+        result.put("manufacturer", DeviceReliability.manufacturer())
+        result.put("isAggressiveOem", DeviceReliability.isAggressiveOem())
+        result.put("ignoringBatteryOptimizations", DeviceReliability.isIgnoringBatteryOptimizations(context))
+        result.put("canScheduleExactAlarms", AlarmScheduler.canScheduleExact(context))
+        result.put("notificationsEnabled", DeviceReliability.areNotificationsEnabled(context))
+        result.put("canUseFullScreenIntent", DeviceReliability.canUseFullScreenIntent(context))
+        result.put("hasAutostartSettings", DeviceReliability.hasAutostartSettings(context))
+        call.resolve(result)
+    }
+
+    /**
+     * Opens one of the settings screens the user must act on themselves. The app
+     * cannot grant any of these — that is the whole point of them — so the most
+     * it can do is remove the navigation guesswork.
+     */
+    @PluginMethod
+    fun openReliabilitySetting(call: PluginCall) {
+        val target = call.getString("target")
+        val opened = when (target) {
+            "battery" -> DeviceReliability.openBatteryOptimizationSettings(context)
+            "autostart" -> DeviceReliability.openAutostartSettings(context)
+            "notifications" -> DeviceReliability.openNotificationSettings(context)
+            "exactAlarms" -> DeviceReliability.openExactAlarmSettings(context)
+            else -> {
+                call.reject("unknown reliability target: $target")
+                return
+            }
+        }
+        Log.i(AlarmScheduler.TAG, "reliability setting '$target' opened=$opened")
+        call.resolve(JSObject().put("opened", opened))
+    }
+
     @PluginMethod
     fun getPendingActions(call: PluginCall) {
         scope.launch {

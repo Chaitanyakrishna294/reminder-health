@@ -37,6 +37,27 @@ export interface BridgeSession {
   userId: string;
 }
 
+/**
+ * Whether alarms will actually fire on this specific device.
+ *
+ * Every field except `manufacturer`/`isAggressiveOem` is something only the USER
+ * can grant — the app can detect and explain, never fix. See DeviceReliability.kt.
+ */
+export interface ReliabilityStatus {
+  manufacturer: string;
+  /** OEM skins known to kill alarms even with battery optimisation already off. */
+  isAggressiveOem: boolean;
+  ignoringBatteryOptimizations: boolean;
+  canScheduleExactAlarms: boolean;
+  notificationsEnabled: boolean;
+  /** Android 14+ gate on the full-screen alarm takeover. */
+  canUseFullScreenIntent: boolean;
+  /** Whether an OEM autostart screen exists on this device to link to. */
+  hasAutostartSettings: boolean;
+}
+
+export type ReliabilityTarget = 'battery' | 'autostart' | 'notifications' | 'exactAlarms';
+
 /** A Taken/Skip/Snooze recorded on the device but not yet accepted by the server. */
 export interface PendingAction {
   id: string;
@@ -67,6 +88,8 @@ declare global {
           getSchedule: () => Promise<{ medications: MedicationPayload[] }>;
           setSession: (options: BridgeSession) => Promise<{ stored: boolean; syncedPendingActions: number }>;
           getPendingActions: () => Promise<{ actions: PendingAction[] }>;
+          getReliabilityStatus?: () => Promise<ReliabilityStatus>;
+          openReliabilitySetting?: (options: { target: ReliabilityTarget }) => Promise<{ opened: boolean }>;
           /** Step-3 debug helper — see BRIDGE_CONTRACT.md. Not a product feature. */
           scheduleTestAlarm: (options: {
             seconds: number;
@@ -121,6 +144,27 @@ export async function syncScheduleToNative(
   // guest left the previous account's medications in place and ringing for
   // doses the current user doesn't have (found on-device 2026-08-11).
   return bridge.syncSchedule({ medications, userId });
+}
+
+/**
+ * Whether alarms will actually fire on this device. Null outside the native app,
+ * and null on an APK older than this bridge method — callers must treat both as
+ * "nothing to show" rather than "everything is fine".
+ */
+export async function getReliabilityStatus(): Promise<ReliabilityStatus | null> {
+  if (!isNativeApp()) return null;
+  const bridge = window.Capacitor?.Plugins?.ScheduleBridge;
+  if (!bridge?.getReliabilityStatus) return null;
+  return bridge.getReliabilityStatus();
+}
+
+/** Opens the system screen for [target]. Only the user can grant these. */
+export async function openReliabilitySetting(target: ReliabilityTarget): Promise<boolean> {
+  if (!isNativeApp()) return false;
+  const bridge = window.Capacitor?.Plugins?.ScheduleBridge;
+  if (!bridge?.openReliabilitySetting) return false;
+  const { opened } = await bridge.openReliabilitySetting({ target });
+  return opened;
 }
 
 /**
