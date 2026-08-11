@@ -2,6 +2,10 @@ package com.reminderhealth.app.schedule
 
 import android.app.Activity
 import android.app.NotificationManager
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.media.AudioAttributes
@@ -21,13 +25,13 @@ import android.view.WindowManager
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import com.reminderhealth.app.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
 import java.time.Instant
-import java.util.UUID
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
@@ -91,11 +95,42 @@ class AlarmActivity : Activity() {
     private var audioFile: File? = null
     private var photoFile: File? = null
 
+    /**
+     * The same dose was just answered from the notification's Taken/Skip buttons
+     * (see [DoseActionReceiver]), so this screen must stop ringing rather than
+     * keep alarming at someone who already responded.
+     *
+     * Treated as answered, NOT unattended: [releaseEverything] runs before
+     * [finish], so `released` is set and [onStop] will not post a missed-dose
+     * fallback for a dose that was in fact answered.
+     */
+    private val answeredElsewhere = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            val answeredId = intent?.getLongExtra(AlarmScheduler.EXTRA_MEDICATION_ID, -1L) ?: -1L
+            if (answeredId != medicationId) return
+            Log.i(
+                AlarmScheduler.TAG,
+                "med $medicationId answered from the notification; closing the alarm screen",
+            )
+            releaseEverything()
+            finish()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         showOverLockScreen()
         setContentView(R.layout.activity_alarm)
+
+        // NOT_EXPORTED: this is an in-process signal only. An exported receiver
+        // would let any app on the device silence a medication alarm.
+        ContextCompat.registerReceiver(
+            this,
+            answeredElsewhere,
+            IntentFilter(DoseActionReceiver.ACTION_ANSWERED),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
 
         medicationId = intent.getLongExtra(AlarmScheduler.EXTRA_MEDICATION_ID, -1L)
         drugName = intent.getStringExtra(AlarmScheduler.EXTRA_DRUG_NAME) ?: drugName
@@ -304,44 +339,23 @@ class AlarmActivity : Activity() {
      * guarantee delivery without this Activity being alive.
      */
     private fun enqueue(action: String) {
-        if (medicationId <= 0L) {
-            // Debug/test alarm — no medication row behind it, nothing to record.
-            Log.i(AlarmScheduler.TAG, "alarm action $action on test alarm; not queued")
-            return
-        }
-        val scheduled = scheduledFor
-        if (scheduled == null) {
-            // Without the dose's scheduled instant the server cannot identify
-            // which dose this answers, so queuing it would be unresolvable.
-            Log.e(AlarmScheduler.TAG, "alarm action $action has no scheduledFor; cannot queue")
-            return
-        }
-
         val appContext = applicationContext
-        val entry = DoseAction(
-            id = UUID.randomUUID().toString(),
-            medicationId = medicationId,
-            drugName = drugName,
-            scheduledFor = scheduled,
-            action = action,
-            recordedAt = Instant.now().toString(),
-            snoozeMinutes = if (action == DoseAction.ACTION_SNOOZE) SNOOZE_MINUTES else null,
-        )
+        val medicationId = this.medicationId
+        val drugName = this.drugName
+        val scheduled = scheduledFor
+        val snoozeMinutes = if (action == DoseAction.ACTION_SNOOZE) SNOOZE_MINUTES else null
 
         CoroutineScope(Dispatchers.IO).launch {
-            runCatching {
-                ScheduleDatabase.getInstance(appContext).doseActionDao().insert(entry)
-                Log.i(
-                    AlarmScheduler.TAG,
-                    "queued $action for med $medicationId ($drugName) scheduled $scheduled",
-                )
-                ActionSync.flush(appContext)
-            }.onFailure {
-                Log.e(AlarmScheduler.TAG, "failed to queue $action for med $medicationId", it)
-            }
-            // Always ask for a constrained retry too: the immediate flush above
-            // fails silently when offline, and this is what delivers it later.
-            runCatching { ActionSyncWorker.enqueue(appContext) }
+            // Shared with DoseActionReceiver (the notification's Taken/Skip
+            // buttons) so both answer paths record identically.
+            DoseActionQueue.record(
+                context = appContext,
+                medicationId = medicationId,
+                drugName = drugName,
+                scheduledFor = scheduled,
+                action = action,
+                snoozeMinutes = snoozeMinutes,
+            )
         }
     }
 
@@ -434,6 +448,7 @@ class AlarmActivity : Activity() {
 
     override fun onDestroy() {
         releaseEverything()
+        runCatching { unregisterReceiver(answeredElsewhere) }
         super.onDestroy()
     }
 

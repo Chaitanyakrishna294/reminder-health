@@ -34,6 +34,25 @@ object ActionSync {
     suspend fun flush(context: Context): Int {
         val dao = ScheduleDatabase.getInstance(context).doseActionDao()
         val pending = dao.pending()
+
+        // Anything unsynced that pending() no longer returns has burned through its
+        // retry ceiling and will never be attempted again. It is still in the table,
+        // but nothing looks at it — so without this line a patient's recorded "I took
+        // it" disappears in total silence, on both the device and the server. Log it
+        // with the last error, since that error is the actual bug to go fix.
+        val stranded = dao.allUnsynced().filter { action -> pending.none { it.id == action.id } }
+        if (stranded.isNotEmpty()) {
+            Log.e(
+                AlarmScheduler.TAG,
+                "STRANDED: ${stranded.size} dose action(s) exhausted their retries and will NOT be " +
+                    "sent — these answers exist only on this device: " +
+                    stranded.joinToString("; ") { action ->
+                        "${action.action} med ${action.medicationId} (${action.drugName}) " +
+                            "scheduled ${action.scheduledFor} last error: ${action.syncError}"
+                    },
+            )
+        }
+
         if (pending.isEmpty()) return 0
 
         val url = SessionStore.supabaseUrl(context)

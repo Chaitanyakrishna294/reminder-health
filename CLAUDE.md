@@ -165,6 +165,66 @@ obligation. Back up the *new* Capacitor app's keystore per the paragraph above o
     remote webview to a blank white screen (`server.url` mode can't load the site without
     network). A local `offline.html` fallback now covers that; the deeper answer is step 4 — the
     full-screen alarm activity is pure native, so alarm *interaction* never depends on the network.
+  - Step 4 (full-screen alarm) ✅ **verified on device 2026-08-11**: rendered with the dose's local
+    time and the §4/S30 hierarchy; Taken dismissed cleanly and the loop re-registered the next dose.
+  - **Unattended-alarm hardening ✅ verified on device 2026-08-11** (commit `e9ab3ac`). Prompted by
+    an overnight 100%→0% battery drain that vivo's own battery stats later attributed to **Pillo**,
+    the competitor app installed for the teardown — **not this app**. The audit was still worth
+    doing and found a genuine bug: the 60s auto-timeout called `dismiss()`, which *cancels the
+    notification*, so an alarm that rang while the patient slept **erased its own trace**. Now the
+    timeout posts a quiet persistent "Missed: take X" on an IMPORTANCE_LOW channel and leaves the
+    dose UNRESOLVED, so server-side escalation still owns missed doses. Verified: alarm rang exactly
+    60000ms with no action, auto-dismissed, `ALARM SCREEN-ON RELEASED`, fallback posted, process
+    ended cleanly. Bonus: `BootReceiver` fired on `MY_PACKAGE_REPLACED` and re-registered 13 alarms
+    from the store — that is step 5's `rescheduleAll` path proven end to end.
+  - **`clearSchedule()` on account change ✅ verified on device 2026-08-11.** Signed in as a guest,
+    the native store had still held the previous account's 12 medications and rang for them —
+    telling someone to take medication that isn't theirs. Verified: logout wiped the store and
+    cancelled alarms on **both** exits (navbar + settings), a guest synced 0 meds and stayed silent,
+    a tripwire dose passed in silence while logged out, re-login re-synced and re-registered, and
+    unsynced actions were kept rather than deleted.
+  - **Still open: test C** — a clean overnight battery reading with Pillo uninstalled and alarms
+    scheduled (expect a single-digit drop). Not blocking; runs on the next overnight.
+
+**Alarm presentation: two shapes, both correct (confirmed on device 2026-08-11 — do not "fix").**
+Android decides how to present the dose alarm's full-screen intent:
+- phone **locked or idle** → the full-screen `AlarmActivity` takes over the screen;
+- phone **unlocked and in active use** → a **heads-up notification** instead (tapping it opens the
+  full alarm screen).
+
+That second case is Android deliberately not hijacking the screen of someone who is demonstrably
+already using their phone. It is correct and desirable. **Never attempt to override it** — the ways
+to do so are exactly the ones CLAUDE.md already forbids (`SYSTEM_ALERT_WINDOW`, a foreground
+service). The design consequence is that **the notification must be fully answerable on its own**:
+- **Taken / Skip / Snooze 10 min are action buttons on the notification itself**, handled by
+  `DoseActionReceiver` (a BroadcastReceiver — no UI opens) and routed through the *same*
+  `DoseActionQueue` as the full-screen buttons. Snooze does both halves: local re-registration
+  **and** `snooze_reminder_event`. Nobody should have to open a takeover screen to answer a dose
+  they are awake for.
+- Both the live alarm and the "Missed: take X" fallback are **persistent** (`setOngoing(true)` +
+  `setAutoCancel(false)`) and stay until the dose is actually resolved. The missed fallback carries
+  the same three buttons — it has to, since a persistent notification with no way to answer it is
+  just a stuck notification.
+- **Android 14+ caveat:** a user can still *deliberately* dismiss an ongoing notification; the
+  platform stopped treating `setOngoing` as absolute. Accepted, not fought — the missed-dose
+  fallback and above all the **server-side escalation ladder** are the real backstop. A
+  notification the OS lets someone dismiss was never the last line of defence.
+  - **Steps 5-6 built 2026-08-11, awaiting device verification.** `BootReceiver` (step 5's
+    `rescheduleAll` already proven via `MY_PACKAGE_REPLACED`; a real reboot still to test — vivo
+    autostart restrictions target `BOOT_COMPLETED` specifically, so that is the one that matters).
+    Step 6: the offline action queue, `snooze_reminder_event`, notification action buttons, and the
+    `resolve_reminder_event` fix that makes the queue actually survive (see below). **Two migrations
+    are PENDING and must be applied before step 6 works end to end** —
+    `migration_snooze_reminder_event_2026_08_11.sql` and
+    `migration_resolve_event_device_queue_2026_08_11.sql`, then their validation files.
+  - **Why the second migration exists (found while wiring step 6):** the alarm is pure native and
+    fires with no server round-trip, so it can never send `p_event_id`. Every device action was
+    therefore treated as a client-fabricated dose and hit two guards meant for the web —
+    `VIRTUAL_EVENT_MUST_BE_FOR_TODAY` (killed anything syncing after the local day rolled over, i.e.
+    exactly the offline-overnight case the queue exists for) and `INVALID_SCHEDULED_TIME` (killed
+    anything syncing after `reminder_times` was edited). Both permanent, so the device retried 5×
+    and dropped a patient's recorded "I took it". The guards are now gated on whether a
+    `reminder_events` row exists rather than on whether the caller knew its id.
 - **M3 — Hardening.** OEM battery onboarding, RLS audit (incl. legacy `caregiver_info` branch),
   Sentry (webview + native), encryption at rest, Turnstile verified or disabled for app origin,
   disclaimer/policy pages, closed test track.

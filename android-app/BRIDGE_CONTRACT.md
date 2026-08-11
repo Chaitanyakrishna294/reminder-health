@@ -124,13 +124,41 @@ channel + offline action queue, nothing more"** (CLAUDE.md) — recommended, but
 
 ---
 
-## 3. Offline action recording + sync — Taken / Skip
+## 3. Offline action recording + sync — Taken / Skip / Snooze
 
-When the user taps Taken/Skip on the native full-screen alarm, native:
-1. Records the action **locally first** (so it survives being fully offline), then
-2. Attempts to sync it to `resolve_reminder_event` immediately if online, else queues it.
+There are **two** places a patient can answer a dose, and both go through the identical path
+(`DoseActionQueue.record`, deliberately shared so neither can drift):
 
-**The RPC is real and its signature is exact** (`db/migrations/migration_fix_resolve_invalid_scheduled_time.sql`):
+- the full-screen `AlarmActivity` — phone locked or idle;
+- the **notification's own Taken / Skip / Snooze buttons**, handled by `DoseActionReceiver` with
+  no UI at all — phone unlocked and in use, where Android suppresses the full-screen intent and
+  shows a heads-up notification instead. See `DoseNotifications`' class comment; that suppression
+  is correct Android behaviour and is not overridden.
+
+Either way, native:
+1. Records the action **locally first** (so it survives being fully offline, the process being
+   killed, and a reboot), then
+2. Attempts to sync immediately if online, else leaves it queued for `ActionSyncWorker` (one-shot,
+   `NetworkType.CONNECTED`) to deliver after a reconnect.
+
+Taken/Skip go to `resolve_reminder_event`; Snooze goes to `snooze_reminder_event` (§5) **and**
+re-registers the device's own alarm — both halves, or a snooze either fails to re-ask the patient
+or produces a false caregiver escalation.
+
+> **`p_event_id` is always null from the device, and that has consequences.** The alarm is pure
+> native and fires with no server round-trip, so all it ever knows is
+> `(medication_id, scheduled_for)`. Until 2026-08-11 that meant every device action was treated as
+> a client-fabricated "virtual" dose and hit two guards meant for the web, either of which killed
+> the queue's whole purpose: `VIRTUAL_EVENT_MUST_BE_FOR_TODAY` rejected anything syncing after the
+> local day rolled over (i.e. exactly the offline-overnight case), and `INVALID_SCHEDULED_TIME`
+> rejected anything syncing after `reminder_times` was edited. Both are permanent failures, so the
+> answer was retried 5 times and dropped. Fixed by
+> `db/migrations/migration_resolve_event_device_queue_2026_08_11.sql`, which gates those guards on
+> whether a `reminder_events` row actually exists rather than on whether the caller knew its id.
+> **If that migration is not applied, the offline queue silently loses doses.**
+
+**The RPC is real and its signature is exact** (`db/migrations/migration_resolve_event_device_queue_2026_08_11.sql`,
+which supersedes `migration_fix_resolve_invalid_scheduled_time.sql`):
 
 ```sql
 resolve_reminder_event(
@@ -163,12 +191,20 @@ interface QueuedAction {
                             // accepts null and resolves by (medication_id, scheduled_for) instead
   scheduledFor: string;    // ISO 8601 UTC — must be the exact reminder_events.scheduled_for
                             // instant, not "now" at tap time
-  action: 'TAKEN' | 'SKIP';
+  action: 'TAKEN' | 'SKIP' | 'SNOOZE';
   recordedAt: string;      // ISO 8601 UTC, when the user actually tapped (device-local truth)
+  snoozeMinutes: number | null;  // SNOOZE only; server clamps to 1..60
   synced: boolean;
   syncError: string | null;
+  attempts: number;        // retry ceiling is 5; see the stranded-action note below
 }
 ```
+
+**Retry ceiling.** `DoseActionDao.pending()` stops returning an action after 5 failed attempts, so
+a permanently-rejected one can't retry forever. That leaves it in the table but invisible to the
+sync path — a patient's recorded answer existing only on the device. `ActionSync.flush` logs those
+loudly (`STRANDED: …` with the last error) rather than letting them disappear quietly. Nothing on
+the web surfaces them yet; `getPendingActions()` (§4) is the hook for that when it's built.
 
 ## 3b. `clearSchedule()` — web → native
 
@@ -207,30 +243,40 @@ changes, so the web doesn't have to poll.
 
 ---
 
-## 5. Known gap: **Snooze has no server sync path today**
+## 5. Snooze — `snooze_reminder_event` (**closed**, was a known gap)
 
-`CLAUDE.md`'s bridge description lists "Taken/Skip/Snooze" as the offline-queued actions, but
-only Taken/Skip have anywhere to go: `resolve_reminder_event`'s `p_action` only branches on
-`'TAKEN'` vs. everything-else-is-`'SKIPPED'` — there's no `SNOOZED` outcome in that RPC at all.
-The **only** existing snooze implementation is the Telegram bot
-(`src/commands.js:1557-1594`), and it works by directly `UPDATE`-ing `reminder_events`
-(`reminder_status: 'SNOOZED'`, `retry_reminder_at`, incremented `snooze_count`, capped by
-`MAX_SNOOZES = 3`) using the bot's **service_role** key. A web/native client can't do the same
-update: `reminder_events` is confirmed **SELECT-only via RLS** for `authenticated` — every
-client write goes through a `SECURITY DEFINER` RPC, and no snooze RPC exists.
+`resolve_reminder_event` has no `SNOOZED` outcome — its `p_action` only branches on `'TAKEN'` vs.
+everything-else-is-`'SKIPPED'`. The only prior snooze implementation was the Telegram bot
+(`src/commands.js:1557-1594`), which `UPDATE`s `reminder_events` directly using the **service_role**
+key. A client can't do that: `reminder_events` is SELECT-only under RLS, so every client write goes
+through a `SECURITY DEFINER` RPC.
 
-Two ways to close this before Snooze can be wired for real, neither implemented here:
-- **(a) Add a `snooze_reminder_event` RPC** (new migration, `SECURITY DEFINER`, ownership check
-  via `profiles.telegram_chat_id` like the others, capped at `MAX_SNOOZES`) mirroring the bot's
-  logic but safely exposed to `authenticated`. Keeps caregiver-visible state consistent — a
-  caregiver watching the web dashboard sees `SNOOZED` the same way regardless of which surface
-  snoozed it.
-- **(b) Device-local snooze only** — native just reschedules its own local alarm N minutes
-  later and never tells the server. Simpler, ships sooner, but a caregiver's dashboard would
-  keep showing the dose as merely "pending," not "snoozed," until it's finally resolved.
+Resolved by adding one — `db/migrations/migration_snooze_reminder_event_2026_08_11.sql`:
 
-Recommend (a) for parity with the bot, but this needs a maintainer decision (and a migration)
-before Snooze is implemented — not before the rest of M2.
+```sql
+snooze_reminder_event(
+  p_medication_id bigint,
+  p_scheduled_for timestamptz,
+  p_snooze_minutes integer DEFAULT 10,  -- clamped server-side to 1..60
+  p_resolution_channel text DEFAULT NULL
+) RETURNS TABLE(event_id, reminder_status, retry_reminder_at, snooze_count, capped, already_resolved)
+```
+
+Mirrors the bot exactly (`SNOOZE_MINUTES = 10`, `MAX_SNOOZES = 3`, sets `reminder_status='SNOOZED'`,
+moves `retry_reminder_at`, increments `snooze_count`) and inserts the row if the device is ahead of
+the server. Deliberately **patient-only** — narrower than `resolve_reminder_event`'s ReBAC — because
+"not right now, ask me again" is a statement only the person taking the medication can make; a
+caregiver deferring someone else's dose would suppress the very escalation they are the audience for.
+It does **not** stamp `last_prompted_at`; the scheduler stamps that at re-fire, which is what keeps
+the escalation ladder anchored on the last real prompt.
+
+**Why this had to exist rather than snoozing device-locally:** a device-only snooze leaves the
+server considering the dose unanswered, so the care circle gets a **false missed-dose alert** for a
+patient who did respond. Unacceptable for a care-circle product.
+
+> **Still PENDING application.** Both this and the device-queue migration above are written but must
+> be applied by the maintainer in the Supabase SQL editor (see `db/migrations/APPLIED.md`). Until
+> then a device snooze reaches an RPC that does not exist, fails, and retries.
 
 ---
 

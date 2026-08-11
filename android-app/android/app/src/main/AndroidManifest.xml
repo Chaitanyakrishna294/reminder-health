@@ -34,6 +34,15 @@
             android:name=".schedule.AlarmReceiver"
             android:exported="false" />
 
+        <!-- Taken / Skip tapped on the notification itself, for when the phone is
+             unlocked and Android shows the alarm as a heads-up notification
+             instead of a full-screen takeover. exported=false: only this app's own
+             notification buttons may record a dose — an exported receiver would
+             let any app on the device mark someone's medication as taken. -->
+        <receiver
+            android:name=".schedule.DoseActionReceiver"
+            android:exported="false" />
+
         <!-- Re-registers alarms after a reboot or an app update, both of which
              clear every AlarmManager alarm. exported=true is REQUIRED here: these
              are system broadcasts, and a non-exported receiver never receives
