@@ -12,6 +12,21 @@ are stale. Keep it updated when you add or move anything.
 - **Migrations are applied manually** by the maintainer in the Supabase SQL editor. Never attempt to apply one; just write `db/migrations/migration_<slug>.sql` (+ rollback/validation when warranted).
 - **moment-timezone stays** — `src/utils.js` and `web/src/lib/medication-utils.ts` must keep identical DST math. No Intl migration.
 - **Dashboard nav = exactly 5 icons** (`dashboard-main-layout.tsx`); secondary pages go in the profile dropdown.
+- **LIGHT MODE IS THE DEFAULT, ALWAYS.** The product never auto-follows the OS theme. **Do not write
+  `prefers-color-scheme` anywhere** — not in `globals.css`, not in a component, not in the native
+  alarm screen. Dark theme exists in the tokens and activates **only** via the explicit in-app
+  Settings toggle. Elderly mode is always light, with the larger scale and stronger contrast. The
+  native `AlarmActivity` follows the same rule: a dose alarm must look identical at 3am and 3pm,
+  because recognising it instantly matters more than matching the OS. (The media query is the
+  default thing to reach for, which is why it is banned by name rather than by convention — the
+  redesign proposal itself shipped with one and rendered dark on a dark-set machine.)
+  - Audited 2026-08-12: the **web already complies** (`theme-context.tsx` defaults to `'light'` and
+    reads only `localStorage`; the two `prefers-color-scheme` hits in the repo are comments
+    explaining why it is not used). `AlarmTheme` is explicitly `Theme.Material.Light`. **One live
+    violation remains:** `android-app/.../res/drawable-night/splash.png` (plus the
+    `drawable-*-night-*` variants) — Android auto-selects these in dark mode, so the splash still
+    follows the OS. Delete them when the new app icon and paper-token splash are built (launch
+    layer (a)); they are Capacitor template placeholders being replaced anyway.
 - **Medication catalog links are human-select-only** — never auto-match a nickname to a real drug (patient safety).
 - Web deploys from **repo root**: `npx vercel deploy --prod --yes --scope chaitanya-krishnas-projects-397d3a53`. **The `--scope` is required** — without it the CLI returns `Not authorized` even though `vercel whoami` succeeds, because `.vercel/repo.json` pins an `orgId` that no longer resolves for the logged-in user. Root `.vercel/repo.json` maps the repo to project `reminder-health` with `directory: web`, so deploy from the ROOT, never from `web/`. Vercel ships the **working tree, not the commit** — check `git status` first, or uncommitted work goes to production too.
 - For nontrivial Next.js work, heed `web/AGENTS.md`: this Next 16 differs from training data; check `node_modules/next/dist/docs/`.

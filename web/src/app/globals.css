@@ -30,14 +30,29 @@
   --primary-strong-hover: #BD2F58;
   --primary-strong-foreground: #ffffff;
 
-  --success: #34C759; /* Success Green */
+  /* VERDICT COLOURS — retuned away from the iOS system palette (redesign §01, approved
+     2026-08-12). These say what happened to a dose, and they are deliberately calmer than
+     notification colours: a missed dose is information, not an emergency. Softening the red
+     from #FF3B30 is the same zero-blame instinct as the copy rules — the screen reports, it
+     does not scold, and "missed" is the state a struggling patient sees most often. */
+  --success: #1E8E5A; /* taken   — was #34C759 */
   --success-foreground: #ffffff;
 
-  --warning: #FF9500; /* Warning Orange */
+  --warning: #A8741F; /* waiting — was #FF9500 */
   --warning-foreground: #ffffff;
 
-  --danger: #FF3B30;  /* Danger Red */
+  --danger: #C2453C;  /* missed  — was #FF3B30 */
   --danger-foreground: #ffffff;
+
+  /* SLOT TINTS — the mood layer (redesign §01). Colour carries time of day so the interface
+     feels different at 7am and 11pm. These tint SURFACES ONLY — the day rail, the slot pip,
+     the dose-icon chip — and are NEVER interactive. The moment a slot tint becomes a button
+     there are five accents and no hierarchy left. Raw values are reference hues: painted at
+     <=20% alpha on fills and ~30% opacity on the rail, so they read as pastels in practice. */
+  --slot-morning: #E8A44E; /* before 11:00 */
+  --slot-midday:  #59A6C6; /* 11:00-16:00  */
+  --slot-evening: #5566B8; /* 16:00-21:00  */
+  --slot-night:   #232A57; /* after 21:00  */
 
   /* Text-on-tint variants. The `-foreground` tokens above are white, which is only
      legible on a SOLID fill; used on a `/10`-`/15` tint they vanish (that was the
@@ -114,14 +129,22 @@
   --primary-strong-hover: #F9A3B8;
   --primary-strong-foreground: #0F1C5A;
 
-  --success: #34C759;
+  /* Verdicts on navy: the same retuned hues lifted for legibility on a dark ground.
+     Reachable only through the explicit Settings toggle — never the OS preference. */
+  --success: #2FA96E;
   --success-foreground: #ffffff;
 
-  --warning: #FF9500;
+  --warning: #C08A2A;
   --warning-foreground: #ffffff;
 
-  --danger: #FF453A;
+  --danger: #D45A50;
   --danger-foreground: #ffffff;
+
+  /* Slot tints, lifted so they still separate from the navy page ground. */
+  --slot-morning: #F0B364;
+  --slot-midday:  #6FB8D6;
+  --slot-evening: #7385CE;
+  --slot-night:   #8E97C9;
 
   /* On dark surfaces the tint is dark, so "strong" means lighter, not darker. */
   --success-strong: #7EE2A0;
@@ -299,6 +322,13 @@ body:has(nav[data-tour="dash-nav"]) .floating-bottom {
   --color-muted-foreground: var(--muted-foreground);
   --color-accent-surface: var(--accent-surface);
   --color-accent-surface-foreground: var(--accent-surface-foreground);
+
+  /* Mood layer — surfaces only, never interactive. Gives `bg-slot-morning/15`,
+     `border-slot-evening`, etc. See the :root definitions for the discipline. */
+  --color-slot-morning: var(--slot-morning);
+  --color-slot-midday: var(--slot-midday);
+  --color-slot-evening: var(--slot-evening);
+  --color-slot-night: var(--slot-night);
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 4px);
   --radius-sm: calc(var(--radius) - 8px);

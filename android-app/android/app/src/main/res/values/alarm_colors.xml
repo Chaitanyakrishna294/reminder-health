@@ -1,24 +1,60 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  PLACEHOLDER alarm-screen palette.
+  Alarm-screen palette - the redesign's locked tokens (approved 2026-08-12).
 
-  These are the fixed brand-poster values already hardcoded in
-  web/src/app/welcome/page.tsx, reused so the alarm doesn't look unrelated to
-  the app. They are NOT the design system: CLAUDE.md's UI Redesign section
-  owns the real tokens, and rule 5 there says the redesign's colour/typography
-  decisions define this screen's final look. This file is the "document them
-  somewhere the Kotlin side can reuse" hook — when the redesign locks tokens,
-  update these values rather than re-theming the layout.
+  This is CLAUDE.md UI-Redesign rule 5 discharged: Kotlin cannot read a CSS
+  variable, so the same decisions live here and in web/src/app/globals.css.
+  Change one, change both.
+
+  (Token names below are written without their CSS leading dashes on purpose:
+  XML forbids a double hyphen inside a comment, which fails the resource merge.)
+
+  LIGHT ONLY, DELIBERATELY. There is no values-night for this file and there must
+  never be one. A dose alarm has to look identical at 3am and 3pm, because
+  recognising it instantly matters more than matching the OS - and the phone is
+  in dark mode at exactly the hour the alarm matters most. AlarmTheme is pinned
+  to Theme.Material.Light for the same reason. See CLAUDE.md's theme policy.
 -->
 <resources>
-    <color name="alarm_bg">#FBF7F8</color>
+    <!-- Ground and ink: the `paper` and `ink` tokens from globals.css. -->
+    <color name="alarm_bg">#F7F4F6</color>
     <color name="alarm_ink">#0F1C5A</color>
-    <color name="alarm_ink_muted">#5B6488</color>
-    <!-- Primary/desired action: big, on top, unmistakable. -->
+    <color name="alarm_ink_muted">#4A5480</color>
+
+    <!--
+      Primary action (Taken): big, on top, unmistakable.
+
+      #CC3D64, NOT the #F26B8A brand pink. White on #F26B8A is 2.9:1 and fails the
+      4.5:1 floor - the redesign handoff table named the brand hue here, which was
+      wrong for a solid fill. This is the app's existing `primary-strong`, the same
+      value every solid CTA on the web already uses, so the alarm and the dashboard
+      agree. The lighter pink stays for tints and outlines only.
+    -->
     <color name="alarm_primary">#CC3D64</color>
     <color name="alarm_on_primary">#FFFFFF</color>
-    <!-- Honest decline: present and full-size, but grey, never guilt-worded. -->
-    <color name="alarm_secondary">#E3E1E6</color>
-    <!-- Deferral: smallest, tinted. -->
-    <color name="alarm_tertiary">#F59FB4</color>
+
+    <!-- Honest decline (Skip): present and full-size, but neutral. Never guilt-worded,
+         never red - skipping a dose is a legitimate answer, not a failure. -->
+    <color name="alarm_secondary">#E4DFE7</color>
+
+    <!-- Deferral (Snooze): smallest, tinted. Matches `primary-soft`. -->
+    <color name="alarm_tertiary">#FDEEF2</color>
+
+    <!--
+      Slot tints - the mood layer, matching the `slot-*` tokens on the web. The alarm
+      screen tints its ground by the DOSE's own time, so a 3am alarm and an 8am alarm
+      feel different before a word is read. Surfaces only: these never colour a button,
+      or the screen would have two competing accents at the exact moment the user is
+      least able to parse one.
+    -->
+    <color name="slot_morning">#E8A44E</color>
+    <color name="slot_midday">#59A6C6</color>
+    <color name="slot_evening">#5566B8</color>
+    <color name="slot_night">#232A57</color>
+
+    <!-- Verdicts, for the missed-dose fallback notification and any future
+         resolved-state UI. Retuned off the iOS palette; see globals.css. -->
+    <color name="verdict_taken">#1E8E5A</color>
+    <color name="verdict_waiting">#A8741F</color>
+    <color name="verdict_missed">#C2453C</color>
 </resources>
