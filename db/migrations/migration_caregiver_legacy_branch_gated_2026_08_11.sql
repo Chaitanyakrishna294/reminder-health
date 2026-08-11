@@ -66,11 +66,21 @@ BEGIN
   -- gone, no modern connection grants it. Deliberately NOT joining through the patient's profile
   -- for the legacy side, so a legacy row whose patient profile is missing still counts as a loss
   -- rather than vanishing from the check (the gap in the audit's Q2).
-  SELECT COUNT(*), string_agg(DISTINCT ci.caregiver_chat_id || '->' || ci.patient_telegram_id, ', ')
+  SELECT COUNT(*),
+         string_agg(DISTINCT COALESCE(ci.caregiver_chat_id, '(null)') || '->' ||
+                             COALESCE(ci.patient_telegram_id, '(null)'), ', ')
     INTO v_lost_meds, v_detail
   FROM public.caregiver_info ci
   WHERE ci.is_active = true
     AND ci.connection_status = 'ACCEPTED'
+    -- A row with either id NULL cannot grant anything through the legacy branch and so cannot
+    -- lose anything either: that branch joins profiles ON telegram_chat_id = ci.caregiver_chat_id
+    -- (NULL never joins), and a NULL patient_telegram_id lands in an IN (...) list where it can
+    -- never match. Counting such rows as "would lose access" made this guard abort on data that
+    -- grants nobody anything — which is what happened on the first apply attempt, 2026-08-11:
+    -- 2 of the 3 accepted legacy rows turned out to be exactly this.
+    AND ci.caregiver_chat_id IS NOT NULL
+    AND ci.patient_telegram_id IS NOT NULL
     AND NOT EXISTS (
       SELECT 1
       FROM public.caregiver_connections cc
@@ -89,11 +99,16 @@ BEGIN
       v_lost_meds, v_detail;
   END IF;
 
-  SELECT COUNT(*), string_agg(DISTINCT ci.caregiver_chat_id || '->' || ci.patient_telegram_id, ', ')
+  SELECT COUNT(*),
+         string_agg(DISTINCT COALESCE(ci.caregiver_chat_id, '(null)') || '->' ||
+                             COALESCE(ci.patient_telegram_id, '(null)'), ', ')
     INTO v_lost_repts, v_detail
   FROM public.caregiver_info ci
   WHERE ci.is_active = true
     AND ci.connection_status = 'ACCEPTED'
+    -- Same NULL exclusion as above: a row that cannot grant cannot lose.
+    AND ci.caregiver_chat_id IS NOT NULL
+    AND ci.patient_telegram_id IS NOT NULL
     AND NOT EXISTS (
       SELECT 1
       FROM public.caregiver_connections cc
