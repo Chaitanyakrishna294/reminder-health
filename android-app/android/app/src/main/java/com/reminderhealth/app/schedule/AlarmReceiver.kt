@@ -55,6 +55,12 @@ class AlarmReceiver : BroadcastReceiver() {
         val pending = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
+                // Any pending snooze for this dose has now been delivered — this
+                // IS the re-prompt. Clearing it before rescheduling matters: a
+                // stale row would make rescheduleAll try to re-register a snooze
+                // whose moment has passed on every subsequent sync.
+                runCatching { ScheduleDatabase.getInstance(context).pendingSnoozeDao().clear(medicationId) }
+
                 val medication = ScheduleDatabase.getInstance(context).medicationDao().getById(medicationId)
                 when {
                     medication == null ->

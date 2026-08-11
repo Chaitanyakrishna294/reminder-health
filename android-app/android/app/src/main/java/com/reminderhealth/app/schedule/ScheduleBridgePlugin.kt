@@ -91,6 +91,9 @@ class ScheduleBridgePlugin : Plugin() {
                 )
                 AlarmScheduler.cancelAllKnown(context)
                 dao.deleteAll()
+                // A pending snooze is one account's deferred dose; it must not
+                // survive into another's schedule.
+                runCatching { ScheduleDatabase.getInstance(context).pendingSnoozeDao().clearAll() }
             }
             if (incomingUserId != null) {
                 SessionStore.setOwnerUserId(context, incomingUserId)
@@ -143,6 +146,7 @@ class ScheduleBridgePlugin : Plugin() {
 
             AlarmScheduler.cancelAllKnown(context)
             ScheduleDatabase.getInstance(context).medicationDao().deleteAll()
+            runCatching { ScheduleDatabase.getInstance(context).pendingSnoozeDao().clearAll() }
 
             val stranded = runCatching {
                 ScheduleDatabase.getInstance(context).doseActionDao().allUnsynced().size

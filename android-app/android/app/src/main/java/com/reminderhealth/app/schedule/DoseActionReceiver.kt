@@ -56,8 +56,10 @@ class DoseActionReceiver : BroadcastReceiver() {
         // and the care circle is not told the dose was missed. A device-only snooze
         // produces a false escalation alert — the whole reason
         // snooze_reminder_event exists.
+        var snoozeFireAt: Instant? = null
         if (action == DoseAction.ACTION_SNOOZE && medicationId > 0L) {
             val fireAt = Instant.now().plusSeconds(AlarmActivity.SNOOZE_MINUTES * 60L)
+            snoozeFireAt = fireAt
             // Carry the ORIGINAL dose instant into the re-fire, not the snooze
             // time — see AlarmScheduler.scheduleAt's `scheduledFor` doc.
             val doseInstant = scheduledFor?.let { runCatching { Instant.parse(it) }.getOrNull() }
@@ -112,6 +114,7 @@ class DoseActionReceiver : BroadcastReceiver() {
                     scheduledFor = scheduledFor,
                     action = action,
                     snoozeMinutes = if (action == DoseAction.ACTION_SNOOZE) AlarmActivity.SNOOZE_MINUTES else null,
+                    snoozeFireAt = snoozeFireAt,
                 )
             } finally {
                 pending.finish()

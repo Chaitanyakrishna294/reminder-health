@@ -19,11 +19,16 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * database once per process" — similar in spirit to reusing a single
  * Supabase client instance instead of creating a new one per call.
  */
-@Database(entities = [Medication::class, DoseAction::class], version = 3, exportSchema = false)
+@Database(
+    entities = [Medication::class, DoseAction::class, PendingSnooze::class],
+    version = 4,
+    exportSchema = false,
+)
 @TypeConverters(ScheduleConverters::class)
 abstract class ScheduleDatabase : RoomDatabase() {
     abstract fun medicationDao(): MedicationDao
     abstract fun doseActionDao(): DoseActionDao
+    abstract fun pendingSnoozeDao(): PendingSnoozeDao
 
     companion object {
         /**
@@ -69,6 +74,27 @@ abstract class ScheduleDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v4 persists in-flight snoozes so a reboot cannot drop the device's
+         * re-prompt (see [PendingSnooze] for the failure it fixes). Same
+         * migrate-don't-drop reasoning as v2/v3: the boot receiver rebuilds
+         * alarms from this database, so a destructive fallback here would be a
+         * silent gap in someone's reminders.
+         */
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS pending_snoozes (
+                        medicationId INTEGER NOT NULL PRIMARY KEY,
+                        doseAt TEXT NOT NULL,
+                        fireAt TEXT NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+            }
+        }
+
         @Volatile
         private var INSTANCE: ScheduleDatabase? = null
 
@@ -78,7 +104,7 @@ abstract class ScheduleDatabase : RoomDatabase() {
                     context.applicationContext,
                     ScheduleDatabase::class.java,
                     "schedule.db",
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { INSTANCE = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build().also { INSTANCE = it }
             }
     }
 }

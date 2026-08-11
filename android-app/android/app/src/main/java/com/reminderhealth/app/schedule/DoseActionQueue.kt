@@ -40,6 +40,11 @@ object DoseActionQueue {
         scheduledFor: String?,
         action: String,
         snoozeMinutes: Int? = null,
+        /**
+         * SNOOZE only: when the device will re-ask. Persisted alongside the dose
+         * instant so the re-prompt survives a reboot — see [PendingSnooze].
+         */
+        snoozeFireAt: Instant? = null,
     ): Boolean {
         if (medicationId <= 0L) {
             // Debug/test alarm — no medication row behind it, nothing to record.
@@ -81,6 +86,30 @@ object DoseActionQueue {
             AlarmScheduler.TAG,
             "queued $action for med $medicationId ($drugName) scheduled $scheduledFor",
         )
+
+        // Snooze bookkeeping, so a reboot cannot lose the re-prompt and so an
+        // answered dose stops re-prompting. Best-effort: this is a convenience
+        // over the alarm that is already registered, never the record of the
+        // patient's answer — that is the queue row written above.
+        runCatching {
+            val snoozeDao = ScheduleDatabase.getInstance(context).pendingSnoozeDao()
+            if (action == DoseAction.ACTION_SNOOZE && snoozeFireAt != null) {
+                snoozeDao.upsert(
+                    PendingSnooze(
+                        medicationId = medicationId,
+                        doseAt = scheduledFor,
+                        fireAt = snoozeFireAt.toString(),
+                    ),
+                )
+            } else {
+                // Taken/Skip: the dose is answered, so any outstanding snooze for
+                // it is void. Without this a re-sync or reboot would resurrect a
+                // re-prompt for a dose the patient already dealt with.
+                snoozeDao.clear(medicationId)
+            }
+        }.onFailure {
+            Log.w(AlarmScheduler.TAG, "pending-snooze bookkeeping failed for med $medicationId", it)
+        }
 
         // Try now (succeeds instantly when online), and always ask for a
         // constrained retry as well — that is what delivers it after a reconnect.

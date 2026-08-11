@@ -328,7 +328,7 @@ class AlarmActivity : Activity() {
                 scheduledFor = doseInstant ?: fireAt,
             )
             Log.i(AlarmScheduler.TAG, "snoozed med $medicationId by $SNOOZE_MINUTES min (dose $scheduledFor)")
-            enqueue(DoseAction.ACTION_SNOOZE)
+            enqueue(DoseAction.ACTION_SNOOZE, snoozeFireAt = fireAt)
         }
         dismiss()
     }
@@ -345,7 +345,7 @@ class AlarmActivity : Activity() {
      * alarm screen must close instantly, and the queue plus WorkManager already
      * guarantee delivery without this Activity being alive.
      */
-    private fun enqueue(action: String) {
+    private fun enqueue(action: String, snoozeFireAt: Instant? = null) {
         val appContext = applicationContext
         val medicationId = this.medicationId
         val drugName = this.drugName
@@ -353,7 +353,7 @@ class AlarmActivity : Activity() {
         val snoozeMinutes = if (action == DoseAction.ACTION_SNOOZE) SNOOZE_MINUTES else null
 
         CoroutineScope(Dispatchers.IO).launch {
-            // Shared with DoseActionReceiver (the notification's Taken/Skip
+            // Shared with DoseActionReceiver (the notification's Taken/Skip/Snooze
             // buttons) so both answer paths record identically.
             DoseActionQueue.record(
                 context = appContext,
@@ -362,6 +362,7 @@ class AlarmActivity : Activity() {
                 scheduledFor = scheduled,
                 action = action,
                 snoozeMinutes = snoozeMinutes,
+                snoozeFireAt = snoozeFireAt,
             )
         }
     }

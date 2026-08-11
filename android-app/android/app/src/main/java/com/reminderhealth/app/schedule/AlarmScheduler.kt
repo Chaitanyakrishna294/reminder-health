@@ -75,17 +75,76 @@ object AlarmScheduler {
     }
 
     suspend fun rescheduleAll(context: Context) {
-        val medications = ScheduleDatabase.getInstance(context).medicationDao().getAll()
+        val db = ScheduleDatabase.getInstance(context)
+        val medications = db.medicationDao().getAll()
+        val snoozeDao = db.pendingSnoozeDao()
         Log.i(TAG, "rescheduleAll: ${medications.size} medication(s) in the local store")
+        val now = Instant.now()
+
         medications.forEach { medication ->
             cancel(context, medication.id)
-            if (medication.active) {
-                scheduleNext(context, medication)
-            } else {
+            if (!medication.active) {
                 Log.i(TAG, "med ${medication.id} (${medication.drugName}) is inactive; no alarm")
+                return@forEach
             }
+
+            // A snooze outranks the next scheduled dose: the patient explicitly
+            // asked to be re-asked about THIS dose, and that promise has to
+            // survive a reboot or a re-sync. Without this, rebuilding from
+            // reminder_times alone silently skipped the re-prompt entirely.
+            val snooze = snoozeDao.get(medication.id)
+            if (snooze != null) {
+                val fireAt = runCatching { Instant.parse(snooze.fireAt) }.getOrNull()
+                val doseAt = runCatching { Instant.parse(snooze.doseAt) }.getOrNull()
+                if (fireAt != null && doseAt != null && fireAt.isAfter(now)) {
+                    scheduleAt(
+                        context = context,
+                        medicationId = medication.id,
+                        drugName = medication.drugName,
+                        doseLabel = doseLabelFor(medication),
+                        fireAt = fireAt,
+                        audioPath = medication.alarmAudioPath,
+                        photoPath = medication.alarmPhotoPath,
+                        scheduledFor = doseAt,
+                    )
+                    Log.i(
+                        TAG,
+                        "med ${medication.id} (${medication.drugName}) has a pending SNOOZE — " +
+                            "re-prompting at $fireAt for the dose due $doseAt",
+                    )
+                    return@forEach
+                }
+
+                // The re-fire came due while the device was off. Deliberately NOT
+                // fired late here: an alarm for a dose from hours ago is startling
+                // and, worse, ambiguous. The dose is still unresolved server-side
+                // with retry_reminder_at set, so the escalation ladder and the
+                // Telegram/push re-prompt still own it — same division of labour
+                // as every other missed dose.
+                Log.i(
+                    TAG,
+                    "med ${medication.id} (${medication.drugName}) had a SNOOZE due ${snooze.fireAt} " +
+                        "that passed while the device was off; clearing it — the server still owns " +
+                        "this dose via retry_reminder_at",
+                )
+                snoozeDao.clear(medication.id)
+            }
+
+            scheduleNext(context, medication)
         }
     }
+
+    /**
+     * "1 tablet" / "5 ml" — the human-readable dose shown on the alarm. Shared so
+     * a snooze re-registration labels itself exactly like the original alarm did.
+     */
+    fun doseLabelFor(medication: Medication): String? = listOfNotNull(
+        medication.dosageAmount.takeIf { it > 0 }?.let { amount ->
+            val trimmed = if (amount % 1.0 == 0.0) amount.toInt().toString() else amount.toString()
+            listOfNotNull(trimmed, medication.unitType).joinToString(" ")
+        },
+        medication.dosage?.takeIf { it.isNotBlank() && it != "N/A" },
+    ).firstOrNull()
 
     /**
      * Registers [medication]'s next dose after [from].
@@ -112,13 +171,7 @@ object AlarmScheduler {
             return
         }
 
-        val doseLabel = listOfNotNull(
-            medication.dosageAmount.takeIf { it > 0 }?.let { amount ->
-                val trimmed = if (amount % 1.0 == 0.0) amount.toInt().toString() else amount.toString()
-                listOfNotNull(trimmed, medication.unitType).joinToString(" ")
-            },
-            medication.dosage?.takeIf { it.isNotBlank() && it != "N/A" },
-        ).firstOrNull()
+        val doseLabel = doseLabelFor(medication)
 
         scheduleAt(
             context = context,
