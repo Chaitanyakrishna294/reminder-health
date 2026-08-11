@@ -29,11 +29,33 @@ class ActionSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
             .onFailure { Log.e(AlarmScheduler.TAG, "ActionSyncWorker failed", it) }
             .getOrNull()
 
-        // retry() (not failure()) on error: WorkManager backs off and tries again,
-        // which is exactly right for a transient network problem. Permanently
-        // rejected actions are bounded separately by DoseActionDao's attempt cap,
-        // so this cannot spin forever.
-        return if (synced == null) Result.retry() else Result.success()
+        if (synced == null) return Result.retry()
+
+        // flush() does NOT throw when an individual action is rejected — it marks
+        // that action failed and moves on, so it can return normally having synced
+        // nothing. Reporting success on that would mean WorkManager schedules no
+        // backoff retry, leaving the action to wait for whatever incidentally
+        // calls flush() next (an app open, the next alarm, a reboot). That was
+        // real: a server-side 400 on 2026-08-11 produced two failed attempts
+        // followed by "Worker result SUCCESS".
+        //
+        // So the worker's verdict comes from the QUEUE, not from flush() merely
+        // returning. Anything still pending means try again with backoff.
+        // Retry-exhausted actions drop out of pending() by definition, so this
+        // cannot spin forever.
+        val stillPending = runCatching {
+            ScheduleDatabase.getInstance(applicationContext).doseActionDao().pending()
+        }.getOrNull()
+
+        return if (stillPending.isNullOrEmpty()) {
+            Result.success()
+        } else {
+            Log.i(
+                AlarmScheduler.TAG,
+                "${stillPending.size} dose action(s) still unsynced after flush — asking WorkManager to retry",
+            )
+            Result.retry()
+        }
     }
 
     companion object {
