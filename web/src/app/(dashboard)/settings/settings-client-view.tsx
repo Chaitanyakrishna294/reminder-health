@@ -22,6 +22,7 @@ import {
 import { CARE_LABELS } from '@/lib/design/semantics';
 import { isGuestGuardError } from '@/lib/auth/guest';
 import { clearNativeSchedule } from '@/lib/native/schedule-bridge';
+import ReminderSetupGuide from '@/components/native/reminder-setup-guide';
 
 interface SettingsClientViewProps {
   user: {
@@ -423,6 +424,12 @@ export default function SettingsClientView({
           </div>
         )}
       </div>
+
+      {/* SECTION 1b: REMINDER SETUP GUIDE (Android app only — renders nothing on
+          the web, where there are no device alarms to protect). Placed high on
+          purpose: a phone silently killing alarms outranks every preference
+          below it. */}
+      <ReminderSetupGuide />
 
       {/* SECTION 2: VISUAL MODE PREFERENCE */}
       <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4">

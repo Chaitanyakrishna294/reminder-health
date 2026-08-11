@@ -227,6 +227,7 @@ class ScheduleBridgePlugin : Plugin() {
     fun getReliabilityStatus(call: PluginCall) {
         val result = JSObject()
         result.put("manufacturer", DeviceReliability.manufacturer())
+        result.put("brand", DeviceReliability.brand())
         result.put("isAggressiveOem", DeviceReliability.isAggressiveOem())
         result.put("ignoringBatteryOptimizations", DeviceReliability.isIgnoringBatteryOptimizations(context))
         result.put("canScheduleExactAlarms", AlarmScheduler.canScheduleExact(context))
@@ -244,18 +245,19 @@ class ScheduleBridgePlugin : Plugin() {
     @PluginMethod
     fun openReliabilitySetting(call: PluginCall) {
         val target = call.getString("target")
-        val opened = when (target) {
-            "battery" -> DeviceReliability.openBatteryOptimizationSettings(context)
-            "autostart" -> DeviceReliability.openAutostartSettings(context)
-            "notifications" -> DeviceReliability.openNotificationSettings(context)
-            "exactAlarms" -> DeviceReliability.openExactAlarmSettings(context)
-            else -> {
-                call.reject("unknown reliability target: $target")
-                return
-            }
+        if (target !in setOf("battery", "autostart", "notifications", "exactAlarms")) {
+            call.reject("unknown reliability target: $target")
+            return
         }
-        Log.i(AlarmScheduler.TAG, "reliability setting '$target' opened=$opened")
-        call.resolve(JSObject().put("opened", opened))
+        // Walks an ordered chain and reports WHICH intent worked, so the web can
+        // show written steps when nothing did — and so the candidate list can be
+        // improved from real devices rather than from guesswork.
+        val openedVia = DeviceReliability.open(context, target!!)
+        call.resolve(
+            JSObject()
+                .put("opened", openedVia != null)
+                .put("openedVia", openedVia),
+        )
     }
 
     @PluginMethod

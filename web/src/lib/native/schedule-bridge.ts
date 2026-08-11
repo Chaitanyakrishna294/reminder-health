@@ -45,6 +45,8 @@ export interface BridgeSession {
  */
 export interface ReliabilityStatus {
   manufacturer: string;
+  /** Distinct from manufacturer: a vivo-made phone reports BRAND=iQOO. */
+  brand: string;
   /** OEM skins known to kill alarms even with battery optimisation already off. */
   isAggressiveOem: boolean;
   ignoringBatteryOptimizations: boolean;
@@ -158,7 +160,13 @@ export async function getReliabilityStatus(): Promise<ReliabilityStatus | null> 
   return bridge.getReliabilityStatus();
 }
 
-/** Opens the system screen for [target]. Only the user can grant these. */
+/**
+ * Opens the system screen for [target]. Only the user can grant these.
+ *
+ * False means every intent in native's chain failed to resolve — the caller must
+ * then show the written steps, because the user is otherwise left on whatever
+ * screen they were on with no idea what happened.
+ */
 export async function openReliabilitySetting(target: ReliabilityTarget): Promise<boolean> {
   if (!isNativeApp()) return false;
   const bridge = window.Capacitor?.Plugins?.ScheduleBridge;
