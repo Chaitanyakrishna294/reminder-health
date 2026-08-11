@@ -42,6 +42,13 @@ object ActionSync {
         // with the last error, since that error is the actual bug to go fix.
         val stranded = dao.allUnsynced().filter { action -> pending.none { it.id == action.id } }
         if (stranded.isNotEmpty()) {
+            // A patient's recorded answer that will never reach the server. The
+            // count and the last error travel; the drug name does not.
+            Crash.report(
+                "dose actions stranded after ${stranded.size} exhausted retries: " +
+                    stranded.first().syncError?.take(200),
+                stranded.first().medicationId,
+            )
             Log.e(
                 AlarmScheduler.TAG,
                 "STRANDED: ${stranded.size} dose action(s) exhausted their retries and will NOT be " +

@@ -330,6 +330,27 @@ service). The design consequence is that **the notification must be fully answer
       (a missing `.so` is an environment problem, not corruption, and must never reach the
       delete-and-resync path); a Keystore that cannot supply a key means running unencrypted with a
       loud log rather than encrypting under a key nobody wrote down.
+  - **Sentry ✅ wired 2026-08-11, switched OFF until a DSN is set.** See
+    [docs/SENTRY_SETUP.md](docs/SENTRY_SETUP.md) for turning it on. Web via `@sentry/nextjs`
+    (`src/instrumentation.ts` + `src/instrumentation-client.ts`, shared scrubbing in
+    `src/lib/observability/sentry-shared.ts`); native via `io.sentry:sentry-android` in
+    `Crash.kt`. **Both are complete no-ops without a DSN** — no init, no build plugin, no cost —
+    so this changed nothing about how the app runs today.
+    - **Never enabled, deliberately:** Session Replay (it records the screen, and that screen is a
+      list of someone's medications), `sendDefaultPii`, native breadcrumbs (`maxBreadcrumbs = 0`,
+      because the alarm core logs drug names to logcat on purpose), and the web tunnel option
+      (it would make the app a proxy for third-party traffic). Web scrubbing drops query strings,
+      cookies, request bodies, all headers but `user-agent`, and console breadcrumb text;
+      `event.user` is reduced to an opaque id.
+    - **The limit worth remembering:** an exception *message* still carries whatever the code put
+      in it. No `beforeSend` regex fixes that — which is why `Crash.report()` takes a **medication
+      id, never a name**. Keep that habit for new reports.
+    - Two silent failures now report themselves: `calculateNextReminder` failing for a medication
+      (that row gets no alarm ever again, silently) and dose actions stranded after exhausting
+      retries (a patient's recorded "I took it" that will never reach the server).
+    - **`Permissions-Policy: microphone=()` in `web/next.config.ts` will block the planned family
+      voice recording** — it must be relaxed to `microphone=(self)` when that feature is built.
+      Noted here because the failure mode is a silently dead record button.
     - **Landmine, paid for once:** the plaintext detector compared against `"SQLite format 3 "`
       with a trailing **space**; the real header ends in a **NUL**. The check never matched, so
       SQLCipher was pointed at a plaintext file and the recovery path deleted a live local store.

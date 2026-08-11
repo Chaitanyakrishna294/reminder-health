@@ -167,7 +167,11 @@ object AlarmScheduler {
         val fireAt = try {
             calculateNextReminder(medication.reminderTimes, medication.timezone, medication.doseDays, from)
         } catch (e: Exception) {
-            Log.e(TAG, "calculateNextReminder failed for med ${medication.id} (${medication.drugName})", e)
+            // A medication that cannot compute a next dose gets NO alarm, ever
+            // again, and says nothing about it. Exactly the silent failure crash
+            // reporting exists for — the id is enough to find the row without
+            // shipping the drug name anywhere.
+            Crash.report("calculateNextReminder failed", medication.id, e)
             return
         }
 

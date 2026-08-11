@@ -10,6 +10,7 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebViewClient;
+import com.reminderhealth.app.schedule.Crash;
 import com.reminderhealth.app.schedule.DoseNotifications;
 import com.reminderhealth.app.schedule.ScheduleBridgePlugin;
 
@@ -36,6 +37,11 @@ public class MainActivity extends BridgeActivity {
     // AlarmReceiver can run with this Activity never having started at all
     // (proven on-device: the process was cold-started purely to fire an alarm).
     DoseNotifications.ensureChannel(this);
+
+    // Crash reporting. Inert unless a DSN resource is configured, and its own
+    // init failure is swallowed — a reporting tool must never be the thing that
+    // takes down the alarm core it exists to watch.
+    Crash.INSTANCE.init(getApplicationContext());
 
     // Android 13+ needs runtime consent to post notifications at all — without
     // it a dose alarm fires but shows nothing, which would look exactly like a

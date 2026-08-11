@@ -52,6 +52,7 @@ dependencies {
     // connectivity-constrained one-shot retry job (never a periodic poll).
     implementation "androidx.security:security-crypto:$securityCryptoVersion"
     // M3 encryption at rest for schedule.db (drug names, dosages, timings — health data).
+    implementation "io.sentry:sentry-android:$sentryAndroidVersion"
     implementation "net.zetetic:sqlcipher-android:$sqlcipherVersion"
     implementation "androidx.sqlite:sqlite:$androidxSqliteVersion"
     implementation "androidx.work:work-runtime-ktx:$workVersion"

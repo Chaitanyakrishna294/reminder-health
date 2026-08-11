@@ -38,4 +38,9 @@ ext {
     // DAOs and entities are untouched by encryption.
     sqlcipherVersion = '4.6.1'
     androidxSqliteVersion = '2.4.0'
+
+    // M3 crash reporting for the alarm core. The plain `sentry-android` artifact,
+    // NOT `sentry-android-replay` or any UI-capturing variant — this app's screen
+    // is a list of someone's medications.
+    sentryAndroidVersion = '7.20.1'
 }
