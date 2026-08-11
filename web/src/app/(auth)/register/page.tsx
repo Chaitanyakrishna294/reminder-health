@@ -262,7 +262,13 @@ export default function RegisterPage() {
             I am 18 or older and I agree to the{' '}
             <Link href="/terms" target="_blank" className="text-primary-strong font-semibold hover:underline">Terms of Service</Link>{' '}
             and{' '}
-            <Link href="/privacy" target="_blank" className="text-primary-strong font-semibold hover:underline">Privacy Policy</Link>.
+            <Link href="/privacy" target="_blank" className="text-primary-strong font-semibold hover:underline">Privacy Policy</Link>,
+            {' '}and I understand this is a reminder tool, not medical advice{' '}
+            {/* Named at the moment of consent, not only in Settings: someone signing
+                up for a medication app should know what it is not BEFORE they rely
+                on it. Play policy for health apps expects the disclaimer to be
+                surfaced, not merely reachable. */}
+            (<Link href="/disclaimer" target="_blank" className="text-primary-strong font-semibold hover:underline">Medical Disclaimer</Link>).
           </span>
         </label>
 

@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   description: 'How Re-MIND-eЯ collects, uses, stores, shares, and protects your data.',
 };
 
-const UPDATED = 'June 29, 2026';
+const UPDATED = 'August 11, 2026';
 const CONTACT_EMAIL = 'hello.remindre@gmail.com';
 const OPERATOR = 'Chaitanya Krishna';
 
@@ -57,10 +57,25 @@ export default function PrivacyPolicyPage() {
           <ul className="list-disc pl-6 space-y-1">
             <li><strong>With caregivers you authorize:</strong> the core function of the app. Caregivers in your
               Care Circle can see only the data and adherence information you permit, until you revoke access.</li>
-            <li><strong>With service providers (processors) who act on our instructions:</strong> Supabase
-              (database, authentication, file storage), Vercel (application hosting), Telegram and your browser&apos;s
-              web-push provider (notification delivery). If you enable optional reminder calls/SMS or a paid plan,
-              we also use a telephony/SMS provider and a payment processor.</li>
+            <li><strong>With service providers (processors) who act on our instructions:</strong>
+              <ul className="list-disc pl-6 mt-1 space-y-1">
+                <li><strong>Supabase</strong> — database, authentication, and file storage. This is where your
+                  medications, schedules, adherence history, and Health Vault documents live.</li>
+                <li><strong>Vercel</strong> — application hosting.</li>
+                <li><strong>Telegram</strong> — delivery of reminder and caregiver-escalation messages, where you
+                  have connected a Telegram account. Telegram receives the message content needed to show your
+                  reminder, which includes the medication name.</li>
+                <li><strong>Your browser or device push provider</strong> — notification delivery.</li>
+                <li><strong>Cloudflare Turnstile</strong> — bot and abuse protection on the sign-in and sign-up
+                  screens. It receives technical signals from your browser (such as IP address and browser
+                  characteristics) to confirm you are a real person. It is not used for advertising, and it does
+                  not receive any of your health data.</li>
+                <li><strong>Sentry</strong> — anonymized crash and error reports, so we can find faults that would
+                  otherwise stop reminders silently. See §5a for exactly what is and is not included.</li>
+                <li>If you enable optional reminder calls/SMS or a paid plan, we also use a telephony/SMS provider
+                  and a payment processor.</li>
+              </ul>
+            </li>
             <li><strong>For legal reasons:</strong> where required by law or to protect rights, safety, and security.</li>
           </ul>
           <p className="mt-2">We do not sell or rent your personal data, and we do not use it for third-party advertising.</p>
@@ -70,10 +85,24 @@ export default function PrivacyPolicyPage() {
           <h2 className="text-xl font-bold mb-2">4. Where your data is stored (international transfer)</h2>
           <p>Our database and file storage are hosted on Supabase infrastructure located in
             <strong> Singapore</strong>, and application hosting is provided by Vercel, which may process data in
-            other countries. This means your information, including health data, may be stored and processed
-            <strong> outside India</strong>. We rely on your consent and on contractual safeguards with these
-            providers for such transfers.</p>
+            other countries. Crash reports are processed by Sentry in the <strong>United States</strong>. This means
+            your information may be stored and processed <strong>outside India</strong>. We rely on your consent and
+            on contractual safeguards with these providers for such transfers.</p>
         </div>
+
+        <div>
+          <h2 className="text-xl font-bold mb-2">4a. Data stored on your own device (Android app)</h2>
+          <p>The Android app keeps a copy of your medication schedule on your phone so that reminders still work
+            when you have no internet connection. This copy contains medication names, dosages, and reminder times,
+            plus any Taken/Skipped/Snoozed responses that have not yet reached our servers.</p>
+          <ul className="list-disc pl-6 space-y-1 mt-2">
+            <li>It is stored in the app&apos;s private storage and is <strong>encrypted at rest</strong>, with the
+              encryption key held in the Android Keystore.</li>
+            <li>It is <strong>erased when you sign out</strong> or switch accounts, and when you delete the app.</li>
+            <li>It is never sent anywhere except back to our own servers to record your responses.</li>
+          </ul>
+        </div>
+
 
         <div>
           <h2 className="text-xl font-bold mb-2">5. Security</h2>
@@ -81,6 +110,24 @@ export default function PrivacyPolicyPage() {
             database row-level security so each user can access only their own records, a private (non-public)
             storage bucket with short-lived signed links for document access, and least-privilege access controls.
             No system is perfectly secure, but we work to protect your information and limit access to it.</p>
+        </div>
+
+        <div>
+          <h2 className="text-xl font-bold mb-2">5a. Crash reports (what we deliberately do not collect)</h2>
+          <p>When something goes wrong, the app sends an anonymized error report to Sentry so we can fix faults
+            that would otherwise cause reminders to fail silently. We have configured this to send as little as
+            possible:</p>
+          <ul className="list-disc pl-6 space-y-1 mt-2">
+            <li><strong>No screen recording or session replay</strong> of any kind.</li>
+            <li><strong>No medication names</strong>, dosages, or schedules. Where a report needs to identify a
+              medication, it carries an internal number only.</li>
+            <li><strong>No email address, name, phone number, or Telegram ID.</strong> Reports are linked to an
+              opaque account identifier, and IP addresses are not collected.</li>
+            <li><strong>No cookies, request contents, or web addresses containing your details</strong> — anything
+              after a &quot;?&quot; in a link is removed before the report is sent.</li>
+          </ul>
+          <p className="mt-2">What is sent is the technical fault itself: the error, where in our code it happened,
+            and basic device and app-version information.</p>
         </div>
 
         <div>

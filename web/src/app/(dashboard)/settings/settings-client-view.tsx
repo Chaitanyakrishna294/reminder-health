@@ -700,6 +700,10 @@ export default function SettingsClientView({
         <Link href="/privacy" className="inline-flex items-center min-h-11 px-1 hover:underline">Privacy Policy</Link>
         <span className="mx-2">·</span>
         <Link href="/terms" className="inline-flex items-center min-h-11 px-1 hover:underline">Terms of Service</Link>
+        <span className="mx-2">·</span>
+        {/* Play policy for health apps expects a findable in-app medical disclaimer,
+            not just §1 of the Terms. */}
+        <Link href="/disclaimer" className="inline-flex items-center min-h-11 px-1 hover:underline">Medical Disclaimer</Link>
       </div>
 
       {/* Delete-account confirmation. Type-to-confirm rather than a single OK, because

@@ -81,6 +81,10 @@ export default function AuthLayout({
             <Link href="/terms" className="hover:underline">
               Terms of Service
             </Link>
+            <span className="mx-2">·</span>
+            <Link href="/disclaimer" className="hover:underline">
+              Medical Disclaimer
+            </Link>
           </p>
         </div>
       </footer>
