@@ -107,8 +107,16 @@ obligation. Back up the *new* Capacitor app's keystore per the paragraph above o
       form (the add-form's step validation had a real, reachable hole: it never required at least
       one reminder time — fixed in `web/src/lib/medications/form-logic.ts`). 39/39 bot tests and
       13/13 web fixture vectors pass.
-- [ ] Back up the (new) keystore per above. **Still open — needs the maintainer** (password
-      manager + cloud drive are outside what an agent should touch).
+- [x] **Keystore generated 2026-08-11** — 4096-bit RSA, 10,000 days, alias `reminder-health-upload`,
+      at `C:/Users/chait/android-keystores/reminder-health-upload.jks` (**outside the repo on
+      purpose**, so no `git add -A` can reach it). Passwords are in
+      `android-app/android/keystore.properties`, gitignored — that file was NOT covered by the
+      existing `*.jks` rule and had to be added; a leaked password plus a keystore from any backup
+      is the same compromise as leaking the keystore.
+- [ ] **Back up the keystore + password in ≥2 places outside the repo — needs the maintainer**
+      (password manager + cloud drive). Do this BEFORE the first Play upload: a lost upload key
+      cannot be recovered without a Play support reset. This is the only truly unrecoverable
+      artifact in the project.
 
 **Constraints carried over from v1 (still binding):**
 - Permissions: `SCHEDULE_EXACT_ALARM`/`USE_EXACT_ALARM`, `USE_FULL_SCREEN_INTENT`,

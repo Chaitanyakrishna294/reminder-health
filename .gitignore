@@ -44,6 +44,12 @@ dataset/
 # 2026-08-10, keystore included; it was never published, so there was no obligation to it.)
 *.keystore
 *.jks
+# The signing PASSWORDS, which are as fatal to leak as the keystore itself — a
+# committed password plus a keystore recovered from anywhere means anyone can
+# publish an update to this app. The keystore file is deliberately stored OUTSIDE
+# the repository entirely; this file only points at it.
+keystore.properties
+**/keystore.properties
 
 # Test coverage
 coverage/

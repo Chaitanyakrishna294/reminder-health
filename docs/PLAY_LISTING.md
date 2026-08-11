@@ -86,6 +86,36 @@ settings screen instead of demanding the grant), and no foreground service.
 manifest from `androidx.work`; the app declares none of them and holds no wake
 lock. See CLAUDE.md for the audit.
 
+## Release build
+
+`./gradlew assembleRelease` from `android-app/android/`. Signing is wired from a
+**gitignored** `keystore.properties`, and the keystore itself lives **outside the
+repo** (`C:/Users/chait/android-keystores/reminder-health-upload.jks`) so no
+`git add -A` can reach it. Without that file the debug build still works and
+`assembleRelease` fails loudly — it will never silently emit an unsigned or
+debug-signed artifact.
+
+**Minification is on** (`minifyEnabled` + `shrinkResources`), which CLAUDE.md
+requires. The rules in `app/proguard-rules.pro` are written per-target with a
+note on what breaks without each, because R8's failure mode is not a build error:
+it strips reflection-only code and produces an APK that installs fine and then
+silently loses a feature in the only build real users get. Reflection surfaces
+here are Capacitor plugin methods (resolved by name from JS), Room entities,
+SQLCipher's JNI, and manifest-named receivers/activities.
+
+Known R8 complaint, already handled: Tink (behind `EncryptedSharedPreferences`)
+references build-time-only annotations that are absent at runtime, so
+`assembleRelease` failed on `Missing class com.google.errorprone.*` /
+`javax.annotation.*` until `-dontwarn` rules were added. If a future dependency
+does the same, R8 writes the exact rules needed to
+`app/build/outputs/mapping/release/missing_rules.txt`.
+
+> **Not yet done: run the release build on a device.** `assembleRelease`
+> succeeding proves the R8 *configuration* is valid, not that the minified app
+> behaves. Installing it replaces the debug build and its signed-in session, so it
+> is a deliberate act — do it before the first upload, not after. Smoke test:
+> app launches, medications list, an alarm fires, Taken syncs.
+
 ## Still open before submitting
 
 - [ ] Closed test track: ~12 testers, 14 days (Play's requirement for new
@@ -94,5 +124,12 @@ lock. See CLAUDE.md for the audit.
       the first upload — a lost upload key cannot be recovered without a Play
       support reset.
 - [ ] Store graphics: icon, feature graphic, phone screenshots.
-- [ ] Confirm the Supabase region stated in `/privacy` §4 (currently "Singapore")
-      still matches the live project.
+- [x] ~~Confirm the Supabase region stated in `/privacy` §4~~ — **confirmed
+      2026-08-11: `ap-southeast-1` (Singapore).** Privacy §4 is accurate as
+      written. Re-check if the project is ever migrated, since it is a
+      data-residency claim in a published policy.
+- [x] ~~Support email~~ — `hello.remindre@gmail.com` confirmed live 2026-08-11.
+
+> **Play Console fee ($25) deferred**, so the closed test is on hold. Everything
+> above that does not need the Console is done; the keystore below is the piece
+> worth having ready *before* the fee is paid, not after.

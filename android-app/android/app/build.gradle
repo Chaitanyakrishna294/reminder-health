@@ -2,6 +2,22 @@ apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
 apply plugin: 'kotlin-kapt'
 
+// Release signing credentials, loaded from a gitignored file that lives outside
+// version control. The keystore itself is kept OUTSIDE the repository entirely
+// (see keystore.properties -> storeFile) so it cannot be committed even by a
+// careless `git add -A`.
+//
+// Absent on a fresh clone or in CI, and that is deliberate: the debug build must
+// still work for anyone without the signing key. Only `assembleRelease` needs it,
+// and it fails loudly rather than silently producing an unsigned or
+// debug-signed artifact.
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+def keystoreProperties = new Properties()
+def hasReleaseSigning = keystorePropertiesFile.exists()
+if (hasReleaseSigning) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace "com.reminderhealth.app"
     compileSdk rootProject.ext.compileSdkVersion
@@ -18,10 +34,27 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (hasReleaseSigning) {
+            release {
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
+
     buildTypes {
         release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            // CLAUDE.md release requirement. R8 also shrinks resources, which
+            // matters less than the obfuscation but is free once minify is on.
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }
