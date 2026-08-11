@@ -240,8 +240,10 @@ ladder clamps the anchor to `created_at`+30m — applied 2026-08-08, APPLIED.md 
 `notifications` (uuid PK, bell feed).
 
 **Care circle:** `caregiver_connections` (modern many-to-many + 6 `can_*` permission flags,
-`is_primary`) · `caregiver_info` (legacy CG###### registry — **still load-bearing** in RLS dual-reads
-and `correct_reminder_event` auth) · view `active_caregiver_links` (union of both) ·
+`is_primary`) · `caregiver_info` (legacy CG###### registry — **no longer read by any RLS policy**
+as of 2026-08-11, APPLIED.md #67; still read by `correct_reminder_event` auth and the care-circle
+UI. Live contents are now 1 real relationship + 2 inert rows with NULL `patient_telegram_id`, so
+retiring it entirely is a realistic cleanup) · view `active_caregiver_links` (union of both) ·
 `caregiver_connection_audit_logs` · `patient_escalation_state`.
 
 **Infra:** `link_codes` (hash-only since 07-11) · `push_subscriptions` · `push_logs` ·
@@ -266,7 +268,10 @@ rate-limit cleanup :30.
 **RLS patterns (pick the matching one for new tables):**
 1. Owner-by-`auth.uid()` (vault, medical, notifications, push_subscriptions…)
 2. Owner-by-telegram-id subquery via profiles (medications, events, logs, voice, subscriptions)
-3. Caregiver dual-read: `caregiver_connections` (ACCEPTED+active+`can_*` flag) OR legacy `caregiver_info`
+3. Caregiver read: `caregiver_connections` (ACCEPTED+active+`can_*` flag) — **single path since
+   2026-08-11.** The legacy `caregiver_info` OR-branch was removed: being `UNION`ed and ungated, it
+   granted regardless of the `can_*` flags, making a patient's permission toggles a no-op. Do NOT
+   reintroduce a dual-read in a new policy.
 4. RLS on, **zero policies** = service-role only (link_codes, phone_verifications, tokens, locks, heartbeat, rate_limits)
 5. Read-only reference (`medication_catalog`: SELECT-true, no write policy)
 6. Mutations via RPC only — events/logs have SELECT-only policies

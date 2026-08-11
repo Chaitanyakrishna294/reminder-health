@@ -291,6 +291,50 @@ service). The design consequence is that **the notification must be fully answer
 - **M3 — Hardening.** OEM battery onboarding, RLS audit (incl. legacy `caregiver_info` branch),
   Sentry (webview + native), encryption at rest, Turnstile verified or disabled for app origin,
   disclaimer/policy pages, closed test track.
+  - **RLS audit ✅ DONE 2026-08-11** (`migration_caregiver_legacy_branch_gated_2026_08_11.sql`,
+    APPLIED.md #67, all 7 validation checks DONE). **The flagged `caregiver_info` dual-read is
+    closed.** Three caregiver SELECT policies (`medications`, `reminder_events`, `reminder_logs`)
+    `UNION`ed a modern branch gated on a `can_*` flag with a legacy branch gated on nothing but
+    ACCEPTED + is_active — and a `UNION` grants if *either* side matches, so any caregiver with an
+    accepted legacy row read the patient's medications, doses and adherence history **regardless of
+    that patient's permission toggles**. The toggles were decorative for those relationships.
+    Audited first (`db/audits/audit_rls_caregiver_dual_read_2026_08_11.sql`): 3 legacy rows, 0
+    without a modern counterpart, 0 currently over-granted — so removal cost nobody anything and
+    closed the bypass permanently. Of those 3, only **one** is a live relationship; the other two
+    are abandoned half-written invitations with a NULL `patient_telegram_id` that never granted
+    anything. **`caregiver_info` is therefore far less load-bearing than the docs implied** —
+    retiring it entirely is now a realistic future cleanup, not a rewrite.
+    - Same audit also confirmed, and these are worth not re-deriving: **no policy grants the `anon`
+      role** (which matters because the APK ships the anon key and can be unpacked — anon's reach
+      *is* the app's worst case), no `public` table has RLS disabled, `FORCE RLS` is still on both
+      PHI tables, and the six policy-less tables (`link_codes`, `phone_verifications`,
+      `push_tracking_tokens`, `rate_limits`, `scheduler_heartbeat`, `scheduler_locks`) match
+      WORK_LEDGER's documented service-role-only list exactly, with no extras.
+    - **Still in M3 scope for the voice feature:** Storage-bucket RLS for family voice recordings
+      (see Post-M2 §1). Unblocked now — "who counts as this patient's care circle" finally has one
+      answer instead of two.
+  - **Encryption at rest ✅ DONE 2026-08-11, verified on device.** `schedule.db` is SQLCipher-
+    encrypted via Room's `openHelperFactory`, so entities and DAOs are untouched. Passphrase lives
+    in its own EncryptedSharedPreferences file, **deliberately separate from `SessionStore`** —
+    that one is wiped on sign-out, and wiping the DB key on sign-out would make the store
+    unreadable rather than merely empty. Stored as a **hex string, not raw bytes**: SQLCipher
+    derives a key from a passphrase, so the conversion (SQL string literal) and Room (byte array)
+    must agree on what the passphrase *is*, or the store converts and then cannot be opened.
+    - **In-place upgrade, not a wipe:** an existing plaintext store is read out through Room,
+      written to a staged encrypted DB, then swapped; the plaintext file is deleted only after the
+      copy is closed, so a process death mid-conversion leaves the original intact. Row-by-row
+      rather than SQLCipher's `ATTACH` + `sqlcipher_export()` recipe — that ATTACH **silently did
+      not take** on this device ("unknown database encrypted").
+    - **`getInstance` never throws.** It runs inside the alarm and boot receivers, where an
+      exception means no reminders at all. The native-library load is checked first and separately
+      (a missing `.so` is an environment problem, not corruption, and must never reach the
+      delete-and-resync path); a Keystore that cannot supply a key means running unencrypted with a
+      loud log rather than encrypting under a key nobody wrote down.
+    - **Landmine, paid for once:** the plaintext detector compared against `"SQLite format 3 "`
+      with a trailing **space**; the real header ends in a **NUL**. The check never matched, so
+      SQLCipher was pointed at a plaintext file and the recovery path deleted a live local store.
+      Recovered from the server exactly as designed — but a data-deleting path was one wrong byte
+      from being reachable by accident.
 - **M4 — Widget.** Native Glance/RemoteViews widget showing next dose, reading the native
   schedule store. Update on data change or ≥15 min; never per-minute.
 - **M5 (optional, later).** Per-device suppression of duplicate server sends; static export or

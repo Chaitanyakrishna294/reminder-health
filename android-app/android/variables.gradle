@@ -30,4 +30,12 @@ ext {
     // 1.1.0 alphas are what production apps actually ship for this library.
     securityCryptoVersion = '1.1.0-alpha06'
     workVersion = '2.9.1'
+
+    // M3 encryption at rest. `sqlcipher-android` is the CURRENT artifact — NOT the
+    // older `android-database-sqlcipher`, which is end-of-life and whose classes
+    // live under a different package (net.sqlcipher.* vs net.zetetic.database.*).
+    // Room talks to it through androidx.sqlite's SupportSQLiteOpenHelper, so the
+    // DAOs and entities are untouched by encryption.
+    sqlcipherVersion = '4.6.1'
+    androidxSqliteVersion = '2.4.0'
 }
