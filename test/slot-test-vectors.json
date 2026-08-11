@@ -1,0 +1,57 @@
+{
+  "_comment": [
+    "Shared fixture for TIME-OF-DAY SLOT assignment — the mood layer's four buckets.",
+    "",
+    "Sibling of schedule-test-vectors.json and it exists for the same reason: the same",
+    "logic is implemented twice (TypeScript in web/src/lib/design/slots.ts, Kotlin in the",
+    "alarm core when it tints its ground by dose time), and two implementations of one",
+    "rule drift. calculateNextReminder already proved that — its two JS copies were",
+    "described as 'lockstep' and had silently diverged on empty input.",
+    "",
+    "Share the TESTS, not the code. Both engines must pass every vector below.",
+    "",
+    "Two decisions encoded here, both deliberate:",
+    "  1. MORNING STARTS AT HOUR 0, not 05:00. A 03:00 dose is real in this app",
+    "     (night-shift workers, strict-interval antibiotics). Calling 03:00 'morning' is",
+    "     a small labelling inaccuracy; a dose landing in NO slot and vanishing off the",
+    "     rail would be a bug. Correctness over label aesthetics.",
+    "  2. SLOTTING USES THE MEDICATION'S TIMEZONE, never the device's. A dose set for",
+    "     08:00 Asia/Kolkata is a morning dose even when the phone is in London.",
+    "     Getting this wrong mistints a travelling patient's entire day.",
+    "",
+    "Boundaries: morning [00:00-10:59], midday [11:00-15:59], evening [16:00-20:59],",
+    "night [21:00-23:59]. Boundaries are INCLUSIVE at the start of each slot.",
+    "",
+    "expectedSlot is one of: morning | midday | evening | night."
+  ],
+  "vectors": [
+    { "name": "midnight is morning, not night", "scheduledFor": "2026-08-11T18:30:00Z", "timezone": "Asia/Kolkata", "expectedSlot": "morning" },
+    { "name": "03:00 dose is slotted, not lost", "scheduledFor": "2026-08-11T21:30:00Z", "timezone": "Asia/Kolkata", "expectedSlot": "morning" },
+    { "name": "08:00 typical morning dose", "scheduledFor": "2026-08-12T02:30:00Z", "timezone": "Asia/Kolkata", "expectedSlot": "morning" },
+    { "name": "10:59 is the last morning minute", "scheduledFor": "2026-08-12T05:29:00Z", "timezone": "Asia/Kolkata", "expectedSlot": "morning" },
+
+    { "name": "11:00 boundary opens midday", "scheduledFor": "2026-08-12T05:30:00Z", "timezone": "Asia/Kolkata", "expectedSlot": "midday" },
+    { "name": "13:00 typical midday dose", "scheduledFor": "2026-08-12T07:30:00Z", "timezone": "Asia/Kolkata", "expectedSlot": "midday" },
+    { "name": "15:59 is the last midday minute", "scheduledFor": "2026-08-12T10:29:00Z", "timezone": "Asia/Kolkata", "expectedSlot": "midday" },
+
+    { "name": "16:00 boundary opens evening", "scheduledFor": "2026-08-12T10:30:00Z", "timezone": "Asia/Kolkata", "expectedSlot": "evening" },
+    { "name": "20:00 typical evening dose", "scheduledFor": "2026-08-12T14:30:00Z", "timezone": "Asia/Kolkata", "expectedSlot": "evening" },
+    { "name": "20:59 is the last evening minute", "scheduledFor": "2026-08-12T15:29:00Z", "timezone": "Asia/Kolkata", "expectedSlot": "evening" },
+
+    { "name": "21:00 boundary opens night", "scheduledFor": "2026-08-12T15:30:00Z", "timezone": "Asia/Kolkata", "expectedSlot": "night" },
+    { "name": "22:30 typical bedtime dose", "scheduledFor": "2026-08-12T17:00:00Z", "timezone": "Asia/Kolkata", "expectedSlot": "night" },
+    { "name": "23:59 is the last night minute", "scheduledFor": "2026-08-12T18:29:00Z", "timezone": "Asia/Kolkata", "expectedSlot": "night" },
+
+    { "name": "medication timezone wins: same instant is morning in Kolkata", "scheduledFor": "2026-08-12T02:30:00Z", "timezone": "Asia/Kolkata", "expectedSlot": "morning" },
+    { "name": "medication timezone wins: same instant is evening in Los Angeles", "scheduledFor": "2026-08-12T02:30:00Z", "timezone": "America/Los_Angeles", "expectedSlot": "evening" },
+    { "name": "medication timezone wins: same instant is midday in London", "scheduledFor": "2026-08-12T12:30:00Z", "timezone": "Europe/London", "expectedSlot": "midday" },
+
+    { "name": "legacy Asia/Calcutta alias matches Asia/Kolkata (both live in real data)", "scheduledFor": "2026-08-12T14:30:00Z", "timezone": "Asia/Calcutta", "expectedSlot": "evening" },
+
+    { "name": "DST: New York spring-forward day, 20:00 local is still evening", "scheduledFor": "2026-03-09T00:00:00Z", "timezone": "America/New_York", "expectedSlot": "evening" },
+    { "name": "DST: New York fall-back day, 08:00 local is morning", "scheduledFor": "2026-11-01T13:00:00Z", "timezone": "America/New_York", "expectedSlot": "morning" },
+    { "name": "null timezone falls back without throwing", "scheduledFor": "2026-08-12T02:30:00Z", "timezone": null, "expectedSlot": null },
+    { "name": "unknown timezone must not throw; slot is engine-local", "scheduledFor": "2026-08-12T02:30:00Z", "timezone": "Not/AZone", "expectedSlot": null },
+    { "name": "malformed instant must not throw", "scheduledFor": "not-a-date", "timezone": "Asia/Kolkata", "expectedSlot": "morning" }
+  ]
+}

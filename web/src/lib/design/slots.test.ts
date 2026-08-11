@@ -9,7 +9,39 @@
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { slotForHour, slotForDose, groupBySlot, SLOTS } from './slots.ts';
+
+/**
+ * THE SHARED FIXTURE — test/slot-test-vectors.json.
+ *
+ * Same pattern and same reason as schedule-test-vectors.json: the Kotlin alarm
+ * core will implement these boundaries too (to tint the alarm ground by dose
+ * time), and two implementations of one rule drift. calculateNextReminder already
+ * proved that — its two "lockstep" JS copies had silently diverged.
+ *
+ * Share the tests, not the code. When the Kotlin port lands it reads THIS file.
+ */
+const vectorsPath = fileURLToPath(new URL('../../../../test/slot-test-vectors.json', import.meta.url));
+const fixture = JSON.parse(readFileSync(vectorsPath, 'utf8')) as {
+  vectors: { name: string; scheduledFor: string; timezone: string | null; expectedSlot: string | null }[];
+};
+
+test('shared fixture: every vector assigns the expected slot', () => {
+  assert.ok(fixture.vectors.length >= 20, 'fixture looks truncated');
+  for (const v of fixture.vectors) {
+    const actual = slotForDose(v.scheduledFor, v.timezone);
+    assert.ok(actual, `${v.name}: returned nothing`);
+    if (v.expectedSlot === null) {
+      // Engine-local by design (no timezone, or an unknown one). The contract is
+      // "returns a slot and never throws", not a specific bucket.
+      assert.ok(SLOTS.some((s) => s.id === actual.id), `${v.name}: not a real slot`);
+      continue;
+    }
+    assert.equal(actual.id, v.expectedSlot, `${v.name}: expected ${v.expectedSlot}, got ${actual.id}`);
+  }
+});
 
 test('every hour of the day lands in exactly one slot', () => {
   for (let h = 0; h < 24; h += 1) {
