@@ -114,9 +114,15 @@ class AlarmActivity : Activity() {
         startAlarmSound()
         startVibration()
 
+        // Unattended-alarm safety net. postDelayed on the MAIN looper is correct
+        // here specifically because this activity keeps the screen on: uptimeMillis
+        // (which postDelayed uses) only stalls in deep sleep, and the device cannot
+        // be in deep sleep while this window is visible. So the timeout is
+        // guaranteed to run — including over the lock screen, which is just a
+        // normal visible window as far as the looper is concerned.
         autoDismiss.postDelayed({
-            Log.i(AlarmScheduler.TAG, "alarm auto-dismissed after ${AUTO_DISMISS_MS}ms with no action")
-            dismiss()
+            Log.i(AlarmScheduler.TAG, "alarm auto-dismissed after ${AUTO_DISMISS_MS}ms with NO action")
+            dismissUnattended()
         }, AUTO_DISMISS_MS)
 
         findViewById<Button>(R.id.alarm_taken).setOnClickListener { resolve("TAKEN") }
@@ -199,6 +205,11 @@ class AlarmActivity : Activity() {
             )
         }
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        Log.i(
+            AlarmScheduler.TAG,
+            "ALARM SCREEN-ON ACQUIRED (keep-screen-on set; NO wake lock — the lit screen keeps the " +
+                "CPU up, and this flag dies with the window so it cannot outlive the alarm)",
+        )
     }
 
     private fun startAlarmSound() {
@@ -334,10 +345,46 @@ class AlarmActivity : Activity() {
         }
     }
 
+    /**
+     * The user answered. Clears the alarm notification, since the dose is
+     * resolved and there is nothing left to chase.
+     */
     private fun dismiss() {
         releaseEverything()
         (getSystemService(NOTIFICATION_SERVICE) as? NotificationManager)
             ?.cancel(medicationId.toInt())
+        finish()
+    }
+
+    /**
+     * Nobody answered — auto-timeout, or the alarm stopped being visible.
+     *
+     * Crucially this does NOT just cancel the notification and vanish, which is
+     * what the old dismiss()-on-timeout did: a patient who slept through a dose
+     * woke to no trace of it at all. The ringing alarm notification is replaced
+     * with a quiet, persistent "Missed: take X" so the reminder survives.
+     *
+     * The dose is deliberately left UNRESOLVED — the server pipeline still owns
+     * missed-dose escalation, exactly as it does for web-only users. Recording a
+     * silent outcome here would hide a missed dose from the care circle.
+     */
+    private fun dismissUnattended() {
+        releaseEverything()
+
+        val manager = getSystemService(NOTIFICATION_SERVICE) as? NotificationManager
+        manager?.cancel(medicationId.toInt())
+
+        if (medicationId > 0L) {
+            DoseNotifications.showMissedDose(
+                context = this,
+                medicationId = medicationId,
+                drugName = drugName,
+                doseLabel = doseLabel,
+                scheduledForIso = scheduledFor,
+                audioPath = audioFile?.absolutePath,
+                photoPath = photoFile?.absolutePath,
+            )
+        }
         finish()
     }
 
@@ -355,7 +402,34 @@ class AlarmActivity : Activity() {
         runCatching { vibrator?.cancel() }
         vibrator = null
 
-        Log.i(AlarmScheduler.TAG, "alarm resources released (sound, vibration)")
+        // Explicitly drop keep-screen-on rather than relying on the window
+        // teardown to do it. This is THE power-relevant resource this screen
+        // holds (there is no wake lock — see the class comment), so it gets an
+        // explicit, greppable release line to verify on device.
+        runCatching { window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+
+        Log.i(
+            AlarmScheduler.TAG,
+            "ALARM SCREEN-ON RELEASED (keep-screen-on cleared, sound stopped, vibration cancelled; " +
+                "no wake lock is ever held by this screen)",
+        )
+    }
+
+    /**
+     * If the alarm is no longer visible it must not keep ringing — the user may
+     * have hit the power button, or another window took over. Treated as
+     * unattended so the missed-dose fallback is posted rather than the reminder
+     * silently disappearing.
+     *
+     * releaseEverything() is idempotent, so the onStop that happens during a
+     * normal finish() is a harmless no-op.
+     */
+    override fun onStop() {
+        if (!released) {
+            Log.i(AlarmScheduler.TAG, "alarm no longer visible (onStop) — treating as unattended")
+            dismissUnattended()
+        }
+        super.onStop()
     }
 
     override fun onDestroy() {

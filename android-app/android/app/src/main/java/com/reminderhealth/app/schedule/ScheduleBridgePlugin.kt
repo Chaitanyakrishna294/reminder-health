@@ -72,8 +72,29 @@ class ScheduleBridgePlugin : Plugin() {
             return
         }
 
+        val incomingUserId = call.getString("userId")
+
         scope.launch {
             val dao = ScheduleDatabase.getInstance(context).medicationDao()
+
+            // ACCOUNT SWITCH GUARD. Found on-device 2026-08-11: signed in as a
+            // guest, the native store still held the previous account's 12
+            // medications and rang for them — alarms for doses the current user
+            // does not have. The store must belong to exactly one identity, so a
+            // different userId wipes it outright rather than layering on top.
+            val currentOwner = SessionStore.ownerUserId(context)
+            if (incomingUserId != null && currentOwner != null && incomingUserId != currentOwner) {
+                Log.w(
+                    AlarmScheduler.TAG,
+                    "ACCOUNT SWITCH: store belonged to $currentOwner, sync is for $incomingUserId — " +
+                        "cancelling that account's alarms and wiping the local store before syncing",
+                )
+                AlarmScheduler.cancelAllKnown(context)
+                dao.deleteAll()
+            }
+            if (incomingUserId != null) {
+                SessionStore.setOwnerUserId(context, incomingUserId)
+            }
 
             // An empty incoming list is legitimate (all medications deleted) but
             // is ALSO what a signed-out or guest session looks like, and it wipes
@@ -99,6 +120,48 @@ class ScheduleBridgePlugin : Plugin() {
             val result = JSObject()
             result.put("synced", medications.size)
             result.put("canScheduleExactAlarms", AlarmScheduler.canScheduleExact(context))
+            call.resolve(result)
+        }
+    }
+
+    /**
+     * `clearSchedule()` — called by the web on logout / login / account switch.
+     *
+     * Wipes the local medication store AND cancels every registered alarm, so the
+     * previous account's doses can never ring for whoever is signed in next.
+     *
+     * Order matters: the action queue is flushed FIRST, while the outgoing
+     * session is still valid, because after this the credential is gone and any
+     * un-synced Taken/Skip could never reach the server. The queue itself is then
+     * left in place rather than deleted — a stranded action is recoverable, a
+     * deleted one is not.
+     */
+    @PluginMethod
+    fun clearSchedule(call: PluginCall) {
+        scope.launch {
+            val flushed = runCatching { ActionSync.flush(context) }.getOrDefault(0)
+
+            AlarmScheduler.cancelAllKnown(context)
+            ScheduleDatabase.getInstance(context).medicationDao().deleteAll()
+
+            val stranded = runCatching {
+                ScheduleDatabase.getInstance(context).doseActionDao().allUnsynced().size
+            }.getOrDefault(0)
+            if (stranded > 0) {
+                Log.w(
+                    AlarmScheduler.TAG,
+                    "clearSchedule: $stranded dose action(s) still unsynced and now have no session. " +
+                        "Kept, not deleted — they retry if this account signs in again.",
+                )
+            }
+
+            SessionStore.clearSession(context)
+            Log.i(AlarmScheduler.TAG, "clearSchedule: local store wiped and all alarms cancelled")
+
+            val result = JSObject()
+            result.put("cleared", true)
+            result.put("syncedBeforeClear", flushed)
+            result.put("strandedActions", stranded)
             call.resolve(result)
         }
     }

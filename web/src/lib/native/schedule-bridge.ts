@@ -57,7 +57,13 @@ declare global {
         ScheduleBridge?: {
           syncSchedule: (options: {
             medications: MedicationPayload[];
+            userId?: string;
           }) => Promise<{ synced: number; canScheduleExactAlarms: boolean }>;
+          clearSchedule: () => Promise<{
+            cleared: boolean;
+            syncedBeforeClear: number;
+            strandedActions: number;
+          }>;
           getSchedule: () => Promise<{ medications: MedicationPayload[] }>;
           setSession: (options: BridgeSession) => Promise<{ stored: boolean; syncedPendingActions: number }>;
           getPendingActions: () => Promise<{ actions: PendingAction[] }>;
@@ -106,9 +112,33 @@ export async function getPendingNativeActions(): Promise<PendingAction[]> {
 
 export async function syncScheduleToNative(
   medications: MedicationPayload[],
+  userId?: string,
 ): Promise<{ synced: number; canScheduleExactAlarms: boolean } | null> {
   if (!isNativeApp()) return null;
   const bridge = window.Capacitor?.Plugins?.ScheduleBridge;
   if (!bridge) return null;
-  return bridge.syncSchedule({ medications });
+  // userId keys the native store to one identity. Without it, signing in as a
+  // guest left the previous account's medications in place and ringing for
+  // doses the current user doesn't have (found on-device 2026-08-11).
+  return bridge.syncSchedule({ medications, userId });
+}
+
+/**
+ * Wipes the native medication store and cancels every registered alarm.
+ *
+ * MUST be called on sign-out (and before signing a different account in), or the
+ * previous user's doses keep ringing on this device. Native flushes any queued
+ * dose actions first, while the outgoing session is still valid.
+ *
+ * A no-op outside the native app.
+ */
+export async function clearNativeSchedule(): Promise<void> {
+  if (!isNativeApp()) return;
+  const bridge = window.Capacitor?.Plugins?.ScheduleBridge;
+  if (!bridge?.clearSchedule) return;
+  const result = await bridge.clearSchedule();
+  console.log(
+    `[ScheduleSync] native store cleared and alarms cancelled ` +
+      `(synced ${result.syncedBeforeClear} before clearing, ${result.strandedActions} stranded)`,
+  );
 }

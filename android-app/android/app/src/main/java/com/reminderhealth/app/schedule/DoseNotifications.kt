@@ -26,6 +26,8 @@ import java.time.format.DateTimeFormatter
 object DoseNotifications {
     private const val CHANNEL_ID = "dose_reminders"
     private const val CHANNEL_NAME = "Medication reminders"
+    private const val MISSED_CHANNEL_ID = "dose_missed"
+    private const val MISSED_CHANNEL_NAME = "Missed doses"
 
     /**
      * Idempotent — safe to call on every notification. IMPORTANCE_HIGH is
@@ -49,6 +51,96 @@ object DoseNotifications {
             enableVibration(true)
         }
         manager.createNotificationChannel(channel)
+    }
+
+    /**
+     * Fallback posted when an alarm rings unattended and auto-dismisses.
+     *
+     * Without this, the auto-timeout path CANCELLED the alarm notification and
+     * left nothing behind — a patient who slept through a dose woke to no trace
+     * of it. Losing the reminder is worse than the ringing stopping.
+     *
+     * Deliberately quiet and non-ringing: no full-screen intent, no sound
+     * (IMPORTANCE_LOW channel), so it cannot itself become a battery or
+     * attention problem. Tapping it reopens the alarm screen — which is pure
+     * native, so the dose can still be recorded with no network.
+     */
+    fun showMissedDose(
+        context: Context,
+        medicationId: Long,
+        drugName: String,
+        doseLabel: String?,
+        scheduledForIso: String?,
+        audioPath: String? = null,
+        photoPath: String? = null,
+    ) {
+        ensureMissedChannel(context)
+
+        val reopen = PendingIntent.getActivity(
+            context,
+            // Offset the request code so this PendingIntent is distinct from the
+            // alarm's own for the same medication.
+            (medicationId + 1_000_000L).toInt(),
+            alarmIntent(context, medicationId, drugName, doseLabel, scheduledForIso, audioPath, photoPath),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+
+        val notification = NotificationCompat.Builder(context, MISSED_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("Missed: take $drugName")
+            .setContentText(
+                listOfNotNull(doseLabel, localTimeOrNull(scheduledForIso)?.let { "due $it" })
+                    .joinToString(" · ")
+                    .ifEmpty { "Tap to record this dose" },
+            )
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setContentIntent(reopen)
+            // Dismissible (the user may have taken it anyway) but not
+            // auto-cancelling on its own, so it persists until acknowledged.
+            .setAutoCancel(true)
+            .setOngoing(false)
+            .build()
+
+        val manager = context.getSystemService(NotificationManager::class.java) ?: return
+        manager.notify(missedNotificationId(medicationId), notification)
+        Log.i(AlarmScheduler.TAG, "posted MISSED fallback notification for med $medicationId ($drugName)")
+    }
+
+    /** Distinct id so the missed notification doesn't overwrite a live alarm's. */
+    fun missedNotificationId(medicationId: Long): Int = (medicationId + 1_000_000L).toInt()
+
+    /** IMPORTANCE_LOW: visible and persistent, but silent — it must not ring again. */
+    private fun ensureMissedChannel(context: Context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val manager = context.getSystemService(NotificationManager::class.java) ?: return
+        if (manager.getNotificationChannel(MISSED_CHANNEL_ID) != null) return
+        manager.createNotificationChannel(
+            NotificationChannel(MISSED_CHANNEL_ID, MISSED_CHANNEL_NAME, NotificationManager.IMPORTANCE_LOW).apply {
+                description = "A dose alarm that rang without being answered"
+            },
+        )
+    }
+
+    /** Shared by the alarm notification and the missed fallback. */
+    private fun alarmIntent(
+        context: Context,
+        medicationId: Long,
+        drugName: String,
+        doseLabel: String?,
+        scheduledForIso: String?,
+        audioPath: String?,
+        photoPath: String?,
+    ): Intent = Intent(context, AlarmActivity::class.java).apply {
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        data = Uri.parse("reminderhealth://alarm/$medicationId")
+        putExtra(AlarmScheduler.EXTRA_MEDICATION_ID, medicationId)
+        putExtra(AlarmScheduler.EXTRA_DRUG_NAME, drugName)
+        putExtra(AlarmScheduler.EXTRA_DOSE_LABEL, doseLabel)
+        putExtra(AlarmScheduler.EXTRA_SCHEDULED_FOR, scheduledForIso)
+        putExtra(AlarmScheduler.EXTRA_AUDIO_PATH, audioPath)
+        putExtra(AlarmScheduler.EXTRA_PHOTO_PATH, photoPath)
     }
 
     /**

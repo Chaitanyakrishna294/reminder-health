@@ -98,7 +98,7 @@ export default function ScheduleSync() {
       }));
 
       try {
-        const result = await syncScheduleToNative(medications);
+        const result = await syncScheduleToNative(medications, session?.user.id);
         if (cancelled) return;
         console.log(
           `[ScheduleSync] synced ${medications.length} medication(s) to the native store` +

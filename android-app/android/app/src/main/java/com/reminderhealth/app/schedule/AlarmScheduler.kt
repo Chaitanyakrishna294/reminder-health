@@ -157,6 +157,29 @@ object AlarmScheduler {
             return
         }
 
+        // Re-fire-loop guard.
+        //
+        // The server's `nextReminderAt` is NEVER used to set an alarm — it is
+        // stored and ignored, and fire times come only from calculateNextReminder,
+        // which returns an instant strictly AFTER its `now`. So a stale/past
+        // nextReminderAt in a sync payload (e.g. 2026-08-10T20:40Z arriving at
+        // 01:32) structurally cannot register an immediate fire. This check exists
+        // to make that PROVABLE on device rather than merely argued: a past or
+        // near-instant fireAt could only come from a bug, and
+        // setExactAndAllowWhileIdle on a past time fires immediately, so an
+        // unguarded one is exactly how a fire loop would start.
+        val minimumFireAt = Instant.now().plusSeconds(5)
+        if (fireAt.isBefore(minimumFireAt)) {
+            Log.e(
+                TAG,
+                "REFUSING to schedule med $medicationId ($drugName) at $fireAt — that is in the past " +
+                    "or under 5s away, which would fire immediately and risk a re-fire loop. " +
+                    "Fire times must come from calculateNextReminder, never from the server's " +
+                    "nextReminderAt. Not scheduling; the next sync or boot will recompute.",
+            )
+            return
+        }
+
         val intent = Intent(context, AlarmReceiver::class.java).apply {
             // PendingIntent equality IGNORES extras, so two alarms that differ
             // only by extras would collide and share whichever extras were set

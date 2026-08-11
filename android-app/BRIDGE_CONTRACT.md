@@ -170,6 +170,33 @@ interface QueuedAction {
 }
 ```
 
+## 3b. `clearSchedule()` — web → native
+
+**Must be called on sign-out, and before signing a different account in.** Wipes the local
+medication store and cancels every registered alarm.
+
+Not optional politeness — found on-device 2026-08-11: signed in as a **guest**, the native store
+still held the previous account's 12 medications and rang for them. A device alarm for a dose the
+current user does not have is worse than a missing alarm: it tells someone to take medication that
+isn't theirs.
+
+Wired on the web at every session exit: `components/layout/navbar.tsx` (logout),
+`settings-client-view.tsx` (logout **and** account deletion — deletion matters more, since the
+medications are gone server-side and any surviving alarm points at nothing).
+
+Ordering inside native is deliberate:
+1. flush the action queue FIRST, while the outgoing session is still valid — after this the
+   credential is gone and an un-synced Taken/Skip could never reach the server;
+2. cancel alarms, wipe the medication store;
+3. keep the action queue itself (a stranded action is recoverable, a deleted one is not) and log
+   how many were stranded;
+4. clear the tokens.
+
+**Second line of defence:** `syncSchedule` also takes `userId` and compares it to the stored
+owner ([`SessionStore.ownerUserId`]). A different id wipes the store before syncing rather than
+layering on top — so the store belongs to exactly one identity even if `clearSchedule` was never
+called (a crash mid-logout, an older web build).
+
 ## 4. `getPendingActions()` — web → native (query) + native → web (event)
 
 `getPendingActions(): Promise<QueuedAction[]>` — callable from the web page (e.g. the

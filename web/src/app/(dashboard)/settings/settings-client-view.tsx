@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { CARE_LABELS } from '@/lib/design/semantics';
 import { isGuestGuardError } from '@/lib/auth/guest';
+import { clearNativeSchedule } from '@/lib/native/schedule-bridge';
 
 interface SettingsClientViewProps {
   user: {
@@ -95,6 +96,11 @@ export default function SettingsClientView({
   }, []);
 
   const handleLogout = async () => {
+    // See navbar.tsx: wipe the Android app's local alarms before the session
+    // goes, or this account's doses ring for whoever signs in next.
+    await clearNativeSchedule().catch((err) => {
+      console.error('[Settings] clearNativeSchedule failed:', err);
+    });
     await supabase.auth.signOut();
     router.refresh();
     router.push('/login');
@@ -120,6 +126,12 @@ export default function SettingsClientView({
       if (!res.ok) {
         throw new Error(data?.error || 'Failed to delete account.');
       }
+      // Deleting the account matters even more than logging out: the medications
+      // are gone server-side, so any alarm left registered on the device would
+      // ring for a dose that no longer exists anywhere.
+      await clearNativeSchedule().catch((clearErr) => {
+        console.error('[Settings] clearNativeSchedule failed after delete:', clearErr);
+      });
       await supabase.auth.signOut();
       router.refresh();
       router.push('/login');

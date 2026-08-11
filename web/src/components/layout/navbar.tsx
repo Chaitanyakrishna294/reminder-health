@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useUiMode } from '@/context/ui-mode-context';
+import { clearNativeSchedule } from '@/lib/native/schedule-bridge';
 import { useTheme } from '@/context/theme-context';
 import { Pill, ChevronDown, LogOut, Glasses, HeartPulse, Siren, Moon, Sun, Calendar } from 'lucide-react';
 import NotificationCenter from '@/components/shared/notification-center';
@@ -30,6 +31,14 @@ export default function Navbar({ user }: NavbarProps) {
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
 
   const handleLogout = async () => {
+    // BEFORE signOut, while the session is still valid: wipe the Android app's
+    // local schedule and cancel its alarms. Otherwise this account's doses keep
+    // ringing on the device for whoever signs in next — observed on-device
+    // 2026-08-11, where a guest session still rang for the previous account's
+    // 12 medications. A no-op in a normal browser.
+    await clearNativeSchedule().catch((err) => {
+      console.error('[Navbar] clearNativeSchedule failed:', err);
+    });
     await supabase.auth.signOut();
     router.refresh();
     router.push('/login');

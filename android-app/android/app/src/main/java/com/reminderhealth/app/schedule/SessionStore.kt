@@ -87,4 +87,24 @@ object SessionStore {
 
     fun hasSession(context: Context): Boolean =
         !prefs(context)?.getString(KEY_ACCESS, null).isNullOrBlank()
+
+    /** Stamps which account owns the local stores, without touching the tokens. */
+    fun setOwnerUserId(context: Context, userId: String?) {
+        prefs(context)?.edit()?.putString(KEY_USER, userId)?.apply()
+    }
+
+    /**
+     * Forgets the credential on logout. The Supabase URL and anon key are kept:
+     * they are not secrets, and keeping them lets a queued action still be
+     * addressed to the right project if a session returns.
+     */
+    fun clearSession(context: Context) {
+        prefs(context)?.edit()
+            ?.remove(KEY_ACCESS)
+            ?.remove(KEY_REFRESH)
+            ?.remove(KEY_EXPIRES)
+            ?.remove(KEY_USER)
+            ?.apply()
+        Log.i(AlarmScheduler.TAG, "session cleared (tokens and owner forgotten)")
+    }
 }
