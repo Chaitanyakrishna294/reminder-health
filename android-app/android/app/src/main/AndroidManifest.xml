@@ -28,6 +28,19 @@
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- Sentry MUST NOT auto-initialise.
+             The SDK ships a SentryInitProvider ContentProvider that runs at
+             process start and reads the DSN from manifest meta-data. With no DSN
+             configured it throws "DSN is required", and because a ContentProvider
+             failure aborts application startup, the whole app dies before any of
+             our code runs — verified on device 2026-08-11: FATAL EXCEPTION on
+             launch, every alarm dead.
+             Crash.kt initialises Sentry itself, only when a DSN resource exists.
+             That keeps the "no DSN means Sentry does not exist" guarantee real
+             instead of aspirational, and keeps crash reporting from ever being
+             the cause of the outage it is meant to reveal. -->
+        <meta-data android:name="io.sentry.auto-init" android:value="false" />
+
         <!-- M2 alarm core. exported=false: only this app's own AlarmManager
              alarms trigger it, never another app. -->
         <receiver
