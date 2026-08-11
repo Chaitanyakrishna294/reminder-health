@@ -185,11 +185,28 @@ obligation. Back up the *new* Capacitor app's keystore per the paragraph above o
     unsynced actions were kept rather than deleted.
   - **Still open: test C** — a clean overnight battery reading with Pillo uninstalled and alarms
     scheduled (expect a single-digit drop). Not blocking; runs on the next overnight.
-  - **Steps 5-6 ✅ built; step 6's core path verified on device 2026-08-11.** Logcat: alarm fired
-    for med 136, **Taken tapped on the notification alone** → queued in 26ms → synced 1.2s later,
-    with no screen ever opening and no `STRANDED` lines. Step 5's `rescheduleAll` is proven via
-    `MY_PACKAGE_REPLACED`; a **real reboot is still untested** and is the one that matters, because
-    vivo's autostart restrictions target `BOOT_COMPLETED` specifically.
+  - **Steps 5-6 ✅ VERIFIED on device 2026-08-11 — M2's alarm core is complete.**
+    - Step 6: alarm fired for med 136, **Taken tapped on the notification alone** → queued in 26ms
+      → synced 1.2s later, no screen opened, no `STRANDED` lines.
+    - Step 5: a **real reboot** on the vivo produced
+      `BootReceiver: android.intent.action.BOOT_COMPLETED — re-registering alarms from the local
+      store` → `rescheduleAll: 19 medication(s)`. This was the one genuinely in doubt, since vivo's
+      autostart restrictions target `BOOT_COMPLETED` specifically. **No autostart exemption was
+      needed on this device** — do not assume that generalises to Xiaomi/Oppo/Realme; M3's OEM
+      onboarding still stands.
+    - Snooze: `synced SNOOZE for med 137 (Op) scheduled 2026-08-11T10:30:00Z` — the **original**
+      dose instant while the re-fire sat at `10:40:13Z`, proving both the `scheduledFor` split and
+      the 42702 fix. The action had failed twice before the migration landed and recovered by
+      itself afterwards, which is the offline queue's entire promise demonstrated on real data.
+  - **Known gap — a reboot cancels an in-flight snooze (device side only).** A snooze is a
+    transient `AlarmManager` re-registration; it is NOT persisted in the Room store, and
+    `BootReceiver`'s `rescheduleAll` recomputes purely from `reminder_times`. So rebooting between
+    a snooze and its re-fire silently drops the device's re-prompt — observed 2026-08-11, where med
+    137's post-boot alarm jumped straight to the next day. **Not urgent:** the server has the dose
+    `SNOOZED` with `retry_reminder_at` set, so Telegram/push re-prompts and the escalation ladder
+    still cover it — the device just goes quiet. Fixing it properly means persisting a pending
+    snooze (dose instant + re-fire time) in the store and having `rescheduleAll` honour one that
+    has not yet passed. Worth doing before release; not a blocker for M2.
   - **Two migrations applied 2026-08-11** (validations all DONE):
     `migration_snooze_reminder_event_2026_08_11.sql` and
     `migration_resolve_event_device_queue_2026_08_11.sql`. The second exists because the alarm is
