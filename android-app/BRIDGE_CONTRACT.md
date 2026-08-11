@@ -274,6 +274,19 @@ the escalation ladder anchored on the last real prompt.
 server considering the dose unanswered, so the care circle gets a **false missed-dose alert** for a
 patient who did respond. Unacceptable for a care-circle product.
 
+A snooze therefore does **both halves** — call this RPC *and* re-register the device's own alarm.
+Both the full-screen alarm and the notification's Snooze button go through the same path.
+
+> **Landmine, fixed 2026-08-11 — this is what "snooze doesn't work" turned out to be.** The local
+> re-registration must carry the **original dose instant**, not the re-fire time.
+> `AlarmScheduler.scheduleAt` used to write `fireAt` into `EXTRA_SCHEDULED_FOR`; for a normal dose
+> those are the same instant, so it was invisible. For a snooze they are not — the re-fire is 10
+> minutes out while the dose it asks about is still the original one. The re-fired alarm therefore
+> advertised its own re-fire time as the dose identity, and answering it queued a `scheduled_for`
+> matching no `reminder_times` entry and no `reminder_events` row: permanent
+> `INVALID_SCHEDULED_TIME`, five retries, **answer dropped**. `scheduleAt` now takes `scheduledFor`
+> separately from `fireAt` (defaulting to `fireAt`, which stays correct for every normal dose).
+
 > **Still PENDING application.** Both this and the device-queue migration above are written but must
 > be applied by the maintainer in the Supabase SQL editor (see `db/migrations/APPLIED.md`). Until
 > then a device snooze reaches an RPC that does not exist, fails, and retries.

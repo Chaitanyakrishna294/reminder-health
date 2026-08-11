@@ -151,6 +151,20 @@ object AlarmScheduler {
         fireAt: Instant,
         audioPath: String? = null,
         photoPath: String? = null,
+        /**
+         * The DOSE's own scheduled instant, which is not always when the alarm
+         * rings. They differ for a snooze: the alarm re-fires 10 minutes from
+         * now, but the dose it is asking about is still the original one.
+         *
+         * This is the identity the server resolves against
+         * (`resolve_reminder_event`'s `(medication_id, scheduled_for)`), so
+         * getting it wrong is not cosmetic. Defaulting this to [fireAt] is what
+         * broke snooze: a snoozed alarm carried its own re-fire time as the dose
+         * instant, so tapping Taken afterwards queued a time that matched no
+         * `reminder_times` entry and no event row — permanent
+         * INVALID_SCHEDULED_TIME, five retries, answer dropped. Found 2026-08-11.
+         */
+        scheduledFor: Instant = fireAt,
     ) {
         val manager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: run {
             Log.e(TAG, "AlarmManager unavailable; cannot schedule med $medicationId")
@@ -189,7 +203,7 @@ object AlarmScheduler {
             putExtra(EXTRA_MEDICATION_ID, medicationId)
             putExtra(EXTRA_DRUG_NAME, drugName)
             putExtra(EXTRA_DOSE_LABEL, doseLabel)
-            putExtra(EXTRA_SCHEDULED_FOR, fireAt.toString())
+            putExtra(EXTRA_SCHEDULED_FOR, scheduledFor.toString())
             putExtra(EXTRA_AUDIO_PATH, audioPath)
             putExtra(EXTRA_PHOTO_PATH, photoPath)
         }

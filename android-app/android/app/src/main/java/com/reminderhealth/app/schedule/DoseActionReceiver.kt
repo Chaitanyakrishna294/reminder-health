@@ -57,14 +57,19 @@ class DoseActionReceiver : BroadcastReceiver() {
         // produces a false escalation alert — the whole reason
         // snooze_reminder_event exists.
         if (action == DoseAction.ACTION_SNOOZE && medicationId > 0L) {
+            val fireAt = Instant.now().plusSeconds(AlarmActivity.SNOOZE_MINUTES * 60L)
+            // Carry the ORIGINAL dose instant into the re-fire, not the snooze
+            // time — see AlarmScheduler.scheduleAt's `scheduledFor` doc.
+            val doseInstant = scheduledFor?.let { runCatching { Instant.parse(it) }.getOrNull() }
             AlarmScheduler.scheduleAt(
                 context = context,
                 medicationId = medicationId,
                 drugName = drugName,
                 doseLabel = doseLabel,
-                fireAt = Instant.now().plusSeconds(AlarmActivity.SNOOZE_MINUTES * 60L),
+                fireAt = fireAt,
                 audioPath = audioPath,
                 photoPath = photoPath,
+                scheduledFor = doseInstant ?: fireAt,
             )
             Log.i(
                 AlarmScheduler.TAG,

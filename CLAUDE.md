@@ -185,6 +185,52 @@ obligation. Back up the *new* Capacitor app's keystore per the paragraph above o
     unsynced actions were kept rather than deleted.
   - **Still open: test C** — a clean overnight battery reading with Pillo uninstalled and alarms
     scheduled (expect a single-digit drop). Not blocking; runs on the next overnight.
+  - **Steps 5-6 ✅ built; step 6's core path verified on device 2026-08-11.** Logcat: alarm fired
+    for med 136, **Taken tapped on the notification alone** → queued in 26ms → synced 1.2s later,
+    with no screen ever opening and no `STRANDED` lines. Step 5's `rescheduleAll` is proven via
+    `MY_PACKAGE_REPLACED`; a **real reboot is still untested** and is the one that matters, because
+    vivo's autostart restrictions target `BOOT_COMPLETED` specifically.
+  - **Two migrations applied 2026-08-11** (validations all DONE):
+    `migration_snooze_reminder_event_2026_08_11.sql` and
+    `migration_resolve_event_device_queue_2026_08_11.sql`. The second exists because the alarm is
+    pure native and can never send `p_event_id`, so every device action was treated as a
+    client-fabricated dose and hit two guards meant for the web —
+    `VIRTUAL_EVENT_MUST_BE_FOR_TODAY` (killed anything syncing after the local day rolled over,
+    i.e. exactly the offline-overnight case) and `INVALID_SCHEDULED_TIME` (killed anything syncing
+    after `reminder_times` was edited). Both permanent, so the device retried 5× and dropped a
+    patient's recorded "I took it". The guards are now gated on whether a `reminder_events` row
+    exists rather than on whether the caller knew its id.
+  - **Snooze bug found and fixed 2026-08-11.** `AlarmScheduler.scheduleAt` wrote `fireAt` into
+    `EXTRA_SCHEDULED_FOR`. Identical for a normal dose, so invisible — but a snooze re-fires 10
+    minutes out while still asking about the *original* dose, so the re-fired alarm carried its own
+    re-fire time as the dose identity. Answering it queued a `scheduled_for` matching no
+    `reminder_times` entry and no event row → permanent `INVALID_SCHEDULED_TIME` → answer dropped.
+    `scheduleAt` now takes `scheduledFor` separately from `fireAt`. **Snooze still needs on-device
+    re-verification.**
+
+**Alarm presentation: two shapes, both correct (confirmed on device 2026-08-11 — do not "fix").**
+Android decides how to present the dose alarm's full-screen intent:
+- phone **locked or idle** → the full-screen `AlarmActivity` takes over the screen;
+- phone **unlocked and in active use** → a **heads-up notification** instead (tapping it opens the
+  full alarm screen).
+
+That second case is Android deliberately not hijacking the screen of someone who is demonstrably
+already using their phone. It is correct and desirable. **Never attempt to override it** — the ways
+to do so are exactly the ones CLAUDE.md already forbids (`SYSTEM_ALERT_WINDOW`, a foreground
+service). The design consequence is that **the notification must be fully answerable on its own**:
+- **Taken / Skip / Snooze 10 min are action buttons on the notification itself**, handled by
+  `DoseActionReceiver` (a BroadcastReceiver — no UI opens) and routed through the *same*
+  `DoseActionQueue` as the full-screen buttons. Snooze does both halves: local re-registration
+  **and** `snooze_reminder_event`. Nobody should have to open a takeover screen to answer a dose
+  they are awake for.
+- Both the live alarm and the "Missed: take X" fallback are **persistent** (`setOngoing(true)` +
+  `setAutoCancel(false)`) and stay until the dose is actually resolved. The missed fallback carries
+  the same three buttons — it has to, since a persistent notification with no way to answer it is
+  just a stuck notification.
+- **Android 14+ caveat:** a user can still *deliberately* dismiss an ongoing notification; the
+  platform stopped treating `setOngoing` as absolute. Accepted, not fought — the missed-dose
+  fallback and above all the **server-side escalation ladder** are the real backstop. A
+  notification the OS lets someone dismiss was never the last line of defence.
 
 **Alarm presentation: two shapes, both correct (confirmed on device 2026-08-11 — do not "fix").**
 Android decides how to present the dose alarm's full-screen intent:

@@ -311,16 +311,23 @@ class AlarmActivity : Activity() {
      */
     private fun snooze() {
         if (medicationId > 0L) {
+            val fireAt = Instant.now().plusSeconds(SNOOZE_MINUTES * 60L)
+            // The re-fire is 10 minutes out, but it still asks about THIS dose,
+            // so it must carry the ORIGINAL scheduled instant — that is what the
+            // server resolves against. See scheduleAt's `scheduledFor` doc for
+            // what conflating the two broke.
+            val doseInstant = scheduledFor?.let { runCatching { Instant.parse(it) }.getOrNull() }
             AlarmScheduler.scheduleAt(
                 context = this,
                 medicationId = medicationId,
                 drugName = drugName,
                 doseLabel = doseLabel,
-                fireAt = Instant.now().plusSeconds(SNOOZE_MINUTES * 60L),
+                fireAt = fireAt,
                 audioPath = audioFile?.absolutePath,
                 photoPath = photoFile?.absolutePath,
+                scheduledFor = doseInstant ?: fireAt,
             )
-            Log.i(AlarmScheduler.TAG, "snoozed med $medicationId by $SNOOZE_MINUTES min")
+            Log.i(AlarmScheduler.TAG, "snoozed med $medicationId by $SNOOZE_MINUTES min (dose $scheduledFor)")
             enqueue(DoseAction.ACTION_SNOOZE)
         }
         dismiss()
