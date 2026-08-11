@@ -104,6 +104,13 @@ SELECT 7,
   END
 FROM public.caregiver_info ci
 WHERE ci.is_active = true AND ci.connection_status = 'ACCEPTED'
+  -- Same NULL exclusion the migration's pre-flight guard uses, and for the same reason: a legacy
+  -- row with either id NULL never granted anything (the branch's join to profiles cannot match a
+  -- NULL, and a NULL patient id contributes only NULL to an IN (...) list), so it cannot have lost
+  -- anything either. Without this, live rows 4 and 24 — abandoned half-written invitations —
+  -- reported as "2 relationships now have NO access", which was alarming and wrong.
+  AND ci.caregiver_chat_id IS NOT NULL
+  AND ci.patient_telegram_id IS NOT NULL
   AND NOT EXISTS (
     SELECT 1 FROM public.caregiver_connections cc
     JOIN public.profiles p_cg  ON p_cg.id  = cc.caregiver_profile_id
