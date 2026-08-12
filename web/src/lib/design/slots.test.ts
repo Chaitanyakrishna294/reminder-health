@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
   slotForHour, slotForDose, groupBySlot,
-  dayKeyForDose, groupByDay, dayKeysEndingAt, timeOfDayForDose,
+  dayKeyForDose, groupByDay, dayKeysEndingAt, weekKeysOf, timeOfDayForDose,
   SLOTS,
 } from './slots.ts';
 
@@ -143,6 +143,39 @@ test('timeOfDayForDose prints the dose\'s own clock, not the viewer\'s', () => {
   assert.equal(timeOfDayForDose('2026-08-12T02:30:00Z', 'Asia/Kolkata'), '08:00');
   assert.equal(timeOfDayForDose('2026-08-12T20:10:00Z', 'Asia/Kolkata'), '01:40');
   assert.equal(timeOfDayForDose('not-a-date', 'Asia/Kolkata'), '');
+});
+
+test('weekKeysOf returns Sunday-first weeks and steps cleanly', () => {
+  // 2026-08-12 is a Wednesday.
+  assert.deepEqual(weekKeysOf('2026-08-12'), [
+    '2026-08-09', '2026-08-10', '2026-08-11', '2026-08-12',
+    '2026-08-13', '2026-08-14', '2026-08-15',
+  ]);
+  // Sunday must anchor its OWN week, not the one before it.
+  assert.equal(weekKeysOf('2026-08-09')[0], '2026-08-09');
+  // Saturday closes the same week rather than opening the next.
+  assert.equal(weekKeysOf('2026-08-15')[0], '2026-08-09');
+  assert.deepEqual(weekKeysOf('2026-08-12', -1)[0], '2026-08-02');
+  assert.deepEqual(weekKeysOf('2026-08-12', 1)[0], '2026-08-16');
+  // Stepping across a DST boundary must not shear the week by an hour into a
+  // different day. 2026-03-08 is US spring-forward.
+  assert.deepEqual(weekKeysOf('2026-03-11', -1), [
+    '2026-03-01', '2026-03-02', '2026-03-03', '2026-03-04',
+    '2026-03-05', '2026-03-06', '2026-03-07',
+  ]);
+  assert.deepEqual(weekKeysOf('not-a-key'), []);
+});
+
+test('weekKeysOf is Sunday-first, matching dose_days 0=Sunday', () => {
+  // Not cosmetic: dose_days stores 0=Sun, and a Monday-first strip would put the
+  // day a medication is due in a different column than the day it renders under.
+  for (const key of ['2026-08-09', '2026-08-12', '2026-08-15', '2027-01-01']) {
+    const week = weekKeysOf(key);
+    const first = new Date(`${week[0]}T12:00:00Z`).getUTCDay();
+    assert.equal(first, 0, `${key}: week starts on weekday ${first}, expected Sunday`);
+    assert.equal(week.length, 7);
+    assert.equal(new Set(week).size, 7, 'a repeated key would render two identical columns');
+  }
 });
 
 test('every hour of the day lands in exactly one slot', () => {

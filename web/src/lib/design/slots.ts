@@ -156,6 +156,29 @@ export function dayKeysEndingAt(endKey: string, count: number): string[] {
 }
 
 /**
+ * The seven day keys of the week containing `key`, SUNDAY FIRST.
+ *
+ * Sunday-first matches `weekOf()` in lib/schedule/day-doses.ts, the Schedule
+ * Planner's month grid, and `dose_days` (0=Sun..6=Sat) — the weekday numbering a
+ * medication is actually stored with. A Monday-first strip would look tidier to a
+ * European eye and silently disagree with the column that decides which days a
+ * medication is due.
+ *
+ * @param weekOffset 0 = the week containing `key`, -1 = the week before, and so on.
+ */
+export function weekKeysOf(key: string, weekOffset = 0): string[] {
+  const [y, m, d] = key.split('-').map(Number);
+  if (!y || !m || !d) return [];
+  const noon = Date.UTC(y, m - 1, d, 12);
+  const sunday = noon - new Date(noon).getUTCDay() * 86_400_000 + weekOffset * 7 * 86_400_000;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return Array.from({ length: 7 }, (_, i) => {
+    const dt = new Date(sunday + i * 86_400_000);
+    return `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}`;
+  });
+}
+
+/**
  * HH:MM (24h) at the dose's own local wall clock.
  *
  * Same reason as the day key: `Date#toTimeString` prints the VIEWER's clock, so an

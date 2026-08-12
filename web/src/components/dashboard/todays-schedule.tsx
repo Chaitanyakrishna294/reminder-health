@@ -14,6 +14,7 @@ import { getSeverityTheme, getToneTheme } from '@/lib/severity-theme';
 import { TONE_VAR, priorityMeta, doseTone, doseLabel } from '@/lib/design/semantics';
 import { Badge } from '@/components/ui/badge';
 import DayRail from '@/components/dashboard/day-rail';
+import BrainMascot from '@/components/dashboard/brain-mascot';
 
 export interface ReminderEvent {
   id: number;
@@ -63,6 +64,13 @@ interface TodaysScheduleProps {
    *    point of reaching back is to repair it.
    */
   isPastDay?: boolean;
+  /**
+   * The rail is previewing a day that has not happened. Read-only: a dose with no
+   * outcome cannot be given one. Both RPCs refuse it server-side regardless —
+   * `resolve_reminder_event` on its forward bound and `correct_reminder_event` with
+   * CANNOT_CORRECT_FUTURE_DOSE — so hiding the actions is courtesy, not the guard.
+   */
+  isFutureDay?: boolean;
 }
 
 // 270° SVG Severity Arc surrounding the timeline status badge
@@ -130,6 +138,7 @@ export default function TodaysSchedule({
   medicationTimezone,
   selectedEventId,
   isPastDay = false,
+  isFutureDay = false,
 }: TodaysScheduleProps) {
   const [events, setEvents] = useState<ReminderEvent[]>(initialEvents);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
@@ -539,7 +548,7 @@ export default function TodaysSchedule({
     // A past day has no live actions. resolve_reminder_event is the live path — it
     // feeds escalation and the retry ladder — and running it for Tuesday's dose on
     // Thursday would start a ladder for a dose nobody is waiting on.
-    if (isPastDay) return false;
+    if (isPastDay || isFutureDay) return false;
     return userRole === 'PATIENT'
       ? isPendingState(event.reminder_status)
       : event.reminder_status === 'ESCALATED_TO_CG';
@@ -551,6 +560,8 @@ export default function TodaysSchedule({
   // well. Same-day only; `handleCorrect` surfaces the expiry from the RPC.
   const railCanCorrect = (event: ReminderEvent) => {
     if (viewMode === 'PATIENT_MONITOR') return false;
+    // Nothing to correct about a dose that has not happened.
+    if (isFutureDay) return false;
     // These two lists mirror correct_reminder_event's own branches
     // (migration_past_day_correction_2026_08_12.sql). They are duplicated rather
     // than derived because the server is the authority and the client is only
@@ -567,12 +578,19 @@ export default function TodaysSchedule({
     <>
       <div className="space-y-6">
         {events.length === 0 ? (
-          <div className="p-8 text-center text-sm text-muted-foreground bg-card/60 rounded-3xl border border-dashed border-border/80">
-            {isPastDay
-              /* Not "nothing scheduled": a past day with no rows means no dose was
-                 ever recorded, which is a different fact and worth not overstating. */
-              ? 'No doses were recorded on this day.'
-              : 'Nothing scheduled for today.'}
+          /* Remi's empty-state slot. `peaceful`, not `concerned`: an empty day is not
+             a problem to be alarmed about, and the calm rule says the mascot never
+             escalates a non-event. One line, no call to action — there is nothing
+             here for the user to do, and inventing a button would say otherwise. */
+          <div className="p-8 flex flex-col items-center text-center gap-3 bg-card/60 rounded-3xl border border-dashed border-border/80">
+            <BrainMascot size={72} mood="peaceful" />
+            <p className="text-sm text-muted-foreground font-semibold">
+              {isPastDay
+                /* Not "nothing scheduled": a past day with no rows means nothing was
+                   ever recorded, which is a different fact and worth not overstating. */
+                ? 'No doses were recorded this day.'
+                : 'No doses scheduled this day.'}
+            </p>
           </div>
         ) : (
           <DayRail

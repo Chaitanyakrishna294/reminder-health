@@ -22,8 +22,8 @@ import RefillStrip from '@/components/dashboard/refill-strip';
 import RefillGate from '@/components/dashboard/refill-gate';
 import type { LowStockMed } from '@/lib/medications/stock';
 import DoseStrip from '@/components/dashboard/dose-strip';
-import DayNav, { type DayNavDay } from '@/components/dashboard/day-nav';
-import { dayKeyForDose, dayKeysEndingAt } from '@/lib/design/slots';
+import WeekStrip, { type WeekStripDay } from '@/components/dashboard/week-strip';
+import { dayKeyForDose, weekKeysOf, dayKeysEndingAt } from '@/lib/design/slots';
 import { getUnitIcon } from '@/components/dashboard/dashboard-helpers';
 
 import { createClient } from '@/lib/supabase/client';
@@ -175,6 +175,9 @@ export default function DashboardClientView({
    * to a date that has quietly become yesterday.
    */
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
+  /** 0 = the week containing today, -1 = last week. Never positive: the strip stops
+   *  at the current week, so there is no next week to step into. */
+  const [weekOffset, setWeekOffset] = useState(0);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -520,12 +523,16 @@ export default function DashboardClientView({
   // `currentTime` rather than a fresh Date(): reading the clock during render is
   // impure, and this one already ticks every 60s.
   const todayKey = dayKeyForDose(currentTime.toISOString(), rowRefTz) ?? '';
-  const dayKeys = todayKey ? dayKeysEndingAt(todayKey, 7) : [];
+  const weekKeys = todayKey ? weekKeysOf(todayKey, weekOffset) : [];
+  // Matches the server query's 8-day reach (app/(dashboard)/dashboard/page.tsx).
+  // If that window changes, change this with it or the strip starts showing days it
+  // has no data for.
+  const oldestLoadedKey = todayKey ? dayKeysEndingAt(todayKey, 8)[0] : '';
 
   // Past days come straight from `recentEvents` — real reminder_events rows with the
-  // status they finished in. Deliberately NOT re-projected from reminder_times the
-  // way the Schedule Planner projects a future day: a past day is a record of what
-  // happened, and drawing a dose that was never actually scheduled would invent one.
+  // status they finished in. Deliberately NOT re-projected from reminder_times: a
+  // past day is a record of what happened, and projecting one would draw doses that
+  // were never actually scheduled and let someone "correct" a dose that never existed.
   const pastEventsByDay: Record<string, ReminderEvent[]> = {};
   for (const e of recentEvents) {
     const tz = medications?.find((m) => m.id === e.medication_id)?.timezone || rowRefTz;
@@ -534,19 +541,81 @@ export default function DashboardClientView({
     (pastEventsByDay[key] ||= []).push(e);
   }
 
-  const isViewingToday = selectedDayKey === null || selectedDayKey === todayKey;
-  const railEvents = isViewingToday ? events : (pastEventsByDay[selectedDayKey!] ?? []);
+  /**
+   * A FUTURE day is the opposite case: nothing has happened, so there is no record —
+   * only the schedule's intention. Projected from `reminder_times` + `dose_days` in
+   * each medication's own zone, exactly the way the Schedule Planner projects, and
+   * marked FUTURE_SCHEDULED so nothing downstream mistakes it for an answerable dose.
+   *
+   * The ids are negative and derived from (medication, hh:mm) — the same virtual-id
+   * scheme today's generator uses — so a preview row can never collide with a real
+   * event id, and the RPC's no-existing-row path refuses it on the future bound.
+   */
+  const projectDay = (key: string): ReminderEvent[] => {
+    if (!medications || !key) return [];
+    const out: ReminderEvent[] = [];
+    for (const med of medications) {
+      const tz = med.timezone || rowRefTz;
+      const at = moment.tz(`${key} 00:00`, 'YYYY-MM-DD HH:mm', tz);
+      if (!occursOnWeekday(at.day(), med.dose_days)) continue;
+      // A medication cannot be due before it existed — and equally, a paused one is
+      // not going to fire. `medications` is already filtered to active rows.
+      for (const timeStr of ((med.reminder_times || []) as string[])) {
+        const [h, m] = timeStr.split(':').map(Number);
+        if (Number.isNaN(h) || Number.isNaN(m)) continue;
+        const when = at.clone().hour(h).minute(m).second(0).millisecond(0);
+        out.push({
+          id: -(med.id * 10000 + h * 60 + m),
+          medication_id: med.id,
+          telegram_id: targetTelegramChatId || myTelegramChatId || '',
+          scheduled_for: when.toISOString(),
+          reminder_status: 'FUTURE_SCHEDULED',
+          snooze_count: 0,
+          medications: {
+            drug_name: med.drug_name,
+            dosage: med.dosage || 'N/A',
+            priority_level: med.priority_level || 'normal',
+            unit_type: med.unit_type,
+            dosage_amount: med.dosage_amount,
+            medication_reason: med.medication_reason,
+          },
+        });
+      }
+    }
+    return out.sort((a, b) => new Date(a.scheduled_for).getTime() - new Date(b.scheduled_for).getTime());
+  };
 
-  const navDays: DayNavDay[] = dayKeys.map((key) => {
-    const dayEvents = key === todayKey ? events : (pastEventsByDay[key] ?? []);
+  const isViewingToday = selectedDayKey === null || selectedDayKey === todayKey;
+  const isViewingFuture = !!selectedDayKey && selectedDayKey > todayKey;
+  const railEvents = isViewingToday
+    ? events
+    : isViewingFuture
+      ? projectDay(selectedDayKey!)
+      : (pastEventsByDay[selectedDayKey!] ?? []);
+
+  const stripDays: WeekStripDay[] = weekKeys.map((key) => {
+    const isFuture = key > todayKey;
+    const dayEvents = key === todayKey ? events : isFuture ? projectDay(key) : (pastEventsByDay[key] ?? []);
     return {
       key,
       total: dayEvents.length,
-      // "Open" means nobody ever answered it. On a past day that is the gap the row
-      // exists to point at; on today it is simply what is still ahead.
-      open: dayEvents.filter((e) => !['TAKEN', 'RESOLVED_BY_CG', 'SKIPPED'].includes(e.reminder_status)).length,
+      // "Open" means nobody ever answered it — the gap the strip exists to point at.
+      // Meaningless for a future day, which is why the dot is suppressed there.
+      open: isFuture
+        ? 0
+        : dayEvents.filter((e) => !['TAKEN', 'RESOLVED_BY_CG', 'SKIPPED'].includes(e.reminder_status)).length,
+      isFuture,
     };
   });
+
+  /** "Aug 15", or "Today" when the rail is on today. Mono, per the date rules. */
+  const selectedLabel = isViewingToday
+    ? 'Today'
+    : new Date(Date.UTC(
+        Number(selectedDayKey!.slice(0, 4)),
+        Number(selectedDayKey!.slice(5, 7)) - 1,
+        Number(selectedDayKey!.slice(8, 10)), 12,
+      )).toLocaleDateString('en-GB', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 
   // "Did you take it?" gate, shown before the dashboard. Present doses first,
   // then the missed backlog (MISSED / PENDING_REVIEW / UNCONFIRMED), oldest first.
@@ -1297,20 +1366,31 @@ export default function DashboardClientView({
               327px. The button keeps its own line and never wraps. */}
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 px-1">
             <div className="min-w-0">
-              <h2 className="text-xl font-black text-foreground tracking-tight">
-                {isViewingToday ? 'Today’s schedule' : 'Earlier'}
-              </h2>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-xl font-black text-foreground tracking-tight font-mono tabular-nums" suppressHydrationWarning>
+                  {selectedLabel}
+                </h2>
+                {/* Only when you are away from today, and it says where it goes.
+                    A permanent "Today" button next to a heading reading "Today" is
+                    a control with nothing to do. */}
+                {!isViewingToday && (
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedDayKey(null); setWeekOffset(0); }}
+                    className="min-h-11 px-3 -my-2 rounded-full bg-primary-soft text-primary-strong font-mono font-bold text-xs inline-flex items-center gap-1 hover:bg-primary/15 active:scale-[0.98] transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  >
+                    <span aria-hidden>«</span> Today
+                  </button>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground font-semibold" suppressHydrationWarning>
                 {isViewingToday
                   ? 'Keep track of your medication requirements'
-                  /* Naming the day is not decoration: the row's highlight also means
-                     "selected", so the heading is the one place that says, in words,
-                     which day you are about to edit. */
-                  : `You are looking at ${new Date(Date.UTC(
-                      Number(selectedDayKey!.slice(0, 4)),
-                      Number(selectedDayKey!.slice(5, 7)) - 1,
-                      Number(selectedDayKey!.slice(8, 10)), 12,
-                    )).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })}. You can still correct what was recorded.`}
+                  : isViewingFuture
+                    /* Says plainly that this is a plan, not a record — the cards below
+                       carry no actions and the reason should not be a mystery. */
+                    ? 'Scheduled for this day. Nothing to record yet.'
+                    : 'You can still correct what was recorded.'}
               </p>
             </div>
             {/* The dashboard's one solid-primary CTA. Refill and Open Hub used to be
@@ -1327,12 +1407,22 @@ export default function DashboardClientView({
           {/* Mounted-gated: the row's days are derived from the device clock, and
               rendering them on the server would hydrate a different week for anyone
               whose date has already turned. */}
-          {mounted && dayKeys.length > 0 && (
-            <DayNav
-              days={navDays}
+          {mounted && weekKeys.length > 0 && (
+            <WeekStrip
+              days={stripDays}
               selectedKey={selectedDayKey ?? todayKey}
               todayKey={todayKey}
               onSelect={(key) => setSelectedDayKey(key === todayKey ? null : key)}
+              onStepWeek={(delta) => setWeekOffset((w) => Math.min(0, w + delta))}
+              /* Stops at the current week. Future is a preview of what is scheduled,
+                 and a strip you can page into next month is an invitation to try to
+                 record an outcome for a dose that has not happened. */
+              canStepForward={weekOffset < 0}
+              /* Only as far back as the 8-day query actually loaded. Beyond it every
+                 day would render empty, and an empty day in an adherence record reads
+                 as "nothing was taken" — the one lie this app must not tell. Deeper
+                 history needs a per-week fetch, the way the Medications page does it. */
+              canStepBack={weekKeys.length > 0 && weekKeys[6] >= oldestLoadedKey}
               isElderly={isElderly}
             />
           )}
@@ -1347,7 +1437,12 @@ export default function DashboardClientView({
             /* A past day is an archive: no live actions, only correction. Passing the
                day through lets TodaysSchedule drop Taken/Skip and widen Change to
                cover a dose nobody ever answered. */
-            isPastDay={!isViewingToday}
+            isPastDay={!isViewingToday && !isViewingFuture}
+            /* A future day is a preview: no actions of any kind. The server refuses
+               a future resolve on its own (resolve_reminder_event's forward bound)
+               and a future correction explicitly, so this only spares the user a
+               button that was always going to fail. */
+            isFutureDay={isViewingFuture}
             userRole={userRole}
             currentUserTelegramChatId={myTelegramChatId || ''}
             patientTelegramChatId={targetTelegramChatId || myTelegramChatId || ''}
