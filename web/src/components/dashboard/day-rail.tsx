@@ -391,7 +391,8 @@ function DoseCard({
     return (
       <article {...anchor} {...tourAttr} className={`rounded-2xl bg-card border border-primary/35 p-4 shadow-[0_2px_4px_rgba(15,28,90,0.06)] ${selectedRing}`}>
         <div className="flex items-center gap-3">
-          <span className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${slotChip}`}>
+          <span className={`rounded-2xl flex items-center justify-center shrink-0 ${isElderly ? 'w-16 h-16' : 'w-12 h-12'} ${slotChip}`}>
+            {/* 28px in elderly — the written floor, not a judgement call. */}
             <Pill className={isElderly ? 'w-7 h-7' : 'w-6 h-6'} aria-hidden />
           </span>
           <div className="min-w-0 flex-1">
@@ -409,14 +410,22 @@ function DoseCard({
           <button
             onClick={() => onResolve(event, 'TAKEN')}
             disabled={isUpdating}
-            className="min-h-[52px] rounded-2xl bg-primary-strong text-primary-strong-foreground font-mono font-bold text-[15px] hover:bg-primary-strong-hover active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50"
+            /* 72px in elderly. The floor is 44 and the normal card sits at 52, but
+               this is THE action of the whole screen for someone who may be shaky —
+               the old elderly view gave it 88px and that instinct was right, even if
+               its shouting copy was not. */
+            className={`rounded-2xl bg-primary-strong text-primary-strong-foreground font-mono font-bold hover:bg-primary-strong-hover active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 ${
+              isElderly ? 'min-h-[72px] text-2xl' : 'min-h-[52px] text-[15px]'
+            }`}
           >
             {isUpdating ? '…' : 'Taken'}
           </button>
           <button
             onClick={() => onResolve(event, 'SKIP')}
             disabled={isUpdating}
-            className="min-h-[52px] px-6 rounded-2xl border border-border text-muted-foreground font-mono font-bold text-[15px] hover:bg-muted active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50"
+            className={`rounded-2xl border border-border text-muted-foreground font-mono font-bold hover:bg-muted active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 ${
+              isElderly ? 'min-h-[72px] px-8 text-xl' : 'min-h-[52px] px-6 text-[15px]'
+            }`}
           >
             Skip
           </button>
@@ -427,8 +436,10 @@ function DoseCard({
 
   return (
     <article {...anchor} {...tourAttr} className={`rounded-2xl bg-card border border-transparent px-3.5 py-3 flex items-center gap-3 shadow-sm ${selectedRing}`}>
-      <span className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${slotChip}`}>
-        <Pill className={isElderly ? 'w-6 h-6' : 'w-[18px] h-[18px]'} aria-hidden />
+      <span className={`rounded-xl flex items-center justify-center shrink-0 ${isElderly ? 'w-14 h-14' : 'w-9 h-9'} ${slotChip}`}>
+        {/* Was 24px in elderly, under the 28px floor. The tile grew with it —
+            a 28px glyph in a 36px tile has no room to breathe. */}
+        <Pill className={isElderly ? 'w-7 h-7' : 'w-[18px] h-[18px]'} aria-hidden />
       </span>
       <div className="min-w-0 flex-1">
         <p className={`font-semibold text-foreground truncate ${isElderly ? 'text-lg' : 'text-[15px]'}`}>
@@ -444,7 +455,7 @@ function DoseCard({
       </div>
       <div className="shrink-0 flex flex-col items-end gap-0.5">
         <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-mono font-semibold ${isElderly ? 'text-xs' : 'text-[10px]'} ${meta.cls}`}>
-          <meta.Icon className="w-3 h-3" aria-hidden />
+          <meta.Icon className={isElderly ? 'w-5 h-5' : 'w-3 h-3'} aria-hidden />
           {meta.label}
         </span>
         {showCorrect && (

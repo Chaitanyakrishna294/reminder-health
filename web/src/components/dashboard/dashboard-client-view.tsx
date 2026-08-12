@@ -9,7 +9,7 @@ import TodaysSchedule, { ReminderEvent } from '@/components/dashboard/todays-sch
 import MedicationReviewQueue from '@/components/dashboard/medication-review-queue';
 import { addStock } from '@/lib/medications/add-stock';
 import { registerPush } from '@/lib/push/register-push';
-import { resolveReminderEvent } from '@/lib/reminder-events';
+
 import { PremiumToast } from '@/components/ui/premium-toast';
 import MedDueGate from '@/components/dashboard/med-due-gate';
 import GuideButton from '@/components/guide/guide-button';
@@ -30,24 +30,16 @@ import { createClient } from '@/lib/supabase/client';
 import { TONE_VAR, doseTone } from '@/lib/design/semantics';
 import { caregiverRoleLabel, patientRoleLabel, firstName } from '@/lib/care-circle/relationship';
 import { Eyebrow } from '@/components/ui/eyebrow';
-import { 
-  Activity, 
-  Clock, 
-  Package, 
-  AlertCircle, 
-  Phone, 
-  Send, 
-  Stethoscope, 
-  AlertTriangle, 
-  Users, 
-  RefreshCw, 
-  Plus, 
-  User, 
-  ShieldAlert, 
+import {
+  Activity,
+  Package,
+  AlertCircle,
+  Send,
+  Stethoscope,
+  AlertTriangle,
+  Users,
+  Plus,
   CheckCircle,
-  HelpCircle,
-  TrendingUp,
-  XCircle,
   Check,
   Pill,
   X,
@@ -55,9 +47,6 @@ import {
   Sun,
   CloudSun,
   Moon,
-  Lock,
-  ChevronDown,
-  Utensils,
   SkipForward,
 } from 'lucide-react';
 
@@ -724,23 +713,6 @@ export default function DashboardClientView({
   // "Request Caregiver Contact" (elderly mode): notifies every linked caregiver
   // via the in-app notification bell. Honest feedback either way.
   const [contactRequestSending, setContactRequestSending] = useState(false);
-  const handleContactRequest = async () => {
-    if (contactRequestSending) return;
-    setContactRequestSending(true);
-    try {
-      const res = await fetch('/api/care/contact-request', { method: 'POST' });
-      const body = await res.json().catch(() => ({}));
-      if (res.ok) {
-        showToast('Contact Request Sent', 'Your caregiver has been notified to assist you.', 'success');
-      } else {
-        showToast('Could Not Send Request', body?.error || 'Please try again, or call your caregiver directly.', 'error');
-      }
-    } catch {
-      showToast('Could Not Send Request', 'Please check your connection and try again.', 'error');
-    } finally {
-      setContactRequestSending(false);
-    }
-  };
 
   // Inline stock refill from the dashboard inventory card. Same write as the
   // Medications page (current_stock += amount; a DB trigger syncs tablet_count).
@@ -764,50 +736,6 @@ export default function DashboardClientView({
   };
 
   // Resolve medication for Elderly Mode giant button
-  const handleElderlyTakeNow = async (event: ReminderEvent, action: 'TAKEN' | 'SKIP') => {
-    // 1. Double-click prevention
-    if (updatingId !== null) return;
-    setUpdatingId(event.id);
-
-    try {
-      const resolvedRecord = await resolveReminderEvent({
-        supabase,
-        eventId: event.id,
-        medicationId: event.medication_id,
-        scheduledFor: event.scheduled_for,
-        action,
-        actorRole: userRole,
-      });
-
-      if (resolvedRecord.already_resolved) {
-        showToast(
-          'Medication already resolved',
-          'This medication was updated from another device.',
-          'error'
-        );
-      }
-
-      setEvents((prev) =>
-        prev.map((e) =>
-          e.id === event.id 
-            ? { 
-                ...e, 
-                id: resolvedRecord.event_id ?? e.id,
-                reminder_status: resolvedRecord.reminder_status
-              } 
-            : e
-        )
-      );
-
-      router.refresh();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.error('[Elderly Dashboard Action] Error:', message, err);
-      showToast('Error', 'Failed to update event. Please try again.', 'error');
-    } finally {
-      setUpdatingId(null);
-    }
-  };
 
   // Doses that are due right now (pending and their scheduled time has arrived). When several
   // land at the same / near time, the patient can confirm them together via "Take all" rather
@@ -817,43 +745,6 @@ export default function DashboardClientView({
     .sort((a, b) => new Date(a.scheduled_for).getTime() - new Date(b.scheduled_for).getTime());
 
   const BATCH_SENTINEL = -99999;
-  const handleResolveAll = async (action: 'TAKEN' | 'SKIP') => {
-    if (updatingId !== null || dueNowEvents.length === 0) return;
-    setUpdatingId(BATCH_SENTINEL);
-    let ok = 0;
-    try {
-      for (const ev of dueNowEvents) {
-        try {
-          const resolved = await resolveReminderEvent({
-            supabase,
-            eventId: ev.id,
-            medicationId: ev.medication_id,
-            scheduledFor: ev.scheduled_for,
-            action,
-            actorRole: userRole,
-          });
-          setEvents((prev) =>
-            prev.map((e) =>
-              e.id === ev.id
-                ? { ...e, id: resolved.event_id ?? e.id, reminder_status: resolved.reminder_status }
-                : e
-            )
-          );
-          ok += 1;
-        } catch (err) {
-          console.error('[Take All] Failed for event', ev.id, err);
-        }
-      }
-      showToast(
-        action === 'TAKEN' ? 'Doses confirmed' : 'Doses skipped',
-        `${ok} medication${ok === 1 ? '' : 's'} updated.`,
-        ok > 0 ? 'success' : 'error'
-      );
-      router.refresh();
-    } finally {
-      setUpdatingId(null);
-    }
-  };
 
   const getGreeting = () => {
     const hours = new Date().getHours();
@@ -877,239 +768,20 @@ export default function DashboardClientView({
   // ==========================================
   // ELDERLY MODE VIEW (Strictly Show ONLY: 1. Next Medication, 2. Today's Progress, 3. Low Stock Alerts)
   // ==========================================
-  if (isElderly) {
-    const progressPercentage = todayTotal > 0 ? Math.round((todayTaken / todayTotal) * 100) : 100;
-
-    return (
-      <>
-        {dueGate}
-        {refillGate}
-        {viewMode !== 'PATIENT_MONITOR' && <GuideAutoStart tour="dashboard" />}
-        {/* Dock clearance is owned by <main> in dashboard-main-layout; adding it here
-            too just stacked two paddings. */}
-        <div className="space-y-8 w-full max-w-4xl mx-auto transition-colors duration-500">
-          {missedStrip}
-          {refillStrip}
-          {/* Gravity State Dimmer Backdrop (Disabled) */}
-
-          {/* Push Banner */}
-          {showPushBanner && (
-            <div className="bg-white/10 dark:bg-slate-900/40 backdrop-blur-xl border-4 border-primary/20 p-5 rounded-2xl flex flex-col sm:flex-row items-center justify-between text-foreground gap-4">
-              <span className="text-2xl font-black text-center sm:text-left flex items-center gap-2">
-                <Send className="w-8 h-8 text-primary shrink-0 animate-bounce" />
-                <span>Enable browser notifications for medication reminders</span>
-              </span>
-              <div className="flex items-center gap-4 w-full sm:w-auto shrink-0 justify-end">
-                <button
-                  onClick={handleEnableNotifications}
-                  className="bg-primary-strong text-primary-strong-foreground font-black px-8 py-3 rounded-xl text-xl cursor-pointer hover:bg-primary-strong-hover transition-all shadow-md shrink-0"
-                >
-                  Enable Notifications
-                </button>
-                <button
-                  onClick={handleDismissBanner}
-                  aria-label="Dismiss banner"
-                  className="p-3 bg-muted text-muted-foreground hover:text-foreground rounded-xl transition-colors cursor-pointer"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* iOS PWA Installation Banner */}
-          {showIosPwaBanner && (
-            <div className="bg-primary/10 border-4 border-primary/30 p-5 rounded-2xl flex flex-col sm:flex-row items-center justify-between text-foreground gap-4">
-              <span className="text-xl font-black text-center sm:text-left flex items-start gap-2">
-                <Plus className="w-8 h-8 text-primary shrink-0" />
-                <span>To receive push reminders on iOS, install Re-MIND-eЯ: tap the Share button and select 'Add to Home Screen'.</span>
-              </span>
-              <button
-                onClick={() => {
-                  localStorage.setItem('dismissedIosPwaBanner', 'true');
-                  setShowIosPwaBanner(false);
-                }}
-                className="bg-primary-strong text-primary-strong-foreground font-black px-8 py-3 rounded-xl text-xl cursor-pointer hover:bg-primary-strong-hover transition-all shadow-md shrink-0"
-              >
-                Dismiss
-              </button>
-            </div>
-          )}
-  
-          {/* Top Info Banner for accidental toggle */}
-          <div className="bg-primary/10 border-4 border-primary/30 p-5 rounded-2xl flex flex-col sm:flex-row items-center justify-between text-foreground gap-4">
-            <span className="text-2xl font-black text-center sm:text-left flex items-center gap-2">
-              <User className="w-8 h-8 text-primary shrink-0" />
-              <span>Currently in Elderly Mode (Accessible Large View)</span>
-            </span>
-            <button 
-              onClick={toggleMode}
-              className="bg-primary-strong text-primary-strong-foreground font-black px-8 py-3 rounded-xl text-xl cursor-pointer hover:bg-primary-strong-hover transition-all shadow-md shrink-0"
-            >
-              Switch to Normal View
-            </button>
-          </div>
-  
-          {/* 1. NEXT MEDICATION */}
-          <div className={`bg-card rounded-3xl p-8 border border-border shadow-sm space-y-6 ${
-            nextPendingEvent?.reminder_status === 'ESCALATED_TO_CG' ||
-            nextPendingEvent?.medications.priority_level === 'critical' ||
-            (nextPendingEvent && isAttentionStatus(nextPendingEvent.reminder_status))
-              ? 'border-danger animate-red-glow bg-danger/5'
-              : 'border-primary'
-          }`}>
-            <h2 className="text-3xl font-black text-muted-foreground tracking-tight uppercase flex items-center gap-2">
-              {nextPendingEvent && isAttentionStatus(nextPendingEvent.reminder_status) ? (
-                <><AlertTriangle className="w-8 h-8 text-danger" /> Missed Medication</>
-              ) : (
-                <><Clock className="w-8 h-8 text-primary" /> Next Medication</>
-              )}
-            </h2>
-            {nextPendingEvent ? (
-              <div className="space-y-6">
-                <div className="flex items-start gap-4">
-                  <Pill className="w-16 h-16 text-primary shrink-0" />
-                  <div>
-                    <h3 className="text-4xl sm:text-5xl font-black text-foreground leading-tight">
-                      {nextPendingEvent.medications.drug_name}
-                    </h3>
-                    <p className="text-2xl text-muted-foreground font-bold mt-2">
-                      Dosage: <b className="text-foreground">{nextPendingEvent.medications.dosage}</b>
-                    </p>
-                    <p className="text-3xl text-primary font-black mt-2" suppressHydrationWarning>
-                      Time: {mounted ? new Date(nextPendingEvent.scheduled_for).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
-                    </p>
-                  </div>
-                </div>
-  
-                {/* Giant 88px buttons with large touch target */}
-                {viewMode === 'PATIENT_MONITOR' ? (
-                  <div className="p-6 bg-muted/60 border border-border rounded-2xl flex items-center justify-center gap-2.5 text-xl font-black text-muted-foreground mt-6">
-                    <Lock className="w-5 h-5 text-muted-foreground shrink-0" />
-                    <span>Read-Only Monitor Mode</span>
-                  </div>
-                ) : (
-                  /* Missed doses are resolved in the MissedDoseStrip above — no duplicate actions here. */
-                  (new Date(nextPendingEvent.scheduled_for).getTime() <= new Date().getTime()) &&
-                  !(nextPendingEvent && isAttentionStatus(nextPendingEvent.reminder_status))
-                ) ? (
-                  <div className="space-y-4 mt-6">
-                    {dueNowEvents.length > 1 && (
-                      <button
-                        onClick={() => handleResolveAll('TAKEN')}
-                        disabled={updatingId !== null}
-                        className="w-full h-[72px] flex items-center justify-center gap-2 text-2xl font-black rounded-2xl bg-primary-strong text-primary-strong-foreground hover:bg-primary/90 transition-all cursor-pointer shadow-lg disabled:opacity-50"
-                      >
-                        <Check className="w-6 h-6" />
-                        {updatingId === BATCH_SENTINEL ? 'Confirming…' : `I TOOK ALL ${dueNowEvents.length}`}
-                      </button>
-                    )}
-                    <div className="flex flex-col sm:flex-row gap-4">
-                      <button
-                        onClick={() => handleElderlyTakeNow(nextPendingEvent, 'TAKEN')}
-                        disabled={updatingId !== null}
-                        className="flex-1 h-[88px] flex items-center justify-center text-3xl font-black rounded-2xl bg-success text-success-foreground hover:bg-success/90 transition-all cursor-pointer shadow-lg disabled:opacity-50"
-                      >
-                        {updatingId === nextPendingEvent.id ? 'Updating...' : 'I TOOK IT'}
-                      </button>
-                      <button
-                        onClick={() => handleElderlyTakeNow(nextPendingEvent, 'SKIP')}
-                        disabled={updatingId !== null}
-                        className="h-[88px] px-8 flex items-center justify-center text-2xl font-black rounded-2xl bg-warning text-warning-foreground hover:bg-warning/90 transition-all cursor-pointer shadow-lg disabled:opacity-50"
-                      >
-                        SKIP
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mt-6 p-6 bg-muted/60 border border-border rounded-2xl flex items-center justify-center gap-2.5 text-xl font-black text-muted-foreground">
-                    <Clock className="w-5 h-5 text-muted-foreground shrink-0 animate-pulse" />
-                    <span>{nextPendingEvent && isAttentionStatus(nextPendingEvent.reminder_status) ? 'Log this dose in the red missed panel above.' : `Options will become available at ${mounted ? new Date(nextPendingEvent.scheduled_for).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}`}</span>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-center py-8 space-y-4">
-                <CheckCircle className="w-16 h-16 text-success mx-auto" />
-                <p className="text-3xl font-black text-success">All Medications Taken!</p>
-                <p className="text-2xl text-muted-foreground font-bold">You have taken all your pills scheduled for today.</p>
-              </div>
-            )}
-          </div>
-  
-          {/* 1B. SECONDARY HELP ACTION (Elderly Refinement Pass) */}
-          {viewMode !== 'PATIENT_MONITOR' && (
-            <div className="bg-card border border-warning/40 rounded-3xl p-8 shadow-sm space-y-4">
-              <h3 className="text-2xl font-black text-foreground">Need Help?</h3>
-              <p className="text-xl text-muted-foreground font-semibold">
-                Tap the button below if you want your caregiver to call or assist you.
-              </p>
-              <button
-                onClick={handleContactRequest}
-                disabled={contactRequestSending}
-                className="w-full h-[88px] flex items-center justify-center text-2xl font-black rounded-2xl bg-warning text-warning-foreground hover:bg-warning/95 active:scale-[0.98] transition-all cursor-pointer shadow-md gap-2 disabled:opacity-60"
-              >
-                <Phone className="w-8 h-8" /> {contactRequestSending ? 'Sending…' : 'Request Caregiver Contact'}
-              </button>
-            </div>
-          )}
-  
-          {/* 2. TODAY'S PROGRESS */}
-          <div className="bg-card border border-border p-8 rounded-3xl shadow-sm space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-              <h2 className="text-3xl font-black text-foreground">Today's Progress</h2>
-              <span className="text-4xl font-black text-primary bg-primary/10 px-6 py-2 rounded-2xl">
-                {todayTaken} of {todayTotal} taken
-              </span>
-            </div>
-  
-            <div className="w-full bg-muted rounded-full h-10 overflow-hidden border-2 border-border">
-              <div 
-                className="bg-success h-full transition-all duration-500 rounded-full" 
-                style={{ width: `${todayTotal > 0 ? progressPercentage : 100}%` }}
-              />
-            </div>
-  
-            {/* `justify-between` with no gap ran the two labels together at phone width
-                in elderly mode — it rendered as "StartedRemaining: 3 doses". */}
-            <div className="flex flex-wrap justify-between gap-x-4 gap-y-1 text-2xl font-bold text-muted-foreground">
-              <span>Started</span>
-              {progressPercentage === 100 ? (
-                <span className="text-success-strong font-black">Done for the day!</span>
-              ) : (
-                <span>
-                  {todayTotal - todayTaken} {todayTotal - todayTaken === 1 ? 'dose' : 'doses'} left
-                </span>
-              )}
-            </div>
-          </div>
-  
-          {/* 3. LOW STOCK WARNINGS */}
-          {lowStockCount > 0 && (
-            <div className="bg-danger/10 border border-danger/30 text-foreground p-8 rounded-3xl shadow-sm space-y-4">
-              <h2 className="text-3xl font-black text-danger flex items-center gap-2">
-                <AlertCircle className="w-8 h-8 text-danger animate-pulse" /> Medicine Alert
-              </h2>
-              <p className="text-2xl font-bold text-muted-foreground">
-                The following medicines are running very low. Please refill soon:
-              </p>
-              <div className="space-y-2">
-                {lowStockMedicines.map((m, idx) => (
-                  <div key={idx} className="bg-card p-4 rounded-xl border border-border flex justify-between items-center">
-                    <span className="text-2xl font-black">{m.drug_name}</span>
-                    <span className="text-2xl font-black text-danger">{m.stock} left</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Toast Notifications */}
-        <PremiumToast toasts={toasts} onDismiss={(id) => setToasts((prev) => prev.filter((t) => t.id !== id))} />
-      </>
-    );
-  }
+  // A PARALLEL ELDERLY DASHBOARD USED TO RETURN HERE — 233 lines of it.
+  //
+  // It was the whole screen built twice: its own hero card (the one the redesign
+  // retired in normal mode, still asking about a dose the rail below would ask
+  // about again), its own giant buttons shouting I TOOK IT and SKIP, its own
+  // banners. Two implementations of one screen is how the two drift, and this pair
+  // had already drifted past the point where a fix to one reached the other: the
+  // week strip, the day rail, past-day correction and the deep link all landed in
+  // normal mode and none of them existed here.
+  //
+  // The written rule is "a larger scale of the SAME type system", not a second
+  // design — so elderly now renders this same tree, and every shared component
+  // sizes itself from isElderly. That is one screen to keep correct instead of two,
+  // and it is the only version of this that stays true a month from now.
 
   // ==========================================
   // NORMAL MODE VIEW (Premium Apple Health Theme)
