@@ -139,29 +139,10 @@ export default async function DashboardPage() {
     canEditStock = !!link?.can_edit_medications;
   }
 
-  // Group 7-day chart data points
-  const chartDataMap: { [key: string]: { Taken: number; Skipped: number; Missed: number; day: number } } = {};
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    // Pin locale so the label format is deterministic across server/clients.
-    const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    chartDataMap[dateStr] = { Taken: 0, Skipped: 0, Missed: 0, day: d.getDate() };
-  }
-
-  logs?.forEach(log => {
-    const dateStr = new Date(log.scheduled_time).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    if (chartDataMap[dateStr]) {
-      if (log.response === 'TAKEN') chartDataMap[dateStr].Taken += 1;
-      else if (log.response === 'SKIP') chartDataMap[dateStr].Skipped += 1;
-      else if (log.response === 'MISSED') chartDataMap[dateStr].Missed += 1;
-    }
-  });
-
-  const chartData = Object.entries(chartDataMap).map(([date, counts]) => ({
-    date,
-    ...counts
-  }));
+  // The 7-day chart aggregation lived here, feeding the dashboard's Health Insights
+  // card. Both removed 2026-08-12: the compliance ring is the adherence surface now,
+  // and computing a `chartData` prop nothing renders is work on every dashboard load.
+  // `logs` is still fetched — `takenLogs` below needs it.
 
   // Find last medication taken from logs
   const takenLogs = (logs || [])
@@ -249,7 +230,6 @@ export default async function DashboardPage() {
       medications={medications || []}
       myTelegramChatId={myTelegramChatId || ''}
       targetTelegramChatId={targetChatId || ''}
-      chartData={chartData}
       lowStockMedicines={lowStockMedicines}
       canEditStock={canEditStock}
       hasPatientLinked={!!targetChatId}

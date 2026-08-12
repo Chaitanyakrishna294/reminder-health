@@ -22,12 +22,15 @@ import RefillStrip from '@/components/dashboard/refill-strip';
 import RefillGate from '@/components/dashboard/refill-gate';
 import type { LowStockMed } from '@/lib/medications/stock';
 import DoseStrip from '@/components/dashboard/dose-strip';
+import { getUnitIcon } from '@/components/dashboard/dashboard-helpers';
 
 import { createClient } from '@/lib/supabase/client';
+import { TONE_VAR, doseTone } from '@/lib/design/semantics';
 import { caregiverRoleLabel, patientRoleLabel, firstName } from '@/lib/care-circle/relationship';
 import { Eyebrow } from '@/components/ui/eyebrow';
-import {
-  Clock,
+import { 
+  Activity, 
+  Clock, 
   Package, 
   AlertCircle, 
   Phone, 
@@ -71,7 +74,6 @@ interface DashboardClientViewProps {
   medications: any[];
   myTelegramChatId: string;
   targetTelegramChatId?: string;
-  chartData: any[];
   lowStockMedicines: LowStockMed[];
   canEditStock: boolean;
   hasPatientLinked: boolean;
@@ -99,7 +101,6 @@ export default function DashboardClientView({
   medications,
   myTelegramChatId,
   targetTelegramChatId,
-  chartData,
   lowStockMedicines,
   canEditStock,
   hasPatientLinked,
@@ -155,10 +156,7 @@ export default function DashboardClientView({
       return next;
     });
   const [updatingId, setUpdatingId] = useState<number | null>(null);
-  // `selectedEvent` outlived the compliance ring it was built for: the blister
-  // strip sets it, and the day rail scrolls that dose's card into view and rings
-  // it. Hover state went with the ring — a hover-driven readout was never
-  // reachable on the phones this audience actually uses.
+  const [hoveredEvent, setHoveredEvent] = useState<ReminderEvent | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<ReminderEvent | null>(null);
   const [mounted, setMounted] = useState(false);
   const [toasts, setToasts] = useState<{ id: string; title: string; message: string; type: 'success' | 'error' }[]>([]);
@@ -488,6 +486,7 @@ export default function DashboardClientView({
   const nextPendingEvent = dueNowPending ?? attentionEvents[0] ?? sortedPending[0];
 
   const upcomingCount = events.filter(e => isPendingState(e.reminder_status)).length;
+  const activeEvent = hoveredEvent || selectedEvent;
 
   // "Did you take it?" gate, shown before the dashboard. Present doses first,
   // then the missed backlog (MISSED / PENDING_REVIEW / UNCONFIRMED), oldest first.
@@ -707,6 +706,11 @@ export default function DashboardClientView({
     if (hours < 17) return <CloudSun className="w-5 h-5 text-warning/80 shrink-0" />;
     return <Moon className="w-5 h-5 text-primary shrink-0" />;
   };
+
+  // Was a private palette of pastel hexes — "Critical Coral" #FF9FA5 for a missed dose
+  // sat right next to the brand pink, and none of the four values matched the tokens the
+  // rest of the app uses for the same states. It also didn't follow dark mode.
+  const getStatusColor = (status: string) => TONE_VAR[doseTone(status)];
 
   // ==========================================
   // ELDERLY MODE VIEW (Strictly Show ONLY: 1. Next Medication, 2. Today's Progress, 3. Low Stock Alerts)
@@ -1278,180 +1282,264 @@ export default function DashboardClientView({
             arrives after the user has already started reading the page. */}
         <div className="rise-in lg:col-span-4 space-y-8" style={{ ['--rise-delay' as string]: '240ms' }}>
 
-
-        {/* Care Circle at a glance, shown from whichever side you are actually on.
-            Role is derived from the connections themselves rather than a stored flag,
-            because a single account can genuinely be both: someone can be cared for by
-            a daughter while caring for a parent. Patient-only sees caregivers,
-            caregiver-only sees patients, and a dual account sees one of each so neither
-            relationship is hidden by the other. */}
-        {(() => {
-          const byPriority = (a: any, b: any) =>
-            Number(Boolean(b.is_primary)) - Number(Boolean(a.is_primary));
-          const caregivers = [...peopleCaringForMe].sort(byPriority);
-          const patients = [...peopleICareFor].sort(byPriority);
-          const isDual = caregivers.length > 0 && patients.length > 0;
-
-          type Member = { key: string; name: string; role: string; photo?: string };
-          const toMember = (conn: any, isPatient: boolean): Member => ({
-            key: conn.connection_id,
-            name: firstName(conn.resolved_name),
-            // The same stored value means opposite things depending on which side of
-            // the link the person on screen is standing.
-            role: isPatient
-              ? patientRoleLabel(conn.relationship_type)
-              : caregiverRoleLabel(conn.relationship_type),
-            // Both directions now: the Medical Profile toggle reads "show my photo to
-            // my care circle" and covers caregiver photos shown to patients too.
-            photo: isPatient
-              ? careCircleAvatars[conn.patient_telegram_id]
-              : careCircleAvatars[conn.caregiver_chat_id],
-          });
-
-          const members: Member[] = isDual
-            ? [toMember(caregivers[0], false), toMember(patients[0], true)]
-            : caregivers.length > 0
-              ? caregivers.slice(0, 3).map(c => toMember(c, false))
-              : patients.slice(0, 3).map(p => toMember(p, true));
-
-          return (
-            <div className="bg-card border border-border rounded-3xl p-4 sm:p-6 shadow-sm flex flex-col min-h-0">
-              {/* "See all" sat beside the title and squeezed it to "Care …". It moves to
-                  the foot of the card, where it also fills the space a short list leaves. */}
+          <div className="grid grid-cols-[1.1fr_1fr] lg:grid-cols-1 gap-3 sm:gap-6 items-stretch">
+          <div data-tour="dash-compliance" className="bg-card border border-border rounded-3xl p-4 sm:p-6 shadow-sm flex flex-col justify-between text-center relative min-h-0 sm:min-h-[300px]">
+            {/* Half-width now, so the title has to fit one line: "Daily Compliance" wrapped
+                to two and the "Daily dose cycle progress" subtitle took two more, spending
+                four lines of a small card restating its own heading. */}
+            <div className="w-full text-left mb-2">
               <h3 className="font-black text-foreground text-xs sm:text-sm flex items-center gap-1.5 min-w-0">
-                <Users className="w-4 h-4 text-primary shrink-0" />
-                <span className="truncate">Care circle</span>
+                <Activity className="w-4 h-4 text-primary shrink-0" />
+                <span className="truncate">Compliance</span>
               </h3>
+              <p className="hidden sm:block text-[11px] text-muted-foreground">Daily dose cycle progress</p>
+            </div>
 
-              {members.length > 0 ? (
-                <ul className="mt-3 space-y-3">
-                  {members.map((m) => (
-                    <li key={m.key} className="flex items-center gap-2.5 min-w-0">
-                      <span className="shrink-0 w-8 h-8 rounded-full bg-primary/10 text-foreground flex items-center justify-center text-[11px] font-black overflow-hidden">
-                        {m.photo ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={m.photo} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          /* text-primary on a primary/10 tint measures 2.9:1. Initials are text. */
-                          m.name.slice(0, 2).toUpperCase()
-                        )}
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block text-xs font-black text-foreground truncate">{m.name}</span>
-                        <span className="block text-[11px] font-bold text-muted-foreground truncate">{m.role}</span>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+            {/* The ring is the whole card. It gets every pixel the half-width card can spare
+                rather than sharing them with a key — a legend of colour names read as small
+                text below a graphic too small to read. */}
+            <div className="flex flex-col items-center w-full">
+            {/* Orbiting compliance ring */}
+            <div className="relative w-full max-w-[150px] sm:max-w-[200px] aspect-square flex items-center justify-center shrink-0">
+              {events.length === 0 ? (
+                <div className="text-center space-y-2">
+                  <CheckCircle className="w-8 h-8 text-success mx-auto" />
+                  <p className="text-xs text-muted-foreground font-bold">No active schedule today</p>
+                </div>
               ) : (
-                <div className="mt-3 flex-1 flex flex-col justify-center">
-                  <p className="text-[11px] font-semibold text-muted-foreground leading-relaxed">
-                    Nobody is notified if you miss a dose yet.
-                  </p>
-                  <Link
-                    href="/settings#care-circle"
-                    className="mt-2 inline-flex items-center text-[11px] font-black text-primary-strong hover:underline"
+                <svg viewBox="0 0 300 300" className="w-full h-full overflow-visible">
+                  {/* Background Track Circle */}
+                  <circle 
+                    cx="150" 
+                    cy="150" 
+                    r="85" 
+                    fill="none" 
+                    stroke="var(--muted)" 
+                    strokeWidth="8" 
+                  />
+                  
+                  {/* Colored Progress Ring */}
+                  <circle 
+                    cx="150" 
+                    cy="150" 
+                    r="85" 
+                    fill="none" 
+                    stroke="var(--primary)" 
+                    strokeWidth="8" 
+                    strokeDasharray="534"
+                    strokeDashoffset={534 * (1 - (todayTotal > 0 ? todayTaken / todayTotal : 0))}
+                    strokeLinecap="round"
+                    className="transition-all duration-1000 ease-out origin-center -rotate-90"
+                  />
+   
+                  {/* Centered Cycle Card */}
+                  <circle 
+                    cx="150" 
+                    cy="150" 
+                    r="45" 
+                    fill="var(--card)" 
+                    stroke={activeEvent ? getStatusColor(activeEvent.reminder_status) : "var(--primary)"}
+                    strokeWidth="2.5"
+                    style={{ transition: 'all 0.3s ease' }}
+                  />
+   
+                  {/* Compliance Text inside foreignObject */}
+                  <foreignObject 
+                    x="102" 
+                    y="102" 
+                    width="96" 
+                    height="96" 
+                    className="pointer-events-none select-none"
                   >
-                    Invite someone
-                  </Link>
-                </div>
-              )}
-
-              {members.length > 0 && (
-                <Link
-                  href="/care-circle"
-                  className="mt-auto inline-flex items-center min-h-11 text-[11px] font-black text-primary-strong hover:underline"
-                >
-                  See all
-                </Link>
-              )}
-            </div>
-          );
-        })()}
-
-          {/* Layer 3: Health Insights — and, since the compliance ring was cut, the
-              dashboard's ONLY history. Everything else on this page is about today.
-              The seven donuts are a placeholder form: at a 3px stroke split three
-              ways you read the "13/15", not the ring. Queued for the dataviz pass. */}
-          <div data-tour="dash-progress" className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4">
-            <div>
-              <h3 className="font-black text-foreground text-sm">Health Insights</h3>
-              <p className="text-[11px] text-muted-foreground">Your last 7 days at a glance</p>
-            </div>
-
-            {/* Weekly rings, laid out like the Olympic rings: 4 on top, 3 below.
-                A missed dose and a day with nothing scheduled used to render as the SAME
-                grey track, so "you had no medications on Sunday" and "you missed every
-                dose on Sunday" looked identical. Missed now draws its own red arc; grey
-                is reserved for genuinely empty days. */}
-            {(() => {
-              const days = chartData.slice(-7);
-              const renderRing = (d: { date: string; day?: number; Taken: number; Skipped: number; Missed: number }, idx: number) => {
-                const taken = d.Taken || 0;
-                const skipped = d.Skipped || 0;
-                const missed = d.Missed || 0;
-                const total = taken + skipped + missed;
-                const C = 2 * Math.PI * 15.5;
-                const takenLen = total > 0 ? C * (taken / total) : 0;
-                const skippedLen = total > 0 ? C * (skipped / total) : 0;
-                const missedLen = total > 0 ? C * (missed / total) : 0;
-                const summary = total === 0
-                  ? `${d.date}: nothing scheduled`
-                  : `${d.date}: ${taken} taken, ${skipped} skipped, ${missed} missed`;
-                return (
-                  <div key={idx} className="flex flex-col items-center gap-1" title={summary}>
-                    <div className="relative w-14 h-14">
-                      <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90" role="img" aria-label={summary}>
-                        {/* Track — nothing scheduled, or the remainder. Neutral, never a warning. */}
-                        <circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--muted)" strokeWidth="3" />
-                        {takenLen > 0 && (
-                          <circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--success)" strokeWidth="3"
-                            strokeDasharray={`${takenLen} ${C - takenLen}`} strokeDashoffset={0} />
-                        )}
-                        {skippedLen > 0 && (
-                          <circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--warning)" strokeWidth="3"
-                            strokeDasharray={`${skippedLen} ${C - skippedLen}`} strokeDashoffset={-takenLen} />
-                        )}
-                        {missedLen > 0 && (
-                          <circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--danger)" strokeWidth="3"
-                            strokeDasharray={`${missedLen} ${C - missedLen}`} strokeDashoffset={-(takenLen + skippedLen)} />
-                        )}
-                      </svg>
-                      <span className="absolute inset-0 flex items-center justify-center text-[11px] font-black text-foreground tabular-nums">
-                        {total === 0 ? '—' : `${taken}/${total}`}
-                      </span>
+                    <div className="w-full h-full flex flex-col justify-center items-center text-center p-1">
+                      {activeEvent ? (
+                        <div className="space-y-0.5 leading-tight flex flex-col items-center">
+                          <span className="text-foreground" style={{ color: getStatusColor(activeEvent.reminder_status) }}>
+                            {getUnitIcon(activeEvent.medications.unit_type, 'w-5 h-5')}
+                          </span>
+                          <p className="text-[9px] font-black text-foreground truncate max-w-[70px]">
+                            {activeEvent.medications.drug_name}
+                          </p>
+                          <p className="text-[8px] font-black text-primary" suppressHydrationWarning>
+                            {mounted ? new Date(activeEvent.scheduled_for).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                          </p>
+                          <p className="text-[7px] font-black text-muted-foreground uppercase tracking-wider">
+                            {activeEvent.reminder_status.replace('_', ' ')}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="leading-tight">
+                          <p className="text-[18px] font-black text-foreground">
+                            {todayTotal > 0 ? Math.round((todayTaken / todayTotal) * 100) : 100}%
+                          </p>
+                          <p className="text-[11px] font-black text-muted-foreground uppercase tracking-wider mt-0.5">
+                            {todayTaken}/{todayTotal} TAKEN
+                          </p>
+                        </div>
+                      )}
                     </div>
-                    <span className="text-[11px] font-bold text-muted-foreground tabular-nums whitespace-nowrap">{d.date}</span>
-                  </div>
-                );
-              };
-              return (
-                <div className="flex flex-col items-center gap-2 py-1">
-                  <div className="flex justify-center gap-3">
-                    {days.slice(0, 4).map((d, i) => renderRing(d, i))}
-                  </div>
-                  <div className="flex justify-center gap-3">
-                    {days.slice(4).map((d, i) => renderRing(d, i + 4))}
-                  </div>
-                  {/* Color alone can't carry this — the audience includes people with
-                      age-related color vision changes. */}
-                  <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 mt-2">
-                    {([
-                      ['Taken', 'var(--success)'],
-                      ['Skipped', 'var(--warning)'],
-                      ['Missed', 'var(--danger)'],
-                      ['None due', 'var(--muted)'],
-                    ] as const).map(([label, color]) => (
-                      <span key={label} className="inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground">
-                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} aria-hidden="true" />
-                        {label}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              );
-            })()}
+                  </foreignObject>
+   
+                  {/* Compliance Ring Markers — orbit the center, pause while inspecting one */}
+                  <g
+                    className="origin-center"
+                    style={{
+                      transformOrigin: '150px 150px',
+                      animation: 'dose-orbit 40s linear infinite',
+                      animationPlayState: activeEvent ? 'paused' : 'running',
+                    }}
+                  >
+                    {events.map((event, idx) => {
+                      const angle = (idx * 2 * Math.PI) / events.length - Math.PI / 2;
+                      const cx = 150 + 85 * Math.cos(angle);
+                      const cy = 150 + 85 * Math.sin(angle);
+                      const statusColor = getStatusColor(event.reminder_status);
+                      const isEscalated = event.reminder_status === 'ESCALATED_TO_CG';
+                      const isActive = activeEvent?.id === event.id;
+
+                      return (
+                        <g
+                          key={event.id}
+                          className="cursor-pointer group/node"
+                          onMouseEnter={() => setHoveredEvent(event)}
+                          onMouseLeave={() => setHoveredEvent(null)}
+                          onClick={() => setSelectedEvent(prev => prev?.id === event.id ? null : event)}
+                        >
+                          {/* Ping ring for alarms */}
+                          {isEscalated && (
+                            <circle 
+                              cx={cx} 
+                              cy={cy} 
+                              r="16" 
+                              fill="none" 
+                              stroke="#FF9FA5" 
+                              strokeWidth="2" 
+                              className="animate-ping"
+                            />
+                          )}
+   
+                          {/* Node Circle - White ringed solid status badge */}
+                          <circle
+                            cx={cx}
+                            cy={cy}
+                            r={isActive ? 12 : 9}
+                            fill={statusColor}
+                            stroke="#ffffff"
+                            strokeWidth={isActive ? 3 : 2.5}
+                            className="transition-all duration-300 group-hover/node:r-[11px]"
+                          />
+                        </g>
+                      );
+                    })}
+                  </g>
+                </svg>
+              )}
+            </div>
+
+            </div>
           </div>
+
+          {/* Care Circle at a glance, shown from whichever side you are actually on.
+              Role is derived from the connections themselves rather than a stored flag,
+              because a single account can genuinely be both: someone can be cared for by
+              a daughter while caring for a parent. Patient-only sees caregivers,
+              caregiver-only sees patients, and a dual account sees one of each so neither
+              relationship is hidden by the other. */}
+          {(() => {
+            const byPriority = (a: any, b: any) =>
+              Number(Boolean(b.is_primary)) - Number(Boolean(a.is_primary));
+            const caregivers = [...peopleCaringForMe].sort(byPriority);
+            const patients = [...peopleICareFor].sort(byPriority);
+            const isDual = caregivers.length > 0 && patients.length > 0;
+
+            type Member = { key: string; name: string; role: string; photo?: string };
+            const toMember = (conn: any, isPatient: boolean): Member => ({
+              key: conn.connection_id,
+              name: firstName(conn.resolved_name),
+              // The same stored value means opposite things depending on which side of
+              // the link the person on screen is standing.
+              role: isPatient
+                ? patientRoleLabel(conn.relationship_type)
+                : caregiverRoleLabel(conn.relationship_type),
+              // Both directions now: the Medical Profile toggle reads "show my photo to
+              // my care circle" and covers caregiver photos shown to patients too.
+              photo: isPatient
+                ? careCircleAvatars[conn.patient_telegram_id]
+                : careCircleAvatars[conn.caregiver_chat_id],
+            });
+
+            const members: Member[] = isDual
+              ? [toMember(caregivers[0], false), toMember(patients[0], true)]
+              : caregivers.length > 0
+                ? caregivers.slice(0, 3).map(c => toMember(c, false))
+                : patients.slice(0, 3).map(p => toMember(p, true));
+
+            return (
+              <div className="bg-card border border-border rounded-3xl p-4 sm:p-6 shadow-sm flex flex-col min-h-0">
+                {/* "See all" sat beside the title and squeezed it to "Care …". It moves to
+                    the foot of the card, where it also fills the space a short list leaves. */}
+                <h3 className="font-black text-foreground text-xs sm:text-sm flex items-center gap-1.5 min-w-0">
+                  <Users className="w-4 h-4 text-primary shrink-0" />
+                  <span className="truncate">Care circle</span>
+                </h3>
+
+                {members.length > 0 ? (
+                  <ul className="mt-3 space-y-3">
+                    {members.map((m) => (
+                      <li key={m.key} className="flex items-center gap-2.5 min-w-0">
+                        <span className="shrink-0 w-8 h-8 rounded-full bg-primary/10 text-foreground flex items-center justify-center text-[11px] font-black overflow-hidden">
+                          {m.photo ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={m.photo} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            /* text-primary on a primary/10 tint measures 2.9:1. Initials are text. */
+                            m.name.slice(0, 2).toUpperCase()
+                          )}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block text-xs font-black text-foreground truncate">{m.name}</span>
+                          <span className="block text-[11px] font-bold text-muted-foreground truncate">{m.role}</span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="mt-3 flex-1 flex flex-col justify-center">
+                    <p className="text-[11px] font-semibold text-muted-foreground leading-relaxed">
+                      Nobody is notified if you miss a dose yet.
+                    </p>
+                    <Link
+                      href="/settings#care-circle"
+                      className="mt-2 inline-flex items-center text-[11px] font-black text-primary-strong hover:underline"
+                    >
+                      Invite someone
+                    </Link>
+                  </div>
+                )}
+
+                {members.length > 0 && (
+                  <Link
+                    href="/care-circle"
+                    className="mt-auto inline-flex items-center min-h-11 text-[11px] font-black text-primary-strong hover:underline"
+                  >
+                    See all
+                  </Link>
+                )}
+              </div>
+            );
+          })()}
+          </div>
+
+          {/* Health Insights lived here — seven day-rings built from a `chartData`
+              prop. Removed 2026-08-12: the compliance ring above is the dashboard's
+              adherence surface, and this card restated the idea in a form you could
+              not actually read (a 3px stroke split three ways, so what you read was
+              the "13/15", not the ring).
+
+              The server-side 7-day aggregation went with it rather than being left
+              computed-and-unused on every dashboard load. If the dataviz pass wants
+              a history surface, the loop is in git history — `chartDataMap` in
+              app/(dashboard)/dashboard/page.tsx. */}
 
           {/* Layer 4: Medication Inventory */}
           <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4">
