@@ -1,5 +1,19 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { type OverrideEntry, findOverride, occursOn, parseTimeToMinutes, toOverrideDateStr } from './dose-engine';
+import { dayKeyForDose, timeOfDayForDose } from '@/lib/design/slots';
+
+/**
+ * What the server falls back to when a medication has no timezone — the same
+ * `coalesce(nullif(timezone,''), 'Asia/Kolkata')` that `correct_reminder_event` and
+ * `resolve_reminder_event` use.
+ *
+ * Mirrored rather than chosen independently, and that matters: the client decides
+ * which DAY to file a dose under, and the server decides whether that dose is still
+ * inside the correction window. If the two pick different zones, the UI offers a
+ * "Change" the RPC then refuses — the worst kind of disagreement, because it only
+ * shows up at the moment someone is trying to fix their record.
+ */
+const SERVER_DEFAULT_TZ = 'Asia/Kolkata';
 
 /**
  * "What doses are there on this day" — shared by the Schedule Planner and the
@@ -63,7 +77,10 @@ export async function fetchDoseHistory(
 ): Promise<DoseHistory> {
   const { data, error } = await supabase
     .from('reminder_logs')
-    .select('id, response, scheduled_time, responded_at, medication_id, drug_name_snapshot, medications(drug_name, dosage, priority_level, medication_reason, linked_brand_name)')
+    // `timezone` is selected because the DAY a dose belongs to is its date in the
+    // MEDICATION's zone. Without it this function keyed by the viewer's date, which
+    // filed every 00:00-05:29 IST dose under the previous day.
+    .select('id, response, scheduled_time, responded_at, medication_id, drug_name_snapshot, medications(drug_name, dosage, priority_level, medication_reason, linked_brand_name, timezone)')
     .eq('telegram_id', telegramId)
     .gte('scheduled_time', from.toISOString())
     .lte('scheduled_time', to.toISOString());
@@ -76,17 +93,45 @@ export async function fetchDoseHistory(
     return {};
   }
 
+  // PostgREST returns an embedded one-to-one join as either an object or a
+  // single-element array depending on how it infers the relationship, so both shapes
+  // are declared rather than assumed.
+  interface JoinedMed {
+    drug_name?: string | null;
+    dosage?: string | null;
+    priority_level?: string | null;
+    medication_reason?: string | null;
+    linked_brand_name?: string | null;
+    timezone?: string | null;
+  }
+  interface LogRow {
+    id: number;
+    response: string | null;
+    scheduled_time: string;
+    responded_at: string | null;
+    medication_id: number | null;
+    drug_name_snapshot: string | null;
+    medications: JoinedMed | JoinedMed[] | null;
+  }
+
   const grouped: DoseHistory = {};
-  for (const row of (data as any[]) || []) {
-    const when = new Date(row.scheduled_time);
-    const key = toOverrideDateStr(when);
+  for (const row of (data ?? []) as unknown as LogRow[]) {
     const joined = Array.isArray(row.medications) ? row.medications[0] : row.medications;
+    // A deleted medication takes its timezone with it — the log keeps only a name
+    // snapshot. Fall back to the same zone the server would, so the day this dose is
+    // filed under matches the day the RPC would judge it by.
+    const tz = joined?.timezone || SERVER_DEFAULT_TZ;
+    // Unparseable instants cannot be filed honestly. In practice impossible —
+    // scheduled_time is a timestamptz — but silently bucketing one under today would
+    // put a stranger's dose in someone's record.
+    const key = dayKeyForDose(row.scheduled_time, tz);
+    if (key === null) continue;
     (grouped[key] ||= []).push({
       id: row.medication_id ?? -row.id,
       drug_name: joined?.drug_name || row.drug_name_snapshot || 'Deleted medication',
       dosage: joined?.dosage || '',
       frequency: '',
-      time: when.toTimeString().slice(0, 5),
+      time: timeOfDayForDose(row.scheduled_time, tz),
       priority_level: joined?.priority_level || 'normal',
       outcome: row.response === 'TAKEN' ? 'TAKEN' : row.response === 'SKIP' ? 'SKIP' : 'MISSED',
       respondedAt: row.responded_at ?? null,

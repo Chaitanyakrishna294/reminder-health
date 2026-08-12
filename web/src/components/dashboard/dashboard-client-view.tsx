@@ -22,6 +22,8 @@ import RefillStrip from '@/components/dashboard/refill-strip';
 import RefillGate from '@/components/dashboard/refill-gate';
 import type { LowStockMed } from '@/lib/medications/stock';
 import DoseStrip from '@/components/dashboard/dose-strip';
+import DayNav, { type DayNavDay } from '@/components/dashboard/day-nav';
+import { dayKeyForDose, dayKeysEndingAt } from '@/lib/design/slots';
 import { getUnitIcon } from '@/components/dashboard/dashboard-helpers';
 
 import { createClient } from '@/lib/supabase/client';
@@ -70,7 +72,8 @@ interface DashboardClientViewProps {
   todayMissed: number;
   activeEscalations: number;
   lowStockCount: number;
-  todayEvents: ReminderEvent[];
+  /** The last 8 days plus 24h forward. Split into today vs past days in the effect below. */
+  recentEvents: ReminderEvent[];
   medications: any[];
   myTelegramChatId: string;
   targetTelegramChatId?: string;
@@ -97,7 +100,7 @@ export default function DashboardClientView({
   todayMissed: initialTodayMissed,
   activeEscalations: initialActiveEscalations,
   lowStockCount,
-  todayEvents,
+  recentEvents,
   medications,
   myTelegramChatId,
   targetTelegramChatId,
@@ -165,6 +168,13 @@ export default function DashboardClientView({
   const [showSetupWizard, setShowSetupWizard] = useState(false);
 
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
+  /**
+   * Which day the RAIL is showing, as a YYYY-MM-DD key. null = today, and null
+   * rather than today's key on purpose: the key changes at midnight, and a user who
+   * left the tab open overnight should roll onto the new day rather than stay pinned
+   * to a date that has quietly become yesterday.
+   */
+  const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -300,20 +310,28 @@ export default function DashboardClientView({
     // today the same way to line up with what the Schedule Planner saved.
     const todayDateStr = toOverrideDateStr(now);
 
-    // Reference timezone for the "today" window: first medication's tz, else browser guess.
+    // Reference timezone, used ONLY for things that need one calendar to hang on:
+    // the date row's labels and the virtual-dose generator's notion of "today".
     const refTz =
       (medications && medications.length > 0 && medications[0]?.timezone) ||
       moment.tz.guess();
 
-    const refToday = moment().tz(refTz);
-    const startOfToday = refToday.clone().startOf('day');
-    const endOfToday = refToday.clone().endOf('day');
+    // "Is this dose today?" is asked PER MEDICATION, against that medication's own
+    // clock. It used to be asked against one reference zone for the whole list, which
+    // is wrong twice over: it moves every dose of a second-zone medication by hours,
+    // and — the bug that actually bit — a start/end-of-day window built from moment
+    // put a 01:40 Asia/Kolkata dose outside it whenever the viewer's clock disagreed.
+    // dayKeyForDose compares calendar dates in the medication's zone, which is the
+    // same comparison correct_reminder_event makes server-side.
+    const nowIso = now.toISOString();
+    const tzForMedication = (medicationId: number) =>
+      medications?.find((m) => m.id === medicationId)?.timezone || refTz;
+    const isToday = (e: ReminderEvent) => {
+      const tz = tzForMedication(e.medication_id);
+      return dayKeyForDose(e.scheduled_for, tz) === dayKeyForDose(nowIso, tz);
+    };
 
-    // Filter database events to the reference timezone's day boundaries
-    const dbEventsToday = todayEvents.filter((e) => {
-      const m = moment(e.scheduled_for);
-      return m.isSameOrAfter(startOfToday) && m.isSameOrBefore(endOfToday);
-    });
+    const dbEventsToday = recentEvents.filter(isToday);
 
     const generatedEvents: ReminderEvent[] = [...dbEventsToday];
 
@@ -411,7 +429,7 @@ export default function DashboardClientView({
     }
 
     setEvents(generatedEvents);
-  }, [todayEvents, medications, targetTelegramChatId, myTelegramChatId, scheduleOverrides]);
+  }, [recentEvents, medications, targetTelegramChatId, myTelegramChatId, scheduleOverrides]);
 
   // Toast Helper
   const showToast = (title: string, message: string, type: 'success' | 'error' = 'success') => {
@@ -487,6 +505,48 @@ export default function DashboardClientView({
 
   const upcomingCount = events.filter(e => isPendingState(e.reminder_status)).length;
   const activeEvent = hoveredEvent || selectedEvent;
+
+  // ── THE DATE ROW ──────────────────────────────────────────────────────────
+  //
+  // Only the RAIL follows the selected day. The dose gate, the blister strip, the
+  // missed-dose strip, the compliance ring and every count above stay pinned to
+  // `events`, which is today. That split is the whole safety story here: CLAUDE.md's
+  // never-disagree invariant is about the gate and the rail asking about the SAME
+  // dose, and it holds because the gate is only ever fed today. Browsing to Tuesday
+  // is archive-editing; it must not be able to make the app interrupt someone about
+  // a dose from Tuesday.
+  const rowRefTz =
+    (medications && medications.length > 0 && medications[0]?.timezone) || moment.tz.guess();
+  // `currentTime` rather than a fresh Date(): reading the clock during render is
+  // impure, and this one already ticks every 60s.
+  const todayKey = dayKeyForDose(currentTime.toISOString(), rowRefTz) ?? '';
+  const dayKeys = todayKey ? dayKeysEndingAt(todayKey, 7) : [];
+
+  // Past days come straight from `recentEvents` — real reminder_events rows with the
+  // status they finished in. Deliberately NOT re-projected from reminder_times the
+  // way the Schedule Planner projects a future day: a past day is a record of what
+  // happened, and drawing a dose that was never actually scheduled would invent one.
+  const pastEventsByDay: Record<string, ReminderEvent[]> = {};
+  for (const e of recentEvents) {
+    const tz = medications?.find((m) => m.id === e.medication_id)?.timezone || rowRefTz;
+    const key = dayKeyForDose(e.scheduled_for, tz);
+    if (key === null || key === todayKey) continue;
+    (pastEventsByDay[key] ||= []).push(e);
+  }
+
+  const isViewingToday = selectedDayKey === null || selectedDayKey === todayKey;
+  const railEvents = isViewingToday ? events : (pastEventsByDay[selectedDayKey!] ?? []);
+
+  const navDays: DayNavDay[] = dayKeys.map((key) => {
+    const dayEvents = key === todayKey ? events : (pastEventsByDay[key] ?? []);
+    return {
+      key,
+      total: dayEvents.length,
+      // "Open" means nobody ever answered it. On a past day that is the gap the row
+      // exists to point at; on today it is simply what is still ahead.
+      open: dayEvents.filter((e) => !['TAKEN', 'RESOLVED_BY_CG', 'SKIPPED'].includes(e.reminder_status)).length,
+    };
+  });
 
   // "Did you take it?" gate, shown before the dashboard. Present doses first,
   // then the missed backlog (MISSED / PENDING_REVIEW / UNCONFIRMED), oldest first.
@@ -1237,8 +1297,21 @@ export default function DashboardClientView({
               327px. The button keeps its own line and never wraps. */}
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 px-1">
             <div className="min-w-0">
-              <h2 className="text-xl font-black text-foreground tracking-tight">Today&apos;s Schedule</h2>
-              <p className="text-xs text-muted-foreground font-semibold">Keep track of your medication requirements</p>
+              <h2 className="text-xl font-black text-foreground tracking-tight">
+                {isViewingToday ? 'Today’s schedule' : 'Earlier'}
+              </h2>
+              <p className="text-xs text-muted-foreground font-semibold" suppressHydrationWarning>
+                {isViewingToday
+                  ? 'Keep track of your medication requirements'
+                  /* Naming the day is not decoration: the row's highlight also means
+                     "selected", so the heading is the one place that says, in words,
+                     which day you are about to edit. */
+                  : `You are looking at ${new Date(Date.UTC(
+                      Number(selectedDayKey!.slice(0, 4)),
+                      Number(selectedDayKey!.slice(5, 7)) - 1,
+                      Number(selectedDayKey!.slice(8, 10)), 12,
+                    )).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })}. You can still correct what was recorded.`}
+              </p>
             </div>
             {/* The dashboard's one solid-primary CTA. Refill and Open Hub used to be
                 equally loud (one of them in a one-off teal), so nothing read as the main
@@ -1251,17 +1324,38 @@ export default function DashboardClientView({
             </Link>
           </div>
 
+          {/* Mounted-gated: the row's days are derived from the device clock, and
+              rendering them on the server would hydrate a different week for anyone
+              whose date has already turned. */}
+          {mounted && dayKeys.length > 0 && (
+            <DayNav
+              days={navDays}
+              selectedKey={selectedDayKey ?? todayKey}
+              todayKey={todayKey}
+              onSelect={(key) => setSelectedDayKey(key === todayKey ? null : key)}
+              isElderly={isElderly}
+            />
+          )}
+
           <MedicationReviewQueue
             patientTelegramChatId={targetTelegramChatId || myTelegramChatId || ''}
             userRole={userRole}
           />
 
           <TodaysSchedule
-            events={events}
+            events={railEvents}
+            /* A past day is an archive: no live actions, only correction. Passing the
+               day through lets TodaysSchedule drop Taken/Skip and widen Change to
+               cover a dose nobody ever answered. */
+            isPastDay={!isViewingToday}
             userRole={userRole}
             currentUserTelegramChatId={myTelegramChatId || ''}
             patientTelegramChatId={targetTelegramChatId || myTelegramChatId || ''}
-            onEventsChange={setEvents}
+            /* Only today's array is this component's to update. A correction on a
+               past day must not write into `events` — that is today, and the gate
+               reads it. The router refresh TodaysSchedule already fires brings the
+               corrected past day back from the server. */
+            onEventsChange={isViewingToday ? setEvents : undefined}
             /* The day rail slots doses by time of day, and that must use the
                MEDICATION's timezone, not the device's — a dose set for 08:00 IST
                is a morning dose even when the phone is in London. ReminderEvent

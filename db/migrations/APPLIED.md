@@ -81,7 +81,9 @@ maintainer applies it in the Supabase SQL editor (project `jaflclnakwtikqbfhfdk`
 
 ## PENDING (written, not yet applied)
 
-_None._
+| # | Migration | Notes |
+|---|-----------|-------|
+| — | `migration_past_day_correction_2026_08_12.sql` | 2026-08-12 (day rail's date row). Redefines `correct_reminder_event`: correction window widens from SAME DAY to **7 days back**, still measured `AT TIME ZONE med.timezone`; future doses refused with a new `CANNOT_CORRECT_FUTURE_DOSE`; on a **past** day an unanswered dose (`MISSED`/`PENDING_REVIEW`/`UNCONFIRMED`/`ESCALATED_TO_CG`) becomes correctable, while **today keeps the resolved-only rule** so the dose gate stays the single live path; a past-day backfill records `delay_minutes = NULL` rather than inventing "1,840 minutes late"; `retry_reminder_at` cleared so a corrected dose cannot be re-picked by the escalation poller. Does **not** touch the status-transition trigger (it already permits the needed set) or the stock trigger. Has rollback + validation. **Until applied, past-day Change buttons fail with `CORRECTION_WINDOW_EXPIRED`, which the UI surfaces as "Too far back — doses can be corrected for 7 days."** |
 
 > Previously listed here and since resolved: `migration_anonymous_guests_2026_08_10.sql` and
 > `migration_dose_days_2026_08_10.sql` turned out to already be live; see #63–64 above. **This

@@ -11,7 +11,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { slotForHour, slotForDose, groupBySlot, SLOTS } from './slots.ts';
+import {
+  slotForHour, slotForDose, groupBySlot,
+  dayKeyForDose, groupByDay, dayKeysEndingAt, timeOfDayForDose,
+  SLOTS,
+} from './slots.ts';
 
 /**
  * THE SHARED FIXTURE — test/slot-test-vectors.json.
@@ -25,7 +29,16 @@ import { slotForHour, slotForDose, groupBySlot, SLOTS } from './slots.ts';
  */
 const vectorsPath = fileURLToPath(new URL('../../../../test/slot-test-vectors.json', import.meta.url));
 const fixture = JSON.parse(readFileSync(vectorsPath, 'utf8')) as {
-  vectors: { name: string; scheduledFor: string; timezone: string | null; expectedSlot: string | null }[];
+  vectors: {
+    name: string;
+    scheduledFor: string;
+    timezone: string | null;
+    expectedSlot: string | null;
+    /** Absent = engine-local, do not assert. Explicit null = must return no day. */
+    expectedDay?: string | null;
+    /** What a naive UTC-date implementation would have produced. Never asserted. */
+    utcDay?: string;
+  }[];
 };
 
 test('shared fixture: every vector assigns the expected slot', () => {
@@ -41,6 +54,95 @@ test('shared fixture: every vector assigns the expected slot', () => {
     }
     assert.equal(actual.id, v.expectedSlot, `${v.name}: expected ${v.expectedSlot}, got ${actual.id}`);
   }
+});
+
+test('shared fixture: every vector files under the expected DAY', () => {
+  let asserted = 0;
+  for (const v of fixture.vectors) {
+    if (!('expectedDay' in v)) continue; // engine-local; nothing honest to assert
+    const actual = dayKeyForDose(v.scheduledFor, v.timezone);
+    assert.equal(actual, v.expectedDay, `${v.name}: expected ${v.expectedDay}, got ${actual}`);
+    asserted += 1;
+  }
+  assert.ok(asserted >= 25, `only ${asserted} day vectors asserted — fixture looks truncated`);
+});
+
+test('shared fixture: every cross-day vector actually disagrees with the UTC date', () => {
+  // Guards the fixture itself. A `utcDay` that matches `expectedDay` would be a
+  // vector that cannot fail for the naive implementation — it would sit in the file
+  // looking like coverage of the exact bug it does not cover.
+  let crossDay = 0;
+  for (const v of fixture.vectors) {
+    if (!v.utcDay) continue;
+    assert.notEqual(v.utcDay, v.expectedDay, `${v.name}: utcDay equals expectedDay, so this vector proves nothing`);
+    assert.equal(v.utcDay, v.scheduledFor.slice(0, 10), `${v.name}: utcDay does not match the instant's UTC date`);
+    crossDay += 1;
+  }
+  assert.ok(crossDay >= 8, `only ${crossDay} cross-day vectors — the 00:00-05:29 IST window needs real coverage`);
+});
+
+test('a dose after midnight IST belongs to the new day, not the UTC one', () => {
+  // The bug this whole module exists to prevent: 01:40 Asia/Kolkata is 20:10 UTC the
+  // PREVIOUS day, so both the UTC date and a UTC-rendered viewer date file it under
+  // yesterday — and the patient opens the app to find last night's dose missing.
+  const instant = '2026-08-12T20:10:00Z';
+  assert.equal(dayKeyForDose(instant, 'Asia/Kolkata'), '2026-08-13');
+  assert.equal(instant.slice(0, 10), '2026-08-12', 'the naive answer, kept here to show the gap');
+});
+
+test('dayKeyForDose returns null only for an instant that does not exist', () => {
+  assert.equal(dayKeyForDose('not-a-date', 'Asia/Kolkata'), null);
+  // An unknown zone degrades to engine-local rather than returning null: the dose is
+  // real and must still appear on some day.
+  assert.ok(dayKeyForDose('2026-08-12T08:00:00Z', 'Not/AZone'));
+});
+
+test('groupByDay buckets per item timezone, not one reference zone', () => {
+  // Same instant, two medications, two zones — and two different days. Bucketing
+  // both by the first medication's zone would put the LA dose on the wrong date.
+  const doses = [
+    { at: '2026-08-12T02:30:00Z', tz: 'Asia/Kolkata' },       // 08:00 on the 12th
+    { at: '2026-08-12T02:30:00Z', tz: 'America/Los_Angeles' }, // 19:30 on the 11th
+  ];
+  const { byDay, undated } = groupByDay(doses, (d) => d.at, (d) => d.tz);
+  assert.deepEqual(Object.keys(byDay).sort(), ['2026-08-11', '2026-08-12']);
+  assert.equal(undated.length, 0);
+});
+
+test('groupByDay sets undated aside rather than dropping it silently', () => {
+  const { byDay, undated } = groupByDay(
+    [{ at: 'not-a-date', tz: 'Asia/Kolkata' }],
+    (d) => d.at,
+    (d) => d.tz,
+  );
+  assert.deepEqual(byDay, {});
+  assert.equal(undated.length, 1, 'a dose with no parseable day must be reportable, not vanished');
+});
+
+test('dayKeysEndingAt walks back over month, year and DST boundaries', () => {
+  assert.deepEqual(dayKeysEndingAt('2026-08-13', 3), ['2026-08-11', '2026-08-12', '2026-08-13']);
+  assert.deepEqual(dayKeysEndingAt('2026-09-01', 2), ['2026-08-31', '2026-09-01']);
+  assert.deepEqual(dayKeysEndingAt('2027-01-01', 2), ['2026-12-31', '2027-01-01']);
+  // 2026-03-08 is US spring-forward. A 23-hour day must not swallow a date.
+  assert.deepEqual(dayKeysEndingAt('2026-03-09', 3), ['2026-03-07', '2026-03-08', '2026-03-09']);
+  // 2026-11-01 is US fall-back — a 25-hour day must not duplicate one either.
+  assert.deepEqual(dayKeysEndingAt('2026-11-02', 3), ['2026-10-31', '2026-11-01', '2026-11-02']);
+  assert.equal(dayKeysEndingAt('2026-08-13', 7).length, 7);
+  assert.deepEqual(dayKeysEndingAt('not-a-key', 3), []);
+});
+
+test('dayKeysEndingAt yields strictly consecutive, ascending keys', () => {
+  const keys = dayKeysEndingAt('2026-03-09', 7);
+  assert.equal(new Set(keys).size, keys.length, 'a repeated key would render two identical date cells');
+  assert.deepEqual([...keys].sort(), keys, 'oldest first — the row reads left to right');
+});
+
+test('timeOfDayForDose prints the dose\'s own clock, not the viewer\'s', () => {
+  // 02:30 UTC is 08:00 in Kolkata. A record that says "02:30" for a dose the patient
+  // was reminded about at 08:00 is a wrong adherence record, not a display quirk.
+  assert.equal(timeOfDayForDose('2026-08-12T02:30:00Z', 'Asia/Kolkata'), '08:00');
+  assert.equal(timeOfDayForDose('2026-08-12T20:10:00Z', 'Asia/Kolkata'), '01:40');
+  assert.equal(timeOfDayForDose('not-a-date', 'Asia/Kolkata'), '');
 });
 
 test('every hour of the day lands in exactly one slot', () => {

@@ -37,10 +37,14 @@ const SLOT_CLASS: Record<string, { rail: string; pip: string; chip: string; labe
 
 type Verdict = 'taken' | 'skipped' | 'missed' | 'waiting' | 'due' | 'later';
 
-function verdictOf(status: string, scheduledFor: string, nowMs: number): Verdict {
+function verdictOf(status: string, scheduledFor: string, nowMs: number, isPastDay = false): Verdict {
   if (status === 'TAKEN' || status === 'RESOLVED_BY_CG') return 'taken';
   if (status === 'SKIPPED') return 'skipped';
   if (status === 'MISSED' || status === 'PENDING_REVIEW' || status === 'UNCONFIRMED') return 'missed';
+  // On a day that has ended, an unanswered dose is not "due" or "snoozed" — those
+  // describe a live ask, and there is nobody left to ask. It went unanswered, and
+  // the archive should say so plainly rather than showing a stale Due now chip.
+  if (isPastDay) return 'missed';
   if (status === 'SNOOZED') return 'waiting';
   return new Date(scheduledFor).getTime() <= nowMs ? 'due' : 'later';
 }
@@ -70,7 +74,14 @@ interface DayRailProps {
    * every resolved dose; dropping it would have been a silent data regression.
    */
   canCorrect?: (event: ReminderEvent) => boolean;
-  onCorrect?: (event: ReminderEvent) => void;
+  onCorrect?: (event: ReminderEvent, action: 'TAKEN' | 'SKIP') => void;
+  /**
+   * The rail is showing a day that has already ended. Two consequences:
+   * nothing is "due now" (an archive has no live ask), and a dose nobody ever
+   * answered gets an explicit Taken/Skipped choice rather than a Change link —
+   * there is no other outcome to flip it to.
+   */
+  isPastDay?: boolean;
   updatingId: number | null;
   isElderly: boolean;
   /**
@@ -99,6 +110,7 @@ export default function DayRail({
   onResolve,
   canCorrect,
   onCorrect,
+  isPastDay = false,
   updatingId,
   isElderly,
   nowMs,
@@ -139,8 +151,9 @@ export default function DayRail({
   // Only ONE card may break the rhythm. If several doses are overdue, the earliest
   // wins — asking about the oldest first matches the gate's queue order, so the two
   // surfaces never disagree about which dose is "the" one right now.
+  // A past day has no due-now card at all: verdictOf never returns 'due' for one.
   const dueNowId = events
-    .filter((e) => verdictOf(e.reminder_status, e.scheduled_for, nowMs) === 'due')
+    .filter((e) => verdictOf(e.reminder_status, e.scheduled_for, nowMs, isPastDay) === 'due')
     .sort((a, b) => new Date(a.scheduled_for).getTime() - new Date(b.scheduled_for).getTime())[0]?.id;
 
   // The guided tour's "your next dose" step used to spotlight the hero card. This
@@ -151,7 +164,7 @@ export default function DayRail({
   // already handles a missing target by centring its bubble with no spotlight.
   const tourAnchorId = dueNowId ?? [...events]
     .filter((e) => {
-      const v = verdictOf(e.reminder_status, e.scheduled_for, nowMs);
+      const v = verdictOf(e.reminder_status, e.scheduled_for, nowMs, isPastDay);
       return v !== 'taken' && v !== 'skipped';
     })
     .sort((a, b) => new Date(a.scheduled_for).getTime() - new Date(b.scheduled_for).getTime())[0]?.id;
@@ -186,6 +199,7 @@ export default function DayRail({
           onResolve={onResolve}
           canCorrect={canCorrect}
           onCorrect={onCorrect}
+          isPastDay={isPastDay}
           updatingId={updatingId}
           isElderly={isElderly}
         />
@@ -197,7 +211,7 @@ export default function DayRail({
 function SlotGroup({
   slot, items, dueNowId, tourAnchorId, selectedEventId, expanded, onToggle,
   nowMs, timeOf, timeZoneFor,
-  canResolve, onResolve, canCorrect, onCorrect, updatingId, isElderly,
+  canResolve, onResolve, canCorrect, onCorrect, isPastDay = false, updatingId, isElderly,
 }: {
   slot: SlotMeta;
   items: ReminderEvent[];
@@ -217,7 +231,7 @@ function SlotGroup({
   // this evening is not owed anything yet, and counting it would make a calm
   // drawer read as a backlog. Only due, missed and snoozed are asking.
   const openCount = items.filter((e) => {
-    const v = verdictOf(e.reminder_status, e.scheduled_for, nowMs);
+    const v = verdictOf(e.reminder_status, e.scheduled_for, nowMs, isPastDay);
     return v === 'due' || v === 'missed' || v === 'waiting';
   }).length;
   const summary = [
@@ -276,6 +290,7 @@ function SlotGroup({
               onResolve={onResolve}
               canCorrect={!!canCorrect?.(event) && !!onCorrect}
               onCorrect={onCorrect}
+              isPastDay={isPastDay}
               isUpdating={updatingId === event.id}
               isElderly={isElderly}
             />
@@ -288,7 +303,7 @@ function SlotGroup({
 
 function DoseCard({
   event, slotChip, isDueNow, isTourAnchor, isSelected, nowMs, time,
-  canResolve, onResolve, canCorrect, onCorrect, isUpdating, isElderly,
+  canResolve, onResolve, canCorrect, onCorrect, isPastDay, isUpdating, isElderly,
 }: {
   event: ReminderEvent;
   slotChip: string;
@@ -300,11 +315,12 @@ function DoseCard({
   canResolve: boolean;
   onResolve: (event: ReminderEvent, action: 'TAKEN' | 'SKIP') => void;
   canCorrect: boolean;
-  onCorrect?: (event: ReminderEvent) => void;
+  onCorrect?: (event: ReminderEvent, action: 'TAKEN' | 'SKIP') => void;
+  isPastDay: boolean;
   isUpdating: boolean;
   isElderly: boolean;
 }) {
-  const verdict = verdictOf(event.reminder_status, event.scheduled_for, nowMs);
+  const verdict = verdictOf(event.reminder_status, event.scheduled_for, nowMs, isPastDay);
   const meta = VERDICT_META[verdict];
   // `unit_type` is stored as an enum id (TABLET, ML, …), so joining it raw printed
   // "1.5 TABLET" — shouting, and wrong in number. unitPhrase is the same helper the
@@ -317,7 +333,12 @@ function DoseCard({
     || '';
   // Undo is offered only where there is something to undo. The chip directly above
   // it already names the current state, so the button itself stays one word.
+  // A resolved dose flips: one word, because the chip above already says which way.
   const showCorrect = canCorrect && (verdict === 'taken' || verdict === 'skipped');
+  // A dose nobody ever answered has no "other" outcome to flip to, so it gets both
+  // spelled out. Only on a past day — today's unanswered doses belong to the due-now
+  // card and the gate, which are the one live path.
+  const showBackfill = canCorrect && isPastDay && verdict === 'missed';
   const tourAttr = isTourAnchor ? { 'data-tour': 'dash-next-med' } : {};
   // Scroll target for the blister strip above, plus the ring that answers "which
   // one did I just tap?" once you arrive. Same focus ring the strip's own pocket
@@ -387,13 +408,32 @@ function DoseCard({
           // aria-label carries the full sentence for anyone who reaches this button
           // without seeing the chip beside it.
           <button
-            onClick={() => onCorrect?.(event)}
+            onClick={() => onCorrect?.(event, verdict === 'taken' ? 'SKIP' : 'TAKEN')}
             disabled={isUpdating}
             aria-label={`Change this dose to ${verdict === 'taken' ? 'skipped' : 'taken'}`}
             className={`min-h-11 px-1 font-semibold text-muted-foreground underline underline-offset-2 hover:text-primary-strong cursor-pointer disabled:opacity-50 ${isElderly ? 'text-sm' : 'text-xs'}`}
           >
             {isUpdating ? 'Changing…' : 'Change'}
           </button>
+        )}
+        {showBackfill && (
+          // Deliberately quiet — small, outlined, no accent fill. Recording what
+          // happened days ago is a repair, not the thing the app wants you doing;
+          // the pink stays on today's live ask so there is still one loudest action
+          // on the page.
+          <span className="flex items-center gap-1">
+            {(['TAKEN', 'SKIP'] as const).map((action) => (
+              <button
+                key={action}
+                onClick={() => onCorrect?.(event, action)}
+                disabled={isUpdating}
+                aria-label={`Record this dose as ${action === 'TAKEN' ? 'taken' : 'skipped'}`}
+                className={`min-h-11 px-2 rounded-lg border border-border font-semibold text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer disabled:opacity-50 ${isElderly ? 'text-sm' : 'text-xs'}`}
+              >
+                {isUpdating ? '…' : action === 'TAKEN' ? 'Taken' : 'Skipped'}
+              </button>
+            ))}
+          </span>
         )}
       </div>
     </article>

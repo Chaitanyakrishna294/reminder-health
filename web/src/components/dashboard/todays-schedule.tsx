@@ -51,6 +51,18 @@ interface TodaysScheduleProps {
    * rather than leaving you to find it.
    */
   selectedEventId?: number | null;
+  /**
+   * The rail is showing a day that has already ended.
+   *
+   * A past day is an ARCHIVE, and the difference is not cosmetic:
+   *  - no Taken/Skip. Those go through resolve_reminder_event, which drives
+   *    escalation and the alarm state machine. Answering a dose from Tuesday must
+   *    never start a ladder for Tuesday.
+   *  - Change instead covers doses nobody ever answered, not just mis-logged ones.
+   *    A MISSED row that was not actually missed is a false record, and the whole
+   *    point of reaching back is to repair it.
+   */
+  isPastDay?: boolean;
 }
 
 // 270° SVG Severity Arc surrounding the timeline status badge
@@ -117,6 +129,7 @@ export default function TodaysSchedule({
   onEventsChange,
   medicationTimezone,
   selectedEventId,
+  isPastDay = false,
 }: TodaysScheduleProps) {
   const [events, setEvents] = useState<ReminderEvent[]>(initialEvents);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
@@ -216,12 +229,20 @@ export default function TodaysSchedule({
     }
   };
 
-  // Correct a same-day dose that was logged wrong (Taken ↔ Skipped). Stock auto-compensates.
-  const handleCorrect = async (event: ReminderEvent, currentStatus: 'TAKEN' | 'SKIPPED') => {
+  /**
+   * Record what actually happened to a dose. Stock auto-compensates via the
+   * reminder_events trigger.
+   *
+   * Takes the TARGET action rather than the current status: on a past day this also
+   * answers a dose that was never answered at all (a MISSED row that was not really
+   * missed), and "the other one" is not defined for those — there is nothing to flip.
+   */
+  const handleCorrect = async (event: ReminderEvent, newAction: 'TAKEN' | 'SKIP') => {
     if (updatingId !== null) return;
-    const newAction: 'TAKEN' | 'SKIP' = currentStatus === 'TAKEN' ? 'SKIP' : 'TAKEN';
-    const label = newAction === 'TAKEN' ? 'Taken' : 'Skipped';
-    if (!window.confirm(`Change this dose to "${label}"?`)) return;
+    const label = newAction === 'TAKEN' ? 'taken' : 'skipped';
+    // Zero-blame, and specific about what it touches: this edits the record, it does
+    // not send anything or change a schedule.
+    if (!window.confirm(`Record this dose as ${label}?`)) return;
     setUpdatingId(event.id);
     try {
       const rec = await correctReminderEvent({
@@ -240,8 +261,18 @@ export default function TodaysSchedule({
       router.refresh();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
+      // Each server guard gets its own sentence. "Something went wrong" on a screen
+      // where someone is trying to repair their own record is the least useful thing
+      // the app could say — and these are the exact errors the widened correction
+      // window can raise (migration_past_day_correction_2026_08_12.sql).
       if (message.includes('CORRECTION_WINDOW_EXPIRED')) {
-        showToast('Cannot change', 'Doses can only be corrected on the same day.', 'error');
+        showToast('Too far back', 'Doses can be corrected for 7 days.', 'error');
+      } else if (message.includes('CANNOT_CORRECT_FUTURE_DOSE')) {
+        showToast('Not yet', 'This dose has not happened yet.', 'error');
+      } else if (message.includes('EVENT_NOT_RESOLVED') || message.includes('EVENT_NOT_CORRECTABLE')) {
+        // Reachable when the day rolled over between render and tap: the client
+        // offered a past-day Change on what the server now judges by today's rule.
+        showToast('Cannot change', 'This dose is no longer editable. Reload and try again.', 'error');
       } else {
         console.error('[Today Schedule] Error correcting event:', message, err);
         showToast('Error', 'Failed to change this dose. Please try again.', 'error');
@@ -258,7 +289,7 @@ export default function TodaysSchedule({
     const isTaken = s === 'TAKEN' || s === 'RESOLVED_BY_CG';
     return (
       <button
-        onClick={() => handleCorrect(event, isTaken ? 'TAKEN' : 'SKIPPED')}
+        onClick={() => handleCorrect(event, isTaken ? 'SKIP' : 'TAKEN')}
         disabled={updatingId === event.id}
         className="min-h-11 text-xs text-foreground/80 hover:text-primary underline font-semibold cursor-pointer disabled:opacity-50"
       >
@@ -505,6 +536,10 @@ export default function TodaysSchedule({
   // mode is safety logic and must have exactly one home.
   const railCanResolve = (event: ReminderEvent) => {
     if (viewMode === 'PATIENT_MONITOR') return false;
+    // A past day has no live actions. resolve_reminder_event is the live path — it
+    // feeds escalation and the retry ladder — and running it for Tuesday's dose on
+    // Thursday would start a ladder for a dose nobody is waiting on.
+    if (isPastDay) return false;
     return userRole === 'PATIENT'
       ? isPendingState(event.reminder_status)
       : event.reminder_status === 'ESCALATED_TO_CG';
@@ -516,6 +551,15 @@ export default function TodaysSchedule({
   // well. Same-day only; `handleCorrect` surfaces the expiry from the RPC.
   const railCanCorrect = (event: ReminderEvent) => {
     if (viewMode === 'PATIENT_MONITOR') return false;
+    // These two lists mirror correct_reminder_event's own branches
+    // (migration_past_day_correction_2026_08_12.sql). They are duplicated rather
+    // than derived because the server is the authority and the client is only
+    // deciding whether to OFFER the button — but they must not drift, or the app
+    // shows a Change that fails the moment someone presses it.
+    if (isPastDay) {
+      return ['TAKEN', 'SKIPPED', 'RESOLVED_BY_CG', 'MISSED', 'PENDING_REVIEW', 'UNCONFIRMED', 'ESCALATED_TO_CG']
+        .includes(event.reminder_status);
+    }
     return ['TAKEN', 'SKIPPED', 'RESOLVED_BY_CG'].includes(event.reminder_status);
   };
 
@@ -524,7 +568,11 @@ export default function TodaysSchedule({
       <div className="space-y-6">
         {events.length === 0 ? (
           <div className="p-8 text-center text-sm text-muted-foreground bg-card/60 rounded-3xl border border-dashed border-border/80">
-            Nothing scheduled for today.
+            {isPastDay
+              /* Not "nothing scheduled": a past day with no rows means no dose was
+                 ever recorded, which is a different fact and worth not overstating. */
+              ? 'No doses were recorded on this day.'
+              : 'Nothing scheduled for today.'}
           </div>
         ) : (
           <DayRail
@@ -533,7 +581,8 @@ export default function TodaysSchedule({
             canResolve={railCanResolve}
             onResolve={handleResolve}
             canCorrect={railCanCorrect}
-            onCorrect={(e) => handleCorrect(e, e.reminder_status === 'SKIPPED' ? 'SKIPPED' : 'TAKEN')}
+            onCorrect={handleCorrect}
+            isPastDay={isPastDay}
             updatingId={updatingId}
             isElderly={isElderly}
             nowMs={nowMs}

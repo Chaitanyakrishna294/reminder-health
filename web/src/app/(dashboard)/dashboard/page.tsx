@@ -34,8 +34,12 @@ export default async function DashboardPage() {
 
   // 3. Fetch data for target patient in parallel
   const now = new Date();
-  // Query a 48-hour window (24 hours before/after now) to ensure timezone changes don't drop events
-  const startOfWindow = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+  // The day rail's date row shows the last 7 days, so the window reaches back 8 —
+  // one spare day because a day boundary is per-medication (its own timezone), and
+  // a dose at 00:30 IST on the oldest visible day is still the previous UTC day.
+  // Forward stays at 24 hours: tomorrow is not selectable, but today's later doses
+  // must survive a viewer whose clock sits behind the medication's zone.
+  const startOfWindow = new Date(now.getTime() - 8 * 24 * 60 * 60 * 1000).toISOString();
   const endOfWindow = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
 
   const sevenDaysAgo = new Date();
@@ -99,7 +103,12 @@ export default async function DashboardPage() {
   // the point: a deleted medication is not something you can still take, so it does not
   // belong in today's actionable list. Its history survives in reminder_logs, which
   // adherence reads WITHOUT joining medications — so the record stays intact.
-  const todayEvents = ((rawEvents || []) as unknown as ReminderEvent[])
+  //
+  // Named `recentEvents`, not `todayEvents`: it now spans 8 days. The old name was
+  // accurate when the window was ±24h and would be a trap here — the client splits
+  // this into today (which drives the dose gate) and the past days the rail can show,
+  // and confusing the two would let the gate ask about a dose from last Tuesday.
+  const recentEvents = ((rawEvents || []) as unknown as ReminderEvent[])
     .filter(e => e.medications != null);
 
   const totalMonthlyDoses = monthlyLogs?.length || 0;
@@ -226,7 +235,7 @@ export default async function DashboardPage() {
       todayMissed={0}
       activeEscalations={0}
       lowStockCount={lowStockCount}
-      todayEvents={todayEvents}
+      recentEvents={recentEvents}
       medications={medications || []}
       myTelegramChatId={myTelegramChatId || ''}
       targetTelegramChatId={targetChatId || ''}
