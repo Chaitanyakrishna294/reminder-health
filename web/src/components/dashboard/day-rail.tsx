@@ -21,6 +21,7 @@
 import React, { useEffect, useState } from 'react';
 import { Check, Clock, SkipForward, AlertCircle, Pill, ChevronDown } from 'lucide-react';
 import { groupBySlot, type SlotMeta } from '@/lib/design/slots';
+import { unitPhrase } from '@/components/medications/medication-form-options';
 import type { ReminderEvent } from '@/components/dashboard/todays-schedule';
 
 /** Tailwind can't build class names at runtime, so slot tints are mapped explicitly. */
@@ -305,8 +306,14 @@ function DoseCard({
 }) {
   const verdict = verdictOf(event.reminder_status, event.scheduled_for, nowMs);
   const meta = VERDICT_META[verdict];
-  const dose = [event.medications.dosage_amount, event.medications.unit_type].filter(Boolean).join(' ')
-    || event.medications.dosage
+  // `unit_type` is stored as an enum id (TABLET, ML, …), so joining it raw printed
+  // "1.5 TABLET" — shouting, and wrong in number. unitPhrase is the same helper the
+  // hero card used, and the one place plural rules live.
+  const amount = event.medications.dosage_amount;
+  const dose = (amount != null && amount !== 0
+    ? `${amount} ${unitPhrase(event.medications.unit_type, amount)}`
+    : '')
+    || (event.medications.dosage && event.medications.dosage !== 'N/A' ? event.medications.dosage : '')
     || '';
   // Undo is offered only where there is something to undo. The chip directly above
   // it already names the current state, so the button itself stays one word.
