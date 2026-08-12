@@ -124,6 +124,19 @@ does the same, R8 writes the exact rules needed to
       the first upload — a lost upload key cannot be recovered without a Play
       support reset.
 - [ ] Store graphics: icon, feature graphic, phone screenshots.
+- [ ] **Rate-limit the two directory lookups before strangers can get accounts.**
+      `lookup_profile_by_connect_code` and `lookup_caregiver_by_code` turn a short
+      code into a real person's name + profile UUID. Both are locked to
+      `authenticated` at the grant AND guarded with `auth.uid()` in the body
+      (2026-08-13), but **"authenticated" is a weak gate here**: guest sign-in is one
+      tap, so anyone can hold a session and walk the code space. That is tolerable
+      while the only testers are people you know; it stops being tolerable the day
+      the closed test opens.
+      Shape it as: call `check_rate_limit` **inside** the two SECURITY DEFINER
+      bodies, keyed on `auth.uid()`. Not from the client — `check_rate_limit(text,
+      int, int)` is **service_role only** (`authenticated` was revoked by
+      `migration_rpc_grant_lockdown_2026_08_08.sql`), so a browser call cannot work;
+      a definer body runs as the owner and can. Own migration, own validation.
 - [x] ~~Confirm the Supabase region stated in `/privacy` §4~~ — **confirmed
       2026-08-11: `ap-southeast-1` (Singapore).** Privacy §4 is accurate as
       written. Re-check if the project is ever migrated, since it is a

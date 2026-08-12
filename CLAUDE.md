@@ -380,6 +380,28 @@ service). The design consequence is that **the notification must be fully answer
 - **M3 — Hardening.** OEM battery onboarding, RLS audit (incl. legacy `caregiver_info` branch),
   Sentry (webview + native), encryption at rest, Turnstile verified or disabled for app origin,
   disclaimer/policy pages, closed test track.
+  - **⬜ OPEN, and it is a launch gate: rate-limit the two directory lookups before the
+    closed test.** `lookup_profile_by_connect_code` and `lookup_caregiver_by_code` turn a
+    short code into a real person's name + profile UUID. As of 2026-08-13 both are locked
+    at the grant (`authenticated` only) **and** guarded with `auth.uid()` in the body —
+    two locks, per the template. But **"authenticated" is a weak gate for this specific
+    risk**: guest sign-in is one tap, so anyone can hold a session and walk the code space.
+    That is fine while every tester is someone the maintainer knows; it stops being fine
+    the day strangers can make accounts.
+    Shape: call `check_rate_limit` **inside** the two SECURITY DEFINER bodies, keyed on
+    `auth.uid()`. NOT from the client — `check_rate_limit(text, int, int)` is
+    **service_role only** (`authenticated` revoked by
+    `migration_rpc_grant_lockdown_2026_08_08.sql`), so a browser call cannot work; a
+    definer body runs as the owner and can. Own migration, own validation.
+    Also tracked in `docs/PLAY_LISTING.md` §"Still open before submitting".
+  - **Function EXECUTE grants ✅ swept 2026-08-13** (`migration_revoke_anon_execute_sweep_2026_08_13.sql`,
+    all 6 validation checks DONE: 47 of ours locked, 31 extension-owned pg_trgm skipped).
+    The audit found **68** functions `anon` could execute — the key shipped inside the APK.
+    Two were live holes, not defence-in-depth: the lookups above had **no auth check at
+    all**, and `expire_stale_connection_requests` / `cleanup_*` take no arguments, check no
+    caller, and UPDATE/DELETE — including wiping `rate_limits`, which is what makes rate
+    limiting mean anything. Root cause is in the Hard rules above: **both revokes, always**.
+    Re-audit any time with `db/audits/audit_function_execute_grants_2026_08_13.sql`.
   - **RLS audit ✅ DONE 2026-08-11** (`migration_caregiver_legacy_branch_gated_2026_08_11.sql`,
     APPLIED.md #67, all 7 validation checks DONE). **The flagged `caregiver_info` dual-read is
     closed.** Three caregiver SELECT policies (`medications`, `reminder_events`, `reminder_logs`)
