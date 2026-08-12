@@ -6,8 +6,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useUiMode } from '@/context/ui-mode-context';
 import { clearNativeSchedule } from '@/lib/native/schedule-bridge';
-import { useTheme } from '@/context/theme-context';
-import { Pill, ChevronDown, LogOut, Glasses, HeartPulse, Siren, Moon, Sun, Calendar } from 'lucide-react';
+import { ChevronDown, LogOut, Glasses, HeartPulse, Siren, Calendar } from 'lucide-react';
 import NotificationCenter from '@/components/shared/notification-center';
 
 interface NavbarProps {
@@ -27,7 +26,6 @@ export default function Navbar({ user }: NavbarProps) {
   const router = useRouter();
   const supabase = createClient();
   const { isElderly, toggleMode, viewMode } = useUiMode();
-  const { theme, toggleTheme } = useTheme();
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
 
   const handleLogout = async () => {
@@ -76,18 +74,15 @@ export default function Navbar({ user }: NavbarProps) {
             {/* Realtime Bell */}
             <NotificationCenter userId={user.id} />
 
-            {/* Theme Toggle (Light/Dark mode) */}
-            <button
-              onClick={toggleTheme}
-              aria-label={theme === 'dark' ? 'Switch to Light mode' : 'Switch to Dark mode'}
-              title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
-              className={`flex items-center justify-center rounded-full transition-all duration-200 border cursor-pointer hover:scale-[1.05] active:scale-[0.95] bg-muted hover:bg-muted/80 border-border text-foreground/80 hover:text-foreground ${isElderly ? 'w-12 h-12' : 'w-11 h-11'
-                }`}
-            >
-              {theme === 'dark'
-                ? <Sun className={isElderly ? 'w-6 h-6' : 'w-[18px] h-[18px]'} />
-                : <Moon className={isElderly ? 'w-6 h-6' : 'w-[18px] h-[18px]'} />}
-            </button>
+            {/* The theme toggle used to sit here — a one-tap moon between the bell and
+                the glasses, three round icons of equal weight, one of which repainted
+                the whole app. Removed 2026-08-12: light is this product's default and
+                dark is a deliberate act (CLAUDE.md theme policy), and a bar button one
+                mis-tap from flipping the entire interface is the accidental flip that
+                policy exists to prevent. It now lives in Settings → Layout Preference,
+                which is also the only place that can explain that elderly mode stays
+                light regardless. The bar is one icon slimmer, which elderly mode wanted
+                anyway. */}
 
             {/* Mode Switcher Toggle (icon-only: glasses = large/accessible "Elderly" view) */}
             <button

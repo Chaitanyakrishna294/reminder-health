@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useUiMode } from '@/context/ui-mode-context';
+import { useTheme } from '@/context/theme-context';
 import { createClient } from '@/lib/supabase/client';
 import {
   Settings,
@@ -67,6 +68,7 @@ export default function SettingsClientView({
   const router = useRouter();
   const supabase = createClient();
   const { isElderly, toggleMode } = useUiMode();
+  const { theme, setTheme } = useTheme();
 
   // State management. `linkedCaregivers` and `linkedPatients` are only counts on this
   // screen now — /care-circle owns the lists and every mutation on them.
@@ -482,6 +484,55 @@ export default function SettingsClientView({
                     ? 'h-8 w-8 left-[calc(100%-2.125rem)]'
                     : 'h-5 w-5 left-[2px]'
                 }`}
+              />
+            </span>
+          </button>
+        </div>
+
+        {/* THEME. This is the app's ONLY theme control, and it lives here on purpose.
+            It used to be a one-tap moon button in the top bar, sitting between the
+            notification bell and the elderly-mode toggle — three round icons of equal
+            weight, one of which repainted the entire app. That is an accidental flip
+            waiting to happen, and this product's rule is that light is the default
+            and dark is a deliberate act (CLAUDE.md theme policy).
+
+            Elderly mode is always light regardless of what is chosen here, which is
+            why the control says so rather than silently ignoring the setting. */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-muted/30 border border-border/80 rounded-2xl p-4">
+          <div className="space-y-0.5">
+            <span className={`font-extrabold text-foreground block ${isElderly ? 'text-xl' : 'text-sm'}`}>
+              Dark theme
+            </span>
+            <span className={`text-muted-foreground block font-semibold ${isElderly ? 'text-base' : 'text-xs'}`}>
+              {isElderly
+                ? 'Elderly mode always uses the light theme for readability.'
+                : 'The app stays light unless you turn this on. It never follows your phone’s setting.'}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            role="switch"
+            aria-checked={theme === 'dark'}
+            disabled={isElderly}
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className={`shrink-0 self-start sm:self-center inline-flex items-center gap-3 rounded-2xl border transition-all bg-card hover:bg-muted border-border disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${
+              isElderly ? 'h-16 px-5' : 'h-12 px-4'
+            }`}
+          >
+            <span className={`font-bold text-foreground ${isElderly ? 'text-lg' : 'text-xs'}`}>
+              {theme === 'dark' && !isElderly ? 'On' : 'Off'}
+            </span>
+            <span
+              aria-hidden="true"
+              className={`relative shrink-0 rounded-full transition-colors ${
+                isElderly ? 'w-16 h-9 bg-input' : theme === 'dark' ? 'w-11 h-6 bg-primary' : 'w-11 h-6 bg-input'
+              }`}
+            >
+              <span
+                className={`absolute top-[2px] bg-white border border-border rounded-full transition-all h-5 w-5 ${
+                  theme === 'dark' && !isElderly ? 'left-[calc(100%-1.375rem)]' : 'left-[2px]'
+                } ${isElderly ? 'h-8 w-8 top-[2px]' : ''}`}
               />
             </span>
           </button>

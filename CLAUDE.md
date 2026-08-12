@@ -22,7 +22,15 @@ are stale. Keep it updated when you add or move anything.
   redesign proposal itself shipped with one and rendered dark on a dark-set machine.)
   - Audited 2026-08-12: the **web already complies** (`theme-context.tsx` defaults to `'light'` and
     reads only `localStorage`; the two `prefers-color-scheme` hits in the repo are comments
-    explaining why it is not used). `AlarmTheme` is explicitly `Theme.Material.Light`. **One live
+    explaining why it is not used).
+  - **The Settings toggle now actually exists (2026-08-12).** Until then the policy's "activates
+    only via the explicit in-app Settings toggle" described a control that had never been built —
+    the ONLY theme switch was a one-tap moon in the top bar, sitting between the notification bell
+    and the elderly-mode glasses as a third equal-weight round icon, one mis-tap from repainting
+    the whole app. That button is gone; the control is **Settings → Layout Preference**, disabled
+    in elderly mode with the reason stated rather than silently ignored. `toggleTheme` was removed
+    from `theme-context.tsx` as well, leaving only `setTheme(theme)` — a one-call flip is what a
+    one-tap control is built from, so its absence keeps this structural rather than conventional. `AlarmTheme` is explicitly `Theme.Material.Light`. **One live
     violation remains:** `android-app/.../res/drawable-night/splash.png` (plus the
     `drawable-*-night-*` variants) — Android auto-selects these in dark mode, so the splash still
     follows the OS. Delete them when the new app icon and paper-token splash are built (launch

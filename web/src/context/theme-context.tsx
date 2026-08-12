@@ -4,9 +4,18 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 
 type Theme = 'light' | 'dark';
 
+/**
+ * `setTheme` only — there is deliberately no `toggleTheme`.
+ *
+ * A one-call flip is what a one-tap control is built from, and this product's rule is
+ * that light is the default and dark is a deliberate act (CLAUDE.md theme policy).
+ * The toggle that used to live in the top bar was removed 2026-08-12; the single
+ * control is now Settings → Layout Preference, which states what it is doing.
+ * Requiring a caller to name the theme it wants keeps that structural rather than
+ * conventional.
+ */
 interface ThemeContextType {
   theme: Theme;
-  toggleTheme: () => void;
   setTheme: (theme: Theme) => void;
 }
 
@@ -49,12 +58,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     applyTheme(newTheme);
   };
 
-  const toggleTheme = () => {
-    setTheme(theme === 'light' ? 'dark' : 'light');
-  };
-
   return (
-    <ThemeContext.Provider value={{ theme: mounted ? theme : 'light', toggleTheme, setTheme }}>
+    <ThemeContext.Provider value={{ theme: mounted ? theme : 'light', setTheme }}>
       {children}
     </ThemeContext.Provider>
   );
