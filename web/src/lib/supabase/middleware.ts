@@ -57,6 +57,7 @@ export async function updateSession(request: NextRequest, nonce: string, cspHead
     '/medical-profile',
     '/emergency',
     '/settings',
+    '/notifications',
     '/care-circle',
     '/care-plus',
     '/admin-diagnostics',

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useId } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
 export interface Notification {
@@ -24,6 +24,24 @@ export function useRealtimeNotifications(userId: string, limit = 20) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const supabase = createClient();
+
+  /**
+   * A topic unique to THIS hook instance.
+   *
+   * The topic used to be `public:notifications:user_id=eq.${userId}` — fixed, and
+   * therefore identical for every mounted copy of this hook. That was invisible
+   * while exactly one component used it (the navbar bell). The moment a second one
+   * mounted alongside it (the /notifications page), supabase-js handed back the
+   * channel the bell had ALREADY subscribed, `.on('postgres_changes', …)` threw
+   * "cannot add postgres_changes callbacks … after subscribe()", the throw escaped
+   * the effect, and the whole page fell to the error boundary — "This page couldn't
+   * load", server perfectly healthy.
+   *
+   * useId, not a random string: it is stable across re-renders and identical on
+   * server and client, so it cannot resubscribe on every render or break hydration.
+   * Math.random() would do neither and is impure during render besides.
+   */
+  const instanceId = useId();
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -50,7 +68,7 @@ export function useRealtimeNotifications(userId: string, limit = 20) {
 
     // Subscribe to INSERT notifications for this specific user
     const channel = supabase
-      .channel(`public:notifications:user_id=eq.${userId}`)
+      .channel(`notifications:${userId}:${instanceId}`)
       .on(
         'postgres_changes',
         {
@@ -75,7 +93,7 @@ export function useRealtimeNotifications(userId: string, limit = 20) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId, supabase, fetchNotifications]);
+  }, [userId, supabase, fetchNotifications, instanceId]);
 
   const markAsRead = async (notificationId: string) => {
     try {
