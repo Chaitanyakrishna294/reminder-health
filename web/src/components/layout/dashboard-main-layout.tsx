@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useLinkStatus } from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useUiMode } from '@/context/ui-mode-context';
 import { createClient } from '@/lib/supabase/client';
@@ -63,6 +64,32 @@ function NavIcon({
     >
       <Icon className={size} />
     </span>
+  );
+}
+
+/**
+ * Instant acknowledgement that a tab tap registered.
+ *
+ * The route-level `loading.tsx` deliberately waits 300ms before showing anything, so
+ * a fast page does not flash a spinner. That leaves a real silent window on a slow
+ * webview: you tap, nothing moves, and the reflex is to tap again. This fills
+ * exactly that window — it appears the moment the navigation starts, on the control
+ * you actually touched, which is where the eye already is.
+ *
+ * `useLinkStatus` must be rendered INSIDE the <Link> it reports on; that is the
+ * whole API (see node_modules/next/dist/docs/.../use-link-status.md).
+ *
+ * A wash of the existing accent, not a spinner: two loading indicators for one
+ * navigation is worse than one, and this one only has to say "heard you".
+ */
+function NavPending() {
+  const { pending } = useLinkStatus();
+  if (!pending) return null;
+  return (
+    <span
+      aria-hidden
+      className="absolute inset-0 rounded-[inherit] bg-primary/20 animate-pulse pointer-events-none"
+    />
   );
 }
 
@@ -293,6 +320,7 @@ export default function DashboardMainLayout({
               aria-label={item.label}
               aria-current={active ? 'page' : undefined}
             >
+              <NavPending />
               <NavIcon icon={item.icon} size={isElderly ? 'w-7 h-7' : 'w-5 h-5'} />
               {!isElderly && (
                 <span className="absolute left-20 scale-0 group-hover:scale-100 transition-all duration-200 bg-foreground text-background text-xs font-bold px-2.5 py-1 rounded shadow-sm pointer-events-none whitespace-nowrap z-50 font-mono">
@@ -340,7 +368,12 @@ export default function DashboardMainLayout({
               aria-label={item.label}
               aria-current={active ? 'page' : undefined}
             >
-              <NavIcon icon={item.icon} size={isElderly ? 'w-7 h-7' : 'w-5 h-5'} />
+              {/* `relative` so the pending wash positions against this tab and not
+                  the dock — without it every tap would flash the whole bar. */}
+              <span className="relative flex items-center justify-center w-full h-full rounded-full">
+                <NavPending />
+                <NavIcon icon={item.icon} size={isElderly ? 'w-7 h-7' : 'w-5 h-5'} />
+              </span>
             </Link>
           );
         })}
