@@ -60,6 +60,16 @@ interface DayRailProps {
   timeZoneFor: (event: ReminderEvent) => string | null | undefined;
   canResolve: (event: ReminderEvent) => boolean;
   onResolve: (event: ReminderEvent, action: 'TAKEN' | 'SKIP') => void;
+  /**
+   * Same-day correction of a dose logged the wrong way round.
+   *
+   * Not cosmetic, and not optional in spirit: the correction window closes at
+   * midnight, so a dose recorded wrongly with nowhere to change it is wrong
+   * permanently. The list this rail replaces carried a "Change to …" link under
+   * every resolved dose; dropping it would have been a silent data regression.
+   */
+  canCorrect?: (event: ReminderEvent) => boolean;
+  onCorrect?: (event: ReminderEvent) => void;
   updatingId: number | null;
   isElderly: boolean;
   /**
@@ -79,6 +89,8 @@ export default function DayRail({
   timeZoneFor,
   canResolve,
   onResolve,
+  canCorrect,
+  onCorrect,
   updatingId,
   isElderly,
   nowMs,
@@ -96,6 +108,19 @@ export default function DayRail({
   // surfaces never disagree about which dose is "the" one right now.
   const dueNowId = events
     .filter((e) => verdictOf(e.reminder_status, e.scheduled_for, nowMs) === 'due')
+    .sort((a, b) => new Date(a.scheduled_for).getTime() - new Date(b.scheduled_for).getTime())[0]?.id;
+
+  // The guided tour's "your next dose" step used to spotlight the hero card. This
+  // rail is the hero's successor, so the anchor moves to the dose the rail is
+  // actually asking about: the due-now card when there is one, otherwise the
+  // earliest dose still unanswered — the same "needs your attention next" the hero
+  // meant. When every dose is resolved there is deliberately no anchor; GuideTour
+  // already handles a missing target by centring its bubble with no spotlight.
+  const tourAnchorId = dueNowId ?? [...events]
+    .filter((e) => {
+      const v = verdictOf(e.reminder_status, e.scheduled_for, nowMs);
+      return v !== 'taken' && v !== 'skipped';
+    })
     .sort((a, b) => new Date(a.scheduled_for).getTime() - new Date(b.scheduled_for).getTime())[0]?.id;
 
   const timeOf = (iso: string, tz?: string | null) => {
@@ -116,11 +141,14 @@ export default function DayRail({
           slot={slot}
           items={items}
           dueNowId={dueNowId}
+          tourAnchorId={tourAnchorId}
           nowMs={nowMs}
           timeOf={timeOf}
           timeZoneFor={timeZoneFor}
           canResolve={canResolve}
           onResolve={onResolve}
+          canCorrect={canCorrect}
+          onCorrect={onCorrect}
           updatingId={updatingId}
           isElderly={isElderly}
         />
@@ -130,11 +158,13 @@ export default function DayRail({
 }
 
 function SlotGroup({
-  slot, items, dueNowId, nowMs, timeOf, timeZoneFor, canResolve, onResolve, updatingId, isElderly,
+  slot, items, dueNowId, tourAnchorId, nowMs, timeOf, timeZoneFor,
+  canResolve, onResolve, canCorrect, onCorrect, updatingId, isElderly,
 }: {
   slot: SlotMeta;
   items: ReminderEvent[];
   dueNowId?: number;
+  tourAnchorId?: number;
   nowMs: number;
   timeOf: (iso: string, tz?: string | null) => string;
 } & Omit<DayRailProps, 'events' | 'nowMs'>) {
@@ -160,10 +190,13 @@ function SlotGroup({
             event={event}
             slotChip={c.chip}
             isDueNow={event.id === dueNowId}
+            isTourAnchor={event.id === tourAnchorId}
             nowMs={nowMs}
             time={timeOf(event.scheduled_for, timeZoneFor(event))}
             canResolve={canResolve(event)}
             onResolve={onResolve}
+            canCorrect={!!canCorrect?.(event) && !!onCorrect}
+            onCorrect={onCorrect}
             isUpdating={updatingId === event.id}
             isElderly={isElderly}
           />
@@ -174,15 +207,19 @@ function SlotGroup({
 }
 
 function DoseCard({
-  event, slotChip, isDueNow, nowMs, time, canResolve, onResolve, isUpdating, isElderly,
+  event, slotChip, isDueNow, isTourAnchor, nowMs, time,
+  canResolve, onResolve, canCorrect, onCorrect, isUpdating, isElderly,
 }: {
   event: ReminderEvent;
   slotChip: string;
   isDueNow: boolean;
+  isTourAnchor: boolean;
   nowMs: number;
   time: string;
   canResolve: boolean;
   onResolve: (event: ReminderEvent, action: 'TAKEN' | 'SKIP') => void;
+  canCorrect: boolean;
+  onCorrect?: (event: ReminderEvent) => void;
   isUpdating: boolean;
   isElderly: boolean;
 }) {
@@ -191,12 +228,16 @@ function DoseCard({
   const dose = [event.medications.dosage_amount, event.medications.unit_type].filter(Boolean).join(' ')
     || event.medications.dosage
     || '';
+  // Undo is offered only where there is something to undo. The chip directly above
+  // it already names the current state, so the button itself stays one word.
+  const showCorrect = canCorrect && (verdict === 'taken' || verdict === 'skipped');
+  const tourAttr = isTourAnchor ? { 'data-tour': 'dash-next-med' } : {};
 
   // The rhythm-breaker. Expanded, outlined in the accent, and the only card on the
   // rail carrying full-width actions.
   if (isDueNow && canResolve) {
     return (
-      <article className="rounded-2xl bg-card border border-primary/35 p-4 shadow-[0_2px_4px_rgba(15,28,90,0.06)]">
+      <article {...tourAttr} className="rounded-2xl bg-card border border-primary/35 p-4 shadow-[0_2px_4px_rgba(15,28,90,0.06)]">
         <div className="flex items-center gap-3">
           <span className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${slotChip}`}>
             <Pill className={isElderly ? 'w-7 h-7' : 'w-6 h-6'} aria-hidden />
@@ -232,7 +273,7 @@ function DoseCard({
   }
 
   return (
-    <article className="rounded-2xl bg-card border border-transparent px-3.5 py-3 flex items-center gap-3 shadow-sm">
+    <article {...tourAttr} className="rounded-2xl bg-card border border-transparent px-3.5 py-3 flex items-center gap-3 shadow-sm">
       <span className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${slotChip}`}>
         <Pill className={isElderly ? 'w-6 h-6' : 'w-[18px] h-[18px]'} aria-hidden />
       </span>
@@ -244,10 +285,25 @@ function DoseCard({
           {[dose, time].filter(Boolean).join(' · ')}
         </p>
       </div>
-      <span className={`shrink-0 inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-mono font-semibold ${isElderly ? 'text-xs' : 'text-[10px]'} ${meta.cls}`}>
-        <meta.Icon className="w-3 h-3" aria-hidden />
-        {meta.label}
-      </span>
+      <div className="shrink-0 flex flex-col items-end gap-0.5">
+        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-mono font-semibold ${isElderly ? 'text-xs' : 'text-[10px]'} ${meta.cls}`}>
+          <meta.Icon className="w-3 h-3" aria-hidden />
+          {meta.label}
+        </span>
+        {showCorrect && (
+          // One visible word, because the chip above it supplies the context. The
+          // aria-label carries the full sentence for anyone who reaches this button
+          // without seeing the chip beside it.
+          <button
+            onClick={() => onCorrect?.(event)}
+            disabled={isUpdating}
+            aria-label={`Change this dose to ${verdict === 'taken' ? 'skipped' : 'taken'}`}
+            className={`min-h-11 px-1 font-semibold text-muted-foreground underline underline-offset-2 hover:text-primary-strong cursor-pointer disabled:opacity-50 ${isElderly ? 'text-sm' : 'text-xs'}`}
+          >
+            {isUpdating ? 'Changing…' : 'Change'}
+          </button>
+        )}
+      </div>
     </article>
   );
 }

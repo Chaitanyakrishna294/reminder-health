@@ -503,6 +503,15 @@ export default function TodaysSchedule({
       : event.reminder_status === 'ESCALATED_TO_CG';
   };
 
+  // Correcting a dose logged the wrong way round. The old list rendered this link
+  // in monitor mode too — the RPC would have refused, but offering an action that
+  // cannot succeed is its own defect, so the read-only guard is applied here as
+  // well. Same-day only; `handleCorrect` surfaces the expiry from the RPC.
+  const railCanCorrect = (event: ReminderEvent) => {
+    if (viewMode === 'PATIENT_MONITOR') return false;
+    return ['TAKEN', 'SKIPPED', 'RESOLVED_BY_CG'].includes(event.reminder_status);
+  };
+
   return (
     <>
       <div className="space-y-6">
@@ -516,6 +525,8 @@ export default function TodaysSchedule({
             timeZoneFor={(e) => medicationTimezone?.(e.medication_id)}
             canResolve={railCanResolve}
             onResolve={handleResolve}
+            canCorrect={railCanCorrect}
+            onCorrect={(e) => handleCorrect(e, e.reminder_status === 'SKIPPED' ? 'SKIPPED' : 'TAKEN')}
             updatingId={updatingId}
             isElderly={isElderly}
             nowMs={nowMs}

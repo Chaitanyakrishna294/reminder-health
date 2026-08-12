@@ -18,8 +18,11 @@ export const TOURS: Record<string, GuideStep[]> = {
     {
       target: 'dash-next-med',
       title: 'Your next dose',
+      // Anchored on the day rail's due-now card since the hero card was retired
+      // (redesign §03). Same dose it always pointed at — DayRail picks the due-now
+      // card, or the earliest unanswered dose when nothing is due yet.
       message:
-        'This card shows the medication that needs your attention next. If a dose is overdue, it moves to the top so you never miss it.',
+        'This is the dose that needs answering next. When it is due, the card grows and shows Taken and Skip.',
       mood: 'curious',
     },
     {
@@ -33,7 +36,7 @@ export const TOURS: Record<string, GuideStep[]> = {
       target: 'dash-today',
       title: 'Today’s schedule',
       message:
-        'Every dose for today lives here. Mark each one Taken or Skip. If you logged one wrong, tap “Change” to fix it.',
+        'Your whole day runs down this line, grouped into morning, midday, evening and bedtime. If you logged a dose the wrong way, tap “Change” under it — that works on the same day only.',
       mood: 'reminder',
     },
     {
