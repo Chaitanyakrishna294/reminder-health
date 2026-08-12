@@ -1360,11 +1360,14 @@ export default function DashboardClientView({
         
         {/* Layer 2: Today's Medication Timeline (Main Content Zone) */}
         <div data-tour="dash-today" className="rise-in lg:col-span-8 space-y-6" style={{ ['--rise-delay' as string]: '180ms' }}>
-          {/* Stacks on a phone. Side by side at 375px, "Today's Schedule" wrapped to two
-              lines AND "Manage Inventory" wrapped to two lines, and the two collided —
-              neither had room, because a 2-line heading and a 2-line button cannot share
-              327px. The button keeps its own line and never wraps. */}
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 px-1">
+          {/* "Manage Inventory" used to sit here as a solid-pink button, the loudest
+              control on the screen. It was answering a question nobody asks while
+              looking at today's doses — restocking is a weekly errand, not a today
+              action — and it took the accent that belongs to the one thing that IS:
+              answering a dose. It now lives with the Medication Inventory card, and
+              low stock reaches Today contextually, as a quiet chip on the dose card
+              of the medication actually running out. */}
+          <div className="px-1">
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-xl font-black text-foreground tracking-tight font-mono tabular-nums" suppressHydrationWarning>
@@ -1393,15 +1396,6 @@ export default function DashboardClientView({
                     : 'You can still correct what was recorded.'}
               </p>
             </div>
-            {/* The dashboard's one solid-primary CTA. Refill and Open Hub used to be
-                equally loud (one of them in a one-off teal), so nothing read as the main
-                action. Both are secondary now. */}
-            <Link
-              href="/medications"
-              className="shrink-0 self-start h-11 px-4 text-xs font-black whitespace-nowrap rounded-full bg-primary-strong text-primary-strong-foreground hover:bg-primary-strong-hover active:scale-[0.98] transition-all shadow-md inline-flex items-center gap-1.5 cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" /> Manage Inventory
-            </Link>
           </div>
 
           {/* Mounted-gated: the row's days are derived from the device clock, and
@@ -1463,6 +1457,17 @@ export default function DashboardClientView({
                that dose's card into view and rings it. Same state the compliance
                ring reads, so all three surfaces agree on which dose is in hand. */
             selectedEventId={selectedEvent?.id ?? null}
+            /* Only medications the shared low-stock rule flags — lowStockMedicines is
+               already that set, computed server-side with the same predicate the bot
+               uses (lib/medications/stock.ts). No chip on a medicine with plenty
+               left: a count on every card is wallpaper, and wallpaper is not a
+               warning. Suppressed on past and future days, where a supply notice is
+               either historically wrong or premature. */
+            lowStockLeft={
+              isViewingToday
+                ? (medicationId) => lowStockMedicines.find((m) => m.id === medicationId)?.stock ?? null
+                : undefined
+            }
           />
         </div>
 
@@ -1810,6 +1815,17 @@ export default function DashboardClientView({
                 <p className="text-[11px] text-muted-foreground font-semibold">All medication stock levels are sufficient.</p>
               </div>
             )}
+
+            {/* Manage inventory's natural home: the card that already lists what is
+                running low and lets you top it up. Secondary styling on purpose — it
+                was a solid-pink button on Today's header, which made restocking look
+                like the most urgent thing on a screen about taking a dose. */}
+            <Link
+              href="/medications"
+              className="inline-flex items-center gap-1.5 min-h-11 text-xs font-black text-primary-strong hover:underline cursor-pointer"
+            >
+              <Package className="w-3.5 h-3.5 shrink-0" aria-hidden /> Manage inventory
+            </Link>
           </div>
 
         </div>

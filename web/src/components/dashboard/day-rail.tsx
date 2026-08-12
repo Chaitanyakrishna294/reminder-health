@@ -19,7 +19,8 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { Check, Clock, SkipForward, AlertCircle, Pill, ChevronDown } from 'lucide-react';
+import Link from 'next/link';
+import { Check, Clock, SkipForward, AlertCircle, Pill, ChevronDown, Package } from 'lucide-react';
 import { groupBySlot, type SlotMeta } from '@/lib/design/slots';
 import { unitPhrase } from '@/components/medications/medication-form-options';
 import type { ReminderEvent } from '@/components/dashboard/todays-schedule';
@@ -101,6 +102,15 @@ interface DayRailProps {
    * rail are two views of the same day, and this is what connects them.
    */
   selectedEventId?: number | null;
+  /**
+   * Units left, for a medication that is actually running low — null otherwise.
+   *
+   * This is the contextual replacement for the "Manage Inventory" button that used
+   * to sit in Today's header. A global button asks everyone to think about stock;
+   * a chip on the one dose card whose medication is running out tells the person
+   * who needs to know, at the moment they are already looking at that medicine.
+   */
+  lowStockLeft?: (medicationId: number) => number | null;
 }
 
 export default function DayRail({
@@ -115,6 +125,7 @@ export default function DayRail({
   isElderly,
   nowMs,
   selectedEventId,
+  lowStockLeft,
 }: DayRailProps) {
   // Which drawers the user has shut. Held in memory only, deliberately: a slot
   // collapsed yesterday should not hide today's doses on a fresh open.
@@ -200,6 +211,7 @@ export default function DayRail({
           canCorrect={canCorrect}
           onCorrect={onCorrect}
           isPastDay={isPastDay}
+          lowStockLeft={lowStockLeft}
           updatingId={updatingId}
           isElderly={isElderly}
         />
@@ -211,7 +223,8 @@ export default function DayRail({
 function SlotGroup({
   slot, items, dueNowId, tourAnchorId, selectedEventId, expanded, onToggle,
   nowMs, timeOf, timeZoneFor,
-  canResolve, onResolve, canCorrect, onCorrect, isPastDay = false, updatingId, isElderly,
+  canResolve, onResolve, canCorrect, onCorrect, isPastDay = false, lowStockLeft,
+  updatingId, isElderly,
 }: {
   slot: SlotMeta;
   items: ReminderEvent[];
@@ -291,6 +304,7 @@ function SlotGroup({
               canCorrect={!!canCorrect?.(event) && !!onCorrect}
               onCorrect={onCorrect}
               isPastDay={isPastDay}
+              stockLeft={lowStockLeft?.(event.medication_id) ?? null}
               isUpdating={updatingId === event.id}
               isElderly={isElderly}
             />
@@ -303,7 +317,7 @@ function SlotGroup({
 
 function DoseCard({
   event, slotChip, isDueNow, isTourAnchor, isSelected, nowMs, time,
-  canResolve, onResolve, canCorrect, onCorrect, isPastDay, isUpdating, isElderly,
+  canResolve, onResolve, canCorrect, onCorrect, isPastDay, stockLeft, isUpdating, isElderly,
 }: {
   event: ReminderEvent;
   slotChip: string;
@@ -317,6 +331,7 @@ function DoseCard({
   canCorrect: boolean;
   onCorrect?: (event: ReminderEvent, action: 'TAKEN' | 'SKIP') => void;
   isPastDay: boolean;
+  stockLeft: number | null;
   isUpdating: boolean;
   isElderly: boolean;
 }) {
@@ -346,6 +361,30 @@ function DoseCard({
   const anchor = { id: `rail-dose-${event.id}` };
   const selectedRing = isSelected ? 'ring-2 ring-ring ring-offset-2 ring-offset-background' : '';
 
+  /**
+   * "N left" — the contextual low-stock signal, on the card of the medicine that is
+   * actually running out.
+   *
+   * WAITING-AMBER, never pink. Pink is the accent for the one thing this screen asks
+   * you to do, which is answer a dose; spending it on a supply notice would put two
+   * things at the top of the same hierarchy. Amber is also honest about the urgency:
+   * running low is a this-week problem, not a right-now one, and `--danger` would
+   * make a refill look like a missed dose.
+   *
+   * `-strong` because this is TEXT on a tint. `--warning` on a 15% wash is nowhere
+   * near 4.5:1 — the exact failure this project has already shipped twice.
+   */
+  const stockChip = stockLeft === null ? null : (
+    <Link
+      href="/medications"
+      aria-label={`${stockLeft} left of ${event.medications.drug_name} — manage inventory`}
+      className={`inline-flex items-center gap-1 self-start rounded-full bg-warning/15 text-warning-strong font-mono font-semibold px-2 min-h-11 hover:bg-warning/25 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${isElderly ? 'text-xs' : 'text-[10px]'}`}
+    >
+      <Package className={isElderly ? 'w-4 h-4' : 'w-3 h-3'} aria-hidden />
+      {stockLeft} left
+    </Link>
+  );
+
   // The rhythm-breaker. Expanded, outlined in the accent, and the only card on the
   // rail carrying full-width actions.
   if (isDueNow && canResolve) {
@@ -363,6 +402,7 @@ function DoseCard({
               {[dose, time && `due now, ${time}`].filter(Boolean).join(' · ')}
             </p>
           </div>
+          {stockChip}
         </div>
 
         <div className="mt-3.5 grid grid-cols-[1fr_auto] gap-2">
@@ -397,6 +437,10 @@ function DoseCard({
         <p className="font-mono text-muted-foreground tabular-nums text-xs" suppressHydrationWarning>
           {[dose, time].filter(Boolean).join(' · ')}
         </p>
+        {/* Under the meta line rather than beside the verdict chip: at 375px the right
+            column already carries the outcome and Change, and a third element there
+            squeezed the drug name — the one thing the row exists to identify. */}
+        {stockChip}
       </div>
       <div className="shrink-0 flex flex-col items-end gap-0.5">
         <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-mono font-semibold ${isElderly ? 'text-xs' : 'text-[10px]'} ${meta.cls}`}>

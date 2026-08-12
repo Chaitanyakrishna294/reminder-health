@@ -71,6 +71,10 @@ interface TodaysScheduleProps {
    * CANNOT_CORRECT_FUTURE_DOSE — so hiding the actions is courtesy, not the guard.
    */
   isFutureDay?: boolean;
+  /** Units left for a medication that is running low, else null. Drives the dose
+   *  card's "N left" chip — the contextual replacement for Today's old inventory
+   *  button. Threaded from the dashboard, which is where stock actually lives. */
+  lowStockLeft?: (medicationId: number) => number | null;
 }
 
 // 270° SVG Severity Arc surrounding the timeline status badge
@@ -139,6 +143,7 @@ export default function TodaysSchedule({
   selectedEventId,
   isPastDay = false,
   isFutureDay = false,
+  lowStockLeft,
 }: TodaysScheduleProps) {
   const [events, setEvents] = useState<ReminderEvent[]>(initialEvents);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
@@ -612,6 +617,7 @@ export default function TodaysSchedule({
             isElderly={isElderly}
             nowMs={nowMs}
             selectedEventId={selectedEventId}
+            lowStockLeft={lowStockLeft}
           />
         )}
       </div>
