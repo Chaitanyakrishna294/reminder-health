@@ -26,7 +26,14 @@ next-env.d.ts
 
 # AI Agents / Scratch files / Local logs
 .agents/
-.claude/
+# `.claude/*` and not `.claude/`, deliberately: git never evaluates a negation for
+# something inside an ignored DIRECTORY, so `.claude/` + `!.claude/skills/` silently
+# does nothing. Ignoring the children individually is what makes the re-include work.
+.claude/*
+# Project skills ARE part of the project — they encode the copy constitution and the
+# accessibility floor, so they must travel with the repo and show up in a diff.
+# A rule that lives on one machine is not a rule.
+!.claude/skills/
 scratch/
 logs/
 *.log
