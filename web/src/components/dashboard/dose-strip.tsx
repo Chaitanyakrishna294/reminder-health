@@ -62,7 +62,8 @@ function pocketFace(tone: Tone, isDue: boolean) {
   if (isDue) {
     return {
       // The one pocket asking for something right now. Solid enough to find at a
-      // glance on a page of tints, but it is NOT the page's CTA — the hero card is.
+      // glance on a page of tints, but it is NOT the page's CTA — the day rail's
+      // due-now card is (it took that job from the hero card, now retired).
       shell: 'border-primary/45 bg-primary-soft',
       well: 'border-primary/40 bg-primary/20 text-primary-strong',
       label: 'text-primary-strong',

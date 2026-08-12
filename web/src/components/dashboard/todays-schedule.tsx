@@ -45,6 +45,12 @@ interface TodaysScheduleProps {
    * the rail yet, need no change.
    */
   medicationTimezone?: (medicationId: number) => string | null | undefined;
+  /**
+   * The dose selected in the blister strip above. The strip and the rail are two
+   * views of the same day, so tapping a pocket has to land you on that dose's card
+   * rather than leaving you to find it.
+   */
+  selectedEventId?: number | null;
 }
 
 // 270° SVG Severity Arc surrounding the timeline status badge
@@ -110,6 +116,7 @@ export default function TodaysSchedule({
   patientTelegramChatId,
   onEventsChange,
   medicationTimezone,
+  selectedEventId,
 }: TodaysScheduleProps) {
   const [events, setEvents] = useState<ReminderEvent[]>(initialEvents);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
@@ -530,6 +537,7 @@ export default function TodaysSchedule({
             updatingId={updatingId}
             isElderly={isElderly}
             nowMs={nowMs}
+            selectedEventId={selectedEventId}
           />
         )}
       </div>

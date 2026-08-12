@@ -1272,6 +1272,10 @@ export default function DashboardClientView({
             medicationTimezone={(medicationId) =>
               medications?.find((m) => m.id === medicationId)?.timezone ?? null
             }
+            /* Tapping a pocket in the strip above selects a dose; the rail scrolls
+               that dose's card into view and rings it. Same state the compliance
+               ring reads, so all three surfaces agree on which dose is in hand. */
+            selectedEventId={selectedEvent?.id ?? null}
           />
         </div>
 
