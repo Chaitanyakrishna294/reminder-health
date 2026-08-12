@@ -25,10 +25,13 @@ import type { ReminderEvent } from '@/components/dashboard/todays-schedule';
 
 /** Tailwind can't build class names at runtime, so slot tints are mapped explicitly. */
 const SLOT_CLASS: Record<string, { rail: string; pip: string; chip: string; label: string }> = {
-  morning: { rail: 'bg-slot-morning/30', pip: 'border-slot-morning', chip: 'bg-slot-morning/15', label: 'text-slot-morning' },
-  midday: { rail: 'bg-slot-midday/30', pip: 'border-slot-midday', chip: 'bg-slot-midday/15', label: 'text-slot-midday' },
-  evening: { rail: 'bg-slot-evening/30', pip: 'border-slot-evening', chip: 'bg-slot-evening/15', label: 'text-slot-evening' },
-  night: { rail: 'bg-slot-night/30', pip: 'border-slot-night', chip: 'bg-slot-night/15', label: 'text-slot-night' },
+  // `label` uses the -ink variant, never the surface hue: #E8A44E on the paper
+  // ground is ~1.9:1, nowhere near the 4.5:1 floor. Surface tints tint surfaces;
+  // text needs its own value. (Caught reviewing this file — it shipped wrong once.)
+  morning: { rail: 'bg-slot-morning/30', pip: 'border-slot-morning', chip: 'bg-slot-morning/15', label: 'text-slot-morning-ink' },
+  midday: { rail: 'bg-slot-midday/30', pip: 'border-slot-midday', chip: 'bg-slot-midday/15', label: 'text-slot-midday-ink' },
+  evening: { rail: 'bg-slot-evening/30', pip: 'border-slot-evening', chip: 'bg-slot-evening/15', label: 'text-slot-evening-ink' },
+  night: { rail: 'bg-slot-night/30', pip: 'border-slot-night', chip: 'bg-slot-night/15', label: 'text-slot-night-ink' },
 };
 
 type Verdict = 'taken' | 'skipped' | 'missed' | 'waiting' | 'due' | 'later';

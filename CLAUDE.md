@@ -559,9 +559,21 @@ elderly mode forbids personality escalation, and the launch rule is that animati
 time. Motion is earned in exactly two places — the all-taken celebration and Remi's idle — and is
 otherwise a smell.
 
-Note: `a11y` and `ux-copy` are **not available** in this environment despite being listed among
-preferred skills — those concerns (44px targets, 4.5:1 contrast, sentence case, zero-blame copy)
-are being applied by hand and should be checked manually, not assumed.
+**Accessibility and copy are enforced by skills now, not by hand (2026-08-12).** Two project skills
+live in `.claude/skills/` and trigger on any UI or copy change:
+- **`ux-copy`** — the copy constitution: sentence case (uppercase mono for structural labels only,
+  never sentences), zero-blame language, the elderly plainest register, Remi shows/doesn't chat, no
+  emoji in interface copy, and never implying the app verifies medical correctness.
+- **`project-a11y`** — the elderly-tuned floor: 44px targets, 4.5:1 contrast (**`--primary-strong`
+  for pink text, `--slot-*-ink` for slot-coloured text**), 28px elderly icons, light mode always for
+  elderly, arm's-length type sizes, visible `:focus-visible`.
+
+For formal WCAG 2.2 A/AA conformance use the installed **`a11y-specialist-skills`** pack —
+`reviewing-a11y` for severity-ranked issue discovery on a component or page, `auditing-wcag` for a
+full Pass/Fail conformance run (worth doing once before the Play closed test).
+
+Both project skills exist because these checks were failing when left to judgement: pink-on-white
+shipped at 2.9:1 twice, and a slot tint shipped as label text at ~1.9:1.
 
 **Rules for when this starts:**
 1. Web-side only. Because M1's Capacitor shell loads the deployed site (`server.url` mode), a

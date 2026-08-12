@@ -54,6 +54,15 @@
   --slot-evening: #5566B8; /* 16:00-21:00  */
   --slot-night:   #232A57; /* after 21:00  */
 
+  /* TEXT versions of the slot tints. The raw hues above are SURFACE colours and are
+     nowhere near legible as type: #E8A44E on the paper ground is about 1.9:1, far
+     under the 4.5:1 floor. Same trap the app already hit once with the status tints,
+     which is why `-strong` variants exist. Use these for any slot-coloured LABEL. */
+  --slot-morning-ink: #8A5A12;
+  --slot-midday-ink:  #1F5B75;
+  --slot-evening-ink: #3B4A92;
+  --slot-night-ink:   #232A57;
+
   /* Text-on-tint variants. The `-foreground` tokens above are white, which is only
      legible on a SOLID fill; used on a `/10`-`/15` tint they vanish (that was the
      unreadable "Refill recommended for:" row). Use `-strong` for any label, heading
@@ -329,6 +338,12 @@ body:has(nav[data-tour="dash-nav"]) .floating-bottom {
   --color-slot-midday: var(--slot-midday);
   --color-slot-evening: var(--slot-evening);
   --color-slot-night: var(--slot-night);
+
+  /* Legible text versions — use these for labels, never the surface hues above. */
+  --color-slot-morning-ink: var(--slot-morning-ink);
+  --color-slot-midday-ink: var(--slot-midday-ink);
+  --color-slot-evening-ink: var(--slot-evening-ink);
+  --color-slot-night-ink: var(--slot-night-ink);
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 4px);
   --radius-sm: calc(var(--radius) - 8px);
