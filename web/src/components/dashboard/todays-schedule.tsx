@@ -583,15 +583,15 @@ export default function TodaysSchedule({
              escalates a non-event. One line, no call to action — there is nothing
              here for the user to do, and inventing a button would say otherwise.
 
-             LAID OUT AS A ROW, not a stacked panel. Centred with p-8 this block ran
-             ~170px tall to say one short sentence, which pushed the week strip off a
-             phone screen — so choosing another day meant scrolling back up to find
-             the chooser. Nothing is worth less vertical space than a message saying
-             there is nothing here. Remi sits beside the text at the same size the
-             dose-card icons use, so the row reads as part of the rail's rhythm. */
-          <div className="px-4 py-4 flex items-center gap-3 bg-card/60 rounded-3xl border border-dashed border-border/80">
-            <BrainMascot size={isElderly ? 56 : 48} mood="peaceful" />
-            <p className={`text-muted-foreground font-semibold text-left ${isElderly ? 'text-base' : 'text-sm'}`}>
+             REMI IS THE CONTENT HERE, not a garnish on a sentence. An empty day is
+             the one screen with nothing competing for attention, so it is where the
+             character earns its place — and at 48px in a row he read as another
+             list icon. Given real size and real room, the empty day stops looking
+             like a failed load and starts looking like a quiet day, which is what
+             it actually is. */
+          <div className="px-6 py-10 flex flex-col items-center text-center gap-5 bg-card/60 rounded-3xl border border-dashed border-border/80">
+            <BrainMascot size={isElderly ? 176 : 144} mood="peaceful" />
+            <p className={`text-muted-foreground font-semibold text-balance ${isElderly ? 'text-lg' : 'text-base'}`}>
               {isPastDay
                 /* Not "nothing scheduled": a past day with no rows means nothing was
                    ever recorded, which is a different fact and worth not overstating. */
