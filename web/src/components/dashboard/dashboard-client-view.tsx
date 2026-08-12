@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useUiMode } from '@/context/ui-mode-context';
 import TodaysSchedule, { ReminderEvent } from '@/components/dashboard/todays-schedule';
 import MedicationReviewQueue from '@/components/dashboard/medication-review-queue';
@@ -178,22 +178,30 @@ export default function DashboardClientView({
   /** 0 = the week containing today, -1 = last week. Never positive: the strip stops
    *  at the current week, so there is no next week to step into. */
   const [weekOffset, setWeekOffset] = useState(0);
+  const searchParams = useSearchParams();
 
   /**
    * Deep link from a dose notification: /dashboard?day=YYYY-MM-DD.
    *
-   * Read from `location` in an effect rather than through `useSearchParams`, which
-   * would put this whole subtree behind a Suspense boundary for no benefit — the
-   * route is already dynamic. Validated against the key shape before use: a query
-   * string is user-editable, and an unvalidated value here would select a "day" that
-   * matches nothing and render an empty rail with no explanation.
+   * The URL is the source of truth, re-read whenever it changes rather than once on
+   * mount. That is what makes Android back work from a deep link: back clears the
+   * `day` param and the rail returns to today by itself, with no second channel
+   * telling it to. A mount-only read would leave the rail stranded on the linked day
+   * after the URL had already moved on.
+   *
+   * Validated against the key shape before use — a query string is user-editable,
+   * and an unvalidated value would select a "day" matching nothing and render an
+   * empty rail with no explanation.
    */
+  const dayParam = searchParams.get('day');
   useEffect(() => {
-    const raw = new URLSearchParams(window.location.search).get('day');
-    if (!raw || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) return;
-    const t = setTimeout(() => setSelectedDayKey(raw), 0);
+    const valid = dayParam && /^\d{4}-\d{2}-\d{2}$/.test(dayParam) ? dayParam : null;
+    const t = setTimeout(() => {
+      setSelectedDayKey(valid);
+      setWeekOffset(0);
+    }, 0);
     return () => clearTimeout(t);
-  }, []);
+  }, [dayParam]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -1404,7 +1412,14 @@ export default function DashboardClientView({
                 {!isViewingToday && (
                   <button
                     type="button"
-                    onClick={() => { setSelectedDayKey(null); setWeekOffset(0); }}
+                    onClick={() => {
+                      setSelectedDayKey(null);
+                      setWeekOffset(0);
+                      // Clear the deep-link param too, or the URL keeps saying
+                      // ?day=… while the rail shows today — and a reload, or
+                      // Android back, would drag it back to the linked day.
+                      if (dayParam) router.replace('/dashboard');
+                    }}
                     className="min-h-11 px-3 -my-2 rounded-full bg-primary-soft text-primary-strong font-mono font-bold text-xs inline-flex items-center gap-1 hover:bg-primary/15 active:scale-[0.98] transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   >
                     <span aria-hidden>«</span> Today

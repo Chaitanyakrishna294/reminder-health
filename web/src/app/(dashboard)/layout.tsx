@@ -9,6 +9,7 @@ import GuideTour from '@/components/guide/guide-tour';
 import GuestBanner from '@/components/guest/guest-banner';
 import ScheduleSync from '@/components/native/schedule-sync';
 import ReliabilityCheck from '@/components/native/reliability-check';
+import AndroidBack from '@/components/layout/android-back';
 
 export default async function DashboardLayout({
   children,
@@ -41,6 +42,11 @@ export default async function DashboardLayout({
   return (
     <GuideProvider>
       <ScheduleSync />
+      {/* Owns the Android hardware back button for every route in this group:
+          sub-pages pop one level, the five tab roots ask before backgrounding.
+          Renders nothing until the dialog is open, and nothing at all in a
+          browser. See lib/navigation/stack.ts for the model. */}
+      <AndroidBack />
       <div className="min-h-screen flex flex-col bg-background">
         {/* Navbar passing user profile details */}
         <Navbar

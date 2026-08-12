@@ -35,6 +35,30 @@ are stale. Keep it updated when you add or move anything.
     `drawable-*-night-*` variants) — Android auto-selects these in dark mode, so the splash still
     follows the OS. Delete them when the new app icon and paper-token splash are built (launch
     layer (a)); they are Capacitor template placeholders being replaced anyway.
+- **Navigation model: tabs replace, sub-pages push, back pops, root minimizes.**
+  Defined in `web/src/lib/navigation/stack.ts`; every new page must pick a side.
+  - **Root pages** are the five tab destinations (`ROOT_PATHS`). Their nav links carry
+    Next's `replace`, so switching tabs never stacks history — otherwise back after four
+    tab taps walks backwards through all four, which nobody expects from a tab bar.
+  - **Sub-pages** (notifications, `/medications/[id]`, the legal pages…) push normally, and
+    **each one renders `<PageBack />`** in its header. Two doors, same rule as notification
+    deletion: the system gesture is the expected one, the visible arrow is the one that
+    works for someone who does not know the gesture exists.
+  - **Android back** is owned by `<AndroidBack />`, mounted once in the `(dashboard)` layout.
+    Sub-page → pop one level. Root → the "Exit the app?" dialog, whose **Cancel is the
+    primary button** (the safe action takes the accent) and whose Exit calls
+    `minimizeApp()`, never `exitApp()`. `/dashboard?day=…` is a deep link, NOT a root view:
+    back there clears the param and returns to today.
+  - The dialog copy never warns about reminders, because **alarms keep working regardless** —
+    they are native `AlarmManager` registrations, independent of the webview. The only line
+    worth saying is the reassurance, which is why Remi is in that dialog at all (`happy`,
+    never `peaceful` — a sleeping mascot on a goodbye screen implies the reminders sleep).
+  - **Requires `@capacitor/app`** (added to `android-app/` 2026-08-12, `cap sync` run). Any
+    APK built before that has no `window.Capacitor.Plugins.App`, so `supportsBackButton()`
+    is false and the back button keeps its old behaviour. Per the server.url note above,
+    this needs BOTH a fresh APK and a web deploy before it can be tested on a device.
+  - Mascot placement is a registry, not a convention: `MASCOT_SLOTS` in `brain-mascot.tsx`.
+    Adding a slot is a design decision — make it there, on purpose.
 - **Medication catalog links are human-select-only** — never auto-match a nickname to a real drug (patient safety).
 - **The dose gate and the rail's due-now card must never disagree.** Both ask "did you take it?"
   about a dose, and both are kept deliberately: the gate is the full-screen interruption on app

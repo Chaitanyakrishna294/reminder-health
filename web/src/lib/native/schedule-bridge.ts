@@ -72,11 +72,35 @@ export interface PendingAction {
   syncError: string | null;
 }
 
+/** Android hardware back button payload — see lib/native/app-bridge.ts. */
+export interface BackButtonEvent {
+  /** Capacitor's own read of whether the webview has history to pop. */
+  canGoBack: boolean;
+}
+
+export interface PluginListenerHandle {
+  remove: () => Promise<void> | void;
+}
+
 declare global {
   interface Window {
     Capacitor?: {
       isNativePlatform?: () => boolean;
       Plugins?: {
+        /**
+         * Capacitor's own App plugin (@capacitor/app). Optional because it was NOT
+         * installed in android-app when the navigation rework was written — any APK
+         * built before that lands has no `App` here at all.
+         */
+        App?: {
+          addListener: (
+            event: 'backButton',
+            cb: (event: BackButtonEvent) => void,
+          ) => Promise<PluginListenerHandle> | PluginListenerHandle;
+          /** Sends the app to the background — what Android's own back gesture does. */
+          minimizeApp?: () => Promise<void>;
+          exitApp?: () => Promise<void>;
+        };
         ScheduleBridge?: {
           syncSchedule: (options: {
             medications: MedicationPayload[];

@@ -29,6 +29,27 @@ const MASCOT: Record<MascotMood, string> = {
 // until the real PNGs are dropped into /public/mascot.
 const POSITIVE = new Set<MascotMood>(['happy', 'proud', 'peaceful', 'encouraging']);
 
+/**
+ * MASCOT PLACEMENT SLOTS — where Remi is allowed to appear, and at what size.
+ *
+ * A registry rather than a convention, because the governing constraint is CALM: the
+ * mascot earns its place on screens with nothing competing for attention, and the way
+ * a character stops being charming is by turning up everywhere. A new slot is a
+ * design decision, so it gets added here on purpose rather than by someone importing
+ * the component into one more card.
+ *
+ * ELDERLY MODE narrows this further — Remi appears only at welcome, celebration and
+ * offline reassurance, and says less everywhere (see the ux-copy skill).
+ */
+export const MASCOT_SLOTS = {
+  /** An empty day on the rail, or an empty notifications list. Remi is the content. */
+  emptyState: { size: 144, elderlySize: 176, mood: 'peaceful' as MascotMood },
+  /** Confirm dialogs — the exit confirmation, and any future one of the same weight. */
+  dialog: { size: 56, elderlySize: 64, mood: 'happy' as MascotMood },
+  /** The guided tour's bubble. */
+  guide: { size: 64, elderlySize: 80, mood: 'curious' as MascotMood },
+} as const;
+
 interface BrainMascotProps {
   size?: number;
   /** 'asking' is kept as a backward-compatible alias for 'reminder'. */

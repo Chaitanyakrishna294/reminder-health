@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState } from 'react';
 import Link from 'next/link';
@@ -30,7 +30,7 @@ import {
 // then settles, with no relationship to how long the route takes.
 //
 // The class is removed on animationend rather than left on the node, so a second tap
-// re-triggers it — CSS animations do not restart while the class is still applied.
+// re-triggers it â€” CSS animations do not restart while the class is still applied.
 function NavIcon({
   icon: Icon,
   size = 'w-5 h-5',
@@ -44,7 +44,7 @@ function NavIcon({
   // arrive: it never fires if the tab is backgrounded while the animation is pending
   // (frames stop compositing), if the icon unmounts on navigation, or if the animation
   // is cancelled. Any of those would leave the class stuck on the node, and a CSS
-  // animation will not restart while its class is still applied — so the next tap
+  // animation will not restart while its class is still applied â€” so the next tap
   // would do nothing.
   React.useEffect(() => {
     if (!tapped) return;
@@ -181,7 +181,7 @@ export default function DashboardMainLayout({
     //
     // Care Circle took the Scheduler's slot. This is a caregiver product and Care
     // Circle was reachable only through a dashboard card or Settings, while the
-    // planner — a task you do occasionally, not daily — held a permanent slot.
+    // planner â€” a task you do occasionally, not daily â€” held a permanent slot.
     // Scheduler is still one tap from the Medications page and the profile menu.
     // Medications holds the CENTER slot: it is the app's core object and the thumb's
     // natural resting position on a phone dock.
@@ -195,7 +195,7 @@ export default function DashboardMainLayout({
 
     if (viewMode === 'PATIENT_MONITOR') {
       // Monitoring is a focused, read-only view of ONE patient. It used to hide only
-      // Medications, leaving Care Circle / Vault / Settings in the dock — all of which
+      // Medications, leaving Care Circle / Vault / Settings in the dock â€” all of which
       // are the caregiver's OWN pages, so tapping them mid-monitoring silently changed
       // whose data you were looking at. Only the monitor dashboard remains; leaving
       // the mode goes through the banner's "Return to My Dashboard", which also writes
@@ -273,6 +273,10 @@ export default function DashboardMainLayout({
             <Link
               key={item.href}
               href={item.href}
+              /* REPLACE, never push. A tab bar that stacks history means back after
+                 four tab taps walks backwards through all four — nobody expects that
+                 from tabs, and it buries the exit. See lib/navigation/stack.ts. */
+              replace
               prefetch={shouldPrefetch(item.href)}
               className={`flex flex-col items-center justify-center rounded-[20px] transition-all relative group ${
                 isElderly
@@ -314,6 +318,10 @@ export default function DashboardMainLayout({
             <Link
               key={item.href}
               href={item.href}
+              /* REPLACE, never push. A tab bar that stacks history means back after
+                 four tab taps walks backwards through all four — nobody expects that
+                 from tabs, and it buries the exit. See lib/navigation/stack.ts. */
+              replace
               prefetch={shouldPrefetch(item.href)}
               className={`flex items-center justify-center rounded-full transition-all ${
                 isElderly
@@ -340,7 +348,7 @@ export default function DashboardMainLayout({
           Bottom padding must clear the floating dock, which is NOT part of the flow:
           it occupies bottom-6 (24px) + its own height (72px normal / 96px elderly),
           plus the home-indicator inset. The old pb-24 (96px) exactly equalled the
-          normal-mode dock band, i.e. zero clearance — the last card on every scrolling
+          normal-mode dock band, i.e. zero clearance â€” the last card on every scrolling
           page sat under it. These values leave ~24-32px of real breathing room. */}
       <main
         className={`flex-1 w-full max-w-[1600px] mx-auto transition-all duration-300 ${
@@ -359,7 +367,7 @@ export default function DashboardMainLayout({
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black bg-[#EAF3FF] text-primary border border-primary/20 uppercase tracking-wider shrink-0">
-                  <Shield className="w-4 h-4" /> READ ONLY — EXCEPT MISSED DOSES
+                  <Shield className="w-4 h-4" /> READ ONLY â€” EXCEPT MISSED DOSES
                 </span>
               )}
 
