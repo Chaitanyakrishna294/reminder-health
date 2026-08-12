@@ -179,6 +179,22 @@ export default function DashboardClientView({
    *  at the current week, so there is no next week to step into. */
   const [weekOffset, setWeekOffset] = useState(0);
 
+  /**
+   * Deep link from a dose notification: /dashboard?day=YYYY-MM-DD.
+   *
+   * Read from `location` in an effect rather than through `useSearchParams`, which
+   * would put this whole subtree behind a Suspense boundary for no benefit — the
+   * route is already dynamic. Validated against the key shape before use: a query
+   * string is user-editable, and an unvalidated value here would select a "day" that
+   * matches nothing and render an empty rail with no explanation.
+   */
+  useEffect(() => {
+    const raw = new URLSearchParams(window.location.search).get('day');
+    if (!raw || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) return;
+    const t = setTimeout(() => setSelectedDayKey(raw), 0);
+    return () => clearTimeout(t);
+  }, []);
+
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -523,11 +539,20 @@ export default function DashboardClientView({
   // `currentTime` rather than a fresh Date(): reading the clock during render is
   // impure, and this one already ticks every 60s.
   const todayKey = dayKeyForDose(currentTime.toISOString(), rowRefTz) ?? '';
-  const weekKeys = todayKey ? weekKeysOf(todayKey, weekOffset) : [];
+  // The strip anchors on the SELECTED day, not on today plus an offset. That is what
+  // lets a deep link (/dashboard?day=…) or any out-of-week selection land with its
+  // own week already on screen — selecting always resets the offset to 0, so the
+  // anchor and the offset can never double-apply.
+  const weekAnchorKey = selectedDayKey ?? todayKey;
+  const weekKeys = weekAnchorKey ? weekKeysOf(weekAnchorKey, weekOffset) : [];
   // Matches the server query's 8-day reach (app/(dashboard)/dashboard/page.tsx).
   // If that window changes, change this with it or the strip starts showing days it
   // has no data for.
   const oldestLoadedKey = todayKey ? dayKeysEndingAt(todayKey, 8)[0] : '';
+  // The week you would step INTO, so the arrow disables before it lands somewhere
+  // empty rather than after.
+  const prevWeekEnd = weekKeys.length > 0 ? dayKeysEndingAt(weekKeys[0], 2)[0] : '';
+  const currentWeekEnd = todayKey ? weekKeysOf(todayKey, 0)[6] : '';
 
   // Past days come straight from `recentEvents` — real reminder_events rows with the
   // status they finished in. Deliberately NOT re-projected from reminder_times: a
@@ -1406,17 +1431,20 @@ export default function DashboardClientView({
               days={stripDays}
               selectedKey={selectedDayKey ?? todayKey}
               todayKey={todayKey}
-              onSelect={(key) => setSelectedDayKey(key === todayKey ? null : key)}
-              onStepWeek={(delta) => setWeekOffset((w) => Math.min(0, w + delta))}
-              /* Stops at the current week. Future is a preview of what is scheduled,
-                 and a strip you can page into next month is an invitation to try to
-                 record an outcome for a dose that has not happened. */
-              canStepForward={weekOffset < 0}
-              /* Only as far back as the 8-day query actually loaded. Beyond it every
-                 day would render empty, and an empty day in an adherence record reads
-                 as "nothing was taken" — the one lie this app must not tell. Deeper
+              /* Selecting re-anchors the strip on that day, so the offset resets or
+                 the two would compound on the next step. */
+              onSelect={(key) => { setSelectedDayKey(key === todayKey ? null : key); setWeekOffset(0); }}
+              onStepWeek={(delta) => setWeekOffset((w) => w + delta)}
+              /* Stops at the week containing today. Future is a preview of what is
+                 scheduled, and a strip you can page into next month is an invitation
+                 to try to record an outcome for a dose that has not happened. */
+              canStepForward={weekKeys.length > 0 && weekKeys[6] < currentWeekEnd}
+              /* Only as far back as the 8-day query actually loaded — measured on the
+                 week you would land in, not the one you are on. Beyond it every day
+                 renders empty, and an empty day in an adherence record reads as
+                 "nothing was taken", the one lie this app must not tell. Deeper
                  history needs a per-week fetch, the way the Medications page does it. */
-              canStepBack={weekKeys.length > 0 && weekKeys[6] >= oldestLoadedKey}
+              canStepBack={!!prevWeekEnd && !!oldestLoadedKey && prevWeekEnd >= oldestLoadedKey}
               isElderly={isElderly}
             />
           )}

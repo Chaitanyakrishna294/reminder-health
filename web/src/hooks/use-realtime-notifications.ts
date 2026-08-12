@@ -14,7 +14,13 @@ export interface Notification {
   connection_id?: string | null;
 }
 
-export function useRealtimeNotifications(userId: string) {
+/**
+ * @param limit how many rows to hold. The bell only needs enough for a badge; the
+ *   notifications PAGE is the full history, so it asks for more. Kept as a parameter
+ *   rather than always fetching the maximum because the bell mounts on every
+ *   dashboard route and a 200-row payload per navigation is real cost on a phone.
+ */
+export function useRealtimeNotifications(userId: string, limit = 20) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const supabase = createClient();
@@ -26,7 +32,7 @@ export function useRealtimeNotifications(userId: string) {
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
-        .limit(20);
+        .limit(limit);
 
       if (error) throw error;
 
@@ -37,7 +43,7 @@ export function useRealtimeNotifications(userId: string) {
     } catch (err) {
       console.error('[Notifications Hook] Error fetching notifications:', err);
     }
-  }, [userId, supabase]);
+  }, [userId, supabase, limit]);
 
   useEffect(() => {
     fetchNotifications();
@@ -120,5 +126,53 @@ export function useRealtimeNotifications(userId: string) {
     }
   };
 
-  return { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification };
+  /**
+   * Delete several at once — the notifications page's selection mode.
+   *
+   * THIS REMOVES THE MESSAGE ONLY. `notifications` rows are a delivery record; the
+   * dose history lives in `reminder_events` and `reminder_logs` and is not touched
+   * here or by any cascade from here. The confirm copy says so out loud, because
+   * "delete" on a screen full of medication messages is otherwise a frightening
+   * word for exactly the audience least able to test what it does.
+   */
+  const deleteMany = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    const removing = new Set(ids);
+    const removedUnread = notifications.filter((n) => removing.has(n.id) && !n.is_read).length;
+    setNotifications((prev) => prev.filter((n) => !removing.has(n.id)));
+    setUnreadCount((prev) => Math.max(0, prev - removedUnread));
+    try {
+      const { error } = await supabase.from('notifications').delete().in('id', ids);
+      if (error) throw error;
+    } catch (err) {
+      console.error('[Notifications Hook] Error deleting notifications:', err);
+      fetchNotifications(); // resync on failure — an optimistic list that lied is worse than a slow one
+    }
+  };
+
+  /** Clear the whole list. Scoped to this user by BOTH the filter and RLS. */
+  const clearAll = async () => {
+    const previous = notifications;
+    setNotifications([]);
+    setUnreadCount(0);
+    try {
+      const { error } = await supabase.from('notifications').delete().eq('user_id', userId);
+      if (error) throw error;
+    } catch (err) {
+      console.error('[Notifications Hook] Error clearing notifications:', err);
+      setNotifications(previous);
+      fetchNotifications();
+    }
+  };
+
+  return {
+    notifications,
+    unreadCount,
+    markAsRead,
+    markAllAsRead,
+    deleteNotification,
+    deleteMany,
+    clearAll,
+    refresh: fetchNotifications,
+  };
 }
