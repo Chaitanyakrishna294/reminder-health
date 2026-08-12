@@ -1688,12 +1688,20 @@ export default function DashboardClientView({
             userRole={userRole}
           />
 
-          <TodaysSchedule 
+          <TodaysSchedule
             events={events}
             userRole={userRole}
             currentUserTelegramChatId={myTelegramChatId || ''}
             patientTelegramChatId={targetTelegramChatId || myTelegramChatId || ''}
             onEventsChange={setEvents}
+            /* The day rail slots doses by time of day, and that must use the
+               MEDICATION's timezone, not the device's — a dose set for 08:00 IST
+               is a morning dose even when the phone is in London. ReminderEvent
+               carries no timezone, so the lookup is threaded from here, where the
+               medication list actually lives. */
+            medicationTimezone={(medicationId) =>
+              medications?.find((m) => m.id === medicationId)?.timezone ?? null
+            }
           />
         </div>
 

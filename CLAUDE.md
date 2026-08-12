@@ -28,6 +28,12 @@ are stale. Keep it updated when you add or move anything.
     follows the OS. Delete them when the new app icon and paper-token splash are built (launch
     layer (a)); they are Capacitor template placeholders being replaced anyway.
 - **Medication catalog links are human-select-only** — never auto-match a nickname to a real drug (patient safety).
+- **The dose gate and the rail's due-now card must never disagree.** Both ask "did you take it?"
+  about a dose, and both are kept deliberately: the gate is the full-screen interruption on app
+  open, the rail's due-now card is the in-page version. The invariant that makes two surfaces safe
+  is that **both pick the EARLIEST overdue dose** — `buildGateQueue` orders due-now-first ascending,
+  and `DayRail` sorts overdue doses ascending and promotes `[0]`. If either ordering changes, change
+  both, or the app will ask about one dose while highlighting another.
 - Web deploys from **repo root**: `npx vercel deploy --prod --yes --scope chaitanya-krishnas-projects-397d3a53`. **The `--scope` is required** — without it the CLI returns `Not authorized` even though `vercel whoami` succeeds, because `.vercel/repo.json` pins an `orgId` that no longer resolves for the logged-in user. Root `.vercel/repo.json` maps the repo to project `reminder-health` with `directory: web`, so deploy from the ROOT, never from `web/`. Vercel ships the **working tree, not the commit** — check `git status` first, or uncommitted work goes to production too.
 - For nontrivial Next.js work, heed `web/AGENTS.md`: this Next 16 differs from training data; check `node_modules/next/dist/docs/`.
 - Exclude `.claude/worktrees/` from repo-wide greps (stale full checkout).
@@ -513,6 +519,49 @@ UI/UX teardown of Pillo, added 2026-08-10. Standing rules for using it:
   and Me tabs, and dark-mode values. The teardown's own §8 "Adapt" section already improves on
   the biggest gap (Pillo's flow ends at "Take now") with a 5-minute countdown + dose-form
   instruction spec — that's pre-approved too, per §8 above.
+
+**Skills to use for design work (decided 2026-08-12 — apply these consistently):**
+`interface-design` is the primary one (product UI: states, hierarchy, information design; it is
+explicitly *not* for marketing pages, which is right for this app). Alongside it: `ponytail` for
+restraint, `verification-before-completion` for evidence-before-claims, `dataviz` for the adherence
+heatmap and stat tiles, `motion-design` + `gsap-*` for the launch idle animation and
+micro-interactions, and `artifact-design` only when publishing a proposal artifact.
+
+**SKILLS SERVE THE DESIGN SYSTEM; THEY NEVER OVERRIDE IT.** The approved proposal — tokens, the
+one-accent rule, slot tints as surfaces only, Remi's five-part palette, the sticker-flat rendering
+law, elderly sizing, and the light-mode default — is the authority. **If a skill's guidance
+conflicts, the proposal wins and the conflict gets flagged**, never silently followed.
+
+Deliberately NOT used, because each carries a competing visual direction: `taste-skill`,
+`gpt-tasteskill` (mandates AIDA marketing structure and randomised layouts — actively wrong for a
+screen opened six times a day to check a dose), `soft-skill`, `minimalist-skill`, `brutalist-skill`,
+`redesign-skill`, `stitch-skill`, `brandkit`, `genjutsu:paint`, `imagegen-*`, `image-to-code-skill`.
+Remi's expressions use **no** skill — the character sheet is the spec, and Claude only writes the
+generation prompt (see [[mascot-asset-workflow]]: the maintainer generates and drops the PNGs).
+
+**The five "design pro" skill sets** (maintainer's name for them — Design DNA · GSAP ×8 ·
+Motion Design · Three.js ×10 · Genjutsu). Verdict on each, so this is not re-litigated:
+- **Design DNA — use as a RECORDER, not a director.** It covers the same three dimensions the
+  proposal already fixed (tokens, style, effects), so it is worth running to formalise the approved
+  system into a structured profile future sessions apply mechanically. Do **not** point it at the
+  app to *derive* a direction — that re-opens decisions already made.
+- **Motion Design — yes, and before reaching for GSAP.** Timing/easing/choreography principles with
+  no dependency added.
+- **GSAP — only for real sequences** (the all-taken celebration, a countdown ring). It is ~50 KB;
+  Remi's idle breathing is two CSS properties and does not justify it. Use `gsap-react` if it lands.
+- **Three.js — no.** This app runs in a webview on low-end Android, and the alarm core's value is
+  working when things are degraded. WebGL is cost with no benefit here.
+- **Genjutsu — `cast` only** (micro-interactions for the celebration). `genjutsu:paint` is art
+  direction for a whole visual universe and conflicts with a locked one.
+
+**The governing constraint is CALM.** The teardown rejects interstitial encouragement screens,
+elderly mode forbids personality escalation, and the launch rule is that animation never adds wait
+time. Motion is earned in exactly two places — the all-taken celebration and Remi's idle — and is
+otherwise a smell.
+
+Note: `a11y` and `ux-copy` are **not available** in this environment despite being listed among
+preferred skills — those concerns (44px targets, 4.5:1 contrast, sentence case, zero-blame copy)
+are being applied by hand and should be checked manually, not assumed.
 
 **Rules for when this starts:**
 1. Web-side only. Because M1's Capacitor shell loads the deployed site (`server.url` mode), a

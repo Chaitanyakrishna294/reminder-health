@@ -13,6 +13,7 @@ import { PremiumToast } from '@/components/ui/premium-toast';
 import { getSeverityTheme, getToneTheme } from '@/lib/severity-theme';
 import { TONE_VAR, priorityMeta, doseTone, doseLabel } from '@/lib/design/semantics';
 import { Badge } from '@/components/ui/badge';
+import DayRail from '@/components/dashboard/day-rail';
 
 export interface ReminderEvent {
   id: number;
@@ -37,6 +38,13 @@ interface TodaysScheduleProps {
   currentUserTelegramChatId: string;
   patientTelegramChatId: string;
   onEventsChange?: (updatedEvents: ReminderEvent[]) => void;
+  /**
+   * medicationId → IANA zone, supplied by the dashboard because ReminderEvent
+   * carries no timezone. The day rail slots by the MEDICATION's zone, never the
+   * device's. Optional so the elderly and caregiver paths, which do not render
+   * the rail yet, need no change.
+   */
+  medicationTimezone?: (medicationId: number) => string | null | undefined;
 }
 
 // 270° SVG Severity Arc surrounding the timeline status badge
@@ -101,15 +109,37 @@ export default function TodaysSchedule({
   currentUserTelegramChatId,
   patientTelegramChatId,
   onEventsChange,
+  medicationTimezone,
 }: TodaysScheduleProps) {
   const [events, setEvents] = useState<ReminderEvent[]>(initialEvents);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [mounted, setMounted] = useState(false);
+  /**
+   * Clock for the rail's "due now" decision. Starts at 0 and is set on mount,
+   * deliberately: the server has no idea what time it is on the user's device, so
+   * deciding "due now" during SSR would hydrate a different card than it rendered.
+   * Zero means nothing reads as due, which is the correct pre-hydration state.
+   */
+  const [nowMs, setNowMs] = useState(0);
   const [toasts, setToasts] = useState<{ id: string; title: string; message: string; type: 'success' | 'error' }[]>([]);
   
   useEffect(() => {
-    setMounted(true);
+    // State is set from timer CALLBACKS, not synchronously in the effect body:
+    // the latter is a cascading render and React's lint flags it. The 0ms timeout
+    // lands in the same frame, so there is no visible delay before "due now" is
+    // known — and the clock is read here rather than during render because the
+    // server does not know the device's time.
+    const start = setTimeout(() => {
+      setMounted(true);
+      setNowMs(Date.now());
+    }, 0);
+    // 60s tick: a dose must flip to "due now" without the user reloading.
+    const tick = setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => {
+      clearTimeout(start);
+      clearInterval(tick);
+    };
   }, []);
 
   // Sync state with parent changes
@@ -459,6 +489,60 @@ export default function TodaysSchedule({
     );
   };
 
+  // THE DAY RAIL (redesign §03). Replaces the completed-only list: the rail shows
+  // the WHOLE day on one spine — taken, missed, snoozed, due now and still to come —
+  // because "what happened and what's left" is one question, and it was previously
+  // answered across four separate surfaces.
+  //
+  // Resolve guards stay here, not in the rail: who may resolve what in which view
+  // mode is safety logic and must have exactly one home.
+  const railCanResolve = (event: ReminderEvent) => {
+    if (viewMode === 'PATIENT_MONITOR') return false;
+    return userRole === 'PATIENT'
+      ? isPendingState(event.reminder_status)
+      : event.reminder_status === 'ESCALATED_TO_CG';
+  };
+
+  return (
+    <>
+      <div className="space-y-6">
+        {events.length === 0 ? (
+          <div className="p-8 text-center text-sm text-muted-foreground bg-card/60 rounded-3xl border border-dashed border-border/80">
+            Nothing scheduled for today.
+          </div>
+        ) : (
+          <DayRail
+            events={events}
+            timeZoneFor={(e) => medicationTimezone?.(e.medication_id)}
+            canResolve={railCanResolve}
+            onResolve={handleResolve}
+            updatingId={updatingId}
+            isElderly={isElderly}
+            nowMs={nowMs}
+          />
+        )}
+      </div>
+
+      {/* Toast Notifications */}
+      <PremiumToast toasts={toasts} onDismiss={(id) => setToasts((prev) => prev.filter((t) => t.id !== id))} />
+    </>
+  );
+}
+
+/**
+ * The previous completed-only list, kept compiling but unreferenced while the rail
+ * is verified on device. Delete once the rail passes — see CLAUDE.md build order.
+ */
+function LegacyCompletedList({
+  events, renderCard, isExpanded, setIsExpanded, toasts, setToasts,
+}: {
+  events: ReminderEvent[];
+  renderCard: (event: ReminderEvent, idx: number) => React.ReactNode;
+  isExpanded: boolean;
+  setIsExpanded: (v: boolean) => void;
+  toasts: { id: string; title: string; message: string; type: 'success' | 'error' }[];
+  setToasts: React.Dispatch<React.SetStateAction<{ id: string; title: string; message: string; type: 'success' | 'error' }[]>>;
+}) {
   const completedEvents = events.filter(e => ['TAKEN', 'RESOLVED_BY_CG', 'SKIPPED', 'MISSED'].includes(e.reminder_status));
   const firstThree = completedEvents.slice(0, 3);
   const remaining = completedEvents.slice(3);
