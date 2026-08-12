@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import PageBack from '@/components/layout/page-back';
 
 export const metadata: Metadata = {
   title: 'Privacy Policy | Re-MIND-eЯ',
@@ -13,6 +14,11 @@ const OPERATOR = 'Chaitanya Krishna';
 export default function PrivacyPolicyPage() {
   return (
     <main className="mx-auto max-w-3xl px-6 py-12 text-foreground">
+      {/* Sub-page, so it carries a back arrow like every other one. The fallback is
+          "/" and not /dashboard: these are reachable from the sign-in screen too,
+          and sending a signed-out reader to a protected route would bounce them
+          somewhere they never asked to go. */}
+      <div className="mb-2"><PageBack fallback="/" /></div>
       <h1 className="text-3xl font-black mb-2">Privacy Policy</h1>
       <p className="text-sm text-muted-foreground mb-8">Last updated: {UPDATED}</p>
 

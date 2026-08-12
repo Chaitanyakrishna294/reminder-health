@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import PageBack from '@/components/layout/page-back';
 import { Download, Share, SquarePlus, MoreVertical } from 'lucide-react';
 
 // Mirrors the type used by components/install-prompt.tsx — not in lib.dom yet.
@@ -79,6 +80,12 @@ export default function InstallPage() {
   return (
     <div className="flex min-h-screen items-center justify-center px-4 py-12 bg-[#f8fafc] dark:bg-background">
       <div className="w-full max-w-md bg-white dark:bg-card border border-border/80 shadow-sm rounded-3xl p-8 space-y-6 text-center">
+        {/* This page had NO way out at all — no link, no back, nothing but the
+            install prompt. Left-aligned inside a centred card on purpose: a back
+            control belongs where the thumb looks for it, not in the middle. */}
+        <div className="flex justify-start -mt-2 -ml-2">
+          <PageBack fallback="/" />
+        </div>
         <Image
           src="/icon-192x192.png"
           alt="Re-MIND-eЯ"

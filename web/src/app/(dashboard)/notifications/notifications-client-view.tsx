@@ -32,7 +32,6 @@ import { useUiMode } from '@/context/ui-mode-context';
 import { dayKeyForDose, timeOfDayForDose } from '@/lib/design/slots';
 import { notificationMeta, notificationHref, type NotificationMeta } from '@/lib/design/notification-kinds';
 import BrainMascot from '@/components/dashboard/brain-mascot';
-import PageBack from '@/components/layout/page-back';
 
 /** The page holds real history, not a badge's worth. */
 const PAGE_LIMIT = 200;
@@ -221,12 +220,9 @@ export default function NotificationsClientView({
   return (
     <div className={`max-w-3xl mx-auto space-y-5 ${isElderly ? 'p-2 space-y-8' : ''}`}>
       <header className="flex items-start justify-between gap-3 flex-wrap px-1">
-        <div className="min-w-0 flex items-start gap-1">
-          {/* Sub-pages push onto the stack, so they carry a visible way back — the
-              system back button is the gesture people expect, this is the one that
-              works for someone who does not know the gesture exists. */}
-          <PageBack label="Back to today" />
-          <div className="min-w-0">
+        {/* No PageBack here: DashboardMainLayout renders one above every sub-page,
+            so a local copy would show two arrows stacked. */}
+        <div className="min-w-0">
           <h1 className={`font-black text-foreground tracking-tight ${isElderly ? 'text-4xl' : 'text-2xl'}`}>
             Notifications
           </h1>
@@ -235,7 +231,6 @@ export default function NotificationsClientView({
               ? `${selected.size} selected`
               : 'Messages about your doses and your care circle.'}
           </p>
-          </div>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">

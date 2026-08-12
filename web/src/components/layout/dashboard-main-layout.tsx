@@ -6,6 +6,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useUiMode } from '@/context/ui-mode-context';
 import { createClient } from '@/lib/supabase/client';
 import { ESCALATION_STATUSES } from '@/lib/schedule/dose-attention';
+import { isRootPath } from '@/lib/navigation/stack';
+import PageBack from '@/components/layout/page-back';
 import { 
   LayoutDashboard, 
   Pill, 
@@ -447,6 +449,17 @@ export default function DashboardMainLayout({
                 <LogOut className="w-3.5 h-3.5" /> Return to My Dashboard
               </button>
             </div>
+          </div>
+        )}
+        {/* THE BACK ARROW FOR EVERY SUB-PAGE, decided here rather than page by page.
+            "Sub-pages get a back arrow" is a rule, and a rule enforced by sixteen
+            copies of the same JSX is a rule that lasts until someone adds the
+            seventeenth page. Driven off isRootPath, so a new route inherits the
+            right behaviour by existing — the five tab destinations get nothing
+            (back there means leave the app), everything else gets an arrow. */}
+        {!isRootPath(pathname) && (
+          <div className="w-full mb-1">
+            <PageBack />
           </div>
         )}
         <div className="w-full">
