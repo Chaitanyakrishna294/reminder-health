@@ -10,6 +10,19 @@ are stale. Keep it updated when you add or move anything.
 
 ## Hard rules
 - **Migrations are applied manually** by the maintainer in the Supabase SQL editor. Never attempt to apply one; just write `db/migrations/migration_<slug>.sql` (+ rollback/validation when warranted).
+- **Every new RPC starts locked: `REVOKE ALL … FROM PUBLIC` *and* `REVOKE ALL … FROM anon`,
+  then grant only the roles that actually call it.** Start from
+  `db/migrations/_TEMPLATE_new_rpc.sql`, which carries the footer and the reasoning.
+  **Both revokes, always** — a role holds EXECUTE two different ways and each needs its own:
+  a NULL `proacl` means Postgres's default of EXECUTE to PUBLIC (and every role is PUBLIC),
+  while Supabase's `ALTER DEFAULT PRIVILEGES` adds a *direct* grant to `anon` on new
+  functions. `REVOKE … FROM anon` cannot touch PUBLIC-derived access and **raises no error
+  when it fails to** — that silent no-op is why the 2026-07 sweep left functions open while
+  reporting success, and why `correct_reminder_event` still validated `anon = true` on
+  2026-08-13 after passing through both that sweep and a `REVOKE … FROM PUBLIC`.
+  This matters more here than in most projects: **anon is the key shipped inside the APK**,
+  which anyone can unpack, so anon's reach is the product's worst case. Validations must
+  assert `NOT has_function_privilege('anon', …)` **and** that `proacl` is not NULL.
 - **moment-timezone stays** — `src/utils.js` and `web/src/lib/medication-utils.ts` must keep identical DST math. No Intl migration.
 - **Dashboard nav = exactly 5 icons** (`dashboard-main-layout.tsx`); secondary pages go in the profile dropdown.
 - **LIGHT MODE IS THE DEFAULT, ALWAYS.** The product never auto-follows the OS theme. **Do not write

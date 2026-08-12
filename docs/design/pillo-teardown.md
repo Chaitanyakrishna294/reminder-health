@@ -559,6 +559,167 @@ ALARM
 
 ---
 
+## 4B. Settings, Log, Trends & Me (from the screen recording)
+
+The screenshots covered the happy path. The recording exposes the depth underneath it — and this is where Pillo turns out to be a far more serious product than the onboarding suggests.
+
+### 4B.1 Settings › Alarm
+
+```
+Alarm
+ ├─ Volume                                        >
+ ├─ Sound                                         >
+ ├─ Alarm size                                    >
+ ├─ Alarm wallpaper                               >
+ ├─ Alarm strength                                >
+ ├─ After the alarm     Countdown timer·Note·Donation
+ └─ Smart Snooze        0 active
+General
+ ├─ Alarm optimization  2 / 3 done ⚠
+ ├─ Preferences · Widgets · Share report
+ ├─ Back up / Restore data · Import log data
+ └─ Restore subscription
+More
+ └─ Remove ads · Send feedback · Share Pillo to friends
+    · Rate Pillo · About                     (v0.6.18)
+```
+
+- Grouped list, ~64 dp rows, leading 20 dp line icon, chevron trailing.
+- **Two-line rows carry live state as the sub-label** — `Countdown timer · Note · Donation`, `0 active`, `2 / 3 done`. You can read the whole configuration without opening anything.
+- `Alarm optimization` renders its sub-label in a warning treatment when incomplete. Settings surfaces its own unfinished business.
+
+### 4B.2 Alarm wallpaper — three tiers
+
+A segmented control with three modes, which reframes the personality feature entirely:
+
+| Tab | Characters | Behaviour |
+|---|---|---|
+| **Varies over time** | Short-tempered, Moody, Fuming, Fuming mini | Expression escalates as you run late |
+| **Single emotion** | Nagging, Worried, Cheerful | One fixed mood, held throughout |
+| **Basic** | Simple and Informative | No character — med info only |
+
+- Rows are name + one-line description + a live phone thumbnail on the right; the selected row gets a `primary` border.
+- **`Cheerful` and `Basic` are the tell.** The angry-mascot escalation I flagged earlier as a risk for elderly and anxious users is *already solved* — the user picks their own emotional register, including opting out entirely. That is the correct answer to the concern, and it costs one segmented control.
+
+### 4B.3 Alarm Strength — three fail-safes
+
+Each toggle has its own detail screen with an illustration and a device mockup:
+
+| Setting | Copy | Notes |
+|---|---|---|
+| **Force log** | *"Won't let you leave the app until you log"* | Badged `Alarm Strength Lv. 🔵🔵🔵` |
+| **Bypass DND** | *"Rings through even in Do Not Disturb mode"* | Single toggle screen |
+| **Auto-dismiss** | *"Saves battery, but might miss a dose"* | Carries a red **`Fail safe`** warning tag; sub-settings for `Black screen & mute after 30 min` and `Restart alarm after 5 min` |
+
+**The honesty here is exceptional.** The battery-saving option is labelled with its own downside — *might miss a dose* — in red, on the screen that sells it. Most products would bury that.
+
+### 4B.4 "After the alarm" — a user-composed pipeline
+
+The single most interesting screen in the app.
+
+```
+Customize steps after the alarm goes off
+
+ ┌────┐  ① Alarm goes off
+ │view│
+ └────┘
+ ┌────┐  ② Countdown timer                    [ON]
+ │view│     Timer that prevents med procrastination
+ └────┘     Time frame                       5 min
+ ┌────┐  ③ Dose Note        Note memorable events  [OFF]
+ │view│     Adjust dose as needed  Change dose directly [OFF]
+ └────┘     Skip Note        Note reason to skip     [ON]
+ ┌────┐  ④ Giving                          Manually
+ │view│
+ └────┘
+```
+
+- Numbered steps in sequence, each with a **thumbnail preview + `View` label** on the left that opens a modal demoing that step.
+- Every step is independently toggleable with its own time/mode parameter.
+- **This is the whole post-alarm flow exposed as an editable pipeline.** The user isn't choosing settings; they're assembling the sequence they'll experience. It's the "show the artefact" principle applied to an entire flow rather than one screen.
+
+### 4B.5 Smart Snooze — context-aware rules
+
+| Rule | Trigger |
+|---|---|
+| Driving safety mode | Auto-snooze while you're driving |
+| Auto snooze on calls | Auto-snooze during phone calls |
+| Phone-in-use snooze | Prompt 3 min before the alert during active phone use |
+| Location-based snooze | *"Snooze until home — reminder will resume when you arrive"* (`+ Add Place`) |
+| Keep dose spacing | Auto-adjust timing between doses |
+
+- Each has an illustrated setup screen with a mock notification and a single `+ Set …` / `+ Add Place` CTA.
+- **Dose spacing** is illustrated with two dose cards and a red `⇅ Maintain 5 hours` bar between them — *"Keep your meds properly spaced! We'll auto-adjust your schedule if you take a dose late or earlier."* This is clinical safety logic rendered as a picture.
+
+### 4B.6 Alarm optimization — the permission checklist
+
+`Please grant all permissions for reliable reminders`
+
+- **Essential:** `1. Allow 'Push notification'` ✓ · `2. Allow 'Display over other apps'` ✓ · `3. Exclude pillo from battery optimization` — rendered as a **full red card with a `Set it up` button** because it's unresolved.
+- **Recommended:** `Disable "Do not disturb" mode`, `Restart the app after OS Update / Reboot`.
+- Every item carries a `Why is this essential?` link.
+- **The pattern to steal:** a persistent, re-visitable health check for the permissions your product depends on, with completion state (`2 / 3 done`) surfaced in the parent settings row. For a PWA with push notifications this is arguably *more* necessary than it is for a native app.
+
+### 4B.7 Preferences · Widgets · Share report
+
+- **Preferences:** Privacy Protection · Dark theme · Text size · Time format · Week starts on · Language.
+- **Widgets:** `Med Cabinet` (meds + stock), `Today's Schedule` (Premium), `Giving garden` (*"Watch your giving garden grow on your home screen"* — a tree that grows with your streak). Each shows a real preview card above `+ Add Widget`.
+- **Share report:** a 2-column grid of six export types — Medication List · Medication Records · Measurement Records · Note Records · Allergies — each an icon tile with a one-line description. This is the "bring it to your doctor" feature, and it's given a whole screen rather than a menu item.
+- **Back up / Restore:** `Sign up to back up or restore data` → Google sign-in. Account creation is deferred until the user has a reason to want one.
+
+### 4B.8 Log tab
+
+Reached from the notes icon in the `Today` header (not the tab bar).
+
+- `Log` title, share icon; `Filters` + month chips below.
+- Day-grouped entries (`Today, Aug 11` / `Yesterday, Aug 10`), each row = status icon + med name + dose + status line.
+- **Status icon carries the whole state:** grey `?` = scheduled but unlogged (`Scheduled at 7:05PM`), blue ✓ = taken (`Taken at 10:20PM`).
+- Blue `+ Log` FAB for retroactive entry.
+
+### 4B.9 Today — the parts the screenshots missed
+
+- **Calendar expand sheet:** tapping the header calendar icon opens a month grid with **per-day dose dots** beneath each date, plus a flat agenda list (`Today, Aug 11` → med name + time, one row each).
+- **`As needed dose`** section below the scheduled groups, with `+ Log extra dose`.
+- **`Got feedback? We'd love to hear your thoughts` / `Send`** card at the bottom of the scroll — feedback capture placed where a satisfied user naturally ends up.
+
+### 4B.10 Trends (Progress › View details)
+
+- `Day` / `Week` segmented tabs.
+- Month strip with an expand chevron to a full calendar.
+- Per-day panel: `Adherence 0%` / `100%` with a **ring chart** on the right, then `Scheduled med` list with check marks.
+- Separate `As-needed med` list, with an explicit note: *"As-needed medications are excluded from adherence calculations."*
+- **The methodology is stated on the screen.** A number that could be gamed or misread is given its definition inline — rare and worth copying, especially for a product whose core metric is adherence.
+- Empty day states are gentle: `No meds for today 😊`.
+
+### 4B.11 Me tab
+
+```
+ ⬤  My Profile                             ✎
+     Medication    3 medications  >
+     Condition     –
+     Allergy       –
+    [ ▢ Note ]  [ 📅 Appointment ]
+
+ Medical team
+  ├─ Prescribers        >   "Call doctor by one click"
+  ├─ Pharmacies         >   "Call pharmacy by one click"
+  └─ Medical facilities >   "Manage your Medical facilities"
+
+ Care team
+  ├─ + Dependents
+  └─ + Caregivers  🔒 Premium
+```
+
+- Profile card is a **clinical summary**, not an account page — meds, conditions, allergies, with `Note` and `Appointment` as the two actions.
+- Each Medical team section is an empty state with an illustration, a benefit-led headline, and one `+ Add …` button. The value proposition is stated before any data exists.
+- **`Dependents` and `Caregivers` are Pillo's version of your Care Circle** — and `Caregivers` is the paywalled feature. That's a direct signal about where this category monetises.
+
+### 4B.12 Exit dialog
+
+A custom `Would you like to exit now?` dialog with the `pillo` wordmark and `Cancel` / `Exit`. Branded even on the way out — and a deliberate friction point for an app whose value depends on staying installed.
+
+---
+
 ## 5. Navigation Model
 
 ```
@@ -567,11 +728,19 @@ Splash
        └─ Permission gate (carousel → OS deep link)
             └─ HOME (Today)
                  ├─ Coach-marks 1/3 → 2/3 → 3/3 (one-time)
-                 ├─ Tab bar ──┬─ Today
+                 ├─ Tab bar ──┬─ Today ── calendar sheet · Log · Settings
                  │            ├─ Med ── Safety tools / Meds List / Pause
-                 │            ├─ Progress
+                 │            ├─ Progress ── Giving · Trends (Day/Week)
                  │            ├─ Health ── metric log sheets
-                 │            └─ Me
+                 │            └─ Me ── Profile · Medical team · Care team
+                 ├─ Settings ─┬─ Alarm ┬─ Volume · Sound · Size · Wallpaper
+                 │            │        ├─ Alarm strength (Force log / DND /
+                 │            │        │   Auto-dismiss)
+                 │            │        ├─ After the alarm (step pipeline)
+                 │            │        └─ Smart Snooze (5 context rules)
+                 │            ├─ Alarm optimization (permission checklist)
+                 │            ├─ Preferences · Widgets · Share report
+                 │            └─ Back up / Restore · About
                  ├─ FAB → Add med
                  │          ├─ Name (type / scan / browse-by-treatment)
                  │          ├─ Dose
@@ -617,6 +786,13 @@ Splash
 | **Altruistic gamification** | Hearts → charity donation | Sidesteps the infantilising tone of points and badges in a medical context, and makes the streak socially costly to break. |
 | **Capture at the moment of truth** | Add Note lives on the timer | Symptom recall is best while the dose is in hand. |
 | **Justify with the behaviour, not the feature** | Countdown upsell copy | *"Delay is the main reason for missed doses"* — states the problem, then sells the fix. |
+| **State in the sub-label** | `2 / 3 done`, `0 active`, `Countdown timer · Note · Donation` | The settings list is readable as a status dashboard without opening a single row. |
+| **Editable pipeline, not a settings list** | After the alarm | The user assembles the sequence they'll experience, with a preview thumbnail per step. |
+| **Name the downside on the selling screen** | Auto-dismiss: *"Saves battery, but might miss a dose"* + red `Fail safe` tag | Trust bought cheaply, in a category where trust is the product. |
+| **Let the user pick the emotional register** | Wallpaper tabs: Varies over time / Single emotion / Basic | Personality escalation becomes opt-in instead of imposed — the fix for the anxious-user risk. |
+| **State the methodology inline** | *"As-needed medications are excluded from adherence calculations"* | The headline metric explains itself where it's displayed. |
+| **Persistent permission health check** | Alarm optimization, `2 / 3 done` | Permissions aren't a one-time gate; they're a monitored dependency with a re-entry point. |
+| **Defer account creation** | Google sign-in only at Back up / Restore | The user signs up when they have something to lose, not before. |
 
 ---
 
@@ -673,13 +849,19 @@ Splash
 - **The reward loop is the strongest idea in the app — but Care Circle gives you a better version.** Pillo motivates with a charity donation because it has no social layer. You do. A taken dose that notifies a caregiver ("Mum took her 8am") is a stronger and more honest motivator than an abstract Heart, and it costs you no sponsor relationship. Keep the asymmetry, though: reward the taken path visibly, and let the skipped path be quiet rather than scolding.
 - **Add Note on the dosing screen.** Trivial to build on your existing schema and it feeds both adherence analytics and the Health Vault. Copy the structure: free text first, with `Severity` / `Condition` / `Measurement` as `+` expanders that never block a quick note.
 - **The heatmap calendar with a legend.** Your adherence analytics almost certainly have this data already; Pillo's 5-step density scale with an explicit legend is a cheap, readable way to render a month at a glance.
+- **A permission health check screen — you need this more than Pillo does.** Web push on a PWA is far more fragile than an Android foreground service: permission revoked, service worker evicted, iOS requiring install-to-home-screen first, browser-level notification blocks. Build the `Alarm optimization` equivalent as a re-visitable checklist with `n / m done` surfaced in Settings, and have your Telegram fallback prompt reference it when push fails. This is the single highest-value thing in the recording for your architecture.
+- **`After the alarm` as an editable pipeline.** You already have escalation logic in the scheduler; exposing it as numbered, toggleable steps with previews turns an opaque backend behaviour into a feature the user can see and trust. It would also make your escalation bugs *visible* to you in the UI.
+- **Dose spacing as a safety rule.** Pillo auto-adjusts subsequent doses when one is taken late. Given your race conditions around virtual dose resolution, this is worth thinking about as a product rule before it becomes a support problem.
+- **`Share report` for the doctor's visit.** Six export types on a dedicated screen. Your Health Vault already stores documents with permission-based sharing — a "generate a report to bring to your appointment" surface is a small addition on top of infrastructure you've already built, and it's the moment a health app earns its keep.
+- **Note the monetisation signal.** Pillo paywalls **Caregivers**, not medication tracking. If Re-MIND-eR ever needs revenue, Care Circle is the feature the market has already decided people will pay for — not the reminders.
 
 ### Reject
 - **The interstitial encouragement screens.** Pacing padding at 6 am.
 - **Bucketed med counts.** Use a real number.
-- **The escalating-anger personalities as a default.** Charming for a 25-year-old, potentially distressing for the elderly and chronically ill user your Care Circle targets. If you build it, make it opt-in and default to neutral.
+- **The escalating-anger personalities as a default.** ~~Charming for a 25-year-old, potentially distressing for the elderly and chronically ill user your Care Circle targets.~~ **Retracted after the recording:** Pillo already solves this with the three-tier wallpaper picker (Varies over time / Single emotion / Basic), so the user chooses their own emotional register and can opt out of the character entirely. Copy that structure rather than rejecting the feature — but keep `Basic` as the *default* for Elderly Mode rather than an option buried behind a tab.
+- **The `Fuming mini` / `Moody` proliferation.** Nine character variants is a lot of art for an MVP. Ship two registers (neutral + encouraging) and add intensity later if retention data asks for it.
 - **Emoji as your entire icon system.** Fine for a fast MVP; brittle for a health product that needs consistent rendering.
 
 ---
 
-*Compiled from 42 captured screens of the Pillo Android app. Measurements are derived from 1080 × 2400 screenshots and should be verified before being committed as design tokens. Not yet captured: the `Me` tab, the Reschedule/snooze picker, the Log complete screen on the taken path, Safety Reports, and the Adherence Streak detail view behind `Setup`.*
+*Compiled from 42 captured screens plus a 3:13 screen recording of the Pillo Android app (v0.6.18), sampled to ~300 deduplicated frames. Measurements are derived from 1080 × 2400 captures and should be verified before being committed as design tokens. Still not captured: the Reschedule/snooze picker, the Log complete screen on the taken path, Safety Reports output, and the Adherence Streak detail behind `Setup`.*

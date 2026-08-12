@@ -275,7 +275,18 @@ rate-limit cleanup :30.
 4. RLS on, **zero policies** = service-role only (link_codes, phone_verifications, tokens, locks, heartbeat, rate_limits)
 5. Read-only reference (`medication_catalog`: SELECT-true, no write policy)
 6. Mutations via RPC only — events/logs have SELECT-only policies
-Also: 2026-07 hardening revokes EXECUTE from `anon` on all SECURITY DEFINER fns.
+**Function EXECUTE grants — this line used to overstate what is enforced.** The 2026-07
+hardening ran `REVOKE EXECUTE ... FROM anon` over every SECURITY DEFINER function, and that
+only removes a DIRECT grant. It does **not** remove access held via `PUBLIC` — you cannot
+revoke a PUBLIC-derived privilege from one role, and Postgres raises no error when you try,
+so the sweep was a silent no-op wherever `proacl` was still NULL (NULL = default privileges
+= EXECUTE to PUBLIC). Found 2026-08-13 when `correct_reminder_event` validated with
+`anon = true` despite having been through both that sweep and a later
+`REVOKE ... FROM PUBLIC`.
+**Every new function needs BOTH revokes** — see `db/migrations/_TEMPLATE_new_rpc.sql`, which
+exists so this is copy-paste rather than remembered. To see the current blast radius run
+`db/audits/audit_function_execute_grants_2026_08_13.sql`; it lists every public function
+`anon` can execute and which of the two routes it comes through.
 
 **Migration workflow:** `db/migrations/migration_<slug>.sql` (+ `rollback_`, `validation_` when
 warranted) → maintainer pastes into Supabase SQL editor → no runner, no version table; ordering is
