@@ -20,6 +20,23 @@ export interface Notification {
  *   rather than always fetching the maximum because the bell mounts on every
  *   dashboard route and a 200-row payload per navigation is real cost on a phone.
  */
+/**
+ * Broadcast between hook instances in the SAME tab.
+ *
+ * Realtime only carries INSERT (see the subscription below), so a row this tab
+ * updates or deletes is announced to nobody — including the other copy of this hook
+ * on screen. That is not academic: the bell lives in the (dashboard) layout, which
+ * does NOT remount when you navigate to /notifications, so clearing every message on
+ * the page left the bell holding its own stale list and still showing a badge for
+ * notifications that no longer existed. Same for marking them read on open.
+ *
+ * Deliberately a DOM event and not a subscription upgrade: this is deterministic and
+ * instant, whereas relying on realtime to echo DELETEs back depends on the table's
+ * replica identity and publication carrying them, which is not something the client
+ * can check. Realtime remains the path for changes made on ANOTHER device.
+ */
+const CHANGED_EVENT = 'reminder-health:notifications-changed';
+
 export function useRealtimeNotifications(userId: string, limit = 20) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -95,6 +112,23 @@ export function useRealtimeNotifications(userId: string, limit = 20) {
     };
   }, [userId, supabase, fetchNotifications, instanceId]);
 
+  /** Announce a change this instance made, so every other copy re-reads the truth. */
+  const announceChange = useCallback(() => {
+    window.dispatchEvent(new CustomEvent(CHANGED_EVENT, { detail: { originId: instanceId } }));
+  }, [instanceId]);
+
+  useEffect(() => {
+    const onChanged = (event: Event) => {
+      const detail = (event as CustomEvent<{ originId?: string }>).detail;
+      // The instance that made the change already applied it optimistically;
+      // refetching there would only make its own list flicker.
+      if (detail?.originId === instanceId) return;
+      fetchNotifications();
+    };
+    window.addEventListener(CHANGED_EVENT, onChanged);
+    return () => window.removeEventListener(CHANGED_EVENT, onChanged);
+  }, [fetchNotifications, instanceId]);
+
   const markAsRead = async (notificationId: string) => {
     try {
       const { error } = await supabase
@@ -108,6 +142,7 @@ export function useRealtimeNotifications(userId: string, limit = 20) {
         prev.map((n) => (n.id === notificationId ? { ...n, is_read: true } : n))
       );
       setUnreadCount((prev) => Math.max(0, prev - 1));
+      announceChange();
     } catch (err) {
       console.error('[Notifications Hook] Error marking as read:', err);
     }
@@ -125,6 +160,9 @@ export function useRealtimeNotifications(userId: string, limit = 20) {
 
       setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
       setUnreadCount(0);
+      // This is the one the bell cares about most: opening the page marks everything
+      // read, and without this the badge sat there contradicting the empty page.
+      announceChange();
     } catch (err) {
       console.error('[Notifications Hook] Error marking all as read:', err);
     }
@@ -138,9 +176,11 @@ export function useRealtimeNotifications(userId: string, limit = 20) {
     try {
       const { error } = await supabase.from('notifications').delete().eq('id', notificationId);
       if (error) throw error;
+      announceChange();
     } catch (err) {
       console.error('[Notifications Hook] Error deleting notification:', err);
       fetchNotifications(); // resync on failure
+      announceChange(); // and tell the others, whose optimistic state may also be wrong
     }
   };
 
@@ -162,9 +202,11 @@ export function useRealtimeNotifications(userId: string, limit = 20) {
     try {
       const { error } = await supabase.from('notifications').delete().in('id', ids);
       if (error) throw error;
+      announceChange();
     } catch (err) {
       console.error('[Notifications Hook] Error deleting notifications:', err);
       fetchNotifications(); // resync on failure — an optimistic list that lied is worse than a slow one
+      announceChange();
     }
   };
 
@@ -176,10 +218,14 @@ export function useRealtimeNotifications(userId: string, limit = 20) {
     try {
       const { error } = await supabase.from('notifications').delete().eq('user_id', userId);
       if (error) throw error;
+      // The reported bug: clearing every message left the bell showing a badge for
+      // notifications that no longer existed, until a full reload.
+      announceChange();
     } catch (err) {
       console.error('[Notifications Hook] Error clearing notifications:', err);
       setNotifications(previous);
       fetchNotifications();
+      announceChange();
     }
   };
 
