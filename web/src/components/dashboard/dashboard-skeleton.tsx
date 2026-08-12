@@ -16,11 +16,15 @@ import { useEffect, useState } from 'react';
  * instantly from the router cache, which makes fast navigation FEEL slower. Under
  * 300ms people read a pause as instantaneous continuation.
  *
- * The blocks mirror `dashboard-client-view`'s real mobile order — greeting, hero,
- * compliance + care circle pair, dose strip, schedule — so the swap to real content
- * lands things roughly where the eye already expects them instead of reshuffling the
- * page. Sizes are approximate on purpose; a skeleton that chases exact heights breaks
- * every time the layout is touched.
+ * The blocks mirror `dashboard-client-view`'s real mobile order — greeting, dose
+ * strip, the day rail, then care circle — so the swap to real content lands things
+ * roughly where the eye already expects them instead of reshuffling the page. Sizes
+ * are approximate on purpose; a skeleton that chases exact heights breaks every time
+ * the layout is touched.
+ *
+ * Updated when the hero card and the compliance ring were cut (redesign §03). A
+ * skeleton that promises a card the page no longer has is worse than no skeleton:
+ * it reshuffles at exactly the moment it exists to prevent reshuffling.
  */
 export default function DashboardSkeleton({ delayMs = 300 }: { delayMs?: number }) {
   const [show, setShow] = useState(false);
@@ -52,16 +56,8 @@ export default function DashboardSkeleton({ delayMs = 300 }: { delayMs?: number 
         </div>
       </div>
 
-      {/* Hero — the next-medication card. Tallest thing on the screen. */}
-      <Block className="w-full h-[231px] rounded-3xl" aria-hidden />
-
-      {/* Compliance ring + care circle, side by side at the same 1.1fr/1fr split. */}
-      <div className="grid grid-cols-[1.1fr_1fr] gap-3 sm:gap-6" aria-hidden>
-        <Block className="h-[210px] rounded-3xl" />
-        <Block className="h-[210px] rounded-3xl" />
-      </div>
-
-      {/* Dose strip: eyebrow + count, then the pockets. */}
+      {/* Dose strip: eyebrow + count, then the pockets. First real content now
+          that the hero is gone. */}
       <div aria-hidden>
         <div className="flex items-baseline justify-between px-1">
           <Block className="w-28 h-3" />
@@ -74,16 +70,25 @@ export default function DashboardSkeleton({ delayMs = 300 }: { delayMs?: number 
         </div>
       </div>
 
-      {/* Today's schedule heading + a couple of rows. */}
+      {/* Today's schedule heading, then the day rail: a slot header and its cards,
+          twice. The narrow header block is the slot eyebrow, indented past where
+          the spine runs. */}
       <div className="space-y-3" aria-hidden>
         <div className="px-1 space-y-2">
           <Block className="w-44 h-5" />
           <Block className="w-60 h-3" />
         </div>
-        {[0, 1].map(i => (
-          <Block key={i} className="w-full h-20 rounded-2xl" />
+        {[0, 1].map(g => (
+          <div key={g} className="pl-9 space-y-2">
+            <Block className="w-24 h-4" />
+            <Block className="w-full h-[66px] rounded-2xl" />
+            <Block className="w-full h-[66px] rounded-2xl" />
+          </div>
         ))}
       </div>
+
+      {/* Care circle — first thing under Today now that the pair moved. */}
+      <Block className="w-full h-[180px] rounded-3xl" aria-hidden />
     </div>
   );
 }

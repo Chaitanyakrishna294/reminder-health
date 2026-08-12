@@ -26,10 +26,13 @@ export const TOURS: Record<string, GuideStep[]> = {
       mood: 'curious',
     },
     {
-      target: 'dash-compliance',
-      title: 'How you’re doing',
+      // Was the compliance ring, which restated today for the third time on one
+      // page and carried ~10px dose markers. Health Insights is the dashboard's
+      // only history now, so the step points there.
+      target: 'dash-progress',
+      title: 'How your week went',
       message:
-        'Your adherence at a glance: the percentage of doses you’ve taken on time. Keeping this high is the goal!',
+        'Each ring is one day, filling in as you answer each dose. Green is taken, amber skipped, red missed.',
       mood: 'encouraging',
     },
     {

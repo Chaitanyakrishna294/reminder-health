@@ -392,21 +392,9 @@ body:has(nav[data-tour="dash-nav"]) .floating-bottom {
   .card-flip-in { animation: none !important; opacity: 1 !important; transform: none !important; }
 }
 
-/* Dose markers revolving around the compliance ring center */
-@keyframes dose-orbit {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  [style*="dose-orbit"] {
-    animation: none !important;
-  }
-}
+/* `dose-orbit` lived here — the markers revolving around the compliance ring.
+   Removed with the ring itself (redesign §03): it restated today a third time,
+   and its markers were ~10px targets against a 44px floor. */
 
 @keyframes red-glow {
   0%, 100% {
