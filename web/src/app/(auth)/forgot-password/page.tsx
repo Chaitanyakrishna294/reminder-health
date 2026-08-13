@@ -45,6 +45,10 @@ export default function ForgotPasswordPage() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  // NOTE: the copy on this screen deliberately never states a digit count. The
+  // OTP length is a Supabase Auth setting (this project issues 8), CodeInput
+  // accepts 6-10 for exactly that reason, and a screen promising "6-digit" while
+  // the email shows eight digits makes a working flow look broken.
 
   const supabase = createClient();
   const router = useRouter();
@@ -141,12 +145,12 @@ export default function ForgotPasswordPage() {
         <p className={`mt-2 text-muted-foreground text-balance ${isElderly ? 'text-lg' : 'text-sm'}`}>
           {codeSent ? (
             <>
-              We emailed a 6-digit code to{' '}
+              We emailed a code to{' '}
               <b className="text-foreground break-all">{email}</b>. Type it below to
               choose a new password.
             </>
           ) : (
-            "Enter your email and we'll send you a 6-digit code."
+            "Enter your email and we'll send you a code."
           )}
         </p>
       </header>
