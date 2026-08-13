@@ -48,16 +48,75 @@ export function notificationMeta(type: Notification['type'] | string): Notificat
   return META[type] ?? FALLBACK;
 }
 
+/** Query params the dashboard reads to select and ring one dose. */
+export const DOSE_MED_PARAM = 'med';
+export const DOSE_AT_PARAM = 'at';
+
 /**
- * Where tapping this notification should go.
+ * Where tapping this notification goes — a complete href, every time.
  *
- * A dose notification returns null here and the caller supplies the day — the
- * `notifications` table stores no medication_id and no scheduled_for, so the only
- * time it knows is `created_at`. See the note in the notifications page.
+ * EVERY KIND GETS A DESTINATION. Care-circle notifications used to navigate
+ * nowhere at all: a caregiver was told their access changed and left holding a
+ * message with no way to act on it. A notification that cannot be acted on is a
+ * worse version of no notification, because it also costs a tap to find out.
+ *
+ * DOSE TAPS ARE EXACT WHEN THE ROW KNOWS ITS DOSE. Since
+ * migration_notification_targets_2026_08_14 the row carries `medication_id` and
+ * `scheduled_for`, so the link names the day AND the dose, and the dashboard
+ * scrolls that card into view and rings it — the same mechanism a dose-strip
+ * pocket already drives.
+ *
+ * OLDER ROWS FALL BACK TO THE APPROXIMATION, deliberately. `created_at` is when
+ * the ROW was written, not when the dose was due, so it is wrong across midnight
+ * and wrong whenever a queued offline action synced late. It is still better
+ * than refusing to navigate — and it is the honest limit of what those rows
+ * know. Nothing pretends otherwise: with no medication_id there is no `med`
+ * param, so the dashboard opens the day without ringing anything rather than
+ * ringing the wrong card.
+ *
+ * @param dayKeyOf resolves a dose instant to a YYYY-MM-DD key in the right
+ *   timezone. Injected rather than imported so this module stays free of the
+ *   slot machinery it does not otherwise need.
  */
-export function notificationHref(type: Notification['type'] | string): string | null {
-  const { kind } = notificationMeta(type);
-  if (kind === 'care-circle') return '/care-circle';
-  if (type === 'LOW_STOCK') return '/medications';
-  return null;
+export function notificationTarget(
+  n: Pick<Notification, 'type' | 'created_at'> & {
+    medication_id?: number | null;
+    scheduled_for?: string | null;
+    connection_id?: string | null;
+  },
+  dayKeyOf: (iso: string) => string | null,
+): string {
+  const { kind } = notificationMeta(n.type);
+
+  if (kind === 'care-circle') {
+    // A pending request is the one care-circle notification with something to DO,
+    // and its screen is not the same as the roster. The others land on the
+    // roster, which is where the relationship they describe is visible.
+    //
+    // Per-member deep linking needs a connection → patient lookup this row does
+    // not carry; it belongs with the care-circle redesign rather than as a query
+    // param nothing reads.
+    return n.type === 'CARE_CIRCLE_ACCESS_REQUEST' ? '/care-circle/requests' : '/care-circle';
+  }
+
+  if (kind === 'system') {
+    // A stock warning is about a medication, not a dose — so it opens that
+    // medication, and never carries a dose instant.
+    return n.medication_id ? `/medications/${n.medication_id}` : '/medications';
+  }
+
+  // Dose.
+  const instant = n.scheduled_for || n.created_at;
+  const key = dayKeyOf(instant);
+  if (!key) return '/dashboard';
+
+  const params = new URLSearchParams({ day: key });
+  // Both, or neither. The pair is what identifies a dose — `reminder_events` is
+  // unique on exactly (medication_id, scheduled_for) — and half of it would ring
+  // whichever dose of that medication happened to sort first.
+  if (n.medication_id && n.scheduled_for) {
+    params.set(DOSE_MED_PARAM, String(n.medication_id));
+    params.set(DOSE_AT_PARAM, n.scheduled_for);
+  }
+  return `/dashboard?${params.toString()}`;
 }

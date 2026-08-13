@@ -30,7 +30,7 @@ import {
 import { useRealtimeNotifications, type Notification } from '@/hooks/use-realtime-notifications';
 import { useUiMode } from '@/context/ui-mode-context';
 import { dayKeyForDose, timeOfDayForDose } from '@/lib/design/slots';
-import { notificationMeta, notificationHref, type NotificationMeta } from '@/lib/design/notification-kinds';
+import { notificationMeta, notificationTarget, type NotificationMeta } from '@/lib/design/notification-kinds';
 import BrainMascot from '@/components/dashboard/brain-mascot';
 
 /** The page holds real history, not a badge's worth. */
@@ -123,7 +123,9 @@ export default function NotificationsClientView({
   const groups = useMemo(() => {
     const byDay = new Map<string, Notification[]>();
     for (const n of notifications) {
-      const key = dayKeyForDose(n.created_at, referenceTimeZone) ?? '';
+      // Group by when the dose was DUE where we know it; the row's own
+      // created_at is only a stand-in for older rows.
+      const key = dayKeyForDose(n.scheduled_for || n.created_at, referenceTimeZone) ?? '';
       if (!key) continue;
       const bucket = byDay.get(key);
       if (bucket) bucket.push(n);
@@ -185,18 +187,15 @@ export default function NotificationsClientView({
   };
   useEffect(() => cancelPress, []);
 
+  /**
+   * Every notification now has somewhere to go — see notificationTarget. A dose
+   * row written since migration_notification_targets_2026_08_14 carries its own
+   * medication and instant, so the link names the day AND the dose and the
+   * dashboard rings that card; older rows keep the created_at approximation and
+   * simply open the day.
+   */
   const openNotification = (n: Notification) => {
-    const href = notificationHref(n.type);
-    if (href) {
-      router.push(href);
-      return;
-    }
-    // A dose notification. The table stores no medication_id and no scheduled_for,
-    // so the day it happened is inferred from `created_at` — accurate except when a
-    // dose is answered across midnight or escalates hours later. Stated in the
-    // commit rather than hidden: the alternative is no deep link at all.
-    const key = dayKeyForDose(n.created_at, referenceTimeZone);
-    router.push(key ? `/dashboard?day=${key}` : '/dashboard');
+    router.push(notificationTarget(n, (iso) => dayKeyForDose(iso, referenceTimeZone)));
   };
 
   const confirmDeleteSelected = () => {
@@ -366,7 +365,7 @@ export default function NotificationsClientView({
                               className={`shrink-0 font-mono tabular-nums text-muted-foreground ${isElderly ? 'text-sm' : 'text-[11px]'}`}
                               suppressHydrationWarning
                             >
-                              {timeOfDayForDose(n.created_at, referenceTimeZone)}
+                              {timeOfDayForDose(n.scheduled_for || n.created_at, referenceTimeZone)}
                             </span>
                           </span>
                           <span className={`block text-muted-foreground leading-relaxed break-words ${isElderly ? 'text-base mt-1' : 'text-xs mt-0.5'}`}>

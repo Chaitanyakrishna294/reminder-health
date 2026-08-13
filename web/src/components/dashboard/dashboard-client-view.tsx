@@ -627,6 +627,44 @@ export default function DashboardClientView({
       ? projectDay(selectedDayKey!)
       : (pastEventsByDay[selectedDayKey!] ?? []);
 
+  /**
+   * DEEP LINK FROM A NOTIFICATION — `?day=…&med=…&at=…`.
+   *
+   * `day` alone opens the right day; these two name the DOSE, so the rail can
+   * scroll that card into view and ring it. Same selection state a dose-strip
+   * pocket sets, so there is one highlight mechanism rather than a second one
+   * built for notifications.
+   *
+   * Matched on (medication_id, scheduled_for) rather than an event id because
+   * that pair is what `reminder_events` is unique on, and it is the only
+   * identity a notification can carry for a dose whose row may not have existed
+   * when the notification was written.
+   *
+   * Runs when the DAY'S EVENTS ARRIVE, not just on mount: a past day is fetched
+   * asynchronously, so on a cold open the target does not exist yet and a
+   * mount-only effect would silently select nothing.
+   */
+  const medParam = searchParams.get('med');
+  const atParam = searchParams.get('at');
+  useEffect(() => {
+    if (!medParam || !atParam) return;
+    const medId = Number(medParam);
+    if (!Number.isFinite(medId)) return;
+    const atMs = new Date(atParam).getTime();
+    if (Number.isNaN(atMs)) return;
+
+    // Compared as instants, not strings: the URL carries whatever ISO form the
+    // database emitted, and "+00:00" vs "Z" is the same moment written twice.
+    const match = railEvents.find(
+      (e) => e.medication_id === medId && new Date(e.scheduled_for).getTime() === atMs,
+    );
+    if (!match) return;
+
+    // Guarded: without it this re-selects on every render while the params sit in
+    // the URL, which would fight the user the moment they tapped a different dose.
+    setSelectedEvent((prev) => (prev?.id === match.id ? prev : match));
+  }, [medParam, atParam, railEvents]);
+
   const stripDays: WeekStripDay[] = weekKeys.map((key) => {
     const isFuture = key > todayKey;
     const dayEvents = key === todayKey ? events : isFuture ? projectDay(key) : (pastEventsByDay[key] ?? []);
