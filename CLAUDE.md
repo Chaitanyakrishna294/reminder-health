@@ -23,6 +23,38 @@ are stale. Keep it updated when you add or move anything.
   This matters more here than in most projects: **anon is the key shipped inside the APK**,
   which anyone can unpack, so anon's reach is the product's worst case. Validations must
   assert `NOT has_function_privilege('anon', …)` **and** that `proacl` is not NULL.
+- **THE BROWSER UPLOADS STRAIGHT TO SUPABASE STORAGE — so a form check is never a limit.**
+  The Health Vault and the avatar picker both call the Storage API from the client with the
+  anon key. Our Next.js server is not in that path at all, which means every size, type and
+  quota check written in a component is *advice to whoever chooses to use our form*, and the
+  person worth defending against is exactly the one who does not. **The only real places to
+  refuse are `storage.buckets.file_size_limit` / `.allowed_mime_types` and the RLS policy on
+  `storage.objects`.** Anything new that accepts a file gets its ceiling there first, and the
+  UI copy second.
+  - **Vault quota, set 2026-08-13** (`migration_vault_upload_limits_2026_08_13.sql`):
+    **5 files per user, 5 MB per file, images + PDF only.** Counted as **storage objects, not
+    `health_records` rows** — a direct API upload creates an object and no row, so a row count
+    would sit at zero while the bucket filled.
+  - **Trash occupies a slot until it is purged**, and the UI says so. A soft delete keeps the
+    object in the bucket so Restore can work; `cleanup_expired_trash` removes it at 30 days.
+    Since the limit counts objects, a trashed file is still a file — the honest options were
+    "say so and offer permanent delete" or "break the restore we promised", and it is the
+    first. Do not "fix" the counter to ignore trash; that would make it disagree with the
+    policy, and a counter that disagrees with the limit is worse than no counter.
+  - **The count function must stay SECURITY DEFINER owned by a BYPASSRLS role.** A policy on
+    `storage.objects` that itself selects from `storage.objects` raises `infinite recursion
+    detected in policy`. Check 5 of the validation asserts this; if it ever reads FAIL, roll
+    back rather than debug live — every vault upload is failing.
+  - **`vault_can_accept_upload()` takes a per-user advisory lock and is granted to nobody.**
+    Without the lock, fifty parallel uploads all read the same count and all pass, which is
+    precisely the attack the quota exists to stop. A polite client was never the threat.
+  - **Existing users over the limit keep every file.** The rule is `count < 5` on INSERT only.
+    Never enforce a new quota by deleting someone's medical records.
+  - **Still open (audited 2026-08-13, `db/audits/audit_unbounded_growth_2026_08_13.sql`):**
+    `audit_logs` has `FOR ALL TO authenticated`, so the client can append rows without bound
+    and the vault does exactly that on every action; and the `avatars` policy checks only the
+    first path segment, so one user can hold unlimited objects under `{uid}/…`. Both are
+    reachable by a guest, and guest sign-in is one tap.
 - **moment-timezone stays** — `src/utils.js` and `web/src/lib/medication-utils.ts` must keep identical DST math. No Intl migration.
 - **Dashboard nav = exactly 5 icons** (`dashboard-main-layout.tsx`); secondary pages go in the profile dropdown.
 - **LIGHT MODE IS THE DEFAULT, ALWAYS.** The product never auto-follows the OS theme. **Do not write

@@ -177,6 +177,7 @@ through RPCs, never raw table writes. `lib/rate-limit.ts` and `lib/medications/c
 | `lib/push/register-push.ts` (client) · `send-push.ts` (server) | Web-push both directions |
 | `lib/plan.ts` · `billing/use-plan-status.ts` · `billing/luxe.ts` | Plan gate, client mirror, Care+ inline-style tokens (deliberately outside Tailwind) |
 | `lib/design/semantics.ts` | **Colour→meaning + canonical labels.** `PRIORITY` (Routine/Important/Critical), `CARE_LABELS` (patient-side first), `DOSE_TONE`/`doseLabel`, `TONE_VAR`. Import these instead of typing a status word or a hex — see `docs/DESIGN_SYSTEM.md` |
+| `lib/health-vault/limits.ts` · `compress-image.ts` | **The 5-file / 5 MB / images-and-PDF vault quota, client side** (2026-08-13). Numbers + all the refusal copy in one module, in lockstep with `migration_vault_upload_limits_2026_08_13.sql`; `compressImage()` resizes photos to 2000px JPEG before upload so the ceiling does not fight an ordinary camera. **Politeness layer only** — the browser uploads straight to Storage, so the real refusal is the bucket ceiling + the `storage.objects` policy. Has a test (`limits.test.ts`) |
 | `lib/design/density.ts` | **The three densities as one system** (2026-08-13): `Density` = `browser \| app \| elderly`, `resolveDensity()`, and `DENSITY_LAYOUT` — the table saying what each one renders. Presentation only; never gate a derivation or a write path on it. `?preview=app\|browser` forces one for the session |
 | `lib/severity-theme.ts` | tone→Tailwind classes (`getToneTheme`, `getSeverityTheme`). `.text` is the readable-on-tint colour; never `text-*-foreground` on a tint |
 | `lib/medications/stock.ts` | **Web mirror of the bot's low-stock predicate** (`isLowStock`: threshold first, `daysOfStockLeft <= 3` backup). Lockstep with `src/reminders.js` is enforced by `test/fixtures/low-stock-cases.json`, which both tests read — same mirror discipline as the moment-timezone pair |
@@ -233,6 +234,15 @@ while `?preview=` is forcing a density.
 
 27 tables + 1 view + 2 private buckets (`health-vault`, `avatars`). Full column detail:
 agent-audited 2026-07-25; `docs/DATABASE_SCHEMA.md` is badly stale (§9).
+
+**Storage quotas (2026-08-13, PENDING —`migration_vault_upload_limits_2026_08_13.sql`).** `health-vault`
+carries `file_size_limit` 5 MB + `allowed_mime_types` images/PDF, and its INSERT policy calls
+`vault_can_accept_upload()` for the 5-file-per-user cap and blocks guests. **This is the only layer
+that counts**: the client uploads to Storage directly with the anon key, so the upload form's checks
+are advice. The cap counts storage OBJECTS, so a trashed record holds its slot until
+`cleanup_expired_trash` purges it at 30 days. See CLAUDE.md's hard rule; unbounded-growth audit in
+`db/audits/audit_unbounded_growth_2026_08_13.sql` (open findings: `audit_logs` client INSERT, avatars
+object count).
 
 **Core:** `profiles` (1:1 auth.users; `telegram_chat_id` unique, synthetic `WEB-<uuid>` for web-only;
 `connect_code` RM+6) · `medications` (**no CREATE TABLE in repo** — pre-repo bot table, only ALTERed;
