@@ -16,6 +16,7 @@ import { openReliabilitySetting } from '@/lib/native/schedule-bridge';
 import type { ReliabilityTarget } from '@/lib/native/schedule-bridge';
 import type { SetupItem } from '@/lib/native/setup-guide';
 import { Check, ChevronRight, CircleAlert } from 'lucide-react';
+import { useUiMode } from '@/context/ui-mode-context';
 
 interface SetupStepCardProps {
   item: SetupItem;
@@ -26,6 +27,11 @@ interface SetupStepCardProps {
 }
 
 export default function SetupStepCard({ item, satisfied, onMarkDone, onUndoDone }: SetupStepCardProps) {
+  // This card had no elderly sizing at all, on the screen where it matters most —
+  // the person being set up for elderly mode is usually the one who needs these
+  // steps read to them, and they were rendering below this app's normal body size.
+  const { isElderly } = useUiMode();
+
   // Null until tried. False means native exhausted its whole intent chain, which
   // is the case where the written steps are the ONLY thing that helps.
   const [deepLinkFailed, setDeepLinkFailed] = useState(false);
@@ -50,7 +56,7 @@ export default function SetupStepCard({ item, satisfied, onMarkDone, onUndoDone 
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <p className="text-sm font-semibold text-foreground">{item.title}</p>
+            <p className={`font-bold text-foreground ${isElderly ? 'text-xl' : 'text-[15px]'}`}>{item.title}</p>
             <span
               className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
                 satisfied ? 'bg-success/15 text-success' : 'bg-warning/20 text-warning-strong'
@@ -60,17 +66,34 @@ export default function SetupStepCard({ item, satisfied, onMarkDone, onUndoDone 
             </span>
           </div>
 
-          <p className="mt-1 text-xs text-muted-foreground">{item.why}</p>
+          <p className={`mt-1 text-muted-foreground ${isElderly ? 'text-base' : 'text-[13px]'}`}>{item.why}</p>
 
           {!satisfied && (
             <>
-              <ol className="mt-2.5 space-y-1.5">
+              {/* THESE ARE INSTRUCTIONS SOMEONE FOLLOWS WHILE LOOKING AT ANOTHER
+                  SCREEN, glancing back and forth and losing their place each time.
+                  They were 12px with a 16px numeral — smaller than this app's body
+                  text, on the one screen where being able to read a line at arm's
+                  length decides whether the alarms work at all. The numeral is now a
+                  real badge rather than a superscript, because "which step was I on"
+                  is the question every glance back has to answer instantly. */}
+              <ol className={isElderly ? 'mt-4 space-y-3.5' : 'mt-3 space-y-2.5'}>
                 {item.steps.map((step, i) => (
-                  <li key={step} className="flex gap-2 text-xs text-foreground">
-                    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground">
+                  <li
+                    key={step}
+                    className={`flex items-start text-foreground ${
+                      isElderly ? 'gap-3.5 text-lg' : 'gap-2.5 text-[15px]'
+                    }`}
+                  >
+                    <span
+                      className={`flex shrink-0 items-center justify-center rounded-full bg-primary-soft font-mono font-bold text-primary-strong tabular-nums ${
+                        isElderly ? 'h-8 w-8 text-base' : 'h-6 w-6 text-xs'
+                      }`}
+                      aria-hidden
+                    >
                       {i + 1}
                     </span>
-                    <span className="min-w-0">{step}</span>
+                    <span className="min-w-0 leading-snug">{step}</span>
                   </li>
                 ))}
               </ol>
@@ -80,9 +103,11 @@ export default function SetupStepCard({ item, satisfied, onMarkDone, onUndoDone 
                   confirmation is your own memory. Naming the visible end state also
                   rescues someone whose phone routed them through different menus but
                   who arrived at the right screen anyway. */}
-              <p className="mt-2.5 flex gap-2 rounded-lg bg-success/10 px-2.5 py-2 text-[11px] font-semibold text-success-strong">
-                <Check className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />
-                <span className="min-w-0">{item.done}</span>
+              <p className={`flex gap-2 rounded-xl bg-success/10 font-semibold text-success-strong ${
+                isElderly ? 'mt-4 px-4 py-3 text-base' : 'mt-3 px-3 py-2.5 text-[13px]'
+              }`}>
+                <Check className={`mt-px shrink-0 ${isElderly ? 'h-5 w-5' : 'h-4 w-4'}`} aria-hidden />
+                <span className="min-w-0 leading-snug">{item.done}</span>
               </p>
 
               {deepLinkFailed && (
