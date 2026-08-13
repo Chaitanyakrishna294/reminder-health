@@ -23,6 +23,8 @@ import { createClient } from '@/lib/supabase/client';
 import { Copy, Check, AlertCircle, Link2, Users, ArrowRight } from 'lucide-react';
 import { useUiMode } from '@/context/ui-mode-context';
 import { isGuestGuardError } from '@/lib/auth/guest';
+import AccessScopeSummary from '@/components/care-circle/access-scope-summary';
+import { DEFAULT_ACCESS } from '@/lib/care-circle/access-scope';
 
 export default function ConnectionsClientView({
   connectCode,
@@ -39,6 +41,15 @@ export default function ConnectionsClientView({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  /**
+   * The resolved person, held between "who is this code?" and "send it".
+   *
+   * The flow used to do both in one tap: resolve a code to a name and
+   * immediately grant standing access to a medication list. The consent was real
+   * and the information was not. Nothing is sent while this is set — it is the
+   * pause where the scope summary lives.
+   */
+  const [pendingInvite, setPendingInvite] = useState<{ profileId: string; name: string } | null>(null);
 
   const copyCode = () => {
     if (!connectCode) return;
@@ -91,9 +102,28 @@ export default function ConnectionsClientView({
         return;
       }
 
+      // STOP HERE. Resolving a code is not consent to share a medication
+      // history — the summary below the form now says what this will grant, and
+      // sending is a second, deliberate tap.
+      setPendingInvite({ profileId, name });
+    } catch (err) {
+      console.error('[Connections] connect failed:', err);
+      setError('Could not send the request. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const sendInvite = async () => {
+    if (!pendingInvite) return;
+    setBusy(true);
+    setError(null);
+    try {
       // invite_caregiver handles dedupe, reactivation and the request notification,
       // all under SECURITY DEFINER — never a direct INSERT from the browser.
-      const { error: connErr } = await supabase.rpc('invite_caregiver', { caregiver_id: profileId });
+      const { error: connErr } = await supabase.rpc('invite_caregiver', {
+        caregiver_id: pendingInvite.profileId,
+      });
       if (connErr) {
         if (isGuestGuardError(connErr)) {
           setError('Add an email to your account first, then you can connect with someone.');
@@ -103,11 +133,11 @@ export default function ConnectionsClientView({
         }
         return;
       }
-
-      setSuccess(`Request sent to ${name}. They will see it on their phone.`);
+      setSuccess(`Request sent to ${pendingInvite.name}. They will see it on their phone.`);
       setCodeInput('');
+      setPendingInvite(null);
     } catch (err) {
-      console.error('[Connections] connect failed:', err);
+      console.error('[Connections] invite failed:', err);
       setError('Could not send the request. Please try again.');
     } finally {
       setBusy(false);
@@ -184,9 +214,44 @@ export default function ConnectionsClientView({
             }`}
           >
             <Link2 className={isElderly ? 'w-6 h-6' : 'w-4 h-4'} />
-            {busy ? 'Sending…' : 'Send request'}
+            {/* No longer "Send request" — this step only looks the code up.
+                Promising to send and then not sending is the kind of small lie
+                that makes people tap twice. */}
+            {busy ? 'Checking…' : 'Look up this code'}
           </button>
         </form>
+
+        {/* THE PAUSE. Nothing has been sent yet: the code resolved to a person,
+            and this is where the reader finds out what saying yes would grant
+            before they say it. */}
+        {pendingInvite && (
+          <div className="space-y-3 pt-1">
+            <AccessScopeSummary flags={DEFAULT_ACCESS} personName={pendingInvite.name} />
+            <div className={`flex gap-2 ${isElderly ? 'flex-col' : ''}`}>
+              <button
+                type="button"
+                onClick={sendInvite}
+                disabled={busy}
+                className={`flex-1 inline-flex items-center justify-center gap-2 rounded-2xl bg-primary-strong text-primary-strong-foreground font-black hover:bg-primary-strong-hover active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                  isElderly ? 'min-h-16 text-xl' : 'min-h-12 text-sm'
+                }`}
+              >
+                <Link2 className={isElderly ? 'w-6 h-6' : 'w-4 h-4'} aria-hidden />
+                {busy ? 'Sending…' : `Send request to ${pendingInvite.name}`}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setPendingInvite(null); setError(null); }}
+                disabled={busy}
+                className={`inline-flex items-center justify-center rounded-2xl border border-border font-bold text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                  isElderly ? 'min-h-16 text-lg' : 'min-h-12 px-5 text-sm'
+                }`}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
 
         {error && (
           <p className={`flex items-start gap-2 text-danger-strong font-bold ${body}`} role="alert">

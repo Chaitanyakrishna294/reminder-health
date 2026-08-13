@@ -22,6 +22,7 @@ import {
 } from '@/components/care-circle/connection-actions';
 import { sourceOf, type ConnectionSource } from '@/lib/care-circle/connection-source';
 import MemberCard from '@/components/care-circle/member-card';
+import ResendInvite from '@/components/care-circle/resend-invite';
 import HideInElderly from '@/components/care-circle/hide-in-elderly';
 import {
   Users,
@@ -319,11 +320,22 @@ export default async function CareCirclePage() {
                    everyone on the same roster page to find themselves again. */
                 manageHref={`/care-circle/manage?connection=${conn.connection_id}`}
                 actions={
+                  <>
+                    {/* Only while it is still waiting. Once accepted there is
+                        nothing to notify about; once declined, re-asking is
+                        exactly what this must not become. */}
+                    {isPendingConnection(conn) && (
+                      <ResendInvite
+                        connectionId={conn.connection_id}
+                        name={conn.resolved_name || 'them'}
+                      />
+                    )}
                   <CaregiverConnectionActions
                     connectionId={conn.connection_id}
                     caregiverName={conn.resolved_name || 'this caregiver'}
                     source={sourceOf(conn.is_migrated)}
                   />
+                  </>
                 }
               />
             ))}
