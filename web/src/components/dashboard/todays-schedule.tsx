@@ -159,12 +159,35 @@ export default function TodaysSchedule({
         actorRole: userRole,
       });
 
+      /**
+       * ALREADY ANSWERED SOMEWHERE ELSE — and that is a SUCCESS, not an error.
+       *
+       * This fired a red error toast reading "Medication already resolved" while
+       * the RPC had returned cleanly, the dose was recorded, and the state update
+       * two lines below was about to show it as taken. The one way to reach it is
+       * the ordinary one: answer the dose on the notification, open the app a
+       * moment later, tap Taken on a card the server has already moved on from.
+       * The app worked perfectly and told a patient it had failed.
+       *
+       * `resolve_reminder_event` is idempotent by design — it returns the
+       * existing row with `already_resolved` rather than raising — so the honest
+       * response to it is to do nothing and let the refresh below show the truth.
+       *
+       * The ONE case still worth a word is when the recorded outcome is not the
+       * one just requested: tapping Taken on a dose already marked Skipped looks
+       * like the tap did the opposite of what was asked. That gets a calm note,
+       * not an error — nobody did anything wrong, and Change is on the card.
+       */
       if (resolvedRecord.already_resolved) {
-        showToast(
-          'Medication already resolved',
-          'This medication was updated from another device.',
-          'error'
-        );
+        const recorded = resolvedRecord.reminder_status === 'TAKEN' ? 'taken' : 'skipped';
+        const requested = action === 'TAKEN' ? 'taken' : 'skipped';
+        if (recorded !== requested) {
+          showToast(
+            'Already recorded',
+            `This dose was already marked as ${recorded}. Tap Change under it if that is wrong.`,
+            'success',
+          );
+        }
       }
 
       const updatedEvents = events.map((e) =>

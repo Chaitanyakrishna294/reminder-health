@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import {
   isNativeApp,
@@ -35,6 +35,7 @@ const MEDICATION_COLUMNS =
  */
 export default function ScheduleSync() {
   const pathname = usePathname();
+  const router = useRouter();
 
   useEffect(() => {
     if (!isNativeApp()) return;
@@ -66,6 +67,23 @@ export default function ScheduleSync() {
           });
           if (result && result.syncedPendingActions > 0) {
             console.log(`[ScheduleSync] synced ${result.syncedPendingActions} queued dose action(s)`);
+            /**
+             * THE SERVER JUST CHANGED UNDER US, so re-read it.
+             *
+             * Handing over the session is what drains the native queue, and the
+             * queue is full of doses answered from the notification shade while
+             * this webview was closed or backgrounded. Without this refresh the
+             * page keeps showing them as due: the patient answered on the
+             * notification, opens the app, and is asked the same question again —
+             * and answering it a second time used to produce a red error toast
+             * (fixed in todays-schedule.tsx) for a dose that was already safely
+             * recorded.
+             *
+             * Only when something actually synced. An unconditional refresh here
+             * would re-render the dashboard on every foreground and every
+             * navigation, which is the calm rule's opposite.
+             */
+            router.refresh();
           }
         } catch (err) {
           console.error('[ScheduleSync] setSession failed:', err);
@@ -120,6 +138,11 @@ export default function ScheduleSync() {
       cancelled = true;
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
+    // `router` is intentionally not a dependency. Next's app-router instance is
+    // stable, and listing it invites a future lint autofix to add something that
+    // is not — which would re-subscribe the visibility listener and re-run the
+    // whole sync on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
   return null;
