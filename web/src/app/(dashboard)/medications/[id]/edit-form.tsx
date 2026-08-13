@@ -220,7 +220,7 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
   };
 
   const labelClass = `block font-semibold text-foreground ${isElderly ? 'text-xl mb-2' : 'text-sm mb-1.5'}`;
-  const inputClass = `mt-1 block w-full px-4 py-3 border border-input rounded-2xl bg-background text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 text-sm transition-all duration-200 font-[var(--font-sans)] ${
+  const inputClass = `mt-1 block w-full px-4 py-3 min-h-11 border border-input rounded-2xl bg-background text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 text-sm transition-all duration-200 font-[var(--font-sans)] ${
     isElderly ? 'py-4 text-xl rounded-2xl border-2' : ''
   }`;
 

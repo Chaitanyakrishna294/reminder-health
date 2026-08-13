@@ -23,7 +23,7 @@ import {
   CircleAlert,
   ClipboardList,
 } from 'lucide-react';
-import { SpoonIcon, CreamBottleIcon, TabletIcon } from '@/components/ui/custom-icons';
+import { getUnitIcon } from '@/lib/design/dose-forms';
 import { PRIORITY } from '@/lib/design/semantics';
 
 export type UnitType =
@@ -44,18 +44,32 @@ export interface UnitOption {
   icon: React.ReactNode;
 }
 
-export const unitOptions: UnitOption[] = [
-  { id: 'TABLET', label: 'Tablet', icon: <TabletIcon className="w-5 h-5" /> },
-  { id: 'CAPSULE', label: 'Capsule', icon: <Pill className="w-5 h-5" /> },
-  { id: 'ML', label: 'Milliliter (ml)', icon: <Beaker className="w-5 h-5" /> },
-  { id: 'DROP', label: 'Drop', icon: <Droplets className="w-5 h-5" /> },
-  { id: 'APPLICATION', label: 'Application', icon: <CreamBottleIcon className="w-5 h-5" /> },
-  { id: 'TEASPOON', label: 'Teaspoon', icon: <SpoonIcon className="w-5 h-5" /> },
-  { id: 'UNIT', label: 'Unit', icon: <Syringe className="w-5 h-5" /> },
-  { id: 'PATCH', label: 'Patch', icon: <Bandage className="w-5 h-5" /> },
-  { id: 'INHALATION', label: 'Inhalation', icon: <Wind className="w-5 h-5" /> },
-  { id: 'OTHER', label: 'Other', icon: <Package className="w-5 h-5" /> },
-];
+/**
+ * TEN measurement options, EIGHT dose forms — and the icon comes from the forms.
+ *
+ * The labels differ on purpose: this list asks "what do you count it in?", so
+ * Milliliter and Teaspoon are separate answers even though both are syrup. The
+ * ICON asks a different question — "what is it?" — and that one has exactly one
+ * source, `lib/design/dose-forms.ts`.
+ *
+ * They used to disagree. This list carried its own inline icons, so a medication
+ * measured in millilitres showed a BEAKER on the screen where you set it and a
+ * SPOON on the card where you read it — the same drift as the priority colours
+ * that made a routine medication pink in one place and green in another. One
+ * registry, or it happens again.
+ */
+export const unitOptions: UnitOption[] = ([
+  { id: 'TABLET', label: 'Tablet' },
+  { id: 'CAPSULE', label: 'Capsule' },
+  { id: 'ML', label: 'Milliliter (ml)' },
+  { id: 'DROP', label: 'Drop' },
+  { id: 'APPLICATION', label: 'Application' },
+  { id: 'TEASPOON', label: 'Teaspoon' },
+  { id: 'UNIT', label: 'Unit' },
+  { id: 'PATCH', label: 'Patch' },
+  { id: 'INHALATION', label: 'Inhalation' },
+  { id: 'OTHER', label: 'Other' },
+] as Array<Omit<UnitOption, 'icon'>>).map((o) => ({ ...o, icon: getUnitIcon(o.id, 'w-5 h-5') }));
 
 /** Quick-pick strengths, scoped to the form chosen in step 1. The picker used to offer
  *  `500mg / 650mg / 5mg / 10mg / 20mg / 100mcg` to everyone — so someone entering a
