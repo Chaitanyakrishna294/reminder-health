@@ -198,8 +198,11 @@ all sizes ≥44px), `badge.tsx` (`Badge`/`CountBadge`), `empty-state.tsx`, `eyeb
 `custom-icons.tsx` and `premium-toast.tsx`. `components/care-circle/connection-actions.tsx` owns
 accept/disconnect/monitor for care relationships (incl. the legacy `caregiver_info` branches) —
 **`/care-circle` is canonical for these; `/settings` keeps identity codes only and links out.**
-Big ones: `dashboard-client-view.tsx` (88 KB), `settings-client-view.tsx` (42 KB),
-`medication-list.tsx` (26 KB). Also `missed-dose-strip.tsx` (top-pinned missed-dose alert, spec
+Big ones: `dashboard-client-view.tsx` (82 KB), `medication-list.tsx` (53 KB).
+`settings-client-view.tsx` is **gone** (2026-08-13) — Settings is now a grouped-row hub
+(`app/(dashboard)/settings/settings-hub.tsx` + `components/settings/settings-row.tsx`) pushing one
+sub-page per concern (`account`, `connections`, `notifications`, `display`, `language`, `help`,
+`legal`, `setup-guide`). Stale references to the old file remain in comments only. Also `missed-dose-strip.tsx` (top-pinned missed-dose alert, spec
 2026-07-27; actionable in caregiver-monitor view; permanently-unresolvable doses render info-only)
 and `med-due-gate.tsx` (full-screen "Did you take it?" gate: due-first queue, pinned asked dose,
 one-by-one/all-at-once toggle; exports `permanentResolveError`/`UNSAVEABLE_DOSE_COPY`).
