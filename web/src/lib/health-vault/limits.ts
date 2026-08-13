@@ -39,8 +39,28 @@ export const VAULT_ALLOWED_EXTENSIONS = [
   '.pdf', '.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif',
 ] as const;
 
-/** The `accept` attribute for the file input — same list, one source. */
-export const VAULT_ACCEPT_ATTR = VAULT_ALLOWED_EXTENSIONS.join(',');
+/**
+ * `accept` for the CHOOSE-A-FILE input: extensions AND explicit MIME types.
+ *
+ * Both, because Android's document picker filters on MIME and has to map each
+ * extension through MimeTypeMap to get there — a mapping that is patchy for
+ * .heic on older devices, which then hides the very photos we are asking for.
+ *
+ * Deliberately NOT `image/*`. Capacitor's onShowFileChooser routes to the CAMERA
+ * when `capture` is set AND acceptTypes contains the literal `image/*`, so that
+ * token belongs on the camera input alone — putting it here would widen this
+ * picker to .gif/.bmp files we then refuse.
+ */
+export const VAULT_ACCEPT_ATTR = [...VAULT_ALLOWED_EXTENSIONS, ...VAULT_ALLOWED_MIME].join(',');
+
+/**
+ * `accept` for the TAKE-A-PHOTO input, paired with `capture="environment"`.
+ *
+ * Must be exactly `image/*`. Capacitor tests `acceptTypes.contains("image/*")`
+ * as list membership, so `image/jpeg` — or any narrower list — silently falls
+ * back to the document picker with no camera, which is the bug this fixes.
+ */
+export const VAULT_CAMERA_ACCEPT = 'image/*';
 
 /** Human-facing list, for the "you can add…" line. Not the enforcement list. */
 export const VAULT_ALLOWED_LABEL = 'PDF, JPG, PNG, WEBP or HEIC';
@@ -70,8 +90,8 @@ const mb = (bytes: number) => `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
  * slip; someone photographing a prescription in a clinic corridor deserves the
  * version that just says what to do.
  */
-export function fileRejectionReason(file: { name: string; size: number }): string | null {
-  return unsupportedTypeReason(file.name) ?? oversizeReason(file.size);
+export function fileRejectionReason(file: { name: string; size: number; type?: string }): string | null {
+  return unsupportedTypeReason(file.name, file.type) ?? oversizeReason(file.size);
 }
 
 /**
@@ -81,13 +101,28 @@ export function fileRejectionReason(file: { name: string; size: number }): strin
  * would quietly launder a disallowed type into an allowed one — a .gif would
  * arrive as a .jpg and pass a list it is not on. The allow-list has to see what
  * the user actually chose.
+ *
+ * THE EXTENSION DECIDES WHEN THERE IS ONE. `mimeType` is only consulted when the
+ * name carries no extension we recognise, which is the camera case: a captured
+ * photo can arrive as `image` or a bare content-URI name depending on the
+ * device's camera app, and refusing someone's own photograph of their
+ * prescription because the filename lost its suffix would break the vault's
+ * front door. Consulting MIME FIRST would be the wrong trade — `File.type` is
+ * attacker-controlled and often empty on mobile, so a .zip claiming image/png
+ * would sail through.
  */
-export function unsupportedTypeReason(fileName: string): string | null {
-  const ext = '.' + (fileName.split('.').pop() || '').toLowerCase();
-  if (!(VAULT_ALLOWED_EXTENSIONS as readonly string[]).includes(ext)) {
-    return `The vault takes ${VAULT_ALLOWED_LABEL} files. That one is a ${ext} file.`;
+export function unsupportedTypeReason(fileName: string, mimeType?: string): string | null {
+  const parts = fileName.split('.');
+  const ext = parts.length > 1 ? '.' + (parts.pop() || '').toLowerCase() : '';
+  if ((VAULT_ALLOWED_EXTENSIONS as readonly string[]).includes(ext)) return null;
+
+  if (!ext && mimeType && (VAULT_ALLOWED_MIME as readonly string[]).includes(mimeType.toLowerCase())) {
+    return null;
   }
-  return null;
+
+  return ext
+    ? `The vault takes ${VAULT_ALLOWED_LABEL} files. That one is a ${ext} file.`
+    : `The vault takes ${VAULT_ALLOWED_LABEL} files. That one has no file type we recognise.`;
 }
 
 /**

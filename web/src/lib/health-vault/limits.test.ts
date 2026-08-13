@@ -13,7 +13,9 @@ import {
   VAULT_MAX_BYTES,
   VAULT_MAX_FILES,
   VAULT_ALLOWED_EXTENSIONS,
+  VAULT_ALLOWED_MIME,
   VAULT_ACCEPT_ATTR,
+  VAULT_CAMERA_ACCEPT,
   atLimit,
   mustDeleteToUpload,
   oversizeReason,
@@ -76,8 +78,35 @@ for (const copy of [vaultFullCopy(5), vaultFullCopy(7, 2), oversizeReason(9e6)!,
   assert.ok(!/you (must|cannot|can't|failed|error)/i.test(copy), `zero-blame violated in: ${copy}`);
 }
 
-// ── The accept attribute is the same list, not a second one ──
-assert.equal(VAULT_ACCEPT_ATTR.split(',').length, VAULT_ALLOWED_EXTENSIONS.length);
+// ── Camera capture: the exact token Capacitor tests for ──
+// BridgeWebChromeClient.onShowFileChooser routes to the camera only when
+// `capture` is set AND acceptTypes.contains("image/*") — LIST MEMBERSHIP, so
+// `image/jpeg` or any narrower value silently falls back to the document picker
+// with no camera at all. That was the bug; this asserts it stays fixed.
+assert.equal(VAULT_CAMERA_ACCEPT, 'image/*');
+
+// ── The choose-a-file accept list must NOT carry image/* ──
+// It would widen that picker to .gif/.bmp we then refuse, and it is the camera
+// input's distinguishing token.
+assert.ok(!VAULT_ACCEPT_ATTR.split(',').includes('image/*'));
 assert.ok(!VAULT_ACCEPT_ATTR.includes('.zip'));
+// Extensions AND MIME types: Android's document picker filters on MIME and its
+// extension→MIME mapping is patchy for .heic.
+for (const ext of VAULT_ALLOWED_EXTENSIONS) assert.ok(VAULT_ACCEPT_ATTR.split(',').includes(ext));
+for (const m of VAULT_ALLOWED_MIME) assert.ok(VAULT_ACCEPT_ATTR.split(',').includes(m));
+
+// ── Camera files whose name lost its extension ──
+// A captured photo can arrive as `image` or a bare content-URI name depending on
+// the device's camera app. Refusing someone's photograph of their own
+// prescription because the suffix went missing would break the front door.
+assert.equal(unsupportedTypeReason('image', 'image/jpeg'), null);
+assert.equal(unsupportedTypeReason('IMG_20260813', 'image/heic'), null);
+// But MIME is only a FALLBACK. It is attacker-controlled, so a real extension
+// always wins — a .zip claiming to be a PNG stays refused.
+assert.notEqual(unsupportedTypeReason('payload.zip', 'image/png'), null);
+assert.notEqual(unsupportedTypeReason('doc.docx', 'image/jpeg'), null);
+// No extension and no usable type is still a refusal, with its own wording.
+assert.match(unsupportedTypeReason('mystery', '')!, /no file type we recognise/);
+assert.match(unsupportedTypeReason('mystery', 'application/zip')!, /no file type we recognise/);
 
 console.log('limits.test.ts: all assertions passed');

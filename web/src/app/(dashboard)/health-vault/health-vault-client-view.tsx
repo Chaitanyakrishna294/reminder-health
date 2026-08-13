@@ -5,9 +5,11 @@ import { useRouter } from 'next/navigation';
 import { useUiMode } from '@/context/ui-mode-context';
 import { createClient } from '@/lib/supabase/client';
 import FolderCarousel from '@/components/health-vault/folder-carousel';
+import { useDensity } from '@/context/density-context';
 import {
   VAULT_ACCEPT_ATTR,
   VAULT_ALLOWED_LABEL,
+  VAULT_CAMERA_ACCEPT,
   VAULT_MAX_BYTES,
   VAULT_MAX_FILES,
   atLimit,
@@ -41,7 +43,8 @@ import {
   Search,
   Trash2,
   RotateCcw,
-  Trash
+  Trash,
+  Camera
 } from 'lucide-react';
 
 interface Category {
@@ -182,6 +185,26 @@ export default function HealthVaultClientView({
   // Drag and drop state
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  /**
+   * Whether to offer "Take photo" as its own door.
+   *
+   * Inside the app always — that is where a patient photographs a paper
+   * prescription, and it is the reason this feature exists. In a browser, only
+   * on a coarse pointer: `capture` is ignored on desktop, so the button would
+   * open a file browser under a label promising a camera, which is worse than
+   * not offering it.
+   *
+   * Resolved after mount because `matchMedia` does not exist on the server, and
+   * defaults to false so the first paint matches the server's.
+   */
+  const { isApp } = useDensity();
+  const [coarsePointer, setCoarsePointer] = useState(false);
+  useEffect(() => {
+    try { setCoarsePointer(window.matchMedia('(pointer: coarse)').matches); } catch { /* older webview */ }
+  }, []);
+  const showCamera = isApp || coarsePointer;
 
   /**
    * Re-read the two numbers behind "N of 5 used". Called after every upload,
@@ -767,9 +790,13 @@ export default function HealthVaultClientView({
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      void acceptFile(e.target.files[0]);
-    }
+    const file = e.target.files?.[0];
+    // Cleared BEFORE handling, so picking the same file twice still fires. A
+    // retake is the common case here — the first photo of a prescription is
+    // blurred, and on some camera apps the retake reuses the same filename, so
+    // without this the second attempt would silently do nothing.
+    e.target.value = '';
+    if (file) void acceptFile(file);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -1753,40 +1780,103 @@ export default function HealthVaultClientView({
               {activeStep === 2 && (
                 <div className="space-y-4">
                   <label className={`block font-black text-foreground ${isElderly ? 'text-lg' : 'text-xs'}`}>
-                    Choose File
+                    Add the document
                   </label>
-                  <div
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                    onClick={() => fileInputRef.current?.click()}
-                    className={`border-2 border-dashed rounded-3xl p-6 flex flex-col items-center justify-center gap-3 cursor-pointer transition-all duration-200 ${
-                      isDragging 
-                        ? 'border-primary bg-primary/5' 
-                        : 'border-border hover:border-primary/50 bg-muted/40 hover:bg-muted/60'
-                    }`}
-                  >
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleFileChange}
-                      accept={VAULT_ACCEPT_ATTR}
-                      className="hidden"
-                    />
-                    <UploadCloud className="w-10 h-10 text-muted-foreground/60 shrink-0" />
-                    <div className="text-center space-y-1">
-                      <p className={`font-black text-foreground ${isElderly ? 'text-base' : 'text-xs'}`}>
-                        {isPreparingFile
-                          ? 'Getting the photo ready…'
-                          : selectedFile ? 'Selected File:' : 'Drag & Drop File Here'}
-                      </p>
+
+                  {/* TWO LABELLED DOORS, not one picker with a camera hidden inside it.
+                      Most of what belongs in this vault is a piece of paper the user is
+                      holding — a prescription, a lab report — so photographing it is the
+                      primary path, not an alternative to browsing files. It leads, and
+                      it says what it does.
+
+                      There were no doors at all before: the single input carried neither
+                      `capture` nor `image/*`, and Capacitor's onShowFileChooser needs BOTH
+                      to route to the camera, so the app offered a documents-only chooser
+                      and the vault's actual front door did not exist. */}
+                  <div className={`grid gap-3 ${showCamera ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                    {showCamera && (
+                      <button
+                        type="button"
+                        onClick={() => cameraInputRef.current?.click()}
+                        disabled={isPreparingFile}
+                        className={`flex flex-col items-center justify-center gap-2 rounded-3xl bg-primary-strong text-primary-strong-foreground font-black transition-all hover:bg-primary-strong-hover active:scale-[0.98] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                          isElderly ? 'min-h-[112px] px-4 text-lg' : 'min-h-[88px] px-3 text-sm'
+                        }`}
+                      >
+                        <Camera className={isElderly ? 'w-8 h-8' : 'w-6 h-6'} aria-hidden />
+                        <span>Take photo</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isPreparingFile}
+                      className={`flex flex-col items-center justify-center gap-2 rounded-3xl border-2 border-border bg-card text-foreground font-black transition-all hover:border-primary/50 hover:bg-muted/50 active:scale-[0.98] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                        isElderly ? 'min-h-[112px] px-4 text-lg' : 'min-h-[88px] px-3 text-sm'
+                      }`}
+                    >
+                      <FolderOpen className={isElderly ? 'w-8 h-8' : 'w-6 h-6'} aria-hidden />
+                      <span>Choose file</span>
+                    </button>
+                  </div>
+
+                  {/* Capacitor routes to the camera only when `capture` is present AND
+                      acceptTypes contains the literal `image/*` — list membership, so
+                      `image/jpeg` silently falls back to the file picker. Do not narrow
+                      this accept value. No CAMERA permission is involved: the manifest
+                      deliberately does not declare it, which is what makes
+                      isMediaCaptureSupported() true and launches the capture intent with
+                      no prompt. Declaring it would REQUIRE a runtime grant. */}
+                  <input
+                    type="file"
+                    ref={cameraInputRef}
+                    onChange={handleFileChange}
+                    accept={VAULT_CAMERA_ACCEPT}
+                    capture="environment"
+                    className="hidden"
+                  />
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    accept={VAULT_ACCEPT_ATTR}
+                    className="hidden"
+                  />
+
+                  {isPreparingFile && (
+                    <div className="flex items-center gap-2.5 rounded-2xl bg-muted px-4 py-3">
+                      <Loader2 className="w-4 h-4 shrink-0 animate-spin text-primary" aria-hidden />
+                      <div className="min-w-0">
+                        <p className={`font-black text-foreground ${isElderly ? 'text-base' : 'text-xs'}`}>
+                          Getting the photo ready…
+                        </p>
+                        <p className="text-[11px] text-muted-foreground font-semibold">
+                          Making it smaller so it uploads quickly
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Drag and drop is a desktop affordance, so it only appears where a
+                      mouse does — on a phone it was a large dead panel above the thing
+                      you actually tap. */}
+                  {!showCamera && !isPreparingFile && (
+                    <div
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                      className={`border-2 border-dashed rounded-3xl p-5 flex flex-col items-center justify-center gap-2 transition-all duration-200 ${
+                        isDragging
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border bg-muted/30'
+                      }`}
+                    >
+                      <UploadCloud className="w-8 h-8 text-muted-foreground/60 shrink-0" aria-hidden />
                       <p className="text-[11px] text-muted-foreground font-semibold">
-                        {isPreparingFile
-                          ? 'Making it smaller so it uploads quickly'
-                          : selectedFile ? selectedFile.name : 'or click to browse local files'}
+                        or drag a file here
                       </p>
                     </div>
-                  </div>
+                  )}
 
                   {/* Says what is accepted BEFORE the picker opens. The rules are
                       enforced by the server either way; this is so nobody hunts
