@@ -40,6 +40,21 @@ pol AS (
   FROM pg_policy
   WHERE polname = 'Users can insert own vault files'
     AND polrelid = 'storage.objects'::regclass
+),
+-- Every public function NAMED in the policy expression, pulled out of the
+-- expression itself rather than hardcoded — so this keeps working when someone
+-- adds a conjunct. `auth.uid()` matches as `uid`, which is not a public function
+-- and drops out of the join.
+policy_fn_names AS (
+  SELECT DISTINCT parts[1] AS fname
+  FROM pol, regexp_matches(pol.with_check, '([a-z_][a-z0-9_]*)\s*\(', 'g') AS m(parts)
+),
+policy_fns AS (
+  SELECT p.proname, has_function_privilege('authenticated', p.oid, 'EXECUTE') AS callable
+  FROM pg_proc p
+  JOIN pg_namespace n ON n.oid = p.pronamespace
+  WHERE n.nspname = 'public'
+    AND p.proname IN (SELECT fname FROM policy_fn_names)
 )
 
 SELECT 1 AS chk, 'health-vault file_size_limit is 5 MB' AS what,
@@ -102,13 +117,17 @@ SELECT 7, 'vault_object_count: acl set, anon revoked, authenticated granted',
             THEN 'DONE' ELSE 'FAIL' END
 
 UNION ALL
--- This one is granted to NOBODY on purpose. It takes a transaction lock; the
--- policy evaluates it as the system, and no client should be able to call it.
-SELECT 8, 'vault_can_accept_upload: acl set, anon AND authenticated both revoked',
+-- REWRITTEN 2026-08-13. This check used to assert that `authenticated` had NO
+-- execute on this function — it asserted the bug, and passed while every vault
+-- upload was failing with `permission denied for function`. A policy expression
+-- is evaluated with the querying role's privileges; SECURITY DEFINER governs
+-- which role the BODY runs as, not who may CALL it. See
+-- migration_vault_can_accept_grant_2026_08_13.sql.
+SELECT 8, 'vault_can_accept_upload: acl set, anon revoked, authenticated GRANTED',
        coalesce((SELECT proacl FROM fn_accept)::text, 'NULL (= PUBLIC!)'),
        CASE WHEN (SELECT proacl FROM fn_accept) IS NOT NULL
              AND NOT has_function_privilege('anon', (SELECT oid FROM fn_accept), 'EXECUTE')
-             AND NOT has_function_privilege('authenticated', (SELECT oid FROM fn_accept), 'EXECUTE')
+             AND has_function_privilege('authenticated', (SELECT oid FROM fn_accept), 'EXECUTE')
             THEN 'DONE' ELSE 'FAIL' END
 
 UNION ALL
@@ -127,6 +146,19 @@ SELECT 10, 'compile probe: both bodies actually run',
          || ' can_accept=' || public.vault_can_accept_upload()::text,
        CASE WHEN public.vault_object_count() = 0
              AND public.vault_can_accept_upload() = false
+            THEN 'DONE' ELSE 'FAIL' END
+
+UNION ALL
+-- THE CHECK THAT WOULD HAVE CAUGHT THE OUTAGE, written to be general rather than
+-- to name today's two functions: EVERY public function the policy calls must be
+-- executable by `authenticated`, because a policy expression is evaluated with
+-- the querying role's privileges. Reads the names out of the policy expression,
+-- so a conjunct added next year is covered without editing this file.
+SELECT 13, 'every function the policy calls is executable by authenticated',
+       coalesce((SELECT string_agg(proname || '=' || callable::text, ', ' ORDER BY proname)
+                 FROM policy_fns), '(none found)'),
+       CASE WHEN (SELECT count(*) FROM policy_fns) >= 2
+             AND NOT EXISTS (SELECT 1 FROM policy_fns WHERE callable IS NOT TRUE)
             THEN 'DONE' ELSE 'FAIL' END
 
 UNION ALL

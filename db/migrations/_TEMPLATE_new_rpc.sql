@@ -17,6 +17,35 @@
 -- success. Always write BOTH revokes.
 --
 -- ============================================================================
+--
+-- AND THE OTHER HALF, WHICH COSTS AN OUTAGE INSTEAD OF A LEAK:
+--
+--   IF AN RLS POLICY CALLS YOUR FUNCTION, THE CALLER STILL NEEDS EXECUTE ON IT.
+--
+-- A policy expression is evaluated with the privileges of the role running the
+-- query. There is no system exemption, and SECURITY DEFINER does not provide one
+-- — DEFINER governs which role the BODY runs as, which is checked AFTER the
+-- EXECUTE privilege, not instead of it. Being definer is exactly what makes it
+-- feel like the rule should not apply.
+--
+-- Paid for on 2026-08-13: `vault_can_accept_upload()` was granted to nobody "because
+-- the policy evaluates it, not the client", and every authenticated Health Vault
+-- upload failed with `permission denied for function vault_can_accept_upload`.
+-- The counter-example was in the same policy — `is_anonymous_user()`, one conjunct
+-- earlier, carries a grant to `authenticated` and evaluated fine.
+--
+-- It fails CLOSED, which is the good half: loud, immediate, and caught by the first
+-- real call. Contrast the missing-revoke bug above, which fails open and silently.
+--
+-- So: a function referenced by a policy is granted to every role that performs the
+-- guarded operation — usually `authenticated`. Lock it at the grant by naming those
+-- roles, never by granting nobody. And have the validation assert it, generically:
+-- read the function names out of `pg_get_expr(polwithcheck, polrelid)` and check
+-- `has_function_privilege('authenticated', …)` for each, so a conjunct added later
+-- is covered without editing the check. See
+-- db/validations/validation_vault_upload_limits_2026_08_13.sql check 13.
+--
+-- ============================================================================
 
 -- CREATE OR REPLACE, never DROP+CREATE, on anything scheduler- or dose-adjacent:
 -- a DROP takes the grants with it and a concurrent caller sees the function vanish.
@@ -54,6 +83,9 @@ GRANT EXECUTE ON FUNCTION public.your_function_name(bigint) TO authenticated;
 -- Only if the bot / cron actually calls it — service_role is not automatic once
 -- PUBLIC has been revoked.
 GRANT EXECUTE ON FUNCTION public.your_function_name(bigint) TO service_role;
+-- If an RLS POLICY calls this function, `authenticated` above is REQUIRED, not
+-- optional — see the second half of the header. "Nobody calls it directly" is not
+-- a reason to grant nobody; the policy is called by the client's own query.
 
 -- ── THEN WRITE THE VALIDATION ───────────────────────────────────────────────
 -- Ship db/validations/validation_<slug>.sql alongside, and include:

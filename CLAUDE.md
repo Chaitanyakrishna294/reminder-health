@@ -23,6 +23,25 @@ are stale. Keep it updated when you add or move anything.
   This matters more here than in most projects: **anon is the key shipped inside the APK**,
   which anyone can unpack, so anon's reach is the product's worst case. Validations must
   assert `NOT has_function_privilege('anon', …)` **and** that `proacl` is not NULL.
+- **IF AN RLS POLICY CALLS A FUNCTION, THE CALLER NEEDS EXECUTE ON IT — `SECURITY DEFINER`
+  does not waive that.** A policy expression is evaluated with the privileges of the role
+  running the query; there is no system exemption. DEFINER governs which role the *body*
+  runs as, and that is checked **after** the EXECUTE privilege, not instead of it. Being
+  definer is precisely what makes it feel like the rule shouldn't apply.
+  - Paid for 2026-08-13: `vault_can_accept_upload()` was granted to nobody "because the
+    policy evaluates it, not the client", and **every authenticated Health Vault upload
+    failed** with `permission denied for function`. Fixed by
+    `migration_vault_can_accept_grant_2026_08_13.sql`. The counter-example was in the same
+    policy — `is_anonymous_user()`, one conjunct earlier, carries a grant and evaluated fine.
+  - **This one fails CLOSED**, which is the opposite of the missing-revoke bug above: loud,
+    immediate, caught by the first real call. Both are privilege-doctrine mistakes; one costs
+    a leak, this one costs an outage. Neither is caught by reading the function.
+  - So a policy-referenced function is granted to every role that performs the guarded
+    operation (usually `authenticated`), and **the validation asserts it generically** — read
+    the names out of `pg_get_expr(polwithcheck, polrelid)` and check
+    `has_function_privilege('authenticated', …)` for each, so a conjunct added later is
+    covered without editing the check. Pattern: `validation_vault_upload_limits_2026_08_13.sql`
+    check 13.
 - **THE BROWSER UPLOADS STRAIGHT TO SUPABASE STORAGE — so a form check is never a limit.**
   The Health Vault and the avatar picker both call the Storage API from the client with the
   anon key. Our Next.js server is not in that path at all, which means every size, type and
@@ -45,9 +64,11 @@ are stale. Keep it updated when you add or move anything.
     `storage.objects` that itself selects from `storage.objects` raises `infinite recursion
     detected in policy`. Check 5 of the validation asserts this; if it ever reads FAIL, roll
     back rather than debug live — every vault upload is failing.
-  - **`vault_can_accept_upload()` takes a per-user advisory lock and is granted to nobody.**
-    Without the lock, fifty parallel uploads all read the same count and all pass, which is
-    precisely the attack the quota exists to stop. A polite client was never the threat.
+  - **`vault_can_accept_upload()` takes a per-user advisory lock.** Without it, fifty
+    parallel uploads all read the same count and all pass, which is precisely the attack the
+    quota exists to stop. A polite client was never the threat. It **is** granted to
+    `authenticated` — the policy calls it, and a policy runs as the caller (see the rule
+    above); granting nobody took vault upload down on 2026-08-13.
   - **Existing users over the limit keep every file.** The rule is `count < 5` on INSERT only.
     Never enforce a new quota by deleting someone's medical records.
   - **Still open (audited 2026-08-13, `db/audits/audit_unbounded_growth_2026_08_13.sql`):**

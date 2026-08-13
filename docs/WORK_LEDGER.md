@@ -235,14 +235,25 @@ while `?preview=` is forcing a density.
 27 tables + 1 view + 2 private buckets (`health-vault`, `avatars`). Full column detail:
 agent-audited 2026-07-25; `docs/DATABASE_SCHEMA.md` is badly stale (§9).
 
-**Storage quotas (2026-08-13, PENDING —`migration_vault_upload_limits_2026_08_13.sql`).** `health-vault`
-carries `file_size_limit` 5 MB + `allowed_mime_types` images/PDF, and its INSERT policy calls
-`vault_can_accept_upload()` for the 5-file-per-user cap and blocks guests. **This is the only layer
-that counts**: the client uploads to Storage directly with the anon key, so the upload form's checks
-are advice. The cap counts storage OBJECTS, so a trashed record holds its slot until
-`cleanup_expired_trash` purges it at 30 days. See CLAUDE.md's hard rule; unbounded-growth audit in
-`db/audits/audit_unbounded_growth_2026_08_13.sql` (open findings: `audit_logs` client INSERT, avatars
-object count).
+**Storage quotas (applied 2026-08-13, `migration_vault_upload_limits_2026_08_13.sql` = APPLIED.md #73).**
+`health-vault` carries `file_size_limit` 5 MB + `allowed_mime_types` images/PDF, and its INSERT policy
+calls `vault_can_accept_upload()` for the 5-file-per-user cap and blocks guests. **This is the only
+layer that counts**: the client uploads to Storage directly with the anon key, so the upload form's
+checks are advice. The cap counts storage OBJECTS, so a trashed record holds its slot until
+`cleanup_expired_trash` purges it at 30 days. Prove it end to end with
+`node db/scripts/verify-vault-limits.mjs` (raw Storage REST API, no UI — use a test account).
+See CLAUDE.md's two hard rules: form-checks-are-not-limits, and policy-called-functions-need-EXECUTE
+(the latter cost a live upload outage the same day; hotfix
+`migration_vault_can_accept_grant_2026_08_13.sql`).
+
+Unbounded-growth audit: `db/audits/audit_unbounded_growth_2026_08_13.sql`. **Three open findings** —
+(1) `audit_logs` is `FOR ALL TO authenticated` with no cleanup job, and the vault client appends to it
+on every action; (2) the `avatars` policy checks only the first path segment, so one user can hold
+unlimited objects under `{uid}/…`; (3) **114 `health-vault` objects have a NULL `owner`** (orphans from
+deleted accounts — `storage.objects.owner` is FK `ON DELETE SET NULL`), so no policy can reach them,
+they count toward nobody's quota, and they are billed forever. Cleaning (3) needs a **service_role
+script via the Storage API, not SQL** — Supabase blocks `DELETE FROM storage.objects` (see APPLIED.md
+#61).
 
 **Core:** `profiles` (1:1 auth.users; `telegram_chat_id` unique, synthetic `WEB-<uuid>` for web-only;
 `connect_code` RM+6) · `medications` (**no CREATE TABLE in repo** — pre-repo bot table, only ALTERed;

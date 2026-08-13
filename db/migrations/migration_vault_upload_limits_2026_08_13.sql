@@ -159,9 +159,16 @@ GRANT EXECUTE ON FUNCTION public.vault_object_count() TO service_role;
 -- Naming it `vault_object_count` and quietly locking inside would be a trap for
 -- whoever calls it next.
 --
--- NOT granted to the browser. It is called from the RLS policy, which runs as
--- part of the storage INSERT and needs no client grant — and a client that could
--- call it would be taking a transaction lock it never releases in time.
+-- CORRECTED 2026-08-13, HOURS AFTER FIRST APPLY. This function originally
+-- carried `REVOKE ... FROM authenticated` and no grant, on the reasoning that an
+-- RLS policy expression is evaluated by the system and needs no client grant.
+-- That is wrong: a policy expression is evaluated with the privileges of the
+-- role running the query, and SECURITY DEFINER governs which role the BODY runs
+-- as, never who may CALL it. Every authenticated vault upload failed with
+-- `permission denied for function vault_can_accept_upload` until the grant below
+-- was added — see migration_vault_can_accept_grant_2026_08_13.sql, which is what
+-- to apply to a database that already ran the broken version. The fix is here
+-- too so that re-running THIS file cannot recreate the outage.
 -- ============================================================================
 CREATE OR REPLACE FUNCTION public.vault_can_accept_upload()
 RETURNS boolean
@@ -200,10 +207,14 @@ COMMENT ON FUNCTION public.vault_can_accept_upload() IS
 
 REVOKE ALL ON FUNCTION public.vault_can_accept_upload() FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.vault_can_accept_upload() FROM anon;
-REVOKE ALL ON FUNCTION public.vault_can_accept_upload() FROM authenticated;
--- No grants at all. An RLS policy expression is evaluated by the system, not by
--- the calling role, so it needs no EXECUTE grant — and giving one would hand the
--- browser a lock it has no business taking.
+-- REQUIRED, not optional: the INSERT policy below calls this function, and a
+-- policy expression runs with the querying role's privileges. Without this grant
+-- every authenticated upload is refused with `permission denied for function`.
+-- Granting it is safe — the lock it takes is keyed on the caller's own uid and
+-- released with their (short) transaction, and the boolean it returns is the
+-- same fact vault_object_count() already gives them.
+GRANT EXECUTE ON FUNCTION public.vault_can_accept_upload() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.vault_can_accept_upload() TO service_role;
 
 
 -- ============================================================================
