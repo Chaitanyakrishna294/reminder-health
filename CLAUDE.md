@@ -730,6 +730,25 @@ restraint, `verification-before-completion` for evidence-before-claims, `dataviz
 heatmap and stat tiles, `motion-design` + `gsap-*` for the launch idle animation and
 micro-interactions, and `artifact-design` only when publishing a proposal artifact.
 
+**SKILL VERDICT, recorded 2026-08-13 so it stops being re-decided per task.**
+- **`ux-copy` and `project-a11y` are NOT OPTIONAL.** They trigger on *any* change
+  that adds user-facing words or touches UI, and they are invoked at the START of
+  the work, not as a review afterwards — both exist because these checks were
+  failing when left to judgement (pink-on-white shipped at 2.9:1 twice; a slot
+  tint shipped as label text at ~1.9:1).
+- **`interface-design` is for VISUAL DIRECTION**, not mechanics. Use it when a
+  screen's hierarchy, layout or information design is genuinely open. Do not
+  invoke it for plumbing — a flow conversion, a nav label, a gesture handler —
+  where the design is already decided and the work is making it true.
+- **`ponytail` is applied as a principle rather than invoked per task.** Its whole
+  content is "reuse what exists": the 2026-08-13 batch reused `CodeInput` for the
+  reset code screen and navigated to the existing `/update-password` instead of
+  building a second password form. If a task is tempted toward a parallel
+  implementation of something the repo already has, that is the signal to reach
+  for it explicitly.
+- Everything in the "Deliberately NOT used" list below stays out. That list is
+  about competing visual directions, and it does not expire.
+
 **SKILLS SERVE THE DESIGN SYSTEM; THEY NEVER OVERRIDE IT.** The approved proposal — tokens, the
 one-accent rule, slot tints as surfaces only, Remi's five-part palette, the sticker-flat rendering
 law, elderly sizing, and the light-mode default — is the authority. **If a skill's guidance

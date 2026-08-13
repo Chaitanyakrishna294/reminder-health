@@ -217,8 +217,12 @@ function LoginForm() {
                 <Mail className={`${iconClass} w-[18px] h-[18px]`} aria-hidden />
                 <input
                   id="login-email"
+                  name="email"
                   type="email"
                   required
+                  autoComplete="email"
+                  autoCapitalize="none"
+                  autoCorrect="off"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className={inputClass}
@@ -235,8 +239,10 @@ function LoginForm() {
                 <Lock className={`${iconClass} w-[18px] h-[18px]`} aria-hidden />
                 <input
                   id="login-password"
+                  name="password"
                   type={showPassword ? 'text' : 'password'}
                   required
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className={`${inputClass} pr-14`}

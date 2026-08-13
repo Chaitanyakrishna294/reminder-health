@@ -106,8 +106,10 @@ export default function UpdatePasswordPage() {
             <Lock className={iconClass} aria-hidden />
             <input
               id="new-password"
+              name="new-password"
               type={showPassword ? 'text' : 'password'}
               required
+              autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className={`${inputClass} pr-14`}
@@ -130,8 +132,10 @@ export default function UpdatePasswordPage() {
             <Lock className={iconClass} aria-hidden />
             <input
               id="confirm-password"
+              name="confirm-password"
               type={showConfirmPassword ? 'text' : 'password'}
               required
+              autoComplete="new-password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               className={`${inputClass} pr-14`}

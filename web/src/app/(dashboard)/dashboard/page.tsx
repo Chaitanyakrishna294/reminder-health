@@ -1,6 +1,7 @@
 import React from 'react';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service-role';
+import PullToRefresh from '@/components/dashboard/pull-to-refresh';
 import DashboardClientView from '@/components/dashboard/dashboard-client-view';
 import { ReminderEvent } from '@/components/dashboard/todays-schedule';
 import { resolveUserData, getMedicalProfile } from '@/lib/supabase/cached-queries';
@@ -223,6 +224,10 @@ export default async function DashboardPage() {
   }
 
   return (
+    // Today is the one screen whose truth can change elsewhere — a caregiver's
+    // phone, a Telegram reply, a dose the device queued offline. Pulling down is
+    // what people already try when they doubt it.
+    <PullToRefresh>
     <DashboardClientView 
       userRole={userRole}
       userName={profile.full_name || 'User'}
@@ -248,6 +253,7 @@ export default async function DashboardPage() {
       peopleCaringForMe={peopleCaringForMe}
       careCircleAvatars={careCircleAvatars}
     />
+    </PullToRefresh>
   );
 }
 

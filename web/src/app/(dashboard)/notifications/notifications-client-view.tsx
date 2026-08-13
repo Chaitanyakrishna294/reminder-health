@@ -25,7 +25,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Bell, Check, SkipForward, XCircle, AlertTriangle, Heart, PackagePlus,
-  Trash2, CheckSquare, Square, X,
+  Trash2, CheckSquare, Square, X, MailOpen, SlidersHorizontal,
 } from 'lucide-react';
 import { useRealtimeNotifications, type Notification } from '@/hooks/use-realtime-notifications';
 import { useUiMode } from '@/context/ui-mode-context';
@@ -114,6 +114,8 @@ export default function NotificationsClientView({
   }, [mounted, notifications, unreadOnOpen]);
 
   const wasUnread = (id: string) => unreadOnOpen?.has(id) ?? false;
+  /** Live unread — i.e. arrived since this page opened. See the button's note. */
+  const hasUnread = notifications.some((n) => !n.is_read);
 
   // ── Grouping ──────────────────────────────────────────────────────────────
   // Same day-key rule as the rail (lib/design/slots.ts), so a notification about a
@@ -231,6 +233,18 @@ export default function NotificationsClientView({
               ? `${selected.size} selected`
               : 'Messages about your doses and your care circle.'}
           </p>
+          {/* The question this page provokes is "can I get fewer of these?", and
+              until now it had no answer on screen — you had to know the setting
+              existed and go looking for it in another section. */}
+          {!selecting && (
+            <Link
+              href="/settings/notifications"
+              className={`mt-2 inline-flex items-center gap-1.5 font-bold text-primary-strong hover:underline min-h-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-lg ${isElderly ? 'text-lg' : 'text-xs'}`}
+            >
+              <SlidersHorizontal className={isElderly ? 'w-5 h-5' : 'w-3.5 h-3.5'} aria-hidden />
+              Choose what you get notified about
+            </Link>
+          )}
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -257,6 +271,17 @@ export default function NotificationsClientView({
                 <button type="button" onClick={() => setSelecting(true)} className={`${btn} border border-border text-foreground hover:bg-muted`}>
                   <CheckSquare className={isElderly ? 'w-5 h-5' : 'w-4 h-4'} aria-hidden /> Select
                 </button>
+                {/* ONLY when something is genuinely unread — which, on this page,
+                    means a message that ARRIVED while it was open. Opening the page
+                    already marks everything read (that is what clears the bell), so
+                    a permanent button here would be a control with nothing to do
+                    999 times out of 1000, and a disabled one would be worse: it
+                    would look like a feature that is broken. */}
+                {hasUnread && (
+                  <button type="button" onClick={markAllAsRead} className={`${btn} border border-border text-foreground hover:bg-muted`}>
+                    <MailOpen className={isElderly ? 'w-5 h-5' : 'w-4 h-4'} aria-hidden /> Mark all as read
+                  </button>
+                )}
                 <button type="button" onClick={confirmClearAll} className={`${btn} text-danger-strong hover:bg-danger/10`}>
                   Clear all
                 </button>

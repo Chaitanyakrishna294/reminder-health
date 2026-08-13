@@ -6,6 +6,7 @@ import { useUiMode } from '@/context/ui-mode-context';
 import { createClient } from '@/lib/supabase/client';
 import FolderCarousel from '@/components/health-vault/folder-carousel';
 import { useDensity } from '@/context/density-context';
+import ZoomableImage from '@/components/health-vault/zoomable-image';
 import {
   VAULT_ACCEPT_ATTR,
   VAULT_ALLOWED_LABEL,
@@ -167,6 +168,18 @@ export default function HealthVaultClientView({
   const [isPreparingFile, setIsPreparingFile] = useState(false);
   /** Original byte size when compression actually shrank the file; null otherwise. */
   const [compressedFrom, setCompressedFrom] = useState<number | null>(null);
+  /** True when the current file came from Take photo, so Retake can reopen the camera. */
+  const [fromCamera, setFromCamera] = useState(false);
+  /**
+   * Object URL for the CHECK-IT-FIRST preview.
+   *
+   * A phone camera in a clinic corridor produces blurred and half-framed shots
+   * routinely, and a vault that holds five files cannot afford one of them being
+   * an unreadable photo of a thumb. Nothing counts against the limit until the
+   * upload actually happens, so this is the moment to look before spending a
+   * slot — and the moment a retake is free.
+   */
+  const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
   const [recordDate, setRecordDate] = useState<string>('');
   const [recordTitle, setRecordTitle] = useState<string>('');
 
@@ -779,6 +792,10 @@ export default function HealthVaultClientView({
         return;
       }
       setSelectedFile(file);
+      setFilePreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return file.type.startsWith('image/') ? URL.createObjectURL(file) : null;
+      });
       // Shown so nobody is startled by a 9 MB photo becoming a 700 KB one —
       // and so a document that did NOT shrink is not silently blamed later.
       setCompressedFrom(file.size < raw.size ? raw.size : null);
@@ -789,7 +806,8 @@ export default function HealthVaultClientView({
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, viaCamera = false) => {
+    setFromCamera(viaCamera);
     const file = e.target.files?.[0];
     // Cleared BEFORE handling, so picking the same file twice still fires. A
     // retake is the common case here — the first photo of a prescription is
@@ -832,6 +850,8 @@ export default function HealthVaultClientView({
     setSelectedCategoryId(categoryId.startsWith('default-') ? '' : categoryId);
     setSelectedFile(null);
     setCompressedFrom(null);
+    setFromCamera(false);
+    setFilePreviewUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
     setIsPreparingFile(false);
     setUploadError(null);
     setUploadSuccess(false);
@@ -1830,7 +1850,7 @@ export default function HealthVaultClientView({
                   <input
                     type="file"
                     ref={cameraInputRef}
-                    onChange={handleFileChange}
+                    onChange={(e) => handleFileChange(e, true)}
                     accept={VAULT_CAMERA_ACCEPT}
                     capture="environment"
                     className="hidden"
@@ -1895,6 +1915,40 @@ export default function HealthVaultClientView({
                       to {(selectedFile.size / (1024 * 1024)).toFixed(1)} MB. It stays readable.
                     </p>
                   )}
+                  {/* CHECK IT BEFORE IT COSTS A SLOT. The photo is shown at a size
+                      you can actually judge, with the retake sitting right next to
+                      it — the vault holds five files and a blurred one is a wasted
+                      fifth. Nothing has been uploaded at this point, so a retake
+                      costs nothing but the tap. */}
+                  {selectedFile && filePreviewUrl && (
+                    <div className="space-y-2.5">
+                      <div className="overflow-hidden rounded-2xl border border-border bg-muted/40">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={filePreviewUrl}
+                          alt="The photo you just took"
+                          className={`w-full object-contain ${isElderly ? 'max-h-72' : 'max-h-56'}`}
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => (fromCamera ? cameraInputRef : fileInputRef).current?.click()}
+                          className={`flex-1 inline-flex items-center justify-center gap-2 rounded-2xl border-2 border-border bg-card font-black text-foreground transition-colors hover:bg-muted cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                            isElderly ? 'min-h-14 text-base' : 'min-h-12 text-sm'
+                          }`}
+                        >
+                          {fromCamera
+                            ? <><Camera className={isElderly ? 'w-6 h-6' : 'w-4 h-4'} aria-hidden /> Retake</>
+                            : <><FolderOpen className={isElderly ? 'w-6 h-6' : 'w-4 h-4'} aria-hidden /> Choose another</>}
+                        </button>
+                      </div>
+                      <p className={`text-muted-foreground font-semibold ${isElderly ? 'text-sm' : 'text-[11px]'}`}>
+                        Can you read it? If not, take it again — nothing is saved yet.
+                      </p>
+                    </div>
+                  )}
+
                   {selectedFile && (
                     <div className="bg-muted p-3.5 rounded-2xl flex items-center justify-between text-xs font-semibold text-foreground">
                       <div className="truncate pr-4">
@@ -1909,6 +1963,8 @@ export default function HealthVaultClientView({
                           setSelectedFile(null);
                           // Or the "photo made smaller" line outlives the photo.
                           setCompressedFrom(null);
+                          setFromCamera(false);
+                          setFilePreviewUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
                           setUploadError(null);
                         }}
                         className="text-muted-foreground hover:text-foreground cursor-pointer"
@@ -2129,13 +2185,11 @@ export default function HealthVaultClientView({
                 const kind = previewKindOf(previewName || previewTitle || '', previewType);
 
                 if (kind === 'image') {
-                  return (
-                    <img
-                      src={previewUrl}
-                      alt={previewTitle || 'Preview'}
-                      className="max-w-full max-h-full object-contain select-none"
-                    />
-                  );
+                  // Pinch / double-tap / buttons. A photographed prescription is
+                  // usually handwriting on a paper slip, so "can I read it at all"
+                  // is the whole reason it was filed — a fixed-size preview made
+                  // the document unreadable and the file pointless.
+                  return <ZoomableImage src={previewUrl} alt={previewTitle || 'Preview'} />;
                 }
 
                 if (kind === 'pdf') {

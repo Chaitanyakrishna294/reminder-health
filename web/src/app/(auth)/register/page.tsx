@@ -201,8 +201,10 @@ export default function RegisterPage() {
             <User className={iconClass} />
             <input
               id="reg-name"
+              name="name"
               type="text"
               required
+              autoComplete="name"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               className={inputClass}
@@ -217,8 +219,12 @@ export default function RegisterPage() {
             <Mail className={iconClass} />
             <input
               id="reg-email"
+              name="email"
               type="email"
               required
+              autoComplete="email"
+              autoCapitalize="none"
+              autoCorrect="off"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className={inputClass}
@@ -233,8 +239,10 @@ export default function RegisterPage() {
           <Lock className={iconClass} />
           <input
             id="reg-password"
+            name="new-password"
             type={showPassword ? 'text' : 'password'}
             required
+            autoComplete="new-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className={`${inputClass} pr-14`}

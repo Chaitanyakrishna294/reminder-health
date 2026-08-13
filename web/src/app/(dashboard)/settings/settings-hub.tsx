@@ -26,6 +26,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useUiMode } from '@/context/ui-mode-context';
 import { clearNativeSchedule } from '@/lib/native/schedule-bridge';
 import SettingsRow, { SettingsGroup } from '@/components/settings/settings-row';
+import VersionLine from '@/components/settings/version-line';
 
 export default function SettingsHub() {
   const { isElderly } = useUiMode();
@@ -109,6 +110,10 @@ export default function SettingsHub() {
           onClick={handleLogout}
         />
       </SettingsGroup>
+
+      {/* Below Log out on purpose: it is the last thing on the page because it is
+          the least important, right up until someone is on a support call. */}
+      <VersionLine />
     </div>
   );
 }
