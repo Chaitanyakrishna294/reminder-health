@@ -56,3 +56,37 @@ export function firstName(fullName?: string | null): string {
   if (!trimmed) return '—';
   return trimmed.split(/\s+/)[0];
 }
+
+
+/**
+ * A connection's state, in words the reader can act on.
+ *
+ * The care-circle cards used to render `connection_status` raw, so a patient
+ * deciding whether their daughter could see their medication list read
+ * "ACCEPTED" and "PENDING" — database values, shouted, on a screen about family.
+ *
+ * "Waiting for them to accept" rather than "Pending" because the difference that
+ * matters to the reader is WHOSE TURN IT IS, and the enum never said.
+ *
+ * Lives here rather than in the card so it is pure, shared by both directions of
+ * the relationship, and covered by a test.
+ */
+export function connectionStateCopy(
+  status: string,
+  isActive: boolean,
+): { label: string; tone: 'success' | 'warning' | 'neutral' } {
+  switch ((status || '').toUpperCase()) {
+    case 'ACCEPTED':
+      return isActive
+        ? { label: 'Connected', tone: 'success' }
+        : { label: 'Paused', tone: 'neutral' };
+    case 'PENDING':
+      return { label: 'Waiting for them to accept', tone: 'warning' };
+    case 'REJECTED':
+      return { label: 'Declined', tone: 'neutral' };
+    default:
+      // Never fall back to the raw enum: an unknown state is better described as
+      // unknown than as a word from a database the reader has never seen.
+      return { label: 'Not connected', tone: 'neutral' };
+  }
+}

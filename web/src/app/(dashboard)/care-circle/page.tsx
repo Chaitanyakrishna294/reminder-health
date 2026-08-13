@@ -21,6 +21,8 @@ import {
   CaregiverConnectionActions,
 } from '@/components/care-circle/connection-actions';
 import { sourceOf, type ConnectionSource } from '@/lib/care-circle/connection-source';
+import MemberCard from '@/components/care-circle/member-card';
+import HideInElderly from '@/components/care-circle/hide-in-elderly';
 import {
   Users,
   ArrowLeft,
@@ -303,58 +305,37 @@ export default async function CareCirclePage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {peopleCaringForMe.map((conn) => (
-              <div
+              <MemberCard
                 key={conn.connection_id}
-                /* Stacks below sm. Side by side, the right-hand group (status badge +
-                   44px settings + 44px disconnect + gaps = ~185px) left ~100px for the
-                   avatar AND the name, so the disconnect button pushed 1px past the card
-                   and got clipped by the rounded edge, while the name sat flush against
-                   the badge with no gap between them. */
-                className="bg-card border border-border rounded-2xl p-5 flex flex-col items-start gap-3 sm:flex-row sm:justify-between sm:items-center shadow-sm"
-              >
-                <div className="flex items-center gap-3 min-w-0 w-full sm:w-auto">
-                  <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold border border-primary/20 text-sm overflow-hidden">
-                    {conn.caregiver_chat_id && caregiverAvatars[conn.caregiver_chat_id] ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={caregiverAvatars[conn.caregiver_chat_id]} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                    conn.resolved_name?.substring(0, 2).toUpperCase() || 'CG'
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="font-bold text-foreground text-sm truncate">{conn.resolved_name}</h3>
-                    {/* A caregiver's name, so the stored value reads correctly as-is. */}
-                    <p className="text-[11px] text-muted-foreground font-semibold mt-0.5 truncate">{caregiverRoleLabel(conn.relationship_type)}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 shrink-0">
-                  {/* Was hardcoded success-green, so a PENDING link showed up as a green
-                      "PENDING" pill — the badge said the opposite of the word inside it. */}
-                  <Badge tone={isLiveConnection(conn) ? 'success' : isPendingConnection(conn) ? 'warning' : 'neutral'}>
-                    {conn.connection_status}
-                  </Badge>
-                  <Link
-                    href="/care-circle/manage"
-                    className="w-11 h-11 flex items-center justify-center hover:bg-muted rounded-xl text-muted-foreground hover:text-foreground border border-transparent hover:border-border transition-all"
-                    title="Manage Shared Trust"
-                    aria-label={`Manage what ${conn.resolved_name} can see`}
-                  >
-                    <Settings className="w-4 h-4" />
-                  </Link>
+                connectionId={conn.connection_id}
+                name={conn.resolved_name || 'Caregiver'}
+                /* A caregiver's own role, so the stored value reads correctly
+                   as-is — the patients section has to invert it. */
+                roleLabel={caregiverRoleLabel(conn.relationship_type)}
+                photoUrl={conn.caregiver_chat_id ? caregiverAvatars[conn.caregiver_chat_id] : undefined}
+                connectionStatus={conn.connection_status}
+                isActive={isLiveConnection(conn)}
+                /* Straight to THIS relationship. The settings icon used to drop
+                   everyone on the same roster page to find themselves again. */
+                manageHref={`/care-circle/manage?connection=${conn.connection_id}`}
+                actions={
                   <CaregiverConnectionActions
                     connectionId={conn.connection_id}
                     caregiverName={conn.resolved_name || 'this caregiver'}
                     source={sourceOf(conn.is_migrated)}
                   />
-                </div>
-              </div>
+                }
+              />
             ))}
           </div>
         )}
       </div>
 
-      {/* Section B: People I Care For */}
+      {/* Section B: People I Care For.
+          Hidden in elderly — see HideInElderly. Caring for someone is work done
+          from a caregiver's own phone, and elderly's care circle answers the
+          other direction of the question. */}
+      <HideInElderly>
       <div className="space-y-4">
         <div className="flex items-center gap-2">
           <Activity className="w-4 h-4 text-primary" />
@@ -394,6 +375,7 @@ export default async function CareCirclePage() {
           </div>
         )}
       </div>
+      </HideInElderly>
 
     </div>
   );

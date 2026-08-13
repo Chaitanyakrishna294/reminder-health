@@ -1,5 +1,7 @@
 'use client';
 
+import { useSearchParams } from 'next/navigation';
+
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
@@ -230,6 +232,34 @@ export default function SharedTrustCenter() {
   useEffect(() => {
     fetchTrustData();
   }, [fetchTrustData]);
+
+  /**
+   * DEEP LINK FROM A MEMBER CARD — `?connection=<id>`.
+   *
+   * The care-circle roster links straight to one relationship now that every row
+   * carries its connection_id. Before this the settings icon on every card led
+   * to the same page, and the reader had to find the person they had just tapped
+   * in a list of everyone.
+   *
+   * Waits for the data: connections load asynchronously, so on a cold open the
+   * target does not exist yet and opening on mount alone would silently do
+   * nothing. Fires once — `opened` guards against re-opening the editor if the
+   * user closes it while the param is still in the URL, which would trap them.
+   */
+  const searchParams = useSearchParams();
+  const deepLinkId = searchParams.get('connection');
+  const [openedFromLink, setOpenedFromLink] = useState(false);
+  useEffect(() => {
+    const all = [...peopleSupportingMe, ...peopleISupport];
+    if (!deepLinkId || openedFromLink || all.length === 0) return;
+    const target = all.find((c) => c.connection_id === deepLinkId);
+    if (!target) return;
+    setOpenedFromLink(true);
+    handleOpenEdit(target);
+    // handleOpenEdit is redefined every render; depending on it would re-open
+    // the editor on each one.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deepLinkId, openedFromLink, peopleSupportingMe, peopleISupport]);
 
   // Actions
   const handleOpenEdit = (conn: CareCircleConnection) => {
