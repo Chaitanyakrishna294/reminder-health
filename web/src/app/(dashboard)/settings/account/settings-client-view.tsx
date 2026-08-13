@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useUiMode } from '@/context/ui-mode-context';
-import { useTheme } from '@/context/theme-context';
 import { createClient } from '@/lib/supabase/client';
 import {
   Settings,
@@ -67,8 +66,8 @@ export default function SettingsClientView({
 }: SettingsClientViewProps) {
   const router = useRouter();
   const supabase = createClient();
-  const { isElderly, toggleMode, uiModeLocked, setUiModeLocked } = useUiMode();
-  const { theme, setTheme } = useTheme();
+  // Only isElderly now — the mode, lock and theme controls live on Settings → Display.
+  const { isElderly } = useUiMode();
 
   // State management. `linkedCaregivers` and `linkedPatients` are only counts on this
   // screen now — /care-circle owns the lists and every mutation on them.
@@ -433,175 +432,11 @@ export default function SettingsClientView({
           below it. */}
       <ReminderSetupGuide />
 
-      {/* SECTION 2: VISUAL MODE PREFERENCE */}
-      <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4">
-        <div className="space-y-1">
-          <h3 className={`font-black text-foreground ${isElderly ? 'text-2xl' : 'text-sm'}`}>
-            Layout Preference
-          </h3>
-          <p className={`text-muted-foreground ${isElderly ? 'text-lg' : 'text-xs'}`}>
-            Customize display density, touch target sizes, and readability factors.
-          </p>
-        </div>
-
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-muted/30 border border-border/80 rounded-2xl p-4">
-          <div className="space-y-0.5">
-            <span className={`font-extrabold text-foreground block ${isElderly ? 'text-xl' : 'text-sm'}`}>
-              Elderly Mode Layout
-            </span>
-            <span className={`text-muted-foreground block font-semibold ${isElderly ? 'text-base' : 'text-xs'}`}>
-              Provides massive fonts, high-contrast items, and large touch targets.
-            </span>
-          </div>
-
-          {/* Was a plain button whose only state signal was its own label — you had to
-              read "Enable"/"Disable" and reason backwards to work out whether the mode
-              was currently on. It's a setting with two states, so it's a switch: the
-              knob's position shows the state without being read, and `role="switch"` +
-              `aria-checked` say the same thing to a screen reader. Matches the inventory
-              toggle in the medication wizard. */}
-          <button
-            type="button"
-            role="switch"
-            aria-checked={isElderly}
-            disabled={uiModeLocked}
-            onClick={() => {
-              // Leaving elderly makes everything smaller, which is disorienting if
-              // you did not mean it. Say what will happen, in those words.
-              if (isElderly && !window.confirm('Switch to the normal view?\n\nText will become smaller.')) return;
-              toggleMode();
-            }}
-            className={`shrink-0 self-start sm:self-center inline-flex items-center gap-3 rounded-2xl border transition-all cursor-pointer bg-card hover:bg-muted border-border ${
-              isElderly ? 'h-16 px-5' : 'h-12 px-4'
-            }`}
-          >
-            <span className={`font-bold text-foreground ${isElderly ? 'text-lg' : 'text-xs'}`}>
-              {isElderly ? 'On' : 'Off'}
-            </span>
-            <span
-              aria-hidden="true"
-              className={`relative shrink-0 rounded-full transition-colors ${
-                isElderly ? 'w-16 h-9 bg-primary' : 'w-11 h-6 bg-input'
-              }`}
-            >
-              <span
-                className={`absolute top-[2px] bg-white border border-border rounded-full transition-all ${
-                  isElderly
-                    ? 'h-8 w-8 left-[calc(100%-2.125rem)]'
-                    : 'h-5 w-5 left-[2px]'
-                }`}
-              />
-            </span>
-          </button>
-        </div>
-
-        {/* THE VIEW LOCK. Offered only while elderly mode is on, because that is the
-            only situation it protects: a phone set up for someone who did not choose
-            the settings and cannot undo a stray tap.
-
-            THE ANTI-JAIL RULE (CLAUDE.md): this control exists HERE AND NOWHERE ELSE,
-            and Settings must therefore stay reachable in every mode — the elderly nav
-            keeps its Settings icon for exactly this reason. A lock that can hide the
-            way to unlock it is not a lock, it is a trap. */}
-        {isElderly && (
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-muted/30 border border-border/80 rounded-2xl p-4">
-            <div className="space-y-0.5">
-              <span className={`font-extrabold text-foreground block ${isElderly ? 'text-xl' : 'text-sm'}`}>
-                Lock this view
-              </span>
-              <span className={`text-muted-foreground block font-semibold ${isElderly ? 'text-base' : 'text-xs'}`}>
-                Prevents switching views by accident. You can change this here anytime.
-              </span>
-            </div>
-
-            <button
-              type="button"
-              role="switch"
-              aria-checked={uiModeLocked}
-              onClick={async () => {
-                if (uiModeLocked) {
-                  // Unlocking is the door out; make it deliberate, and say plainly
-                  // what it re-exposes rather than warning about danger.
-                  if (!window.confirm('Unlock this view?\n\nThe view button will come back in the top bar.')) return;
-                  await setUiModeLocked(false);
-                } else {
-                  await setUiModeLocked(true);
-                }
-              }}
-              className={`shrink-0 self-start sm:self-center inline-flex items-center gap-3 rounded-2xl border transition-all cursor-pointer bg-card hover:bg-muted border-border ${
-                isElderly ? 'h-16 px-5' : 'h-12 px-4'
-              }`}
-            >
-              <span className={`font-bold text-foreground ${isElderly ? 'text-lg' : 'text-xs'}`}>
-                {uiModeLocked ? 'On' : 'Off'}
-              </span>
-              <span
-                aria-hidden="true"
-                className={`relative shrink-0 rounded-full transition-colors ${
-                  isElderly ? 'w-16 h-9' : 'w-11 h-6'
-                } ${uiModeLocked ? 'bg-primary' : 'bg-input'}`}
-              >
-                <span
-                  className={`absolute top-[2px] bg-white border border-border rounded-full transition-all ${
-                    isElderly ? 'h-8 w-8' : 'h-5 w-5'
-                  } ${uiModeLocked
-                      ? (isElderly ? 'left-[calc(100%-2.125rem)]' : 'left-[calc(100%-1.375rem)]')
-                      : 'left-[2px]'}`}
-                />
-              </span>
-            </button>
-          </div>
-        )}
-
-        {/* THEME. This is the app's ONLY theme control, and it lives here on purpose.
-            It used to be a one-tap moon button in the top bar, sitting between the
-            notification bell and the elderly-mode toggle — three round icons of equal
-            weight, one of which repainted the entire app. That is an accidental flip
-            waiting to happen, and this product's rule is that light is the default
-            and dark is a deliberate act (CLAUDE.md theme policy).
-
-            Elderly mode is always light regardless of what is chosen here, which is
-            why the control says so rather than silently ignoring the setting. */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-muted/30 border border-border/80 rounded-2xl p-4">
-          <div className="space-y-0.5">
-            <span className={`font-extrabold text-foreground block ${isElderly ? 'text-xl' : 'text-sm'}`}>
-              Dark theme
-            </span>
-            <span className={`text-muted-foreground block font-semibold ${isElderly ? 'text-base' : 'text-xs'}`}>
-              {isElderly
-                ? 'Elderly mode always uses the light theme for readability.'
-                : 'The app stays light unless you turn this on. It never follows your phone’s setting.'}
-            </span>
-          </div>
-
-          <button
-            type="button"
-            role="switch"
-            aria-checked={theme === 'dark'}
-            disabled={isElderly}
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            className={`shrink-0 self-start sm:self-center inline-flex items-center gap-3 rounded-2xl border transition-all bg-card hover:bg-muted border-border disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${
-              isElderly ? 'h-16 px-5' : 'h-12 px-4'
-            }`}
-          >
-            <span className={`font-bold text-foreground ${isElderly ? 'text-lg' : 'text-xs'}`}>
-              {theme === 'dark' && !isElderly ? 'On' : 'Off'}
-            </span>
-            <span
-              aria-hidden="true"
-              className={`relative shrink-0 rounded-full transition-colors ${
-                isElderly ? 'w-16 h-9 bg-input' : theme === 'dark' ? 'w-11 h-6 bg-primary' : 'w-11 h-6 bg-input'
-              }`}
-            >
-              <span
-                className={`absolute top-[2px] bg-white border border-border rounded-full transition-all h-5 w-5 ${
-                  theme === 'dark' && !isElderly ? 'left-[calc(100%-1.375rem)]' : 'left-[2px]'
-                } ${isElderly ? 'h-8 w-8 top-[2px]' : ''}`}
-              />
-            </span>
-          </button>
-        </div>
-      </div>
+      {/* The display controls — elderly mode, the view lock and the theme — moved to
+          Settings → Display when the hub landed. They are not duplicated here: two
+          copies of a toggle is two things that can disagree about the same state,
+          and the lock in particular has an anti-jail rule that depends on there
+          being exactly one place it can be changed. */}
 
       {/* SECTION 3: CARE CIRCLE — IDENTITY ONLY.
           This section used to duplicate /care-circle wholesale: it re-queried the
