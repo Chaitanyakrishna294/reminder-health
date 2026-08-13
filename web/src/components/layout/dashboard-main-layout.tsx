@@ -104,7 +104,7 @@ export default function DashboardMainLayout({
   patientPhone?: string;
   patientChatId?: string | null;
 }) {
-  const { isElderly, viewMode, setViewMode } = useUiMode();
+  const { isElderly, viewMode, setViewMode, showNavLabels } = useUiMode();
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
@@ -346,12 +346,14 @@ export default function DashboardMainLayout({
             >
               <NavPending />
               <NavIcon icon={item.icon} size={isElderly ? 'w-7 h-7' : 'w-5 h-5'} />
-              {/* Replaces a hover-only tooltip. A label you have to hover to read
-                  is not a label — it does not exist on touch at all, and it was
-                  the only thing naming these icons. */}
-              <span className={`font-bold leading-none ${isElderly ? 'text-sm' : 'text-xs'}`}>
-                {(isElderly && item.shortElderly) || item.short}
-              </span>
+              {/* OFF by default, forced on in elderly — see showNavLabels in
+                  ui-mode-context. The hover tooltip it replaced was worse than
+                  nothing on touch, where hover does not exist. */}
+              {showNavLabels && (
+                <span className={`font-bold leading-none ${isElderly ? 'text-sm' : 'text-xs'}`}>
+                  {(isElderly && item.shortElderly) || item.short}
+                </span>
+              )}
             </Link>
           );
         })}
@@ -364,7 +366,7 @@ export default function DashboardMainLayout({
         className={`md:hidden fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-40 rounded-[32px] bg-white/85 dark:bg-card/80 backdrop-blur-xl border border-border/70 shadow-lg flex items-center justify-around px-4 transition-all duration-300 ${
           isElderly
             ? 'w-[94%] h-[104px] border-2 border-primary/50'
-            : 'w-[92%] max-w-[480px] h-[84px]'
+            : `w-[92%] max-w-[480px] ${showNavLabels ? 'h-[84px]' : 'h-[72px]'}`
         }`}
       >
         {navItems.map((item) => {
@@ -386,7 +388,7 @@ export default function DashboardMainLayout({
                   ? `h-[84px] flex-1 ${
                       active ? 'bg-primary-strong text-primary-strong-foreground shadow-lg' : 'text-foreground bg-muted/40'
                     }`
-                  : `h-[68px] flex-1 ${
+                  : `${showNavLabels ? 'h-[68px]' : 'h-12 max-w-[56px]'} flex-1 ${
                       active 
                         ? 'bg-primary-strong text-primary-strong-foreground shadow-md shadow-primary/20' 
                         : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
@@ -401,13 +403,15 @@ export default function DashboardMainLayout({
               <span className="relative flex flex-col items-center justify-center gap-1 w-full h-full rounded-2xl px-0.5">
                 <NavPending />
                 <NavIcon icon={item.icon} size={isElderly ? 'w-7 h-7' : 'w-5 h-5'} />
-                {/* The icons were unlabelled, so every destination was a guess —
-                    a folder-with-heart is not self-evidently a document vault.
-                    aria-label keeps the FULL destination name; this is the part
-                    that has to fit under a 61px tab. */}
-                <span className={`font-bold leading-none ${isElderly ? 'text-sm' : 'text-xs'}`}>
-                  {(isElderly && item.shortElderly) || item.short}
-                </span>
+                {/* aria-label always carries the FULL destination name, labels or
+                    not — the visible short label is only what fits under a 61px
+                    tab, and turning it off must never cost a screen reader user
+                    the name of the tab. */}
+                {showNavLabels && (
+                  <span className={`font-bold leading-none ${isElderly ? 'text-sm' : 'text-xs'}`}>
+                    {(isElderly && item.shortElderly) || item.short}
+                  </span>
+                )}
               </span>
             </Link>
           );
@@ -424,7 +428,7 @@ export default function DashboardMainLayout({
         className={`flex-1 w-full max-w-[1600px] mx-auto transition-all duration-300 ${
           isElderly
             ? 'p-8 md:p-12 md:pl-40 pb-[calc(11rem+env(safe-area-inset-bottom))] md:pb-12'
-            : 'p-6 md:p-8 md:pl-32 pb-[calc(9rem+env(safe-area-inset-bottom))] md:pb-8'
+            : `p-6 md:p-8 md:pl-32 md:pb-8 ${showNavLabels ? 'pb-[calc(9rem+env(safe-area-inset-bottom))]' : 'pb-[calc(7.5rem+env(safe-area-inset-bottom))]'}`
         }`}
       >
         {viewMode === 'PATIENT_MONITOR' && (
