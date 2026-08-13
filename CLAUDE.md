@@ -48,6 +48,38 @@ are stale. Keep it updated when you add or move anything.
     `drawable-*-night-*` variants) — Android auto-selects these in dark mode, so the splash still
     follows the OS. Delete them when the new app icon and paper-token splash are built (launch
     layer (a)); they are Capacitor template placeholders being replaced anyway.
+- **ELDERLY IS THE THIRD DENSITY — browser · app · elderly-minimal.** Treat all three
+  as one system; the density-split work must account for elderly, not bolt it on after.
+  - **Elderly renders FEWER elements, not bigger ones.** Scaling the standard UI up was
+    tried and was the wrong experience. `ElderlyToday` is a ONE-QUESTION SCREEN: the whole
+    viewport answers "what do I do now?" — one dominant card (huge med name, dose-form
+    icon, 88px Taken, quiet Skip below). **No rail, no drawers, no week strip, no date
+    navigation, no dose strip, no inventory, no analytics.** Four states: due-now → the
+    card · nothing due → "Nothing right now. Next: …" + Remi · missed → ONE gentle line
+    ("… not taken", tap opens that dose) · all answered → check + Remi celebration.
+  - **Corrections and history stay OUT of elderly.** Repairing the past needs judgement
+    about the past; that is the caregiver's job from their own phone or standard mode.
+  - **A PRESENTATION BRANCH, NEVER A SECOND IMPLEMENTATION.** The old elderly dashboard
+    re-derived its own next-dose pick, resolve handler and totals — so the week strip,
+    the rail, past-day correction and the deep link all landed in normal mode and reached
+    none of it. `ElderlyToday` computes nothing: every value is a prop from the same
+    derivation the standard view uses, and it resolves through the same
+    `resolveReminderEvent`. Keep it that way, or it rots again.
+  - Elderly nav collapses to **Today + Care Circle + Settings**. That is the one place the
+    "exactly 5 icons" rule below does not apply.
+- **THE VIEW LOCK, AND THE ANTI-JAIL INVARIANT.** Settings offers "Lock this view" while
+  elderly is on; when locked, the mode control disappears from the top bar **in every
+  mode**, and `setMode` refuses regardless of which control calls it — hiding a button is
+  a promise about today's UI, the guard is a promise about every UI.
+  - **THE LOCK MUST NEVER LOCK OUT SETTINGS.** It is cleared from Settings and nowhere
+    else, so Settings stays reachable in every mode — that is why elderly's collapsed nav
+    keeps its Settings icon, and why no future "simplify the nav" change may remove it.
+    A lock that can hide the way to unlock it is a trap, not a lock.
+  - Persisted on `profiles.ui_mode_locked` (migration 2026-08-13) so it survives a
+    reinstall or a new phone — the moments when the person least able to re-find the
+    setting is the one holding the device. localStorage mirrors it for the first frame
+    and for offline; **the profile wins on conflict**, because a cleared browser must not
+    quietly unlock someone's phone.
 - **Navigation model: tabs replace, sub-pages push, back pops, root minimizes.**
   Defined in `web/src/lib/navigation/stack.ts`; every new page must pick a side.
   - **Root pages** are the five tab destinations (`ROOT_PATHS`). Their nav links carry

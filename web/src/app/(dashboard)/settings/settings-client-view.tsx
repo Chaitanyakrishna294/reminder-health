@@ -67,7 +67,7 @@ export default function SettingsClientView({
 }: SettingsClientViewProps) {
   const router = useRouter();
   const supabase = createClient();
-  const { isElderly, toggleMode } = useUiMode();
+  const { isElderly, toggleMode, uiModeLocked, setUiModeLocked } = useUiMode();
   const { theme, setTheme } = useTheme();
 
   // State management. `linkedCaregivers` and `linkedPatients` are only counts on this
@@ -464,7 +464,13 @@ export default function SettingsClientView({
             type="button"
             role="switch"
             aria-checked={isElderly}
-            onClick={toggleMode}
+            disabled={uiModeLocked}
+            onClick={() => {
+              // Leaving elderly makes everything smaller, which is disorienting if
+              // you did not mean it. Say what will happen, in those words.
+              if (isElderly && !window.confirm('Switch to the normal view?\n\nText will become smaller.')) return;
+              toggleMode();
+            }}
             className={`shrink-0 self-start sm:self-center inline-flex items-center gap-3 rounded-2xl border transition-all cursor-pointer bg-card hover:bg-muted border-border ${
               isElderly ? 'h-16 px-5' : 'h-12 px-4'
             }`}
@@ -488,6 +494,64 @@ export default function SettingsClientView({
             </span>
           </button>
         </div>
+
+        {/* THE VIEW LOCK. Offered only while elderly mode is on, because that is the
+            only situation it protects: a phone set up for someone who did not choose
+            the settings and cannot undo a stray tap.
+
+            THE ANTI-JAIL RULE (CLAUDE.md): this control exists HERE AND NOWHERE ELSE,
+            and Settings must therefore stay reachable in every mode — the elderly nav
+            keeps its Settings icon for exactly this reason. A lock that can hide the
+            way to unlock it is not a lock, it is a trap. */}
+        {isElderly && (
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-muted/30 border border-border/80 rounded-2xl p-4">
+            <div className="space-y-0.5">
+              <span className={`font-extrabold text-foreground block ${isElderly ? 'text-xl' : 'text-sm'}`}>
+                Lock this view
+              </span>
+              <span className={`text-muted-foreground block font-semibold ${isElderly ? 'text-base' : 'text-xs'}`}>
+                Prevents switching views by accident. You can change this here anytime.
+              </span>
+            </div>
+
+            <button
+              type="button"
+              role="switch"
+              aria-checked={uiModeLocked}
+              onClick={async () => {
+                if (uiModeLocked) {
+                  // Unlocking is the door out; make it deliberate, and say plainly
+                  // what it re-exposes rather than warning about danger.
+                  if (!window.confirm('Unlock this view?\n\nThe view button will come back in the top bar.')) return;
+                  await setUiModeLocked(false);
+                } else {
+                  await setUiModeLocked(true);
+                }
+              }}
+              className={`shrink-0 self-start sm:self-center inline-flex items-center gap-3 rounded-2xl border transition-all cursor-pointer bg-card hover:bg-muted border-border ${
+                isElderly ? 'h-16 px-5' : 'h-12 px-4'
+              }`}
+            >
+              <span className={`font-bold text-foreground ${isElderly ? 'text-lg' : 'text-xs'}`}>
+                {uiModeLocked ? 'On' : 'Off'}
+              </span>
+              <span
+                aria-hidden="true"
+                className={`relative shrink-0 rounded-full transition-colors ${
+                  isElderly ? 'w-16 h-9' : 'w-11 h-6'
+                } ${uiModeLocked ? 'bg-primary' : 'bg-input'}`}
+              >
+                <span
+                  className={`absolute top-[2px] bg-white border border-border rounded-full transition-all ${
+                    isElderly ? 'h-8 w-8' : 'h-5 w-5'
+                  } ${uiModeLocked
+                      ? (isElderly ? 'left-[calc(100%-2.125rem)]' : 'left-[calc(100%-1.375rem)]')
+                      : 'left-[2px]'}`}
+                />
+              </span>
+            </button>
+          </div>
+        )}
 
         {/* THEME. This is the app's ONLY theme control, and it lives here on purpose.
             It used to be a one-tap moon button in the top bar, sitting between the

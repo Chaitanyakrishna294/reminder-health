@@ -222,6 +222,21 @@ export default function DashboardMainLayout({
       { href: '/settings', label: 'Settings', icon: Settings },
     ];
 
+    // ELDERLY = the third density, and its nav collapses with everything else.
+    // Five destinations is five decisions before the one that matters. Today is the
+    // screen; Care Circle is the only other place an elderly user has a reason to be.
+    //
+    // SETTINGS IS THE THIRD, AND IT IS NOT OPTIONAL — see the anti-jail rule in
+    // CLAUDE.md. The view lock is set and cleared from Settings and nowhere else, so
+    // a nav that hides Settings can strand a locked patient with no way out and no
+    // way for a caregiver to help without a rebuild. Minimal is the goal; locked out
+    // is not, and the difference between them is exactly one icon.
+    if (isElderly) {
+      return baseItems.filter(item =>
+        ['/dashboard', '/care-circle', '/settings'].includes(item.href)
+      );
+    }
+
     if (viewMode === 'PATIENT_MONITOR') {
       // Monitoring is a focused, read-only view of ONE patient. It used to hide only
       // Medications, leaving Care Circle / Vault / Settings in the dock â€” all of which

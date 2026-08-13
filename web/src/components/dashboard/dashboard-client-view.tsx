@@ -23,6 +23,7 @@ import RefillGate from '@/components/dashboard/refill-gate';
 import type { LowStockMed } from '@/lib/medications/stock';
 import DoseStrip from '@/components/dashboard/dose-strip';
 import WeekStrip, { type WeekStripDay } from '@/components/dashboard/week-strip';
+import ElderlyToday from '@/components/dashboard/elderly-today';
 import { dayKeyForDose, weekKeysOf, dayKeysEndingAt } from '@/lib/design/slots';
 import { getUnitIcon } from '@/components/dashboard/dashboard-helpers';
 
@@ -768,20 +769,40 @@ export default function DashboardClientView({
   // ==========================================
   // ELDERLY MODE VIEW (Strictly Show ONLY: 1. Next Medication, 2. Today's Progress, 3. Low Stock Alerts)
   // ==========================================
-  // A PARALLEL ELDERLY DASHBOARD USED TO RETURN HERE — 233 lines of it.
+  // ELDERLY = THE THIRD DENSITY. A presentation branch, and the distinction from the
+  // parallel dashboard that used to live here matters:
   //
-  // It was the whole screen built twice: its own hero card (the one the redesign
-  // retired in normal mode, still asking about a dose the rail below would ask
-  // about again), its own giant buttons shouting I TOOK IT and SKIP, its own
-  // banners. Two implementations of one screen is how the two drift, and this pair
-  // had already drifted past the point where a fix to one reached the other: the
-  // week strip, the day rail, past-day correction and the deep link all landed in
-  // normal mode and none of them existed here.
+  //   * that one re-derived everything — its own next-dose pick, its own resolve
+  //     handler, its own totals — so the week strip, the day rail, past-day
+  //     correction and the deep link all landed in normal mode and reached none of
+  //     it. Nobody remembers to build a thing twice.
+  //   * this one computes NOTHING. Every value below was derived above, by the same
+  //     code the standard view uses, and ElderlyToday resolves through the same
+  //     `resolveReminderEvent` wrapper. A change to the dose rules reaches both
+  //     because there is only one of them.
   //
-  // The written rule is "a larger scale of the SAME type system", not a second
-  // design — so elderly now renders this same tree, and every shared component
-  // sizes itself from isElderly. That is one screen to keep correct instead of two,
-  // and it is the only version of this that stays true a month from now.
+  // Scaling the standard UI up was the wrong experience: elderly needs FEWER
+  // elements, not bigger ones. Everything below this line — the strip, the rail, the
+  // week nav, inventory, insights — is a thing to read before the answer appears,
+  // and the screen has two seconds to make the answer obvious.
+  if (isElderly) {
+    return (
+      <>
+        {/* The gate stays: it is the same "did you take it?" question, and it is
+            the one interruption that earns its place. */}
+        {dueGate}
+        {refillGate}
+        <ElderlyToday
+          events={events}
+          nextPendingEvent={nextPendingEvent}
+          attentionEvents={attentionEvents}
+          userRole={userRole}
+          readOnly={viewMode === 'PATIENT_MONITOR'}
+          onEventsChange={setEvents}
+        />
+      </>
+    );
+  }
 
   // ==========================================
   // NORMAL MODE VIEW (Premium Apple Health Theme)

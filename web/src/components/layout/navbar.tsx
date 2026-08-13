@@ -25,7 +25,7 @@ interface NavbarProps {
 export default function Navbar({ user }: NavbarProps) {
   const router = useRouter();
   const supabase = createClient();
-  const { isElderly, toggleMode, viewMode } = useUiMode();
+  const { isElderly, toggleMode, viewMode, uiModeLocked } = useUiMode();
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
 
   const handleLogout = async () => {
@@ -84,7 +84,13 @@ export default function Navbar({ user }: NavbarProps) {
                 light regardless. The bar is one icon slimmer, which elderly mode wanted
                 anyway. */}
 
-            {/* Mode Switcher Toggle (icon-only: glasses = large/accessible "Elderly" view) */}
+            {/* Mode Switcher Toggle (icon-only: glasses = large/accessible "Elderly" view).
+                HIDDEN ENTIRELY WHEN THE VIEW IS LOCKED — in every mode, not just
+                elderly. The lock exists because one stray tap on a round icon up here
+                makes the text small and the layout unfamiliar for someone who cannot
+                undo it, so leaving a disabled-looking version would keep the target
+                that caused the problem. The control lives in Settings while locked. */}
+            {!uiModeLocked && (
             <button
               onClick={toggleMode}
               aria-label={isElderly ? 'Switch to Normal view' : 'Switch to Elderly (large, accessible) view'}
@@ -96,6 +102,7 @@ export default function Navbar({ user }: NavbarProps) {
             >
               <Glasses className={isElderly ? 'w-6 h-6' : 'w-[18px] h-[18px]'} />
             </button>
+            )}
 
             {/* Profile Dropdown */}
             <div className="relative">
