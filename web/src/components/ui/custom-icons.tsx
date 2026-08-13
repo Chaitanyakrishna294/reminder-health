@@ -1,5 +1,4 @@
 import React from 'react';
-import { doseFormOf } from '@/lib/design/dose-forms';
 
 export const SpoonIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
   <svg 
@@ -41,14 +40,10 @@ export const TabletIcon = ({ className = "w-5 h-5" }: { className?: string }) =>
   </svg>
 );
 
-// Maps a medication's unit_type to its representative icon.
-//
-// DELEGATES to lib/design/dose-forms.ts, which is now the single registry of the
-// eight dose forms. This wrapper stays because every existing caller — the
-// compliance ring, the day rail, the dose gate, the medication list — imports
-// `getUnitIcon`, and one source of truth is worth more than one import path.
-// Swapping a placeholder for the drawn icon is an edit to dose-forms.ts alone.
-export const getUnitIcon = (unitType?: string, className: string = 'w-6 h-6') => {
-  const { Icon } = doseFormOf(unitType);
-  return <Icon className={className} />;
-};
+// NOTE: getUnitIcon USED to live here and now lives in lib/design/dose-forms.ts.
+// It cannot live in this file: dose-forms imports these three SVGs, so a
+// re-export here would close an import cycle — custom-icons -> dose-forms ->
+// custom-icons — and the cycle fails at RUNTIME, not at build time, with
+// "Cannot access 'TabletIcon' before initialization". The build is happy; the
+// page is blank. Keep this file a leaf: SVG components only, no imports from
+// anything that imports it back.

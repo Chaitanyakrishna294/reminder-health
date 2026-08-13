@@ -19,7 +19,7 @@
 import React from 'react';
 import { Check, X, AlertTriangle } from 'lucide-react';
 import { doseTone, doseLabel, type Tone } from '@/lib/design/semantics';
-import { getUnitIcon } from '@/components/ui/custom-icons';
+import { getUnitIcon } from '@/lib/design/dose-forms';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import type { ReminderEvent } from '@/components/dashboard/todays-schedule';
 

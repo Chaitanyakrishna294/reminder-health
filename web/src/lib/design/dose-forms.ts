@@ -88,5 +88,17 @@ export function doseFormOf(unitType?: string | null): DoseFormMeta {
   return DOSE_FORMS[UNIT_TO_FORM[(unitType || '').toUpperCase()] ?? 'other'];
 }
 
+/**
+ * The icon element for a medication's unit_type.
+ *
+ * Lives here rather than in custom-icons.tsx because this module imports those
+ * SVGs — putting it there closes an import cycle that survives the build and
+ * throws on the first render.
+ */
+export function getUnitIcon(unitType?: string, className: string = 'w-6 h-6') {
+  const { Icon } = doseFormOf(unitType);
+  return React.createElement(Icon, { className });
+}
+
 /** How many of the eight still need drawing. Read by nothing yet; kept honest. */
 export const UNDRAWN_FORMS = Object.values(DOSE_FORMS).filter((f) => !f.drawn).length;

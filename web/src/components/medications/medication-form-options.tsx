@@ -127,6 +127,50 @@ export function describeDoseDays(days: number[] | null | undefined): string {
   return sorted.map((d) => weekdays[d].full.slice(0, 3)).join(', ');
 }
 
+/** `"14:05"` → `"2:05 PM"`. Pure, so the card and the review screen agree. */
+export function format12Hour(timeStr: string): string {
+  const [hourStr, minStr] = (timeStr || '').split(':');
+  const hour = parseInt(hourStr, 10);
+  if (Number.isNaN(hour)) return timeStr;
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const displayHour = hour % 12 === 0 ? 12 : hour % 12;
+  return `${displayHour}:${minStr} ${ampm}`;
+}
+
+/**
+ * One line answering "when do I take this?" — `"8:00 AM · daily"`.
+ *
+ * Replaces a row of time pills plus a separate `once_daily` frequency chip. Those
+ * said the same thing twice in two vocabularies: the pills gave the times, the
+ * chip gave a count of them, and NEITHER mentioned which days — so a
+ * Monday/Thursday medication read as "Twice Daily" on the card and surprised
+ * someone on a Tuesday.
+ *
+ * Times lead, because the time is what gets checked against the clock in your
+ * hand. The day pattern follows, because it only matters when it is not "daily".
+ */
+export function scheduleSummary(
+  reminderTimes: string[] | null | undefined,
+  doseDays: number[] | null | undefined,
+): string {
+  const times = (reminderTimes ?? []).filter(Boolean);
+  // An empty reminder_times is a real state — the bot pre-filters these and the
+  // forms now refuse to save one — so say so rather than printing "· daily"
+  // beside nothing and implying a schedule that does not exist.
+  if (times.length === 0) return 'No times set';
+
+  const days = describeDoseDays(doseDays);
+  // "Every day" becomes "daily" so the line reads as a phrase. A specific list
+  // keeps its capitals — "Mon, Wed" is a set of names, not a word.
+  const dayPhrase =
+    days === 'Every day' ? 'daily'
+      : days === 'Weekdays' ? 'weekdays'
+        : days === 'Weekends' ? 'weekends'
+          : days;
+
+  return `${times.map(format12Hour).join(', ')} · ${dayPhrase}`;
+}
+
 export const frequencies = [
   { id: 'once_daily', title: 'Once Daily', desc: 'One dose per day', icon: <Sun className="w-5 h-5" /> },
   { id: 'twice_daily', title: 'Twice Daily', desc: 'Morning and night', icon: <CloudSun className="w-5 h-5" /> },

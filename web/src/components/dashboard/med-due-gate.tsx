@@ -7,7 +7,7 @@ import { resolveReminderEvent } from '@/lib/reminder-events';
 import { isAttentionStatus } from '@/lib/schedule/dose-attention';
 import { useUiMode } from '@/context/ui-mode-context';
 import { useTheme } from '@/context/theme-context';
-import { getUnitIcon } from '@/components/ui/custom-icons';
+import { getUnitIcon } from '@/lib/design/dose-forms';
 import { unitPhrase } from '@/components/medications/medication-form-options';
 import { Check, X, Clock, Siren, AlertTriangle } from 'lucide-react';
 import BrainMascot from './brain-mascot';
