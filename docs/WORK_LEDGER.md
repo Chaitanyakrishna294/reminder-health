@@ -177,6 +177,7 @@ through RPCs, never raw table writes. `lib/rate-limit.ts` and `lib/medications/c
 | `lib/push/register-push.ts` (client) · `send-push.ts` (server) | Web-push both directions |
 | `lib/plan.ts` · `billing/use-plan-status.ts` · `billing/luxe.ts` | Plan gate, client mirror, Care+ inline-style tokens (deliberately outside Tailwind) |
 | `lib/design/semantics.ts` | **Colour→meaning + canonical labels.** `PRIORITY` (Routine/Important/Critical), `CARE_LABELS` (patient-side first), `DOSE_TONE`/`doseLabel`, `TONE_VAR`. Import these instead of typing a status word or a hex — see `docs/DESIGN_SYSTEM.md` |
+| `lib/design/density.ts` | **The three densities as one system** (2026-08-13): `Density` = `browser \| app \| elderly`, `resolveDensity()`, and `DENSITY_LAYOUT` — the table saying what each one renders. Presentation only; never gate a derivation or a write path on it. `?preview=app\|browser` forces one for the session |
 | `lib/severity-theme.ts` | tone→Tailwind classes (`getToneTheme`, `getSeverityTheme`). `.text` is the readable-on-tint colour; never `text-*-foreground` on a tint |
 | `lib/medications/stock.ts` | **Web mirror of the bot's low-stock predicate** (`isLowStock`: threshold first, `daysOfStockLeft <= 3` backup). Lockstep with `src/reminders.js` is enforced by `test/fixtures/low-stock-cases.json`, which both tests read — same mirror discipline as the moment-timezone pair |
 | `lib/medications/add-stock.ts` | The single web path that writes `current_stock`. Raising it clears `low_stock_notified_at` via the `rearm_low_stock_notice()` trigger |
@@ -185,7 +186,10 @@ through RPCs, never raw table writes. `lib/rate-limit.ts` and `lib/medications/c
 | `lib/admin.ts` | `getAdminUser()` — `ADMIN_EMAILS` allowlist, fail closed |
 
 Context: `theme-context` (light/dark, **defaults to light** when nothing is saved), `ui-mode-context`
-(`normal|elderly` + `PATIENT_SELF|PATIENT_MONITOR`, persisted to `view-mode` cookie).
+(`normal|elderly` + `PATIENT_SELF|PATIENT_MONITOR`, persisted to `view-mode` cookie; also owns the
+elderly view lock on `profiles.ui_mode_locked`), `density-context` (`useDensity()` → the browser/app/
+elderly split; mounted INSIDE `UiModeProvider` because elderly outranks the rest, and paired with a
+pre-paint `data-density` script in `app/layout.tsx` + the `.browser-only` rule in globals.css).
 Hook: `use-realtime-notifications` (realtime `notifications` channel → bell).
 
 Components live in `components/{layout,dashboard,medications,guide,billing,settings,medical,shared,care-circle,ui}/`.
@@ -205,7 +209,11 @@ out the refill-reminder feature. `dashboard/dose-strip.tsx` (added 2026-08-09) i
 row of blister pockets — it replaced the four Morning/Afternoon/Evening/Night tiles, and tapping a
 pocket drives the compliance ring's centre (which was hover-only, i.e. dead on a phone). It takes
 `now` as a prop rather than reading `Date.now()` in render (`react-hooks/purity`). Guided tours: `components/guide/*` (`TOURS` map in `guide-content.ts`,
-`data-tour` attributes, `GuideAutoStart`).
+`data-tour` attributes, `GuideAutoStart`). A step may carry `densities?: Density[]` when its target
+only exists at some densities — `guide-tour.tsx` filters on it so step counts stay honest; note
+`medications/new/page.tsx` indexes `TOURS.newMedication` by raw index, so that one tour must stay
+unfiltered unless both sides change together. `components/dev/density-preview-badge.tsx` renders only
+while `?preview=` is forcing a density.
 
 **Recipes**
 - *New dashboard page:* `app/(dashboard)/<route>/page.tsx` server component calling `resolveUserData()` with `export const revalidate = 0`. Nav: `getNavItems()` in `components/layout/dashboard-main-layout.tsx` — **exactly 5 icons, hard rule**; secondary pages go in the navbar profile dropdown. Optionally add to `shouldPrefetch()` allowlist and to `isProtectedRoute` in `lib/supabase/middleware.ts` (list synced 07-26 — keep it that way). Optional tour entry in `guide-content.ts`.

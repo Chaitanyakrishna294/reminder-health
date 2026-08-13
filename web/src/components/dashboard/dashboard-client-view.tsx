@@ -5,6 +5,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useUiMode } from '@/context/ui-mode-context';
+import { useDensity } from '@/context/density-context';
 import TodaysSchedule, { ReminderEvent } from '@/components/dashboard/todays-schedule';
 import MedicationReviewQueue from '@/components/dashboard/medication-review-queue';
 import { addStock } from '@/lib/medications/add-stock';
@@ -105,6 +106,16 @@ export default function DashboardClientView({
   avatarUrl = null,
 }: DashboardClientViewProps) {
   const { isElderly, toggleMode, viewMode } = useUiMode();
+  /**
+   * THE DENSITY SPLIT. `layout` is the table in lib/design/density.ts — read it
+   * rather than comparing densities by hand here, so the whole difference
+   * between browser and app stays in one readable place instead of spreading
+   * into conditions scattered down a 1500-line file.
+   *
+   * The elderly branch below returns before any of this matters; it is its own
+   * presentation, not a variant of this one.
+   */
+  const { layout } = useDensity();
 
   const [events, setEvents] = useState<ReminderEvent[]>([]);
   // Per-day schedule overrides saved by the Schedule Planner (localStorage). Applied
@@ -818,8 +829,11 @@ export default function DashboardClientView({
       {missedStrip}
       {refillStrip}
 
-      {/* Push Banner */}
-      {showPushBanner && (
+      {/* Push Banner. Browser density only — inside the app a dose alarm is a
+          native AlarmManager registration, so "Enable Browser Notifications"
+          would be offering a channel the app does not use, and ReliabilityCheck
+          already owns the permission that DOES matter there. */}
+      {layout.webPushBanner && showPushBanner && (
         <div className="bg-white/10 dark:bg-slate-900/40 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-3xl p-5 shadow-lg relative overflow-hidden flex flex-col sm:flex-row items-center justify-between gap-4 animate-fade-in z-45">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-primary/10 text-foreground flex items-center justify-center shrink-0">
@@ -1086,8 +1100,14 @@ export default function DashboardClientView({
       {/* Main Workspace Layout Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
-        {/* Layer 2: Today's Medication Timeline (Main Content Zone) */}
-        <div data-tour="dash-today" className="rise-in lg:col-span-8 space-y-6" style={{ ['--rise-delay' as string]: '180ms' }}>
+        {/* Layer 2: Today's Medication Timeline (Main Content Zone).
+            Takes the full twelve columns once the side column is gone, rather
+            than leaving four columns of whitespace beside it on a tablet. */}
+        <div
+          data-tour="dash-today"
+          className={`rise-in space-y-6 ${layout.sideColumn ? 'lg:col-span-8' : 'lg:col-span-12'}`}
+          style={{ ['--rise-delay' as string]: '180ms' }}
+        >
           {/* "Manage Inventory" used to sit here as a solid-pink button, the loudest
               control on the screen. It was answering a question nobody asks while
               looking at today's doses — restocking is a weekly errand, not a today
@@ -1209,10 +1229,22 @@ export default function DashboardClientView({
           />
         </div>
 
-        {/* Side Workspaces (Insights, Inventory) */}
+        {/* Side Workspaces (Insights, Inventory) — the spec's ANALYTICS COLUMN,
+            and the whole of what the app density drops.
+
+            Nothing here is lost on the app, only un-duplicated: the compliance
+            ring is the one genuinely analytical card and the app is a
+            today-view, while Care circle and Medication inventory are both
+            already tabs in the five-icon nav, one tap away. Low stock still
+            reaches the app through the refill gate, the refill strip and the
+            per-dose "N left" chip, none of which live in this column.
+
+            `browser-only` is the pre-paint half of the same decision — see the
+            note in globals.css. The condition is the real one. */}
         {/* Tail of the cascade. 240ms is the last delay — anything later and the card
             arrives after the user has already started reading the page. */}
-        <div className="rise-in lg:col-span-4 space-y-8" style={{ ['--rise-delay' as string]: '240ms' }}>
+        {layout.sideColumn && (
+        <div className="browser-only rise-in lg:col-span-4 space-y-8" style={{ ['--rise-delay' as string]: '240ms' }}>
 
           <div className="grid grid-cols-[1.1fr_1fr] lg:grid-cols-1 gap-3 sm:gap-6 items-stretch">
           <div data-tour="dash-compliance" className="bg-card border border-border rounded-3xl p-4 sm:p-6 shadow-sm flex flex-col justify-between text-center relative min-h-0 sm:min-h-[300px]">
@@ -1567,6 +1599,7 @@ export default function DashboardClientView({
           </div>
 
         </div>
+        )}
 
       </div>
 

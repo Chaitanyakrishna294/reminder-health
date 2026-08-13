@@ -48,6 +48,44 @@ are stale. Keep it updated when you add or move anything.
     `drawable-*-night-*` variants) — Android auto-selects these in dark mode, so the splash still
     follows the OS. Delete them when the new app icon and paper-token splash are built (launch
     layer (a)); they are Capacitor template placeholders being replaced anyway.
+- **THREE DENSITIES, ONE SYSTEM (built 2026-08-13).** The same routes, the same data and
+  the same derivations render at three densities. `web/src/lib/design/density.ts` holds the
+  type, the resolution rule and `DENSITY_LAYOUT` — **a table, so the entire difference
+  between the densities is readable in one place**; `web/src/context/density-context.tsx`
+  resolves it and `useDensity()` hands out `{ density, layout, isApp, isBrowser }`.
+  - **browser** — the full view, including the side column the redesign spec calls the
+    *analytics column* (compliance ring · care circle · medication inventory). Health
+    Insights is NOT in it: that card and its server-side 7-day aggregation were deleted
+    2026-08-12 (the compliance ring is the adherence surface now). Any future dataviz pass
+    lands in this column, at this density.
+  - **app** — inside Capacitor (`isNativeApp()`, i.e. `Capacitor.isNativePlatform()`).
+    A calm today-view: the analytics column is dropped whole, and so is the "Enable
+    Browser Notifications" prompt, which offers a channel the app does not use. **Nothing
+    is lost, only un-duplicated** — care circle and inventory are both tabs in the
+    five-icon nav, and low stock still reaches Today via the refill gate, the refill strip
+    and the per-dose "N left" chip.
+  - **elderly** — the minimal presentation below. Outranks everything, including the dev
+    override: `?preview=` is a developer's convenience, elderly is somebody's ability to
+    read the screen.
+  - **`?preview=app` / `?preview=browser`** forces a density from a desktop browser. It is
+    **sticky for the session** (sessionStorage) so you can walk the app rather than
+    re-appending a param to every URL — and because sticky invisible state is a trap, a
+    badge says which density is forced and offers Exit. The two ship together.
+  - **PRESENTATION ONLY.** No density may gate a derivation, a query, a write path or a
+    safety check. If one ever needs its own copy of dose logic, the split is in the wrong
+    place — that is exactly how the old elderly dashboard rotted.
+  - **The first-paint half is deliberate duplication.** The server cannot know it is
+    rendering into the Capacitor webview, so every page streams the *browser* density; the
+    pre-paint script in `app/layout.tsx` stamps `data-density` on `<html>` and one rule in
+    `globals.css` hides `.browser-only` until React catches up. **React is always the
+    authority** — the attribute is an approximation (it cannot know about elderly, and it
+    learns "this is the app" from a flag written on a previous load, so the first launch
+    after install still flashes once). Never rely on `.browser-only` alone to keep
+    something off the app.
+  - **Tour steps carry `densities?: Density[]`** (`guide-content.ts`), filtered in
+    `guide-tour.tsx`, so the app tour does not spend a step describing a card that is not
+    on screen. `medications/new/page.tsx` indexes `TOURS.newMedication` directly — filter
+    that tour and you must filter it there too, or the wizard and the tour drift apart.
 - **ELDERLY IS THE THIRD DENSITY — browser · app · elderly-minimal.** Treat all three
   as one system; the density-split work must account for elderly, not bolt it on after.
   - **Elderly renders FEWER elements, not bigger ones.** Scaling the standard UI up was

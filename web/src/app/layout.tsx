@@ -3,6 +3,8 @@ import { headers } from "next/headers";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { UiModeProvider } from "@/context/ui-mode-context";
+import { DensityProvider } from "@/context/density-context";
+import DensityPreviewBadge from "@/components/dev/density-preview-badge";
 import { ThemeProvider } from "@/context/theme-context";
 import CookieConsent from "@/components/cookie-consent";
 import InstallPrompt from "@/components/install-prompt";
@@ -85,15 +87,41 @@ export default async function RootLayout({
             __html: `(function(){try{if(!/[?&]launch=1(&|$)/.test(location.search))return;var d=document.documentElement;d.setAttribute('data-launching','1');var m=/[?&]s=(\\d+)/.exec(location.search);if(m){var e=Date.now()-Number(m[1]);if(e>0)d.style.setProperty('--lh-seek',(-Math.min(e,1400))+'ms');}}catch(e){}})();`,
           }}
         />
+        {/* THE DENSITY SPLIT's first-paint half — same reason as the theme script
+            above. The server cannot know it is rendering into the Capacitor
+            webview, so every page streams the BROWSER density; without this the
+            app's home screen would visibly collapse to the app density the moment
+            React hydrated. This stamps data-density before paint, and one rule in
+            globals.css hides `.browser-only` while it says "app".
+
+            It is an APPROXIMATION, corrected by DensityProvider within the first
+            commit — it cannot know about elderly at all, and it learns "this is
+            the app" from a flag the provider wrote on a previous load (Capacitor
+            injects window.Capacitor too late to rely on here), so the very first
+            launch after install still flashes once. Ordered: an explicit
+            ?preview= wins, then the remembered flag. Keep the storage keys in
+            lockstep with lib/design/density.ts. */}
+        <script
+          nonce={nonce}
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var d=document.documentElement,o=null,m=/[?&]preview=(app|browser)(&|$)/.exec(location.search);if(m){o=m[1];try{sessionStorage.setItem('previewDensity',o);}catch(e){}}else{try{var s=sessionStorage.getItem('previewDensity');if(s==='app'||s==='browser')o=s;}catch(e){}}var n=false;try{n=!!(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform());}catch(e){}if(!n){try{n=localStorage.getItem('isNativeApp')==='1';}catch(e){}}d.setAttribute('data-density',o?o:(n?'app':'browser'));}catch(e){}})();`,
+          }}
+        />
       </head>
       <body className="min-h-full flex flex-col">
         <LaunchHandoff />
         <ThemeProvider>
           <UiModeProvider>
-            {children}
-            <RegisterSW />
-            <InstallPrompt />
-            <CookieConsent />
+            {/* Inside UiModeProvider: elderly outranks every other density. */}
+            <DensityProvider>
+              {children}
+              <RegisterSW />
+              <InstallPrompt />
+              <CookieConsent />
+              {/* Renders only while ?preview= is forcing a density. */}
+              <DensityPreviewBadge />
+            </DensityProvider>
           </UiModeProvider>
         </ThemeProvider>
       </body>

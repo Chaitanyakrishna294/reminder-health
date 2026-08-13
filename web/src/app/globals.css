@@ -358,6 +358,22 @@ body:has(nav[data-tour="dash-nav"]) .floating-bottom {
   --animate-fade-in: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* ── The density split, first-paint half ───────────────────────────────────
+   `data-density` is stamped on <html> before paint by the script in
+   app/layout.tsx, and re-stamped with the truth by DensityProvider. This rule
+   is what stops the app's home screen from painting the browser layout and then
+   visibly collapsing once React hydrates — the server renders every page long
+   before it can know it is inside the Capacitor webview.
+
+   REACT IS THE AUTHORITY, always: this only covers the window between first
+   paint and hydration, after which the element is genuinely unmounted. So
+   `.browser-only` is a hint about that window, never the mechanism — never rely
+   on it alone to keep something off the app.
+
+   !important because the marked element carries layout utilities and a
+   half-hidden section is worse than either outcome. */
+html[data-density='app'] .browser-only { display: none !important; }
+
 /* ── Entrance choreography ─────────────────────────────────────────────────
    ONE curve, ONE distance, ONE stagger unit for every section of a page, so a
    screen reads as a single cascade instead of N unrelated fades.

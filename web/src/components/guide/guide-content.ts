@@ -1,4 +1,5 @@
 import type { MascotMood } from '@/components/dashboard/brain-mascot';
+import type { Density } from '@/lib/design/density';
 
 export interface GuideStep {
   /** Matches a `data-tour="<target>"` attribute on the element to spotlight. */
@@ -9,6 +10,15 @@ export interface GuideStep {
   /** For multi-step forms: which wizard step this field lives on, so the page can
    *  jump there before the field is spotlighted. Used by the Add Medication wizard. */
   wizardStep?: number;
+  /**
+   * Which densities render this step's target. Omit when every density does.
+   *
+   * The tour degrades gracefully when a target is missing — it centres the card
+   * and skips the spotlight — but "gracefully" is not the same as "honestly": a
+   * step describing a ring that is not on this screen is a tour lying to the
+   * person following it. Filtered in guide-tour.tsx.
+   */
+  densities?: Density[];
 }
 
 // Single source of truth for all guided tours. Add a tour or edit copy here only;
@@ -27,6 +37,10 @@ export const TOURS: Record<string, GuideStep[]> = {
     },
     {
       target: 'dash-compliance',
+      // The ring lives in the side column, which only the browser density
+      // renders. Without this the app tour would spend a step on a card that is
+      // not there.
+      densities: ['browser'],
       title: 'How today is going',
       // Was "Keeping this high is the goal!" — pressure, and an exclamation mark, on
       // the one number a struggling patient sees most. The screen reports; it does
