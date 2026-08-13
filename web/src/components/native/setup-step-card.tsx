@@ -75,6 +75,16 @@ export default function SetupStepCard({ item, satisfied, onMarkDone, onUndoDone 
                 ))}
               </ol>
 
+              {/* HOW YOU KNOW IT WORKED. A checklist that ends on its last
+                  instruction ends in doubt — you did four things and the only
+                  confirmation is your own memory. Naming the visible end state also
+                  rescues someone whose phone routed them through different menus but
+                  who arrived at the right screen anyway. */}
+              <p className="mt-2.5 flex gap-2 rounded-lg bg-success/10 px-2.5 py-2 text-[11px] font-semibold text-success-strong">
+                <Check className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />
+                <span className="min-w-0">{item.done}</span>
+              </p>
+
               {deepLinkFailed && (
                 <p className="mt-2 rounded-lg bg-muted px-2.5 py-1.5 text-[11px] text-muted-foreground">
                   Your phone would not let the app open that screen directly — please follow the

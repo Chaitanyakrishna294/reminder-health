@@ -26,38 +26,69 @@ export interface SetupItem {
    * that claims to know something it cannot is worse than one that asks.
    */
   autoDetected: boolean;
-  /** Ordered, one action per line. */
+  /** Ordered, ONE action per line — genuinely one, see the note on GENERIC_STEPS. */
   steps: string[];
+  /**
+   * How you know it worked, in what you can SEE. Without this a checklist ends in
+   * doubt: you followed four instructions, and the only confirmation is your own
+   * memory of doing them. Naming the end state also rescues someone who took a
+   * different route through a manufacturer's menus and arrived at the right place.
+   */
+  done: string;
 }
 
 const APP_NAME = 'Re-MIND-eЯ';
 
-/** Used when the device's brand has no verified path yet. */
+/**
+ * Used when the device's brand has no verified path yet.
+ *
+ * ONE ACTION PER STEP, strictly. "Tap Apps, then find Re-MIND-eЯ" was one line and
+ * two things, and the second is the one people get stuck on — the app list is long,
+ * alphabetical, and our name starts with a character that does not sort where anyone
+ * expects. Splitting it means the stuck step is the step that is highlighted.
+ *
+ * EVERY STEP NAMES WHAT YOU TAP, in the words printed on the screen, in quotes. A
+ * step that says "go to battery settings" is a translation task; a step that says
+ * tap "Battery" is a matching task, and matching is what someone unfamiliar with a
+ * phone can actually do.
+ */
 const GENERIC_STEPS: Record<ReliabilityTarget, string[]> = {
   notifications: [
-    'Open your phone Settings',
-    'Tap Apps, then find ' + APP_NAME,
-    'Tap Notifications',
-    'Turn notifications ON',
+    'Open your phone\'s Settings app — the grey gear icon',
+    'Tap "Apps"',
+    `Scroll the list and tap ${APP_NAME}`,
+    'Tap "Notifications"',
+    'Turn the switch at the top ON',
   ],
   exactAlarms: [
-    'Open your phone Settings',
-    'Tap Apps, then find ' + APP_NAME,
-    'Look for "Alarms & reminders" (it may be under Special app access)',
-    'Allow ' + APP_NAME + ' to set alarms and reminders',
+    'Open your phone\'s Settings app — the grey gear icon',
+    'Tap "Apps"',
+    'Tap "Special app access" — it is usually near the bottom',
+    'Tap "Alarms & reminders"',
+    `Find ${APP_NAME} and turn it ON`,
   ],
   battery: [
-    'Open your phone Settings',
-    'Tap Apps, then find ' + APP_NAME,
-    'Tap Battery',
-    'Choose "Unrestricted" (not "Optimised" or "Restricted")',
+    'Open your phone\'s Settings app — the grey gear icon',
+    'Tap "Apps"',
+    `Scroll the list and tap ${APP_NAME}`,
+    'Tap "Battery"',
+    'Choose "Unrestricted"',
   ],
   autostart: [
-    'Open your phone Settings',
-    'Look for Autostart, Auto-launch or "Background start" — often under Apps, Special app access, or your phone\'s security app',
-    'Find ' + APP_NAME + ' in the list',
-    'Turn it ON',
+    'Open your phone\'s Settings app — the grey gear icon',
+    'Tap "Apps"',
+    'Tap "Special app access"',
+    'Tap "Autostart" — it may be called "Auto-launch" or "Background start"',
+    `Find ${APP_NAME} and turn it ON`,
   ],
+};
+
+/** What you should be able to see once each one is right. */
+const DONE_STATES: Record<ReliabilityTarget, string> = {
+  notifications: `The switch at the top of ${APP_NAME}'s notification screen is on.`,
+  exactAlarms: `${APP_NAME} shows as allowed in the "Alarms & reminders" list.`,
+  battery: 'Background power says "Unrestricted", not "Optimised" or "Restricted".',
+  autostart: `${APP_NAME}'s switch in the autostart list is on.`,
 };
 
 interface BrandGuide {
@@ -75,18 +106,20 @@ const BRAND_GUIDES: BrandGuide[] = [
     label: 'vivo / iQOO',
     steps: {
       autostart: [
-        'Open your phone Settings',
-        'Tap Apps',
-        'Tap Special app access',
-        'Tap Autostart',
-        `Find ${APP_NAME} in the list`,
-        'Turn ON "Allow autostart"',
+        'Open your phone\'s Settings app — the grey gear icon',
+        'Tap "Apps"',
+        'Tap "Special app access"',
+        'Tap "Autostart"',
+        `Scroll to ${APP_NAME} in the list`,
+        'Turn its switch ON',
       ],
       battery: [
+        // This path starts from the home screen, not Settings, because on vivo it is
+        // three taps instead of six — and it was the route verified on the device.
         `Press and hold the ${APP_NAME} icon on your home screen`,
-        'Tap App info',
-        'Tap App battery usage',
-        'Tap Background power',
+        'Tap "App info" in the small menu that appears',
+        'Tap "App battery usage"',
+        'Tap "Background power"',
         'Choose "Unrestricted"',
       ],
     },
@@ -120,6 +153,7 @@ export function setupItems(status: ReliabilityStatus | null): SetupItem[] {
       why: 'Without this, dose alarms cannot appear at all. Nothing else on this list matters until it is on.',
       autoDetected: true,
       steps: stepsFor('notifications', status),
+      done: DONE_STATES.notifications,
     },
     {
       id: 'exactAlarms',
@@ -127,6 +161,7 @@ export function setupItems(status: ReliabilityStatus | null): SetupItem[] {
       why: 'Without this, Android is free to deliver a reminder late — by minutes or by hours.',
       autoDetected: true,
       steps: stepsFor('exactAlarms', status),
+      done: DONE_STATES.exactAlarms,
     },
     {
       id: 'battery',
@@ -134,6 +169,7 @@ export function setupItems(status: ReliabilityStatus | null): SetupItem[] {
       why: 'While the phone sits idle, battery saving can delay or skip alarms entirely. This usually bites overnight, which is exactly when a missed dose goes unnoticed.',
       autoDetected: true,
       steps: stepsFor('battery', status),
+      done: DONE_STATES.battery,
     },
     {
       id: 'autostart',
@@ -142,6 +178,7 @@ export function setupItems(status: ReliabilityStatus | null): SetupItem[] {
       // Android exposes no API for this — the OEM managers keep it to themselves.
       autoDetected: false,
       steps: stepsFor('autostart', status),
+      done: DONE_STATES.autostart,
     },
   ];
 }
