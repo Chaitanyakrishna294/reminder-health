@@ -232,8 +232,12 @@ export default function DashboardMainLayout({
     // way for a caregiver to help without a rebuild. Minimal is the goal; locked out
     // is not, and the difference between them is exactly one icon.
     if (isElderly) {
+      // Today · Medications · Care Circle · Settings. Four, not five: the Health
+      // Vault is a filing cabinet and nobody opens one from the home screen.
+      // Medications earns its slot — "what am I taking?" is a question people ask
+      // out loud, and the alternative was making them find it through Settings.
       return baseItems.filter(item =>
-        ['/dashboard', '/care-circle', '/settings'].includes(item.href)
+        ['/dashboard', '/medications', '/care-circle', '/settings'].includes(item.href)
       );
     }
 

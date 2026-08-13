@@ -52,6 +52,9 @@ interface ElderlyTodayProps {
   userRole: 'PATIENT' | 'CAREGIVER';
   readOnly: boolean;
   onEventsChange: (events: ReminderEvent[]) => void;
+  /** Answered today, and scheduled today. Both derived above; shown as a sentence. */
+  todayTaken: number;
+  todayTotal: number;
 }
 
 /** Time in the viewer's locale, hour and minute only. Rendered client-side only. */
@@ -67,6 +70,8 @@ export default function ElderlyToday({
   userRole,
   readOnly,
   onEventsChange,
+  todayTaken,
+  todayTotal,
 }: ElderlyTodayProps) {
   const supabase = createClient();
   const router = useRouter();
@@ -141,8 +146,33 @@ export default function ElderlyToday({
     ].filter(Boolean).join(' · ');
   };
 
+  // Doses still ahead, excluding whatever the card is already asking about. Read
+  // only — name and time, no buttons. It answers "what else is coming today", which
+  // people do ask, WITHOUT asking them to decide anything about it.
+  const later = events
+    .filter((e) =>
+      e.id !== asking?.id
+      && !['TAKEN', 'RESOLVED_BY_CG', 'SKIPPED'].includes(e.reminder_status)
+      && !isAttentionStatus(e.reminder_status)
+      && new Date(e.scheduled_for).getTime() > nowMs)
+    .sort((a, b) => new Date(a.scheduled_for).getTime() - new Date(b.scheduled_for).getTime());
+
   return (
-    <div className="w-full max-w-2xl mx-auto px-1">
+    <div className="w-full max-w-2xl mx-auto px-1 pb-4">
+      {/* THE HEADER. The first version had none, and a lone card floating on the
+          page reads like an error state rather than a screen you are on. Two lines:
+          where you are, and how the day is going — a sentence, not a chart. */}
+      <header className="mb-5 px-1">
+        <h2 className="font-mono uppercase tracking-[0.14em] text-sm text-muted-foreground">
+          Today
+        </h2>
+        {todayTotal > 0 && (
+          <p className="mt-1 text-2xl font-bold text-foreground tabular-nums" suppressHydrationWarning>
+            {todayTaken} of {todayTotal} taken
+          </p>
+        )}
+      </header>
+
       {asking ? (
         /* ── STATE 1: a dose is due ────────────────────────────────────────── */
         <section className="bg-card border-2 border-primary/30 rounded-[32px] p-7 shadow-sm text-center">
@@ -190,36 +220,68 @@ export default function ElderlyToday({
         </section>
       ) : allAnswered ? (
         /* ── STATE 2: everything answered — an approved celebration moment ─── */
-        <section className="text-center py-6">
+        <section className="bg-card border-2 border-success/25 rounded-[32px] p-7 text-center shadow-sm">
           <span
-            className="mx-auto mb-6 w-28 h-28 rounded-full bg-success/15 text-success-strong flex items-center justify-center"
+            className="mx-auto mb-5 w-24 h-24 rounded-full bg-success/15 text-success-strong flex items-center justify-center"
             aria-hidden
           >
-            <Check className="w-16 h-16" strokeWidth={3} />
+            <Check className="w-14 h-14" strokeWidth={3} />
           </span>
           <h1 className="text-4xl font-black text-foreground text-balance">All done for today</h1>
-          <div className="mt-6 flex justify-center">
-            <BrainMascot size={176} mood="proud" />
+          <p className="mt-2 text-xl font-bold text-muted-foreground">Nothing left to take.</p>
+          <div className="mt-4 flex justify-center">
+            <BrainMascot size={144} mood="proud" />
           </div>
         </section>
       ) : (
         /* ── STATES 3 & 4: nothing due right now ───────────────────────────── */
-        <section className="text-center py-6">
+        <section className="bg-card border-2 border-border rounded-[32px] p-7 text-center shadow-sm">
           <h1 className="text-4xl font-black text-foreground text-balance">Nothing right now</h1>
           {nextPendingEvent ? (
-            <p className="mt-4 text-2xl font-bold text-muted-foreground text-balance" suppressHydrationWarning>
+            <p className="mt-3 text-2xl font-bold text-muted-foreground text-balance" suppressHydrationWarning>
               Next: {nextPendingEvent.medications.drug_name} at{' '}
               <span className="font-mono tabular-nums text-foreground">
                 {timeOf(nextPendingEvent.scheduled_for, mounted)}
               </span>
             </p>
           ) : (
-            <p className="mt-4 text-2xl font-bold text-muted-foreground">No medicines scheduled today.</p>
+            <p className="mt-3 text-2xl font-bold text-muted-foreground">No medicines scheduled today.</p>
           )}
-          <div className="mt-8 flex justify-center">
+          <div className="mt-4 flex justify-center">
             {/* peaceful, not happy: this is a quiet moment, not an achievement. */}
-            <BrainMascot size={176} mood="peaceful" />
+            <BrainMascot size={144} mood="peaceful" />
           </div>
+        </section>
+      )}
+
+      {/* ── LATER TODAY. Read-only on purpose. ───────────────────────────────
+          The first version showed the one card and nothing else, which left no
+          answer to "what else is coming" — so the screen felt like it was hiding
+          things. These are rows, not controls: name and time, no buttons, nothing
+          to decide. The one decision on this screen stays the card above. */}
+      {later.length > 0 && (
+        <section className="mt-6">
+          <h2 className="font-mono uppercase tracking-[0.14em] text-sm text-muted-foreground px-1 mb-2">
+            Later today
+          </h2>
+          <ul className="space-y-2">
+            {later.map((event) => (
+              <li
+                key={event.id}
+                className="bg-card border border-border rounded-2xl px-5 py-4 flex items-center justify-between gap-4"
+              >
+                <span className="text-xl font-bold text-foreground truncate">
+                  {event.medications.drug_name}
+                </span>
+                <span
+                  className="text-xl font-bold text-muted-foreground font-mono tabular-nums shrink-0"
+                  suppressHydrationWarning
+                >
+                  {timeOf(event.scheduled_for, mounted)}
+                </span>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 

@@ -799,6 +799,8 @@ export default function DashboardClientView({
           userRole={userRole}
           readOnly={viewMode === 'PATIENT_MONITOR'}
           onEventsChange={setEvents}
+          todayTaken={todayTaken}
+          todayTotal={todayTotal}
         />
       </>
     );
