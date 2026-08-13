@@ -20,7 +20,7 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  UserCircle, Bell, Monitor, Users, LifeBuoy, Globe, ShieldCheck, LogOut, ClipboardCheck,
+  UserCircle, Bell, Monitor, Users, LifeBuoy, Globe, ShieldCheck, LogOut, ClipboardCheck, Link2,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useUiMode } from '@/context/ui-mode-context';
@@ -64,7 +64,9 @@ export default function SettingsHub() {
       {!isElderly && (
         <SettingsGroup>
           <SettingsRow icon={UserCircle} label="Account" href="/settings/account" />
-          <SettingsRow icon={Bell} label="Notifications" href="/settings/account#notifications" />
+          {/* Was /settings/account#notifications — an anchor that did not exist,
+              because the preferences did not either. It now has a real page. */}
+          <SettingsRow icon={Bell} label="Notifications" href="/settings/notifications" />
           <SettingsRow icon={Monitor} label="Display" href="/settings/display" />
         </SettingsGroup>
       )}
@@ -78,6 +80,10 @@ export default function SettingsHub() {
 
       {!isElderly && (
         <SettingsGroup title="Care">
+          {/* Connections is codes — share yours, enter theirs. Care circle is the
+              relationships those codes create. Two rows because they are two tasks:
+              you connect once and manage for months. */}
+          <SettingsRow icon={Link2} label="Connections" href="/settings/connections" />
           <SettingsRow icon={Users} label="Care circle" href="/care-circle" />
           <SettingsRow icon={ClipboardCheck} label="Setup guide" href="/settings/setup-guide" />
         </SettingsGroup>
