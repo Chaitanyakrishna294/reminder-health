@@ -246,14 +246,29 @@ See CLAUDE.md's two hard rules: form-checks-are-not-limits, and policy-called-fu
 (the latter cost a live upload outage the same day; hotfix
 `migration_vault_can_accept_grant_2026_08_13.sql`).
 
-Unbounded-growth audit: `db/audits/audit_unbounded_growth_2026_08_13.sql`. **Three open findings** —
+**Orphaned storage objects are a RECURRING CHORE, and `db/scripts/purge-orphan-storage.mjs` is the
+companion to `delete_my_account`.** `storage.objects.owner` is FK to `auth.users` `ON DELETE SET
+NULL`, so **every account deletion leaves more** objects that no policy can match — unlistable,
+undeletable through the app, counted toward nobody's quota, billed forever. 114 existed in
+`health-vault` as of 2026-08-13. `delete_my_account` cannot fix it: Supabase blocks `DELETE FROM
+storage.objects` (that 42501 once broke all in-app account deletion — APPLIED.md #61), so bytes can
+only go through the Storage API, which means service_role. Run it after a batch of deletions:
+
+```
+node db/scripts/purge-orphan-storage.mjs                    # dry run, both buckets, prints the list
+node db/scripts/purge-orphan-storage.mjs --delete --confirm DELETE
+```
+
+Dry run is the default; `--max` (500) caps the blast radius; `--json` for a manifest. **It does NOT
+test `owner IS NULL`** — `avatars` policies key on the path's first segment, not on `owner`, so that
+test would delete live users' photos. It asks whether the account named by the first path segment
+still exists, and SKIPS anything it cannot classify (non-UUID first segment; a `health-vault` object a
+`health_records` row still points at).
+
+Unbounded-growth audit: `db/audits/audit_unbounded_growth_2026_08_13.sql`. **Two open findings** —
 (1) `audit_logs` is `FOR ALL TO authenticated` with no cleanup job, and the vault client appends to it
 on every action; (2) the `avatars` policy checks only the first path segment, so one user can hold
-unlimited objects under `{uid}/…`; (3) **114 `health-vault` objects have a NULL `owner`** (orphans from
-deleted accounts — `storage.objects.owner` is FK `ON DELETE SET NULL`), so no policy can reach them,
-they count toward nobody's quota, and they are billed forever. Cleaning (3) needs a **service_role
-script via the Storage API, not SQL** — Supabase blocks `DELETE FROM storage.objects` (see APPLIED.md
-#61).
+unlimited objects under `{uid}/…`.
 
 **Core:** `profiles` (1:1 auth.users; `telegram_chat_id` unique, synthetic `WEB-<uuid>` for web-only;
 `connect_code` RM+6) · `medications` (**no CREATE TABLE in repo** — pre-repo bot table, only ALTERed;

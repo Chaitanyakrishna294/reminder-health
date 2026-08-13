@@ -71,6 +71,19 @@ are stale. Keep it updated when you add or move anything.
     above); granting nobody took vault upload down on 2026-08-13.
   - **Existing users over the limit keep every file.** The rule is `count < 5` on INSERT only.
     Never enforce a new quota by deleting someone's medical records.
+  - **DELETING AN ACCOUNT ORPHANS ITS FILES, EVERY TIME — this is a standing chore, not a
+    one-off.** `storage.objects.owner` is FK to `auth.users` `ON DELETE SET NULL`, so each
+    deletion converts that account's remaining objects into ones no policy can match:
+    unlistable, undeletable through the app, billed forever (114 in `health-vault` on
+    2026-08-13). `delete_my_account` **cannot** clean them — Supabase blocks `DELETE FROM
+    storage.objects`, the 42501 that once broke all in-app account deletion (APPLIED.md #61).
+    Bytes only move through the Storage API, so the companion is
+    **`db/scripts/purge-orphan-storage.mjs`** (service_role; dry run by default,
+    `--delete --confirm DELETE` to act). Run it after a batch of deletions.
+    **It must never test `owner IS NULL`** — `avatars` policies key on the path's first
+    segment, not on `owner`, so that test deletes live users' photos. It asks whether the
+    account named by the first path segment still exists, and skips whatever it cannot
+    classify.
   - **Still open (audited 2026-08-13, `db/audits/audit_unbounded_growth_2026_08_13.sql`):**
     `audit_logs` has `FOR ALL TO authenticated`, so the client can append rows without bound
     and the vault does exactly that on every action; and the `avatars` policy checks only the
