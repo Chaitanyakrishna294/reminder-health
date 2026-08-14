@@ -712,6 +712,20 @@ service). The design consequence is that **the notification must be fully answer
     no separate app entry. Verified live on that origin: widget renders
     (`cf-chl-widget-…_response`), a real **794-char token** is issued, no error fallback, submit
     enabled.
+    - **PREVIEW DEPLOYMENTS BREAK LOGIN, and this will recur on every design review.**
+      A Vercel preview lands on its own hostname
+      (`reminder-health-<hash>-<team>.vercel.app`), which is NOT in the site key's
+      allowed domains — so Turnstile fails and nobody can sign in to review the
+      branch. Nothing is wrong with the branch; it is the domain lock doing its job.
+      **Fix: alias the preview to ONE stable hostname and whitelist that once** —
+      `npx vercel alias set <deployment-url> reminder-health-refresh.vercel.app --scope …`,
+      then add `reminder-health-refresh.vercel.app` in Cloudflare → Turnstile →
+      the widget → Settings → Domains. Re-point the same alias at each new preview
+      and the whitelist never needs touching again.
+      **Do NOT "fix" it by pointing Preview at Turnstile's always-passes test key**
+      (`1x00000000000000000000AA`): Supabase verifies the token against the real
+      SECRET key, so a dummy site key produces a token Supabase rejects, and login
+      breaks in a more confusing way than it does now.
     - **What would break it:** moving to bundled assets — the M5 "static export or RN migration"
       option — changes the origin to `capacitor://localhost` / `https://localhost`, which is NOT in
       the site key's allowed domains. CAPTCHA would then fail on the app while still working on the
