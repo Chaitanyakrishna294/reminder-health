@@ -18,6 +18,27 @@ export interface MedicationPayload {
   nextReminderAt: string;
   active: boolean;
   medicationReason: string | null;
+  /**
+   * `medications.priority_level` — 'normal' | 'important' | 'critical'.
+   *
+   * Sent as of the retry ladder (2026-08-14). It was deliberately NOT in this
+   * payload before, because nothing native needed it: the alarm rang once and
+   * the server owned every escalation decision. The ladder is the first native
+   * behaviour that differs by priority, so now it travels.
+   */
+  priorityLevel: string | null;
+  /**
+   * Retry override, or NULL to use the priority default. BOTH or NEITHER — a
+   * half-set pair is rejected by the DB constraint, and the native side treats
+   * either being null as "use the default".
+   *
+   * `interval * count` may never exceed 30 minutes. That is not a preference:
+   * the server clamps its escalation anchor at created_at + 30, so a longer
+   * ladder would have the device re-asking the patient while the caregiver was
+   * already being told the dose was missed. See lib/schedule/retry-ladder.ts.
+   */
+  retryIntervalMinutes: number | null;
+  retryCount: number | null;
 }
 
 /**

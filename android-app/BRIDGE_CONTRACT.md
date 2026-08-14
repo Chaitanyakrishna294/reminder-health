@@ -39,6 +39,67 @@ recognises as having no row behind it and therefore skips rescheduling.
 
 ---
 
+## 0. Retry ladder — what the three new payload fields are for (2026-08-14)
+
+Between the first ring and the caregiver being told, the device re-asks. The
+ladder is those re-asks, and it is **native**: chained exact alarms, same
+offline and reboot guarantees as the first ring, no polling.
+
+| priority | default ladder | offsets from the dose time |
+|---|---|---|
+| `normal` (Routine) | 15 x 1 | +15 |
+| `important` | 10 x 2 | +10, +20 |
+| `critical` | 5 x 5 | +5, +10, +15, +20, +25 |
+
+`retryIntervalMinutes` / `retryCount` override the default for **important and
+critical only**; NULL means "use the default", and that is the normal state.
+
+**`interval * count` MAY NEVER EXCEED 30 MINUTES.** This is a safety property.
+`scan_and_escalate_overdue_reminders` clamps its escalation anchor to
+`created_at + 30 minutes` so a dose nobody re-prompted still escalates; a ladder
+running past that would have the device politely re-asking the patient at +35
+while the caregiver was already being told the dose was missed. Enforced by a DB
+CHECK, by the edit form, and by `retryOffsets()` falling back to the priority
+default rather than clamping. Do not raise it on the native side alone.
+
+**The arithmetic is fixture-driven.** `test/retry-ladder-vectors.json` is shared
+by `web/src/lib/schedule/retry-ladder.ts` and the Kotlin `RetryLadder` port —
+same rule as `schedule-test-vectors.json`. Add cases there, never in one side's
+test, or the two drift invisibly. **Fire times still come only from the native
+core**; the fixture is offsets, not wall-clock instants.
+
+### Rules the Kotlin half must honour
+
+1. **Retries reuse the ORIGINAL `scheduledFor`.** `scheduleAt` already separates
+   `fireAt` from `scheduledFor` — that split was the snooze fix, and a retry has
+   exactly the same shape: a later ring about an earlier dose. Getting this wrong
+   makes the answer unsaveable (`INVALID_SCHEDULED_TIME`).
+2. **Retry is not snooze.** A user snooze suspends the ladder and reschedules per
+   snooze rules; auto-retries never touch `scheduledFor` and never call
+   `snooze_reminder_event`.
+3. **Resolving from ANY surface cancels the pending chain** — notification
+   action, app, or a caregiver on the web. An offline device keeps climbing until
+   it learns, which is correct: it has no reason to believe the dose was taken.
+4. **Boot reconstructs in-flight ladders.** `rescheduleAll` recomputes from
+   `reminder_times`, so a reboot mid-ladder would otherwise drop a critical
+   medication's remaining rungs silently — the exact failure this feature exists
+   to prevent. This is a must-fix within the feature, not a follow-up.
+5. **Presentation follows the standing rule**: locked or idle -> full-screen
+   `AlarmActivity`; unlocked and in use -> heads-up notification, fully
+   answerable on its own.
+6. **One ring, N doses.** Rungs landing in the same minute coalesce. The ring
+   lists **every still-unanswered dose from the same original scheduled time**,
+   each answerable on its own — the patient takes their noon pills as one
+   handful and must never be double-asked. Answered doses show their state
+   immediately and the screen persists until every dose is answered or dismissed;
+   at 8:01 the unanswered remainder must still be plainly visible. **In elderly
+   mode the same handful presents ONE DOSE AT A TIME** (answer -> next appears),
+   matching the one-question philosophy. Either way an unanswered dose never
+   vanishes: its own ladder, the sticky, and the rail all keep holding it.
+   Ladders stay independent in the scheduler; only presentation coalesces.
+7. **Copy is zero-blame** — "Still time to take Telmikind", reminding rather than
+   scolding. The sticky keeps its current honest record-keeping role.
+
 ## 1. `syncSchedule(medications: MedicationPayload[])` — web → native
 
 Called by the web app after any medication create/edit/delete, and once on app foreground to
@@ -53,6 +114,9 @@ interface MedicationPayload {
   dosageAmount: number;           // medications.dosage_amount (numeric, default 1)
   unitType: string | null;        // medications.unit_type
   reminderTimes: string[];        // medications.reminder_times (jsonb array of "HH:MM")
+  priorityLevel: string | null;   // medications.priority_level — 'normal' | 'important' | 'critical'
+  retryIntervalMinutes: number|null; // medications.retry_interval_minutes, NULL = priority default
+  retryCount: number | null;      // medications.retry_count, NULL = priority default
   doseDays: number[] | null;      // medications.dose_days (smallint[]); null = every day, 0=Sun..6=Sat
   timezone: string;               // medications.timezone (IANA tz string, e.g. "Asia/Kolkata")
   nextReminderAt: string;         // medications.next_reminder_at, ISO 8601 UTC — a server-computed

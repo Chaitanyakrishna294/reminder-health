@@ -5,6 +5,13 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { calculateNextReminder } from '@/lib/medication-utils';
+import {
+  DEFAULT_LADDERS,
+  RETRY_CAP_MINUTES,
+  isConfigurable,
+  ladderError,
+  retryOffsets,
+} from '@/lib/schedule/retry-ladder';
 import { useUiMode } from '@/context/ui-mode-context';
 import { type UnitType, unitOptions, stepMeta, frequencies, priorities, weekdays, describeDoseDays, unitPhrase } from '@/components/medications/medication-form-options';
 import { validateMedicationStep, buildSharedMedicationFields, normalizeDoseDays } from '@/lib/medications/form-logic';
@@ -36,6 +43,8 @@ interface EditMedicationFormProps {
     reminder_times: string[];
     tablet_count: number;
     priority_level: string;
+    retry_interval_minutes?: number | null;
+    retry_count?: number | null;
     active: boolean;
     low_stock_alert_enabled: boolean;
     unit_type?: string;
@@ -98,6 +107,16 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
   
   // Step 5 states
   const [medicationReason, setMedicationReason] = useState<string>(medication.medication_reason || '');
+  // Retry ladder override. NULL/NULL is the normal state and means "use the
+  // priority default", so the inputs start EMPTY rather than pre-filled with the
+  // default — a filled box reads as a choice somebody made.
+  const [retryInterval, setRetryInterval] = useState<string>(
+    medication.retry_interval_minutes != null ? String(medication.retry_interval_minutes) : '',
+  );
+  const [retryCount, setRetryCount] = useState<string>(
+    medication.retry_count != null ? String(medication.retry_count) : '',
+  );
+
   const [priority, setPriority] = useState<'normal' | 'important' | 'critical'>(
     medication.priority_level as any
   );
@@ -196,10 +215,30 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
       nextReminder = calculateNextReminder(sortedTimes, medication.timezone ?? undefined, normalizeDoseDays(doseDays));
     }
 
+    // Both or neither, and under the cap. The DB CHECK enforces this too — the
+    // form check is so nobody discovers it as a save failure.
+    const ladderTouched = retryInterval.trim() !== '' || retryCount.trim() !== '';
+    let retryFields: { retry_interval_minutes: number | null; retry_count: number | null } = {
+      retry_interval_minutes: null,
+      retry_count: null,
+    };
+    if (ladderTouched) {
+      const iv = Number(retryInterval);
+      const ct = Number(retryCount);
+      const problem = ladderError(iv, ct);
+      if (problem) {
+        setError(problem);
+        setLoading(false);
+        return;
+      }
+      retryFields = { retry_interval_minutes: iv, retry_count: ct };
+    }
+
     try {
       const { error: updateErr } = await supabase
         .from('medications')
         .update({
+          ...retryFields,
           ...buildSharedMedicationFields(
             { drugName, frequency, times, doseDays, dosageAmount, strength, enableInventory, currentStock, stockThreshold, medicationReason, priority, unitType, catalogLink },
             sortedTimes,
@@ -632,6 +671,85 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
                     })}
                   </div>
                 </div>
+
+                {/* REMINDING AGAIN, BEFORE ANYONE ELSE IS TOLD.
+                    Routine is deliberately excluded: a supplement does not need
+                    its own retry schedule, and it would be one more decision on
+                    a form that already asks plenty. */}
+                {isConfigurable(priority) && (
+                  <div className="pt-4 border-t border-border">
+                    <label className={labelClass}>If you do not answer</label>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Your phone asks again before anyone in your care circle is told.
+                      Leave these empty to use the usual pattern for this priority.
+                    </p>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label htmlFor="retry-interval" className="block text-xs font-semibold text-muted-foreground mb-1.5">
+                          Every (minutes)
+                        </label>
+                        <input
+                          id="retry-interval"
+                          type="number"
+                          inputMode="numeric"
+                          min={1}
+                          max={RETRY_CAP_MINUTES}
+                          value={retryInterval}
+                          onChange={(e) => setRetryInterval(e.target.value)}
+                          placeholder={String(DEFAULT_LADDERS[priority].interval)}
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="retry-count" className="block text-xs font-semibold text-muted-foreground mb-1.5">
+                          How many times
+                        </label>
+                        <input
+                          id="retry-count"
+                          type="number"
+                          inputMode="numeric"
+                          min={1}
+                          max={RETRY_CAP_MINUTES}
+                          value={retryCount}
+                          onChange={(e) => setRetryCount(e.target.value)}
+                          placeholder={String(DEFAULT_LADDERS[priority].count)}
+                          className={inputClass}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Shows the actual rings rather than the rule. "+5, +10,
+                        +15" is checkable against what the phone will do; "5 x 5,
+                        max 30" is arithmetic homework. */}
+                    {(() => {
+                      const touched = retryInterval.trim() !== '' || retryCount.trim() !== '';
+                      const problem = touched
+                        ? ladderError(Number(retryInterval), Number(retryCount))
+                        : null;
+                      if (problem) {
+                        return (
+                          <p className="mt-2.5 text-xs font-semibold text-danger-strong" role="alert">
+                            {problem}
+                          </p>
+                        );
+                      }
+                      const offsets = retryOffsets(
+                        priority,
+                        touched
+                          ? { interval: Number(retryInterval), count: Number(retryCount) }
+                          : null,
+                      );
+                      return (
+                        <p className="mt-2.5 text-xs text-muted-foreground font-semibold tabular-nums">
+                          {touched ? 'Reminds you' : 'Usual pattern'} at{' '}
+                          {offsets.map((o) => `+${o}`).join(', ')} minutes after the dose is due
+                          {touched ? '.' : ' — leave empty to keep this.'}
+                        </p>
+                      );
+                    })()}
+                  </div>
+                )}
               </div>
             )}
 

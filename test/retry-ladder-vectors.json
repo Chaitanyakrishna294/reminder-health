@@ -1,0 +1,159 @@
+{
+  "_comment": [
+    "SHARED RETRY-LADDER FIXTURE — the one-clock doctrine applied to retries.",
+    "",
+    "Read by web/src/lib/schedule/retry-ladder.test.ts today and by the Kotlin",
+    "RetryLadder test when the alarm core lands. Same rule as",
+    "schedule-test-vectors.json: add cases HERE, never ad hoc in one side's test,",
+    "or the two implementations drift and the drift is invisible until a dose is",
+    "missed.",
+    "",
+    "OFFSETS ARE MINUTES FROM THE DOSE'S SCHEDULED TIME. This file computes no",
+    "wall-clock times on purpose — fire times come only from the native core.",
+    "",
+    "THE CAP IS 30 because scan_and_escalate_overdue_reminders clamps its",
+    "escalation anchor to created_at + 30 minutes. A ladder running past it would",
+    "have the device re-asking the patient while the caregiver was already being",
+    "told they missed the dose."
+  ],
+  "capMinutes": 30,
+
+  "defaults": [
+    {
+      "name": "routine gets one nudge — a missed vitamin is not an event",
+      "priority": "normal",
+      "config": null,
+      "expectedOffsets": [15],
+      "expectedWindow": 15
+    },
+    {
+      "name": "important gets two",
+      "priority": "important",
+      "config": null,
+      "expectedOffsets": [10, 20],
+      "expectedWindow": 20
+    },
+    {
+      "name": "critical gets five — the case the feature exists for",
+      "priority": "critical",
+      "config": null,
+      "expectedOffsets": [5, 10, 15, 20, 25],
+      "expectedWindow": 25
+    },
+    {
+      "name": "unknown priority falls to routine, matching priorityMeta",
+      "priority": "URGENT_MAYBE",
+      "config": null,
+      "expectedOffsets": [15],
+      "expectedWindow": 15
+    },
+    {
+      "name": "missing priority falls to routine",
+      "priority": null,
+      "config": null,
+      "expectedOffsets": [15],
+      "expectedWindow": 15
+    },
+    {
+      "name": "priority is matched case-insensitively — the column is free text",
+      "priority": "Critical",
+      "config": null,
+      "expectedOffsets": [5, 10, 15, 20, 25],
+      "expectedWindow": 25
+    }
+  ],
+
+  "custom": [
+    {
+      "name": "a critical med may be asked every 3 minutes, ten times — exactly at the cap",
+      "priority": "critical",
+      "config": { "interval": 3, "count": 10 },
+      "expectedOffsets": [3, 6, 9, 12, 15, 18, 21, 24, 27, 30],
+      "expectedWindow": 30
+    },
+    {
+      "name": "one rung at 30 is allowed — the cap is on the product, not the interval",
+      "priority": "critical",
+      "config": { "interval": 30, "count": 1 },
+      "expectedOffsets": [30],
+      "expectedWindow": 30
+    },
+    {
+      "name": "a partial config takes the priority default for the missing half",
+      "priority": "important",
+      "config": { "interval": 5 },
+      "expectedOffsets": [5, 10],
+      "expectedWindow": 10
+    },
+    {
+      "name": "over the cap is IGNORED, not clamped — fall back to the known-good default",
+      "priority": "critical",
+      "config": { "interval": 10, "count": 4 },
+      "expectedOffsets": [5, 10, 15, 20, 25],
+      "expectedWindow": 25
+    },
+    {
+      "name": "zero rungs is not a way to silence a medication",
+      "priority": "critical",
+      "config": { "interval": 5, "count": 0 },
+      "expectedOffsets": [5, 10, 15, 20, 25],
+      "expectedWindow": 25
+    },
+    {
+      "name": "a fractional interval falls back rather than firing at odd seconds",
+      "priority": "important",
+      "config": { "interval": 7.5, "count": 2 },
+      "expectedOffsets": [10, 20],
+      "expectedWindow": 20
+    }
+  ],
+
+  "validation": [
+    { "name": "critical default is valid", "interval": 5, "count": 5, "valid": true },
+    { "name": "exactly at the cap is valid", "interval": 3, "count": 10, "valid": true },
+    { "name": "one minute over is not", "interval": 31, "count": 1, "valid": false },
+    { "name": "product over the cap is not", "interval": 10, "count": 4, "valid": false },
+    { "name": "zero count is not", "interval": 5, "count": 0, "valid": false },
+    { "name": "zero interval is not", "interval": 0, "count": 5, "valid": false },
+    { "name": "negative is not", "interval": -5, "count": 5, "valid": false },
+    { "name": "fractional minutes are not", "interval": 2.5, "count": 4, "valid": false }
+  ],
+
+  "_cancellationComment": [
+    "`expectedCancelled` is the set of rungs that had NOT yet fired when the dose",
+    "was answered — i.e. exactly the alarms to cancel. It is not the set that",
+    "rings; resolving means none of them ring."
+  ],
+  "cancellation": [
+    {
+      "name": "answered before any rung fired — all five are cancelled, none ring",
+      "offsets": [5, 10, 15, 20, 25],
+      "resolvedAtMinute": 2,
+      "expectedCancelled": [5, 10, 15, 20, 25]
+    },
+    {
+      "name": "answered mid-ladder — the two that fired stand, the three ahead are cancelled",
+      "offsets": [5, 10, 15, 20, 25],
+      "resolvedAtMinute": 12,
+      "expectedCancelled": [15, 20, 25]
+    },
+    {
+      "name": "answered exactly on a rung — that one has already fired, so it is not cancelled",
+      "offsets": [5, 10, 15, 20, 25],
+      "resolvedAtMinute": 15,
+      "expectedCancelled": [20, 25]
+    },
+    {
+      "name": "answered after the ladder finished — the sticky is up and there is nothing to cancel",
+      "offsets": [5, 10, 15, 20, 25],
+      "resolvedAtMinute": 40,
+      "expectedCancelled": []
+    },
+    {
+      "name": "a one-rung routine ladder answered late",
+      "offsets": [15],
+      "resolvedAtMinute": 20,
+      "expectedCancelled": []
+    }
+  ]
+}
