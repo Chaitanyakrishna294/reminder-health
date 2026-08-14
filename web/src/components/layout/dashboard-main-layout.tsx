@@ -259,9 +259,6 @@ export default function DashboardMainLayout({
   };
 
   const navItems = getNavItems();
-  // Which tab the indicator sits over. -1 on a sub-page, where no tab is
-  // current and the indicator should not be showing at all.
-  const activeNavIndex = navItems.findIndex((item) => isLinkActive(item.href));
 
   const shouldPrefetch = (path: string) => {
     const allowed = ['/dashboard', '/medications', '/care-circle', '/health-vault'];
@@ -323,48 +320,6 @@ export default function DashboardMainLayout({
             : 'w-[72px] py-8 space-y-6'
         }`}
       >
-        {/* THE SLIDING INDICATOR. One pink pill that MOVES between tabs rather
-            than a colour block that appears and disappears — the movement is
-            what tells you where you came from, which a block cannot.
-
-            Absolutely positioned behind the tabs and driven by the active index,
-            so it is one composited translateX and never touches layout. Elderly
-            keeps its solid block: that density is excluded from this round, and
-            a moving target is the wrong idea there anyway. */}
-        {!isElderly && activeNavIndex >= 0 && (
-          <span
-            aria-hidden
-            className="absolute top-2 bottom-2 left-4 right-4 pointer-events-none"
-          >
-            <span
-              className="absolute top-0 bottom-0 rounded-2xl shadow-md shadow-primary/20 motion-reduce:transition-none"
-              style={{
-                width: `${100 / navItems.length}%`,
-                transform: `translateX(${activeNavIndex * 100}%)`,
-                transition: 'transform 260ms cubic-bezier(0.22, 1, 0.36, 1)',
-                /*
-                 * THE FILL IS AN INLINE TOKEN READ, not `bg-primary-strong`.
-                 *
-                 * The utility rendered GREY in light mode and pink in dark on a
-                 * real device (2026-08-15), and the cause was not reproducible by
-                 * reading: the token exists, the @theme mapping exists, and the
-                 * class is spelled correctly. Rather than guess which layer ate
-                 * it — utility-vs-plain-class ordering, the parent's
-                 * backdrop-filter stacking context, a purge miss on a class only
-                 * this element uses — the fill now reads the variable directly.
-                 *
-                 * An inline style cannot be purged, cannot lose to layer order,
-                 * and still flips with the theme because the TOKEN flips. For a
-                 * single moving element whose whole job is being the accent, that
-                 * is the right trade; it is not a licence to inline colours
-                 * generally.
-                 */
-                background: 'var(--primary-strong)',
-              }}
-            />
-          </span>
-        )}
-
         {navItems.map((item) => {
           const active = isLinkActive(item.href);
           return (
@@ -435,11 +390,17 @@ export default function DashboardMainLayout({
                     }`
                   : `${showNavLabels ? 'h-[68px]' : 'h-12 max-w-[56px]'} flex-1 relative z-10 ${
                       active
-                        // No fill here: the sliding indicator behind is the fill.
-                        // White on --primary-strong is 4.75:1, the same pairing
-                        // the block used.
-                        ? 'text-primary-strong-foreground'
-                        : 'text-muted-foreground hover:text-foreground'
+                        /* THE ACTIVE TAB OWNS ITS FILL AGAIN.
+                           A sliding indicator was tried in this round and shipped
+                           GREY in light mode twice — first as `bg-primary-strong`,
+                           then as an inline `var(--primary-strong)` read, neither
+                           reproducible from the source. Reverted rather than
+                           guessed at a third time: the nav is the frame around
+                           every screen, and a verified-correct block beats an
+                           unverifiable animation. The slide is worth retrying
+                           when someone can watch it render. */
+                        ? 'bg-primary-strong text-primary-strong-foreground shadow-md shadow-primary/20'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
                     }`
               }`}
               title={item.label}
