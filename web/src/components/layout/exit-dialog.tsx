@@ -63,7 +63,7 @@ export default function ExitDialog({ open, onCancel, onExit }: ExitDialogProps) 
         aria-labelledby="exit-dialog-title"
         aria-describedby="exit-dialog-body"
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-xs bg-card border border-border rounded-3xl shadow-xl p-6 flex flex-col items-center text-center gap-4"
+        className="w-full max-w-xs card-lift card-lift-2 shadow-xl p-6 flex flex-col items-center text-center gap-4"
       >
         <BrainMascot size={isElderly ? slot.elderlySize : slot.size} mood={slot.mood} />
 
