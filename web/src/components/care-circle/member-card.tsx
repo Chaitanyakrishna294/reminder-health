@@ -73,7 +73,7 @@ export default function MemberCard({
 
   return (
     <div
-      className={`bg-card border border-border rounded-2xl shadow-sm flex flex-col gap-3 ${
+      className={`card-lift shadow-sm flex flex-col gap-3 ${
         isElderly ? 'p-6' : 'p-5'
       }`}
     >

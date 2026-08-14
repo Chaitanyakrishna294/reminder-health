@@ -95,7 +95,7 @@ async function PatientStatusCard({ id, name, relationship, isPrimary, telegramId
   // Hover was `slate-200`/`slate-50` — near-white raw palette, so on dark the whole
   // patient card lit up almost white under the cursor.
   return (
-    <div className="group relative bg-card border border-border rounded-3xl p-6 hover:border-input hover:bg-muted/40 transition-all flex flex-col justify-between shadow-sm">
+    <div className="group relative card-lift p-6 hover:border-input hover:bg-muted/40 transition-all flex flex-col justify-between shadow-sm">
       {/* Arrow Accent */}
       <div className="absolute top-5 right-5 text-muted-foreground group-hover:text-primary transition-colors">
         <ArrowUpRight className="w-5 h-5" />
