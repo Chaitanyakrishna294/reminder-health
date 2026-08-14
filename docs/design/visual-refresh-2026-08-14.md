@@ -22,10 +22,10 @@ glass of water.
 **Signature — the tray.** A dosette box is compartments sitting *in* a tray. That
 is exactly the "cards on a board" language, and it is why it fits this product
 rather than being a generic Material trend: **the board is the tray, the cards
-are the compartments you lift out.** The tell that it is ours and not anyone
-else's is §3 — the card's shadow is *tinted by the time of day*, so a morning
-screen and a midnight screen have different light falling on them without a
-single fill changing.
+are the compartments you lift out.** The distinguishing move was going to be
+§3's time-tinted shadow; that was CUT after the device review, so what carries
+the identity now is the tray itself plus the restraint around it — which is the
+more honest answer for a screen whose job is answering "did I take it?".
 
 **Rejecting three defaults.**
 
@@ -85,13 +85,16 @@ Today's `rounded-3xl` (24) on cards *and* on 40px chips is the defect this fixes
 - **Mind pink stays the single accent.** `--primary-strong` for anything
   load-bearing (4.75:1), `--primary` for tints, rings and the logo. Unchanged.
 - **Slot tints stay surfaces**, never interactive, never text without `-ink`.
-  **New, and this is the signature:** the board's shadow takes a slot-tinted hue
-  — `--lift-tint` swaps the shadow's colour by time of day. Morning shadows lean
-  warm, night shadows lean indigo. Surfaces stay neutral; only the *light*
-  changes. It is the one thing on this list another app could not have copied.
-- **Vault folder browns/purples → tokens.** `--category-1..4` already exist and
-  are already documented as identity-not-status. The Vault's hardcoded hex moves
-  onto them, which is a token fix, not a palette change.
+- ~~**Slot-tinted shadows** — the board's shadow taking a slot hue by time of
+  day.~~ **CUT after the device review.** It was the most distinctive idea here
+  and it is parked, not deleted: the app already reads calm, and the honest
+  reading is that tinted shadows would have added atmosphere to a screen whose
+  job is answering "did I take it?". Worth revisiting in a polish pass with
+  fresh eyes; it needs a reason beyond being interesting.
+- **Vault folder covers were already on tokens.** `folder-carousel` derives every
+  cover from `var(--category-N)` by index and holds no hex at all — see the §8.1
+  correction. Nothing to do; the audit item was written from expectation rather
+  than from the file.
 - **`--hydration-*` stays scoped** to water. Unchanged, and still the only
   exception.
 
@@ -164,11 +167,21 @@ sticky search sits on the board, not in a bordered bar.
 *internal* dividers only. The group titles are the one place mono earns its
 keep, as micro-labels.
 
+**Auth (stage 3)** — the sign-in screens keep their own `--auth-radial` ground
+rather than the board: they are the one place in the app that is not a working
+surface, and pulling them onto the tray would make signing in look like a task.
+What they take from the system is the parts that were inconsistent — inputs
+become WELLS (`surface-sunk`, receiving content rather than being another white
+plane with a line round it), the logo plate drops `shadow-xl` for `--lift-2`, and
+radii join the three-step scale.
+
 ## 8. Flagged, NOT done here (needs logic, not presentation)
 
-1. **Vault folder colours are hardcoded per folder in component state**, not
-   read from a token map. Moving them to `--category-*` is a data-shape change to
-   how a folder stores its colour — flagged, not smuggled in.
+1. ~~**Vault folder colours are hardcoded per folder in component state.**~~
+   **WRONG — checked in stage 3 and there was nothing to fix.** `folder-carousel`
+   already derives every cover from `var(--category-N)` by index, and the file
+   contains no hex at all. The flag was written from the spec's expectation
+   rather than from the code, which is exactly the mistake §8 exists to prevent.
 2. **The reliability banner's heading is mono** because it was styled as a
    structural label. Changing it to Inter is presentation; changing what it says
    is copy, and it was rewritten yesterday, so it is left alone.

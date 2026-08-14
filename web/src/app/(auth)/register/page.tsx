@@ -108,7 +108,7 @@ export default function RegisterPage() {
   };
 
   // Kept identical to the login page — the two screens sit one tap apart.
-  const inputClass = `w-full pl-12 pr-4 rounded-2xl bg-white border border-border text-foreground shadow-sm placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all ${isElderly ? 'py-5 text-lg' : 'py-4 text-[15px]'}`;
+  const inputClass = `w-full pl-12 pr-4 rounded-[14px] surface-sunk border border-input text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all ${isElderly ? 'py-5 text-lg' : 'py-4 text-[15px]'}`;
   const iconClass = 'absolute left-4 top-1/2 -translate-y-1/2 text-primary pointer-events-none w-[18px] h-[18px]';
   const labelClass = `block font-bold text-foreground mb-1.5 ${isElderly ? 'text-base' : 'text-xs'}`;
 
@@ -123,7 +123,7 @@ export default function RegisterPage() {
 
         <header className="text-center">
           {/* Same hero-tile treatment as the login page's code screen. */}
-          <div className="mx-auto mb-6 w-28 h-28 rounded-[32px] bg-white shadow-xl ring-1 ring-primary/15 flex items-center justify-center">
+          <div className="mx-auto mb-6 w-28 h-28 rounded-[20px] card-lift card-lift-2 ring-1 ring-primary/15 flex items-center justify-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/mascot/login-hero.png"
