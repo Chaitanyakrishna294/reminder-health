@@ -337,11 +337,29 @@ export default function DashboardMainLayout({
             className="absolute top-2 bottom-2 left-4 right-4 pointer-events-none"
           >
             <span
-              className="absolute top-0 bottom-0 rounded-2xl bg-primary-strong shadow-md shadow-primary/20 motion-reduce:transition-none"
+              className="absolute top-0 bottom-0 rounded-2xl shadow-md shadow-primary/20 motion-reduce:transition-none"
               style={{
                 width: `${100 / navItems.length}%`,
                 transform: `translateX(${activeNavIndex * 100}%)`,
                 transition: 'transform 260ms cubic-bezier(0.22, 1, 0.36, 1)',
+                /*
+                 * THE FILL IS AN INLINE TOKEN READ, not `bg-primary-strong`.
+                 *
+                 * The utility rendered GREY in light mode and pink in dark on a
+                 * real device (2026-08-15), and the cause was not reproducible by
+                 * reading: the token exists, the @theme mapping exists, and the
+                 * class is spelled correctly. Rather than guess which layer ate
+                 * it — utility-vs-plain-class ordering, the parent's
+                 * backdrop-filter stacking context, a purge miss on a class only
+                 * this element uses — the fill now reads the variable directly.
+                 *
+                 * An inline style cannot be purged, cannot lose to layer order,
+                 * and still flips with the theme because the TOKEN flips. For a
+                 * single moving element whose whole job is being the accent, that
+                 * is the right trade; it is not a licence to inline colours
+                 * generally.
+                 */
+                background: 'var(--primary-strong)',
               }}
             />
           </span>
