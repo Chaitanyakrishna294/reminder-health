@@ -221,6 +221,24 @@ object DoseNotifications {
         val id = groupId(scheduledForIso, rows.first().medicationId)
         val many = rows.size > 1
 
+        /*
+         * ONE HANDFUL, ONE RING.
+         *
+         * Four medications at 12:00 fire as four separate alarms milliseconds
+         * apart, and each one calls this with `alerting = true`. Without this
+         * check the same notification id would re-alert four times — four
+         * sounds, four vibrations, and four full-screen intent launches for what
+         * is one handful. Whichever alarm lands first does the ringing; the rest
+         * update the notification silently.
+         *
+         * A RUNG STILL RINGS: it fires minutes later, by which point the live
+         * notification has been answered or replaced by the sticky, so there is
+         * nothing active at this id to suppress it. If one somehow is active, the
+         * patient is already looking at an alarm for this dose and re-ringing it
+         * would be the app raising its voice at someone who can see it.
+         */
+        val alertNow = alerting && !isShowing(context, id)
+
         // ONE full-screen intent for the group, keyed on the instant. Four
         // alarms firing milliseconds apart therefore update a single PendingIntent
         // instead of racing to launch four activities — the bug this whole change
@@ -251,7 +269,7 @@ object DoseNotifications {
             // On a content-only update this suppresses the re-ring AND the
             // re-launch of the full-screen intent, which is what keeps answering
             // one dose from interrupting the answering of the next.
-            .setOnlyAlertOnce(!alerting)
+            .setOnlyAlertOnce(!alertNow)
             .also { b -> localTimeOrNull(scheduledForIso)?.let { b.setSubText(it) } }
 
         if (many) {
@@ -335,6 +353,18 @@ object DoseNotifications {
     }
 
     private fun notificationOf(builder: NotificationCompat.Builder) = builder.build()
+
+    /**
+     * Is a notification with this id already in the shade?
+     *
+     * Best-effort by design: `activeNotifications` can throw on some OEM builds,
+     * and the safe answer to "I could not tell" is **false** — ringing twice is a
+     * nuisance, not ringing at all is a missed dose.
+     */
+    private fun isShowing(context: Context, id: Int): Boolean {
+        val manager = context.getSystemService(NotificationManager::class.java) ?: return false
+        return runCatching { manager.activeNotifications.any { it.id == id } }.getOrDefault(false)
+    }
 
     // -- MISSED FALLBACK -----------------------------------------------------
 

@@ -145,6 +145,16 @@ class AlarmActivity : Activity() {
     private var elderly = false
 
     /**
+     * Elderly is showing "✓ Taken" and will advance to the next dose on a timer.
+     *
+     * A refresh must not re-render over it. Recording an answer broadcasts
+     * ACTION_ANSWERED — including the answer just made HERE — so without this
+     * flag the confirmation would be replaced by the next dose within a few
+     * milliseconds, which reads as the tap having done nothing.
+     */
+    private var confirming = false
+
+    /**
      * Family voice alarms (CLAUDE.md "Post-M2 features"). Null until that
      * feature ships; both are LOCAL paths, verified readable before use, so a
      * missing or deleted file falls back instead of breaking the alarm. For a
@@ -240,6 +250,9 @@ class AlarmActivity : Activity() {
         answered.clear()
         allRows = listOfNotNull(seed)
         closing = false
+        // A hand-over to a different dose must not inherit the previous one's
+        // pending confirmation, which would leave the new dose unrendered.
+        confirming = false
 
         Log.i(
             AlarmScheduler.TAG,
@@ -284,7 +297,12 @@ class AlarmActivity : Activity() {
                 }
             }
 
-            if (outstanding.isEmpty()) allAnswered() else render()
+            when {
+                outstanding.isEmpty() -> allAnswered()
+                // The pending advance will render; see [confirming].
+                confirming -> Unit
+                else -> render()
+            }
         }
     }
 
@@ -486,7 +504,14 @@ class AlarmActivity : Activity() {
         list.removeAllViews()
         list.addView(answeredView(LayoutInflater.from(this), list, row, action))
         findViewById<Button>(R.id.alarm_snooze).visibility = View.GONE
-        handler.postDelayed({ if (!closing) render() }, ELDERLY_ADVANCE_MS)
+        confirming = true
+        // postDelayed, not removeCallbacks-then-post: armAutoDismiss() has
+        // already cleared the queue and re-armed the silence timer by the time
+        // this runs, so this advance is the only other thing pending.
+        handler.postDelayed({
+            confirming = false
+            if (!closing) render()
+        }, ELDERLY_ADVANCE_MS)
     }
 
     /**
