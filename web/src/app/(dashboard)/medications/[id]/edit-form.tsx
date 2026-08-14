@@ -289,7 +289,7 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
         </div>
       )}
 
-      <div className={`bg-card rounded-3xl border border-border shadow-md overflow-hidden ${isElderly ? 'border-2' : ''}`}>
+      <div className={`card-lift shadow-md overflow-hidden ${isElderly ? 'border-2' : ''}`}>
         
         {/* ── Premium Stepper ── */}
         <div className="px-6 pt-6 pb-4 md:px-8 md:pt-8">
