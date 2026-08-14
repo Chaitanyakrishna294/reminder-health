@@ -150,7 +150,19 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
   const [error, setError] = useState<string | null>(null);
   const [small, setSmall] = useState(false);
   // Session-local: every gate appearance starts back at one-by-one (safety default).
-  const [view, setView] = useState<'one' | 'list'>('one');
+  /**
+   * ALL-AT-ONCE IS THE DEFAULT, except in elderly.
+   *
+   * It used to open on 'one' always, so four doses at 08:00 were four
+   * consecutive questions — and by the second one the person has already
+   * swallowed the handful and is answering from memory. A handful is one
+   * handful; the list shows it and each dose is still answered independently.
+   *
+   * Elderly keeps one-at-a-time, per the one-question philosophy. That is
+   * presentation only: the other doses are still outstanding, still laddering
+   * and still on the rail — the screen just asks about one at a time.
+   */
+  const [view, setView] = useState<'one' | 'list'>(isElderly ? 'one' : 'list');
   // List rows already saved, kept on screen briefly as confirmation before removal.
   const [flashIds, setFlashIds] = useState<number[]>([]);
   // One-by-one: pin the dose being asked. The parent re-renders every 60s and on
@@ -251,7 +263,11 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
   const missedMode = isAttentionStatus(event.reminder_status);
   const med = event.medications;
   // Keep showing the list while a saved-row confirmation is still flashing.
-  const effectiveView = remaining > 1 || flashIds.length > 0 ? view : 'one';
+  // Elderly never lists, whatever the toggle last held — the mode can change
+  // under a mounted gate.
+  const effectiveView = isElderly
+    ? 'one'
+    : remaining > 1 || flashIds.length > 0 ? view : 'one';
 
   // Theme-aware page gradient. The text inside uses semantic tokens that flip
   // to near-white in dark mode, so the background MUST flip with the app theme

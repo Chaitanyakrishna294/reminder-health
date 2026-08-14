@@ -221,12 +221,25 @@ are stale. Keep it updated when you add or move anything.
   - Mascot placement is a registry, not a convention: `MASCOT_SLOTS` in `brain-mascot.tsx`.
     Adding a slot is a design decision — make it there, on purpose.
 - **Medication catalog links are human-select-only** — never auto-match a nickname to a real drug (patient safety).
-- **The dose gate and the rail's due-now card must never disagree.** Both ask "did you take it?"
-  about a dose, and both are kept deliberately: the gate is the full-screen interruption on app
-  open, the rail's due-now card is the in-page version. The invariant that makes two surfaces safe
-  is that **both pick the EARLIEST overdue dose** — `buildGateQueue` orders due-now-first ascending,
-  and `DayRail` sorts overdue doses ascending and promotes `[0]`. If either ordering changes, change
-  both, or the app will ask about one dose while highlighting another.
+- **THE GATE AND THE RAIL MUST NEVER DISAGREE ABOUT WHICH DOSES ARE OUTSTANDING.** Both ask
+  "did you take it?", and both are kept deliberately: the gate is the full-screen interruption
+  on app open, the rail's due-now card is the in-page version.
+  - **Doses at the SAME INSTANT are presented together and answered independently.** A noon
+    handful is one handful; asking about it one pill at a time means the second question
+    arrives after the person has already swallowed all four, and they answer it from memory.
+  - **Earliest-first ordering still governs ACROSS different instants** — an unanswered 08:00
+    dose still outranks a 14:00 one on both surfaces.
+  - **Elderly asks one question at a time**, per the one-question philosophy. That is the one
+    density where the grouping is presentation-only: the doses are still all outstanding, the
+    screen just shows them one at a time.
+  - Narrowed from "both pick the EARLIEST overdue dose" on 2026-08-14. That wording was built
+    on there being exactly one earliest, which is false for the case it most needed to cover:
+    four medications at 08:00 have no earliest, and a 4-med device test found two fighting for
+    the full screen while two sat as notifications. The safety property was never "one dose at
+    a time" — it was "the two surfaces show the same work", and that is what the rule now says.
+  - `buildGateQueue` (`lib/schedule/dose-attention.ts`) and `DayRail` are the two
+    implementations. **If either ordering or grouping changes, change both**, or the app will
+    ask about one dose while highlighting another.
 - Web deploys from **repo root**: `npx vercel deploy --prod --yes --scope chaitanya-krishnas-projects-397d3a53`. **The `--scope` is required** — without it the CLI returns `Not authorized` even though `vercel whoami` succeeds, because `.vercel/repo.json` pins an `orgId` that no longer resolves for the logged-in user. Root `.vercel/repo.json` maps the repo to project `reminder-health` with `directory: web`, so deploy from the ROOT, never from `web/`. Vercel ships the **working tree, not the commit** — check `git status` first, or uncommitted work goes to production too.
 - For nontrivial Next.js work, heed `web/AGENTS.md`: this Next 16 differs from training data; check `node_modules/next/dist/docs/`.
 - Exclude `.claude/worktrees/` from repo-wide greps (stale full checkout).

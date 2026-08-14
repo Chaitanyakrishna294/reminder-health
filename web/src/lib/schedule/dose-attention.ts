@@ -67,3 +67,28 @@ export function buildGateQueue<T extends DoseLike>(
     e => !(snoozedUntil[e.id] && nowMs < snoozedUntil[e.id]),
   );
 }
+
+/**
+ * The doses that share the EARLIEST outstanding instant.
+ *
+ * The gate and the rail both call this, so "which doses are the ones right now"
+ * has exactly one definition. A noon handful is one handful: asking about it a
+ * pill at a time means the second question arrives after the person has already
+ * swallowed all four, and they answer it from memory.
+ *
+ * Earliest-first still governs ACROSS instants — an unanswered 08:00 dose still
+ * outranks a 14:00 one. What changed on 2026-08-14 is that "earliest" stopped
+ * meaning "exactly one": a 4-medication device test found two fighting for the
+ * full screen while two sat as notifications, because the old rule was built on
+ * there being a single earliest and four doses at 08:00 have none.
+ *
+ * Returns [] for an empty queue, so callers can render nothing without a guard.
+ */
+export function earliestDoseGroup<T extends DoseLike>(queue: T[]): T[] {
+  if (queue.length === 0) return [];
+  const times = queue.map((e) => new Date(e.scheduled_for).getTime());
+  const earliest = Math.min(...times);
+  // Exact equality on the instant, deliberately. Two doses a minute apart are
+  // two separate asks; only a genuinely simultaneous set is one handful.
+  return queue.filter((e, i) => times[i] === earliest);
+}
