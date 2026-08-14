@@ -256,6 +256,19 @@ are stale. Keep it updated when you add or move anything.
     first (`localStorage`), the row is the shared truth. The cost — an offline
     change can be overwritten by another device — is acceptable precisely because
     nothing else reads this data.
+  - **BUT the device tally merges with `max()`, and that is not a contradiction.**
+    These are two different situations and the rule follows the situation, not the
+    datatype:
+    - **Two EDITS of one value** (this phone's row vs another phone's row) →
+      **last write wins**. One of them is a correction, and the later one is it.
+    - **Two INDEPENDENT TALLIES of the same day** (cups added on the notification,
+      which native counts locally, vs cups added in the app, which the row counts)
+      → **`max()`, on the way in only**. Neither is a correction of the other;
+      they are partial counts of the same thing, and taking the lower one silently
+      discards cups the user actually logged.
+    Undo still wins wherever it matters, because undo writes the ROW — and the row
+    is what the next merge compares against. `ScheduleSync` is the only place the
+    `max()` is applied.
   - **No caregiver read.** `water_settings` / `water_logs` are own-row only.
     Nobody escalates on water, and a caregiver seeing whether someone drank enough
     is surveillance without a purpose.
@@ -358,6 +371,18 @@ are stale. Keep it updated when you add or move anything.
     caregiver's remote answer can leave the phone re-asking until the app is next opened
     (at most one ladder, ≤30 min). Closing that gap means the device polling the server, which is
     forbidden and would break the offline guarantee the alarm core exists for.
+- **PRODUCTION DEPLOYS NEED AN EXPLICIT GO — otherwise deploy a PREVIEW.** `--prod`
+  only when the maintainer has said so for that deploy, or when every commit in the
+  working tree is one they have already approved. Anything else is
+  `npx vercel deploy --yes --scope …` (no `--prod`), which returns a preview URL.
+  Paid for 2026-08-14: a `--prod` ran from a tree that was the freshly-merged design
+  branch **plus an unreviewed commit**. It was harmless — the new code was gated off
+  and its every read was no-op wrapped — but "harmless this time" is not the standard,
+  and Vercel ships the WORKING TREE, so the blast radius of a stray `--prod` is
+  whatever happens to be checked out. Check `git status` AND `git log origin/main..HEAD`
+  before reaching for the flag.
+  - Preview URLs break Turnstile (domain lock) — alias them to one stable hostname
+    and whitelist it once. See the Turnstile note in M3.
 - Web deploys from **repo root**: `npx vercel deploy --prod --yes --scope chaitanya-krishnas-projects-397d3a53`. **The `--scope` is required** — without it the CLI returns `Not authorized` even though `vercel whoami` succeeds, because `.vercel/repo.json` pins an `orgId` that no longer resolves for the logged-in user. Root `.vercel/repo.json` maps the repo to project `reminder-health` with `directory: web`, so deploy from the ROOT, never from `web/`. Vercel ships the **working tree, not the commit** — check `git status` first, or uncommitted work goes to production too.
 - For nontrivial Next.js work, heed `web/AGENTS.md`: this Next 16 differs from training data; check `node_modules/next/dist/docs/`.
 - Exclude `.claude/worktrees/` from repo-wide greps (stale full checkout).
