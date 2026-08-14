@@ -250,6 +250,16 @@ object DoseNotifications {
      * @param medicationId used as the notification id, so a re-fire for the
      *   same medication replaces its own notification instead of stacking.
      */
+    /**
+     * [isRetry] changes the WORDING and nothing else.
+     *
+     * "Still time to take X" rather than "Time to take X": the second and third
+     * ask must read as the app being patient, not as the app being cross. There
+     * is no "again", no "you still have not", and no count -- a person who has
+     * not answered twice already knows, and telling them is the one thing this
+     * screen must never do. The sticky that follows keeps its own honest
+     * record-keeping wording; that is a different job.
+     */
     fun showDoseReminder(
         context: Context,
         medicationId: Long,
@@ -258,6 +268,7 @@ object DoseNotifications {
         scheduledForIso: String?,
         audioPath: String? = null,
         photoPath: String? = null,
+        isRetry: Boolean = false,
     ) {
         ensureChannel(context)
 
@@ -295,7 +306,7 @@ object DoseNotifications {
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("Time to take $drugName")
+            .setContentTitle(if (isRetry) "Still time to take $drugName" else "Time to take $drugName")
             .setContentText(doseLabel ?: "Tap to open Re-MIND-eЯ")
             // All three actions straight on the notification. When the phone is
             // unlocked and in use, Android suppresses the full-screen intent and

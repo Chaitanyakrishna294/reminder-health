@@ -65,6 +65,16 @@ class ScheduleBridgePlugin : Plugin() {
                     nextReminderAt = m.getString("nextReminderAt"),
                     active = m.getBoolean("active"),
                     medicationReason = m.stringOrNull("medicationReason"),
+                    // Retry ladder (BRIDGE_CONTRACT.md section 0). All three are
+                    // tolerated as absent so an APK newer than the deployed web
+                    // still syncs -- server.url means the two halves ship
+                    // separately, and a payload from an older build must not
+                    // fail the whole parse and leave the device with no
+                    // schedule at all. Absent means null means "use the priority
+                    // default", which is the correct behaviour anyway.
+                    priorityLevel = m.stringOrNull("priorityLevel"),
+                    retryLadderIntervalMinutes = m.intOrNull("retryIntervalMinutes"),
+                    retryLadderCount = m.intOrNull("retryCount"),
                 )
             }
         } catch (e: Exception) {
@@ -94,6 +104,11 @@ class ScheduleBridgePlugin : Plugin() {
                 // A pending snooze is one account's deferred dose; it must not
                 // survive into another's schedule.
                 runCatching { ScheduleDatabase.getInstance(context).pendingSnoozeDao().clearAll() }
+                // A ladder belongs to the account that started it. Left behind,
+            // it would re-ask the NEXT person to sign in about medication
+            // that is not theirs -- the same failure clearSchedule exists
+            // to prevent, verified on device 2026-08-11.
+            runCatching { ScheduleDatabase.getInstance(context).pendingRetryDao().clearAll() }
             }
             if (incomingUserId != null) {
                 SessionStore.setOwnerUserId(context, incomingUserId)
@@ -147,6 +162,11 @@ class ScheduleBridgePlugin : Plugin() {
             AlarmScheduler.cancelAllKnown(context)
             ScheduleDatabase.getInstance(context).medicationDao().deleteAll()
             runCatching { ScheduleDatabase.getInstance(context).pendingSnoozeDao().clearAll() }
+            // A ladder belongs to the account that started it. Left behind,
+            // it would re-ask the NEXT person to sign in about medication
+            // that is not theirs -- the same failure clearSchedule exists
+            // to prevent, verified on device 2026-08-11.
+            runCatching { ScheduleDatabase.getInstance(context).pendingRetryDao().clearAll() }
 
             val stranded = runCatching {
                 ScheduleDatabase.getInstance(context).doseActionDao().allUnsynced().size
@@ -348,5 +368,16 @@ class ScheduleBridgePlugin : Plugin() {
  * empty all to a real Kotlin null, which is what [Medication]'s nullable
  * fields actually mean.
  */
+/**
+ * An optional integer from the payload.
+ *
+ * Absent and JSON null both become Kotlin null, which the retry ladder reads as
+ * "use the priority default". Distinct from `optInt`, which returns 0 for a
+ * missing key -- and 0 is a value the ladder would reject, so the difference
+ * between "not configured" and "configured to zero" has to survive.
+ */
+private fun JSONObject.intOrNull(key: String): Int? =
+    if (!has(key) || isNull(key)) null else getInt(key)
+
 private fun JSONObject.stringOrNull(key: String): String? =
     if (!has(key) || isNull(key)) null else optString(key).ifEmpty { null }

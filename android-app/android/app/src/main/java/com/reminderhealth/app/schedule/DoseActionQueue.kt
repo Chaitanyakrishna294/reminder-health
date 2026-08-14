@@ -107,6 +107,24 @@ object DoseActionQueue {
                 // re-prompt for a dose the patient already dealt with.
                 snoozeDao.clear(medicationId)
             }
+
+            /*
+             * THE RETRY LADDER STOPS THE INSTANT THE DOSE IS ANSWERED, whichever
+             * surface answered it — the full-screen alarm, the notification
+             * buttons, or a caregiver on the web whose answer arrives here as a
+             * sync. This is the one choke point every local answer passes
+             * through, which is why the cancellation lives here rather than in
+             * two UI files that would drift.
+             *
+             * A SNOOZE SUSPENDS the ladder rather than ending it: the patient
+             * asked for quiet time, not to be counted as having answered. The
+             * snooze re-fire finds no ladder and starts a fresh one, so the
+             * re-asking resumes from the re-prompt instead of racing it.
+             *
+             * cancelLadder also restores the next-dose alarm, which is not
+             * optional: a live rung occupies this medication's single alarm slot.
+             */
+            AlarmScheduler.cancelLadder(context, medicationId)
         }.onFailure {
             Log.w(AlarmScheduler.TAG, "pending-snooze bookkeeping failed for med $medicationId", it)
         }
