@@ -20,7 +20,7 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  UserCircle, Bell, Monitor, Users, LifeBuoy, Globe, ShieldCheck, LogOut, ClipboardCheck, Link2, Palette,
+  UserCircle, Bell, Monitor, Users, LifeBuoy, Globe, ShieldCheck, LogOut, ClipboardCheck, Link2, Palette, Droplets,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useUiMode } from '@/context/ui-mode-context';
@@ -72,6 +72,11 @@ export default function SettingsHub() {
               render of the alarm plus the controls that change it is a page. */}
           <SettingsRow icon={Palette} label="Notification style" href="/settings/notification-style" />
           <SettingsRow icon={Monitor} label="Display" href="/settings/display" />
+          {/* Opt-in and off by default. It lives here rather than under
+              Notifications because it is a thing you set up, not a channel you
+              switch on — and it is not medication, which is the distinction the
+              scoped sky-blue exists to keep visible. */}
+          <SettingsRow icon={Droplets} label="Water" href="/settings/water" />
         </SettingsGroup>
       )}
 

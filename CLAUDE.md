@@ -221,6 +221,44 @@ are stale. Keep it updated when you add or move anything.
   - Mascot placement is a registry, not a convention: `MASCOT_SLOTS` in `brain-mascot.tsx`.
     Adding a slot is a design decision — make it there, on purpose.
 - **Medication catalog links are human-select-only** — never auto-match a nickname to a real drug (patient safety).
+- **WATER INTAKE IS THE QUIET TIER, AND THAT IS THE WHOLE DESIGN (2026-08-14).**
+  Opt-in, OFF by default, and deliberately the least insistent thing in the
+  product: a normal swipeable notification on its own low-importance channel,
+  **never the full-screen alarm path**, no retry ladder, no missed tracking, no
+  escalation, no streaks. Ignoring a nudge records nothing; a missed water day
+  says nothing about anybody. If the goal is already met, remaining nudges
+  silently skip.
+  - **Water yields to medicine.** A nudge within 10 minutes of a scheduled dose is
+    DROPPED, not moved — moving it puts the cup somewhere the user did not choose
+    and can cascade into the next one. `withoutDoseClashes` in
+    `web/src/lib/water/hydration.ts`.
+  - **Nudges are INEXACT** (WorkManager / inexact alarms). Exact alarms stay
+    medication-only — that is a hard rule and a glass of water does not earn one.
+  - **The goal is a rule of thumb, never advice**: weight × 35 ml/kg, 25 ml/kg at
+    65+, ÷ cup size, rounded to whole cups. Editable, shown as a suggestion, and
+    the setup screen carries the safety line FIRST, not as a footnote: "If you
+    have heart or kidney conditions or take fluid pills, ask your doctor about
+    your water goal." For someone on a fluid restriction, a cheerful app telling
+    them to drink ten glasses is the one genuinely unsafe thing here.
+  - **`--hydration-*` is a SCOPED accent — the only exception to the one-accent
+    rule.** Sky blue exists so a glass of water is never mistaken for a dose. It
+    belongs to the water widget and its settings room and nowhere else; if it ever
+    appears on a dose card, a rail, a gate or the alarm, that is the bug.
+    `--hydration-ink` for any text (the raw hue is ~2.6:1 on paper).
+  - **The tumbler animates only as feedback to a touch.** No idle loop, no
+    breathing, nothing that moves while someone reads the screen. One composited
+    `translateY` on the fill plus one small slosh, and `prefers-reduced-motion`
+    snaps both — a real branch, not a shortened duration, because this is an
+    elderly app.
+  - **Sync is last-write-wins on `water_logs`, NOT "larger count wins".** Taking
+    the larger number is the obvious rule for a counter and the wrong one: it
+    makes undo impossible by resurrecting the count the user just corrected. Local
+    first (`localStorage`), the row is the shared truth. The cost — an offline
+    change can be overwritten by another device — is acceptable precisely because
+    nothing else reads this data.
+  - **No caregiver read.** `water_settings` / `water_logs` are own-row only.
+    Nobody escalates on water, and a caregiver seeing whether someone drank enough
+    is surveillance without a purpose.
 - **THE GATE AND THE RAIL MUST NEVER DISAGREE ABOUT WHICH DOSES ARE OUTSTANDING.** Both ask
   "did you take it?", and both are kept deliberately: the gate is the full-screen interruption
   on app open, the rail's due-now card is the in-page version.
@@ -837,6 +875,21 @@ micro-interactions, and `artifact-design` only when publishing a proposal artifa
   for it explicitly.
 - Everything in the "Deliberately NOT used" list below stays out. That list is
   about competing visual directions, and it does not expire.
+- **`motion-design` — consulted 2026-08-14 for the water tumbler, verdict: USE IT
+  FOR THE NUMBERS, NOT THE AMBITION.** Its timing/easing/material tables are
+  genuinely useful (fluid material → ~1.5× duration and a settle rather than a
+  bounce is why the fill is 380ms on `cubic-bezier(0.34,1.06,0.64,1)`). But its
+  "always three motion layers — primary, secondary, **ambient**" rule is a direct
+  conflict with the calm rule and was **refused**: an ambient layer is a looping
+  idle animation, and nothing on Today may move for attention. Flagged per the
+  conflict rule rather than followed. Same for its "success = particle burst".
+- **`interface-design` — consulted for the same work, verdict: correct call, and
+  its "use what exists" half did the most work.** The water card ended up on the
+  page's existing card conventions and spacing scale rather than inventing a
+  surface, which is what keeps it part of Today rather than a sticker on it. Its
+  domain-exploration phase is for screens whose direction is open; the water
+  direction was already decided in the request, so that half was skipped on
+  purpose.
 
 **SKILLS SERVE THE DESIGN SYSTEM; THEY NEVER OVERRIDE IT.** The approved proposal — tokens, the
 one-accent rule, slot tints as surfaces only, Remi's five-part palette, the sticker-flat rendering

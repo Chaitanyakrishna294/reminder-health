@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useUiMode } from '@/context/ui-mode-context';
 import { useDensity } from '@/context/density-context';
 import TodaysSchedule, { ReminderEvent } from '@/components/dashboard/todays-schedule';
+import WaterCard, { type WaterCardProps } from '@/components/water/water-card';
 import MedicationReviewQueue from '@/components/dashboard/medication-review-queue';
 import { addStock } from '@/lib/medications/add-stock';
 import { registerPush } from '@/lib/push/register-push';
@@ -74,6 +75,12 @@ interface DashboardClientViewProps {
   caregiverId?: string;
   lastTaken: { drug_name: string; time: string } | null;
   peopleICareFor?: any[];
+  /**
+   * Opt-in hydration. Threaded from the server rather than fetched in the
+   * card, so a feature that is OFF for almost everyone costs nobody an extra
+   * round trip on the one screen that has to paint fast.
+   */
+  water?: WaterCardProps;
   peopleCaringForMe?: any[];
   /** Signed avatar URLs keyed by telegram id, for members who consented to sharing. */
   careCircleAvatars?: Record<string, string>;
@@ -101,6 +108,7 @@ export default function DashboardClientView({
   caregiverId,
   lastTaken,
   peopleICareFor = [],
+  water,
   peopleCaringForMe = [],
   careCircleAvatars = {},
   avatarUrl = null,
@@ -1267,6 +1275,16 @@ export default function DashboardClientView({
                 : undefined
             }
           />
+
+          {/* WATER, in the gap under Today's Doses — including the "nothing
+              scheduled" empty state, which is the case it earns most: a day with
+              no doses is an empty screen, and one quiet useful thing beats
+              nothing. Renders null unless the feature is switched on.
+
+              Every density: the app and the browser get the same widget, and
+              elderly gets it larger with the same one tap. It is NOT in the
+              analytics column — this is a thing you do, not a thing you read. */}
+          {water && <WaterCard {...water} />}
         </div>
 
         {/* Side Workspaces (Insights, Inventory) — the spec's ANALYTICS COLUMN,

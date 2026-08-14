@@ -223,12 +223,38 @@ export default async function DashboardPage() {
     }
   }
 
+  /*
+   * Opt-in hydration. Its own query in its own try, for the reason PostgREST
+   * forces: it fails an ENTIRE select on a table it does not know, so folding
+   * this into anything Today needs would take the whole dashboard down between
+   * this deploy and the migration being applied. Undefined means "no water
+   * card", which is also what everyone who has not opted in gets.
+   */
+  let water: { enabled: boolean; goalCups: number; cupMl: number } | undefined;
+  try {
+    const { data: waterSettings } = await supabase
+      .from('water_settings')
+      .select('enabled, goal_cups, cup_ml')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (waterSettings?.enabled) {
+      water = {
+        enabled: true,
+        goalCups: waterSettings.goal_cups ?? 8,
+        cupMl: waterSettings.cup_ml ?? 250,
+      };
+    }
+  } catch {
+    // Table not there yet. No card, no error, nothing else affected.
+  }
+
   return (
     // Today is the one screen whose truth can change elsewhere — a caregiver's
     // phone, a Telegram reply, a dose the device queued offline. Pulling down is
     // what people already try when they doubt it.
     <PullToRefresh>
     <DashboardClientView 
+      water={water}
       userRole={userRole}
       userName={profile.full_name || 'User'}
       avatarUrl={avatarUrl}
