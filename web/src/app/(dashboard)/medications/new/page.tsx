@@ -20,6 +20,8 @@ import {
   unitPhrase,
 } from '@/components/medications/medication-form-options';
 import { priorityMeta, TONE_VAR } from '@/lib/design/semantics';
+import RetryLadderFields, { isCustomLadder } from '@/components/medications/retry-ladder-fields';
+import { ladderError } from '@/lib/schedule/retry-ladder';
 import { getToneTheme } from '@/lib/severity-theme';
 import MedicationCatalogLink from '@/components/medications/medication-catalog-link';
 import GuideButton from '@/components/guide/guide-button';
@@ -106,6 +108,13 @@ export default function NewMedicationPage() {
   
   // Step 5 states
   const [medicationReason, setMedicationReason] = useState<string>('');
+  /**
+   * Retry ladder, configured at the moment the priority is chosen rather than
+   * on a later visit to the edit form. Empty strings mean "use the usual
+   * pattern for this priority", which is what the database stores as NULL.
+   */
+  const [retryInterval, setRetryInterval] = useState<string>('');
+  const [retryCount, setRetryCount] = useState<string>('');
   const [priority, setPriority] = useState<'normal' | 'important' | 'critical'>('normal');
   
   const [loading, setLoading] = useState(false);
@@ -265,6 +274,23 @@ export default function NewMedicationPage() {
     // added on a Tuesday fires once on the Tuesday before settling in.
     const nextReminder = calculateNextReminder(sortedTimes, timezone, normalizeDoseDays(doseDays));
 
+    /*
+     * The ladder is validated HERE as well as in the fields, for the same reason
+     * the database has a CHECK: a form check is advice. The cap is a safety
+     * property — a ladder longer than 30 minutes would have the phone re-asking
+     * the patient while their caregiver was already being told the dose was
+     * missed — so it is enforced at every layer that can enforce it.
+     */
+    const customLadder = isCustomLadder(retryInterval, retryCount);
+    const ladderProblem = customLadder
+      ? ladderError(Number(retryInterval), Number(retryCount))
+      : null;
+    if (ladderProblem) {
+      setError(ladderProblem);
+      setLoading(false);
+      return;
+    }
+
     try {
       const { error: insertErr } = await supabase.from('medications').insert([
         {
@@ -277,7 +303,13 @@ export default function NewMedicationPage() {
           next_reminder_at: nextReminder.toISOString(),
           active: true,
           refill_confirmed: false,
-          retry_count: 0
+          // The BOT's send-retry counter, not the ladder. Different column,
+          // different feature — the name collision cost a failed migration.
+          retry_count: 0,
+          // NULL means "use the priority default", which is the normal state and
+          // what the database CHECK expects when the pair is unset.
+          retry_ladder_interval_minutes: customLadder ? Number(retryInterval) : null,
+          retry_ladder_count: customLadder ? Number(retryCount) : null,
         }
       ]);
 
@@ -765,6 +797,21 @@ export default function NewMedicationPage() {
                       })}
                     </div>
                   </div>
+
+                  {/* Appears the moment Critical or Important is selected —
+                      configuration at the point of decision, which is when the
+                      person actually knows how urgent this medication is. */}
+                  <RetryLadderFields
+                    priority={priority}
+                    interval={retryInterval}
+                    count={retryCount}
+                    onIntervalChange={setRetryInterval}
+                    onCountChange={setRetryCount}
+                    isElderly={isElderly}
+                    inputClass={inputClass}
+                    labelClass={labelClass}
+                    idPrefix="new-retry"
+                  />
                 </div>
               )}
 
