@@ -1,11 +1,15 @@
-# design: visual refresh — "cards on a board" (stage 1)
+# design: visual refresh — "cards on a board"
 
 > Paste this as the PR body. Open it at:
 > https://github.com/Chaitanyakrishna294/reminder-health/compare/main...design/visual-refresh
 > (`gh` is not installed on this machine, so the PR could not be opened from the CLI.)
 
-**Draft — stage 1 only.** Design language + three proof screens. Stage 2 (rollout to
-every remaining surface) waits on approval of this.
+**Ready to merge.** Design language, the three proof screens, the full rollout,
+and the auth pass. Reviewed on device and approved.
+
+**Nine commits, one per surface**, so this is reviewable a screen at a time:
+language + proof screens · Vault · Care Circle · Settings rooms · forms ·
+dashboard remainder · auth + corrections.
 
 **Preview:** https://reminder-health-5720h56ia-chaitanya-krishnas-projects-397d3a53.vercel.app
 
@@ -13,6 +17,13 @@ every remaining surface) waits on approval of this.
 read this first; the PR is that spec made true on three screens.
 
 ---
+
+## Approved on device
+
+Reviewed on a real phone: reads clean, nothing broken. Dark mode re-derived
+itself from the tokens with no per-surface work — `.card-lift` reads `--surface`
+and `--lift-1`, and the `.dark` block redefines both as a lightness step plus a
+hairline ring, since shadows barely register on navy.
 
 ## ⚠️ No before/after screenshots, and I will not fake them
 
@@ -69,16 +80,24 @@ idle-animates; `prefers-reduced-motion` is a real branch, not a shorter duration
 | `theme-factory` (registry) | **Rejected, and it would have been harmful** — it applies one of ten preset palettes, and the brief says tokens *evolve* rather than get replaced |
 | `frontend-design` (installed) | **Not invoked** — overlaps `interface-design`, which CLAUDE.md designates primary for product UI. Two directions for one screen |
 
-## Flagged, NOT done (needs logic, not presentation)
+## Resolved since the first draft
 
-1. **Vault folder colours are hardcoded in component state**, not read from a
-   token map. Moving them onto `--category-*` is a data-shape change to how a
-   folder stores its colour.
-2. **Dark mode is re-derived in stage 2.** Tokens are in place; shadows barely
-   read on navy, so the dark board separates by lightness step instead. Doing it
-   now would double the review surface.
-3. **The reliability banner heading stays mono** — it was styled as a structural
-   label, and its copy was rewritten yesterday, so it is left alone.
+1. ~~Vault folder colours are hardcoded~~ — **wrong flag.** `folder-carousel`
+   already derives every cover from `var(--category-N)` and holds no hex. I wrote
+   that from the spec's expectation rather than from the file; corrected in the
+   spec rather than quietly dropped.
+2. **Dark mode** — done, and it needed no per-surface work (see above).
+3. **Slot-tinted shadows** — **cut** on review and parked in the spec. The most
+   distinctive idea in the proposal, which is exactly why it needed a reason
+   beyond being interesting.
+4. **The reliability banner heading stays mono** — styled as a structural label,
+   and its copy was rewritten separately, so it is left alone.
+
+## Deliberately unchanged
+
+**`elderly-today.tsx` is byte-identical to `main`** (`git diff main` is empty).
+The sweep script refuses it by filename: elderly sits in the same grep results as
+everything else, and that is precisely how it would have been swept up.
 
 ## Constraints held
 
