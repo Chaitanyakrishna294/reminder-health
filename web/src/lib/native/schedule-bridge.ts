@@ -204,6 +204,14 @@ declare global {
           doseResolved?: (options: { doses: ResolvedDose[] }) => Promise<{ applied: number }>;
           getActiveLadders?: () => Promise<{ ladders: ActiveLadder[] }>;
           /** Alarm backdrop + sound. Native owns the files — see AlarmMediaState. */
+          /** Water nudges. Optional: an APK older than 2026-08-14 has neither. */
+          syncWater?: (options: {
+            enabled: boolean;
+            goalCups: number;
+            cupsToday: number;
+            nudgeMinutes: number[];
+          }) => Promise<{ scheduled: number; cupsToday: number }>;
+          getWaterCount?: () => Promise<{ cupsToday: number }>;
           getAlarmMedia?: () => Promise<AlarmMediaState>;
           setAlarmImage?: (options: { choice: string }) => Promise<AlarmMediaState>;
           pickAlarmImage?: () => Promise<AlarmPickResult>;
@@ -383,6 +391,44 @@ export async function stopAlarmSoundPreview(): Promise<void> {
     await bridge.stopAlarmSoundPreview();
   } catch {
     /* stopping is best-effort; it self-stops anyway */
+  }
+}
+
+/**
+ * Push the hydration schedule to the device.
+ *
+ * The WEB computes the nudge times — including dropping the ones that clash with
+ * a dose — so the settings preview and the phone cannot disagree about when
+ * reminders arrive. Native only picks the next one, which it must be able to do
+ * with no network.
+ *
+ * Silent on every failure: water is the quiet tier, and a sync problem here must
+ * never surface as an error on a medication screen.
+ */
+export async function syncWaterToNative(opts: {
+  enabled: boolean;
+  goalCups: number;
+  cupsToday: number;
+  nudgeMinutes: number[];
+}): Promise<void> {
+  const bridge = window.Capacitor?.Plugins?.ScheduleBridge;
+  if (!isNativeApp() || !bridge?.syncWater) return;
+  try {
+    await bridge.syncWater(opts);
+  } catch (err) {
+    console.error('[ScheduleBridge] syncWater failed:', err);
+  }
+}
+
+/** Cups the DEVICE counted (from the notification's Taken), or null if it cannot say. */
+export async function getNativeWaterCount(): Promise<number | null> {
+  const bridge = window.Capacitor?.Plugins?.ScheduleBridge;
+  if (!isNativeApp() || !bridge?.getWaterCount) return null;
+  try {
+    const { cupsToday } = await bridge.getWaterCount();
+    return typeof cupsToday === 'number' ? cupsToday : null;
+  } catch {
+    return null;
   }
 }
 

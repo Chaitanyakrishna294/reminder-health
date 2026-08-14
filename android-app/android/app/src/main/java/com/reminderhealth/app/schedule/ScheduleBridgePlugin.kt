@@ -183,6 +183,8 @@ class ScheduleBridgePlugin : Plugin() {
             // that is not theirs -- the same failure clearSchedule exists
             // to prevent, verified on device 2026-08-11.
             runCatching { ScheduleDatabase.getInstance(context).pendingRetryDao().clearAll() }
+            // Hydration belongs to the account that set it up.
+            runCatching { WaterPrefs.clear(context); WaterNudge.cancel(context) }
 
             val stranded = runCatching {
                 ScheduleDatabase.getInstance(context).doseActionDao().allUnsynced().size
@@ -431,6 +433,45 @@ class ScheduleBridgePlugin : Plugin() {
             result.put("ladders", arr)
             call.resolve(result)
         }
+    }
+
+    /**
+     * `syncWater({ enabled, goalCups, cupsToday, nudgeMinutes })` — the web hands
+     * over the hydration schedule it already computed.
+     *
+     * The WEB computes the times (including dropping the ones that clash with a
+     * dose) so the settings preview and the phone cannot disagree; `WaterSchedule`
+     * exists on this side for picking the NEXT one with no network, and is
+     * fixture-matched to the TypeScript.
+     *
+     * `cupsToday` is the web's count taken as truth — last write wins, not
+     * "larger wins", the same rule the web sync uses and for the same reason:
+     * larger-wins makes undo impossible.
+     */
+    @PluginMethod
+    fun syncWater(call: PluginCall) {
+        val enabled = call.getBoolean("enabled") ?: false
+        val goalCups = call.getInt("goalCups") ?: 0
+        val minutes = call.getArray("nudgeMinutes")?.let { arr ->
+            (0 until arr.length()).mapNotNull { runCatching { arr.getInt(it) }.getOrNull() }
+        } ?: emptyList()
+
+        WaterPrefs.save(context, enabled, goalCups, minutes)
+        call.getInt("cupsToday")?.let { WaterPrefs.setCups(context, it) }
+        if (enabled) WaterNudge.schedule(context) else WaterNudge.cancel(context)
+
+        val result = JSObject()
+        result.put("scheduled", if (enabled) minutes.size else 0)
+        result.put("cupsToday", WaterPrefs.cupsToday(context))
+        call.resolve(result)
+    }
+
+    /** Today's count as the DEVICE has it — cups added from the notification. */
+    @PluginMethod
+    fun getWaterCount(call: PluginCall) {
+        val result = JSObject()
+        result.put("cupsToday", WaterPrefs.cupsToday(context))
+        call.resolve(result)
     }
 
     // -- ALARM MEDIA ---------------------------------------------------------
