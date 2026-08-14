@@ -242,9 +242,39 @@ are stale. Keep it updated when you add or move anything.
     ask about one dose while highlighting another.
   - **THE NATIVE ALARM IS THE THIRD SURFACE, and it obeys the same rule (2026-08-14).** One
     notification id per dose *instant*, one `singleInstance` `AlarmActivity` reading
-    `DosesAtInstant.rowsAt`, per-dose answering, the screen persisting until every dose is
-    answered or the screen is closed. `AlarmPrefs.elderly` (bridged from the web) is what makes
-    elderly ask one at a time there too.
+    `DosesAtInstant.rowsAt`, per-dose answering. `AlarmPrefs.elderly` (bridged from the web)
+    is what makes elderly ask one at a time there too.
+    - **THE FOCUSED LIST.** All same-instant doses are on screen, but exactly ONE is
+      active: it rings with big Taken/Skip, the rest sit below showing their state and
+      can be tapped to jump the queue in any order. Answering advances the focus; so
+      does running out of ring time, which **yields** — that dose stops taking the
+      screen's attention *without being resolved*, so its ladder and its missed notice
+      carry on as if the screen had never opened. When every dose has had its turn, the
+      screen closes. Four cards with two buttons each is eight equal choices at 3am, and
+      it also let one unanswered dose hold the screen while the other three were never
+      asked at all.
+    - **The rotation lives in `DoseFocus`, not the Activity.** A dose quietly dropped
+      from it is a dose never asked about, which on screen is indistinguishable from a
+      dose that was never due. An Activity cannot be unit-tested; three sets can.
+    - **Ring duration is `profiles.alarm_ring_seconds`, 60-300s, PER DOSE** — so a
+      handful of four at 2 minutes runs for 8. The setting says the total out loud
+      rather than leaving it to be discovered at 3am. Bridged like `elderly`.
+    - **The backdrop and the sound are DEVICE-LOCAL and belong to the PRESENTATION** —
+      one picture and one tone for the whole handful, never per row. Files live in
+      app-private storage (`AlarmMedia`), never Supabase, never a URL, so the alarm
+      shows and plays them in airplane mode with the process dead. Three bundled
+      gradients ship in the APK; a gallery pick is COPIED IN, so deleting the original
+      cannot break the alarm. **Contrast is structural**: every backdrop sits under the
+      same 55% black scrim and the buttons keep opaque fills, so no image can make them
+      hard to see. Picked images are decoded downsampled — a 50MP photo decoded whole is
+      an OOM on the one screen that must never crash.
+    - **This is the one bridge area where NATIVE owns the data.** The webview cannot
+      write to app-private storage, so the picker is Kotlin and the web only learns
+      which choice is active. See BRIDGE_CONTRACT.md §1c.
+    - **Global image/sound, not per medication** — decided 2026-08-14. Per-medication
+      override is half built already (`Medication.alarmAudioPath`/`alarmPhotoPath` in
+      Room v2, and the resolution order already prefers them); it needs a server column
+      and per-med UI, not a rewrite.
     - **The group is derived from the SCHEDULE, never from alarm state.** That is what makes a
       retry rung, a rung rebuilt after a reboot, and the original ring all compute the same
       group without knowing about each other. Asking "which alarms are pending" would be wrong

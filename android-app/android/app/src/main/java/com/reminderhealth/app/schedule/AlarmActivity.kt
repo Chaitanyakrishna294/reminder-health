@@ -48,30 +48,38 @@ import java.time.format.DateTimeFormatter
  * intent extras, so it works with no network and without the webview ever
  * starting.
  *
- * ## ONE SCREEN PER HANDFUL (the coalesced ring, 2026-08-14)
+ * ## THE FOCUSED LIST (2026-08-14)
  *
- * Doses at the same instant are asked about together and answered
- * independently. Four medications at 12:00 previously produced four alarms; on a
- * real device two fought for the full screen while the other two sat in the
- * shade. Now the notification carries one id per dose instant and this activity
- * is `singleInstance`, so there is exactly one screen, and it asks
- * [DosesAtInstant] who is still waiting rather than trusting whichever alarm
- * happened to arrive first.
+ * Doses at the same instant are one handful, and the whole handful is on screen —
+ * but only ONE dose is being asked about at a time. The focused dose rings with
+ * big Taken / Skip; the rest sit below it showing their state, and any of them
+ * can be tapped to jump the queue. Answering advances the focus. So does running
+ * out of ring time, which **yields**: that dose stops taking the screen's
+ * attention without being resolved, so its ladder and its missed notice carry on
+ * exactly as if the screen had never opened. When every dose has had its turn,
+ * the screen closes.
  *
- * Three properties this leans on, each load-bearing:
+ * The alternative — four cards each with two buttons — is eight equal choices at
+ * 3am, and the earlier version of it also let one unanswered dose hold the screen
+ * while the other three were never asked at all.
  *
- *  - **The group is derived from the SCHEDULE, not from alarm state.** A retry
- *    rung, a rung rebuilt after a reboot, and the original ring all compute the
- *    same group, so a rung joins its handful without knowing the handful exists.
- *  - **Answering is per dose and the screen persists.** An answered row turns
- *    into a confirmation and stays; the screen closes only when nothing is left.
- *  - **Closing with doses unanswered marks ONLY those doses unattended.** Their
- *    ladders keep running and their missed notice posts; the answered ones are
- *    answered. See [dismissUnattended].
+ * The rotation itself lives in [DoseFocus], not here: a dose quietly dropped from
+ * it is a dose never asked about, and on screen that is indistinguishable from a
+ * dose that was never due. An Activity cannot be unit-tested; three sets can.
  *
- * **Elderly asks one question at a time** ([AlarmPrefs.isElderly]) — the doses
- * are all still outstanding, the screen just shows them one at a time. That is
- * presentation only, the same split `ElderlyToday` keeps on the web.
+ * Two properties this leans on, both load-bearing:
+ *
+ *  - **The group is derived from the SCHEDULE, not from alarm state**
+ *    ([DosesAtInstant]). A retry rung, a rung rebuilt after a reboot, and the
+ *    original ring all compute the same handful, so a rung arriving mid-screen
+ *    re-presents exactly the still-unanswered subset without knowing anything
+ *    about what this screen has been doing.
+ *  - **Closing with doses unanswered marks ONLY those doses unattended.** The
+ *    missed notice re-reads the store, so answered doses are never chased.
+ *
+ * **Elderly reduces the list to the focused dose alone** ([AlarmPrefs.isElderly])
+ * — the same one-question rule `ElderlyToday` keeps on the web. Same mechanism,
+ * fewer elements: every dose is still outstanding and still laddering.
  *
  * **No wake lock, deliberately.** CLAUDE.md's rule is "any wake lock must be
  * released the moment the alarm is dismissed or auto-times-out" — the cleanest
@@ -86,9 +94,9 @@ import java.time.format.DateTimeFormatter
  * temporary lock for the broadcast, so there is no gap either.)
  *
  * Lifecycle discipline:
- *  - [releaseEverything] is called from every exit path (all doses answered,
- *    timeout, onDestroy) and is idempotent; it stops the looping audio and
- *    vibration, which ARE things that would otherwise outlive the screen;
+ *  - [releaseEverything] is called from every exit path and is idempotent; it
+ *    stops the looping audio and vibration, which ARE things that would otherwise
+ *    outlive the screen;
  *  - `FLAG_KEEP_SCREEN_ON` is dropped by the OS when the window goes away;
  *  - no service, no repeating alarm, nothing survives this screen.
  */
@@ -98,22 +106,8 @@ class AlarmActivity : Activity() {
         /** Mirrors src/constants.js SNOOZE_MINUTES so device and bot agree. */
         const val SNOOZE_MINUTES = 10
 
-        /**
-         * Auto-dismiss after this long without a tap. Matches CLAUDE.md's ~60s
-         * figure. An unanswered dose is NOT resolved here — the server pipeline
-         * still owns missed-dose escalation, exactly as it does for web-only
-         * users.
-         *
-         * **Re-armed on every answer.** A handful of four takes longer to answer
-         * than one dose does, and someone who has just tapped Taken is
-         * demonstrably present; timing them out mid-handful would leave the rest
-         * of the doses unasked with the patient standing right there. The window
-         * only ever counts silence.
-         */
-        private const val AUTO_DISMISS_MS = 60_000L
-
-        /** How long an answered dose's confirmation is shown before elderly advances. */
-        private const val ELDERLY_ADVANCE_MS = 900L
+        /** How long an answered dose's confirmation is shown before the focus moves on. */
+        private const val ADVANCE_MS = 800L
 
         /** How long "All done" stays up before the screen closes itself. */
         private const val ALL_DONE_MS = 1_100L
@@ -126,7 +120,7 @@ class AlarmActivity : Activity() {
     private var released = false
     private var closing = false
 
-    /** The dose instant this screen is asking about — the group's identity. */
+    /** The dose instant this screen is asking about — the handful's identity. */
     private var doseInstantIso: String? = null
 
     /**
@@ -136,44 +130,47 @@ class AlarmActivity : Activity() {
      */
     private var seed: DoseRow? = null
 
-    /** Every dose known at this instant, stable order, answered or not. */
-    private var allRows: List<DoseRow> = emptyList()
+    /** Every dose known at this instant, keyed by medication id. */
+    private var rows: Map<Long, DoseRow> = emptyMap()
 
-    /** medicationId → the action recorded for it, or null when answered elsewhere. */
-    private val answered = LinkedHashMap<Long, String?>()
+    /** Who is being asked, who has answered, who has had their turn. */
+    private val focus = DoseFocus()
 
     private var elderly = false
 
     /**
-     * Elderly is showing "✓ Taken" and will advance to the next dose on a timer.
+     * How long each dose rings before yielding. **Per dose, not per screen** — a
+     * handful of four at two minutes each can run for eight, which is why the
+     * setting's copy says "each medicine rings this long" rather than hiding the
+     * arithmetic. Bridged from the web ([AlarmPrefs.ringSeconds]); 60s until a
+     * sync says otherwise, which is the behaviour every existing device has.
+     */
+    private var ringMs = AlarmPrefs.RING_SECONDS_DEFAULT * 1000L
+
+    /**
+     * The backdrop and the sound belong to the ALARM, not to a row.
      *
-     * A refresh must not re-render over it. Recording an answer broadcasts
-     * ACTION_ANSWERED — including the answer just made HERE — so without this
-     * flag the confirmation would be replaced by the next dose within a few
-     * milliseconds, which reads as the tap having done nothing.
+     * A handful gets ONE picture and ONE tone: swapping either as the focus moves
+     * down the list would make the screen flicker and the sound stutter at the
+     * exact moment someone is trying to read a medicine name. Resolved once, in
+     * [startFor], and then left alone.
+     *
+     * Both are LOCAL — app-private storage, never a URL — so the alarm shows and
+     * plays them in airplane mode with the process dead. See [AlarmMedia].
      */
-    private var confirming = false
+    private var backdrop: AlarmMedia.Image = AlarmMedia.Image.None
+
+    /** True when a backdrop is actually on screen, so content switches to its over-photo treatment. */
+    private val onPhoto: Boolean get() = backdrop !is AlarmMedia.Image.None
 
     /**
-     * Family voice alarms (CLAUDE.md "Post-M2 features"). Null until that
-     * feature ships; both are LOCAL paths, verified readable before use, so a
-     * missing or deleted file falls back instead of breaking the alarm. For a
-     * handful, the first dose's personalisation stands for the group — one
-     * voice, one photo, one alarm.
-     */
-    private var audioFile: File? = null
-    private var photoFile: File? = null
-
-    /**
-     * A dose at this instant was just answered somewhere else — the
-     * notification's buttons ([DoseActionReceiver]), or the webview
+     * A dose at this instant was answered somewhere else — the notification's
+     * buttons ([DoseActionReceiver]), or the webview
      * ([ScheduleBridgePlugin.doseResolved], which is how a caregiver's remote
      * answer reaches the device).
      *
      * The screen REFRESHES rather than closing: one dose of four being answered
-     * elsewhere must not take the other three off the screen. It closes only
-     * when the refresh finds nothing left, which is the same rule every other
-     * path uses.
+     * elsewhere must not take the other three off the screen.
      */
     private val answeredElsewhere = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -207,15 +204,19 @@ class AlarmActivity : Activity() {
     /**
      * Another full-screen intent arrived while this screen was up.
      *
-     * Same instant (a second medication in the handful, or a retry rung) → just
-     * re-read the group. `singleInstance` is what routes it here instead of
+     * Same instant — a second medication in the handful, or a **retry rung** —
+     * re-reads the group. `singleInstance` is what routes it here instead of
      * stacking a second alarm screen, and it is the whole reason four
      * simultaneous alarms can no longer fight for the display.
      *
+     * A rung also un-yields the dose it is about. That is the point of a rung:
+     * the ladder promised to ask again, and a dose that already had its turn on
+     * this screen would otherwise be re-presented as still-unanswered but never
+     * actually asked.
+     *
      * DIFFERENT instant → the newer dose takes over, and the one being replaced
      * is retired honestly: its remaining doses get their missed notice and their
-     * ladders keep running. Leaving the old dose on screen while a new alarm
-     * rings underneath it is the failure this whole change exists to remove.
+     * ladders keep running.
      */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -223,6 +224,12 @@ class AlarmActivity : Activity() {
         setIntent(intent)
 
         if (incoming != null && incoming == doseInstantIso) {
+            val ringingFor = intent.getLongExtra(AlarmScheduler.EXTRA_MEDICATION_ID, -1L)
+            if (ringingFor > 0L && ringingFor !in focus.answered) {
+                Log.i(AlarmScheduler.TAG, "a rung for med $ringingFor arrived mid-screen; giving it the focus")
+                focus.focusOn(ringingFor)
+                armRingWindow()
+            }
             refreshFromStore()
             return
         }
@@ -236,28 +243,32 @@ class AlarmActivity : Activity() {
     private fun startFor(intent: Intent) {
         val medicationId = intent.getLongExtra(AlarmScheduler.EXTRA_MEDICATION_ID, -1L)
         doseInstantIso = intent.getStringExtra(AlarmScheduler.EXTRA_SCHEDULED_FOR)
-        audioFile = readableFileOrNull(intent.getStringExtra(AlarmScheduler.EXTRA_AUDIO_PATH), "audio")
-        photoFile = readableFileOrNull(intent.getStringExtra(AlarmScheduler.EXTRA_PHOTO_PATH), "photo")
         seed = DoseRow(
             medicationId = medicationId,
             drugName = intent.getStringExtra(AlarmScheduler.EXTRA_DRUG_NAME) ?: getString(R.string.alarm_tap_to_open),
             doseLabel = intent.getStringExtra(AlarmScheduler.EXTRA_DOSE_LABEL),
-            audioPath = audioFile?.absolutePath,
-            photoPath = photoFile?.absolutePath,
+            audioPath = intent.getStringExtra(AlarmScheduler.EXTRA_AUDIO_PATH),
+            photoPath = intent.getStringExtra(AlarmScheduler.EXTRA_PHOTO_PATH),
         )
+        // The per-medication paths carried by the alarm are the OVERRIDE slot and
+        // are null in this phase; AlarmMedia falls through to the user's global
+        // choice, then to no backdrop / the system tone.
+        backdrop = AlarmMedia.resolveImage(this, seed?.photoPath)
 
         elderly = AlarmPrefs.isElderly(this)
-        answered.clear()
-        allRows = listOfNotNull(seed)
+        ringMs = AlarmPrefs.ringSeconds(this) * 1000L
+        rows = seed?.let { mapOf(it.medicationId to it) } ?: emptyMap()
+        focus.answered.clear()
+        focus.yielded.clear()
+        focus.setOrder(rows.keys.toList())
+        focus.advance()
         closing = false
-        // A hand-over to a different dose must not inherit the previous one's
-        // pending confirmation, which would leave the new dose unrendered.
         confirming = false
 
         Log.i(
             AlarmScheduler.TAG,
             "AlarmActivity shown for the dose due $doseInstantIso, seeded with med $medicationId " +
-                "[voice=${audioFile != null}, photo=${photoFile != null}, elderly=$elderly]",
+                "[elderly=$elderly, ring=${ringMs / 1000}s per dose, backdrop=$backdrop]",
         )
 
         bindChrome()
@@ -265,20 +276,20 @@ class AlarmActivity : Activity() {
         startRinging()
 
         // The seed is one dose; the handful may be four. Ask the store who else
-        // is waiting at this instant and re-render — always, because the seed is
-        // also the ONLY thing known if that read fails.
+        // is waiting at this instant — always, because the seed is also the ONLY
+        // thing known if that read fails.
         refreshFromStore()
     }
 
-    // -- THE GROUP -----------------------------------------------------------
+    // -- THE HANDFUL ---------------------------------------------------------
 
     /**
      * Re-read who is still waiting and re-render.
      *
-     * Merges rather than replaces: a dose that has dropped out of the store's
-     * unanswered set has been ANSWERED (here, on the notification, or on the
-     * web), so it becomes a confirmation row instead of disappearing from a list
-     * the patient is working through.
+     * `rowsAt` returns UNANSWERED doses only, so this is also the proof that a
+     * rung re-presents the right subset: anything already answered simply is not
+     * in the result. [DoseFocus.answeredElsewhere] then records the ones this
+     * screen knew about that have since dropped out.
      */
     private fun refreshFromStore() {
         val instant = doseInstantIso
@@ -288,30 +299,42 @@ class AlarmActivity : Activity() {
             if (instant != doseInstantIso) return@launch // a newer dose took over mid-read
             val outstandingIds = outstanding.map { it.medicationId }.toSet()
 
-            allRows = (allRows + outstanding).distinctBy { it.medicationId }.sortedBy { it.medicationId }
-            allRows.forEach { row ->
-                if (row.medicationId !in outstandingIds && !answered.containsKey(row.medicationId)) {
-                    // Answered somewhere this screen did not see, so the outcome
-                    // is unknown to it — say "recorded", never guess Taken.
-                    answered[row.medicationId] = null
-                }
+            // Anything this screen knew about that is no longer outstanding was
+            // answered somewhere it could not see. Recorded as an unknown outcome
+            // — "✓ Recorded", never a guessed Taken.
+            rows.keys.filter { it !in outstandingIds }.forEach { focus.answeredElsewhere(it) }
+
+            rows = (rows + outstanding.associateBy { it.medicationId })
+                .filterKeys { it in outstandingIds || it in focus.answered }
+            focus.setOrder(rows.keys.sorted())
+
+            if (focus.focused == null && !confirming) {
+                if (focus.advance() != null) armRingWindow()
             }
 
             when {
-                outstanding.isEmpty() -> allAnswered()
-                // The pending advance will render; see [confirming].
-                confirming -> Unit
+                focus.isFinished() && focus.outstanding().isEmpty() -> allAnswered()
+                confirming -> Unit // the pending advance will render; see [confirming]
+                focus.isFinished() -> finishHandful()
                 else -> render()
             }
         }
     }
 
-    private fun outstandingRows(): List<DoseRow> = allRows.filter { !answered.containsKey(it.medicationId) }
+    /**
+     * Showing "✓ Taken" and about to move the focus on.
+     *
+     * A refresh must not re-render over it: recording an answer broadcasts
+     * ACTION_ANSWERED — including the answer just made HERE — so without this the
+     * confirmation would be replaced within milliseconds, which reads as the tap
+     * having done nothing.
+     */
+    private var confirming = false
 
     // -- RENDERING -----------------------------------------------------------
 
     private fun bindChrome() {
-        bindPhoto()
+        bindBackdrop()
 
         // Eyebrow shows the dose's own scheduled LOCAL time, not "now" — if the
         // phone was asleep and the alarm is a moment late, the honest answer is
@@ -334,19 +357,15 @@ class AlarmActivity : Activity() {
         val list = findViewById<LinearLayout>(R.id.alarm_dose_list)
         list.removeAllViews()
 
-        val outstanding = outstandingRows()
-        val total = allRows.size
-        // ELDERLY IS THE ONLY DENSITY THAT NARROWS THE SCREEN, and it narrows
-        // presentation only: every dose is still outstanding, still laddering,
-        // still answerable — it is asked about one at a time.
-        val visible = if (elderly) outstanding.take(1) else outstanding
-        val solo = elderly || total <= 1
+        val ordered = rows.keys.sorted().mapNotNull { rows[it] }
+        val total = ordered.size
+        val focusedId = focus.focused
 
         val count = findViewById<TextView>(R.id.alarm_group_count)
         when {
             total <= 1 -> count.visibility = View.GONE
             elderly -> {
-                count.text = getString(R.string.alarm_group_progress, answered.size + 1, total)
+                count.text = getString(R.string.alarm_group_progress, focus.answered.size + 1, total)
                 count.visibility = View.VISIBLE
             }
             else -> {
@@ -356,32 +375,31 @@ class AlarmActivity : Activity() {
         }
 
         val inflater = LayoutInflater.from(this)
-
-        // Confirmations first and in place, so the handful reads top-to-bottom as
-        // "done, done, still to do" rather than reshuffling under a thumb.
-        if (!elderly) {
-            allRows.filter { answered.containsKey(it.medicationId) }.forEach { row ->
-                list.addView(answeredView(inflater, list, row, answered[row.medicationId]))
-            }
-        }
+        // Elderly is a PURE one-question screen: the list reduces to the focused
+        // dose. Every other dose is still outstanding and still laddering — it is
+        // only the presentation that narrows.
+        val visible = if (elderly) ordered.filter { it.medicationId == focusedId } else ordered
 
         visible.forEach { row ->
-            list.addView(doseView(inflater, list, row, solo))
+            val view = when {
+                row.medicationId == focusedId -> focusedView(inflater, list, row, solo = elderly || total <= 1)
+                else -> quietView(inflater, list, row)
+            }
+            list.addView(view)
         }
 
         findViewById<Button>(R.id.alarm_snooze).visibility =
-            if (outstanding.isEmpty()) View.GONE else View.VISIBLE
+            if (focus.outstanding().isEmpty()) View.GONE else View.VISIBLE
     }
 
     /**
-     * One actionable dose. [solo] picks the layout, and that is the entire
-     * difference between the two presentations — the ids and this binding are
-     * shared, so a group row and a single dose can never grow different
-     * behaviour.
+     * The dose being asked about. [solo] picks the full-screen presentation (one
+     * dose, or elderly) over the in-list card; both carry the same ids, so this
+     * one binding covers them and the two cannot drift.
      */
-    private fun doseView(inflater: LayoutInflater, parent: ViewGroup, row: DoseRow, solo: Boolean): View {
+    private fun focusedView(inflater: LayoutInflater, parent: ViewGroup, row: DoseRow, solo: Boolean): View {
         val view = inflater.inflate(
-            if (solo) R.layout.alarm_dose_solo else R.layout.alarm_dose_grouped,
+            if (solo) R.layout.alarm_dose_solo else R.layout.alarm_dose_focused,
             parent,
             false,
         )
@@ -405,55 +423,123 @@ class AlarmActivity : Activity() {
         view.findViewById<Button>(R.id.dose_taken).setOnClickListener { answer(row, DoseAction.ACTION_TAKEN) }
         view.findViewById<Button>(R.id.dose_skip).setOnClickListener { answer(row, DoseAction.ACTION_SKIP) }
 
-        if (photoFile != null) {
-            val onPhoto = Color.WHITE
-            view.findViewById<TextView>(R.id.dose_name).setTextColor(onPhoto)
-            view.findViewById<TextView>(R.id.dose_amount).setTextColor(onPhoto)
+        if (onPhoto) {
+            if (!solo) view.setBackgroundResource(R.drawable.bg_alarm_card_focused_on_photo)
+            view.findViewById<TextView>(R.id.dose_name).setTextColor(Color.WHITE)
+            view.findViewById<TextView>(R.id.dose_amount).setTextColor(Color.WHITE)
         }
         return view
     }
 
-    private fun answeredView(inflater: LayoutInflater, parent: ViewGroup, row: DoseRow, action: String?): View {
-        val view = inflater.inflate(R.layout.alarm_dose_answered, parent, false)
-        view.findViewById<TextView>(R.id.dose_verdict).text = when (action) {
-            DoseAction.ACTION_TAKEN -> getString(R.string.alarm_recorded_taken)
-            DoseAction.ACTION_SKIP -> getString(R.string.alarm_recorded_skipped)
-            else -> getString(R.string.alarm_recorded)
+    /** Waiting, not-answered, or already recorded — see alarm_dose_quiet.xml. */
+    private fun quietView(inflater: LayoutInflater, parent: ViewGroup, row: DoseRow): View {
+        val view = inflater.inflate(R.layout.alarm_dose_quiet, parent, false)
+        val id = row.medicationId
+        val isAnswered = focus.answered.containsKey(id)
+
+        val verdict = view.findViewById<TextView>(R.id.dose_verdict)
+        when {
+            focus.answered[id] == DoseAction.ACTION_TAKEN -> {
+                verdict.text = getString(R.string.alarm_recorded_taken)
+                verdict.setTextColor(ContextCompat.getColor(this, R.color.verdict_taken))
+            }
+            focus.answered[id] == DoseAction.ACTION_SKIP -> {
+                verdict.text = getString(R.string.alarm_recorded_skipped)
+                verdict.setTextColor(ContextCompat.getColor(this, R.color.verdict_taken))
+            }
+            isAnswered -> {
+                verdict.text = getString(R.string.alarm_recorded)
+                verdict.setTextColor(ContextCompat.getColor(this, R.color.verdict_taken))
+            }
+            id in focus.yielded -> {
+                verdict.text = getString(R.string.alarm_not_answered)
+                verdict.setTextColor(ContextCompat.getColor(this, R.color.verdict_waiting))
+            }
+            else -> {
+                verdict.text = getString(R.string.alarm_waiting)
+                verdict.setTextColor(ContextCompat.getColor(this, R.color.alarm_ink_muted))
+            }
         }
+
         view.findViewById<TextView>(R.id.dose_name).text = row.drugName
+        view.findViewById<TextView>(R.id.dose_amount).apply {
+            text = row.doseLabel ?: ""
+            visibility = if (row.doseLabel.isNullOrBlank()) View.GONE else View.VISIBLE
+        }
+
+        if (onPhoto) {
+            view.findViewById<TextView>(R.id.dose_name).setTextColor(Color.WHITE)
+            view.findViewById<TextView>(R.id.dose_amount).setTextColor(Color.WHITE)
+        }
+
+        if (isAnswered) {
+            // Inert. Correcting a dose is a judgement about the past and belongs
+            // on the caregiver's history surface, not a 3am alarm screen.
+            view.setBackgroundResource(
+                if (onPhoto) R.drawable.bg_alarm_card_on_photo else R.drawable.bg_alarm_card_quiet,
+            )
+        } else {
+            view.setBackgroundResource(
+                if (onPhoto) R.drawable.bg_alarm_card_on_photo else R.drawable.bg_alarm_card,
+            )
+            view.contentDescription = "${row.drugName}. ${getString(R.string.alarm_tap_to_answer)}"
+            view.setOnClickListener {
+                // ANY ORDER. A handful is not a queue, and the medicine you can
+                // reach first is a perfectly good one to answer first.
+                focus.focusOn(id)
+                armRingWindow()
+                render()
+            }
+        }
         return view
     }
 
     /**
-     * Shows the care-circle photo full-screen when one is present, and flips the
-     * text to white over the scrim so it stays readable against an arbitrary
-     * photo. With no photo, nothing changes — the default alarm keeps its own
-     * light palette.
+     * Draws the chosen backdrop behind everything, under a fixed scrim.
+     *
+     * THE SCRIM IS NOT DECORATION. A user-chosen photograph is arbitrary — it can
+     * be bright, busy, or light-on-light — so text over it needs a guaranteed
+     * floor rather than the hope that the picture cooperates. Every backdrop,
+     * bundled or picked, gets the same 55% black, which is what lets white text
+     * clear 4.5:1 without anyone checking each image.
+     *
+     * The BUTTONS are a separate guarantee: they keep their own opaque fills, so
+     * no photograph can affect their contrast at all.
      */
-    private fun bindPhoto() {
-        val file = photoFile
+    private fun bindBackdrop() {
         val photo = findViewById<ImageView>(R.id.alarm_photo)
         val scrim = findViewById<View>(R.id.alarm_photo_scrim)
-        if (file == null) {
-            photo.visibility = View.GONE
-            scrim.visibility = View.GONE
-            return
+
+        when (val image = backdrop) {
+            is AlarmMedia.Image.None -> {
+                photo.visibility = View.GONE
+                scrim.visibility = View.GONE
+                return
+            }
+            is AlarmMedia.Image.Bundled -> photo.setImageResource(image.resId)
+            is AlarmMedia.Image.Local -> {
+                // Downsampled: a 50-megapixel gallery photo decoded whole is an
+                // OutOfMemoryError on a cheap phone, on the one screen that must
+                // never crash. The picker puts exactly that file one tap away.
+                val metrics = resources.displayMetrics
+                val bitmap = AlarmMedia.decodeSampled(image.file, metrics.widthPixels, metrics.heightPixels)
+                if (bitmap == null) {
+                    Log.w(AlarmScheduler.TAG, "alarm backdrop could not be decoded — falling back to none")
+                    backdrop = AlarmMedia.Image.None
+                    photo.visibility = View.GONE
+                    scrim.visibility = View.GONE
+                    return
+                }
+                photo.setImageBitmap(bitmap)
+            }
         }
 
-        val bitmap = runCatching { BitmapFactory.decodeFile(file.absolutePath) }.getOrNull()
-        if (bitmap == null) {
-            Log.w(AlarmScheduler.TAG, "photo at ${file.absolutePath} could not be decoded — using default")
-            photoFile = null
-            return
-        }
-
-        photo.setImageBitmap(bitmap)
         photo.visibility = View.VISIBLE
         scrim.visibility = View.VISIBLE
 
-        val onPhoto = Color.WHITE
-        findViewById<TextView>(R.id.alarm_eyebrow).setTextColor(onPhoto)
-        findViewById<TextView>(R.id.alarm_group_count).setTextColor(onPhoto)
+        val ink = Color.WHITE
+        findViewById<TextView>(R.id.alarm_eyebrow).setTextColor(ink)
+        findViewById<TextView>(R.id.alarm_group_count).setTextColor(ink)
     }
 
     /**
@@ -472,50 +558,65 @@ class AlarmActivity : Activity() {
     // -- ANSWERING -----------------------------------------------------------
 
     /**
-     * Taken / Skip for ONE dose. The other doses in the handful are untouched:
-     * their ladders keep running, their rows stay on screen, and the alarm keeps
-     * ringing until the last one is answered.
+     * Taken / Skip for ONE dose. The others in the handful are untouched: their
+     * ladders keep running and the alarm keeps ringing until the last one has had
+     * its turn.
      */
     private fun answer(row: DoseRow, action: String) {
-        if (answered.containsKey(row.medicationId)) return
-        answered[row.medicationId] = action
+        val id = row.medicationId
+        if (focus.answered.containsKey(id)) return
         enqueue(row, action)
 
-        // The person is demonstrably here, so the silence timer starts again.
-        armAutoDismiss()
-
-        if (outstandingRows().isEmpty()) {
+        val next = focus.answer(id, action)
+        if (next == null && focus.outstanding().isEmpty()) {
             allAnswered()
             return
         }
 
-        if (elderly) {
-            // One question at a time: show what was just recorded, then the next
-            // dose. Advancing instantly would make four taps feel like one
-            // mis-registered tap.
-            showElderlyConfirmationThenAdvance(row, action)
-        } else {
-            render()
-        }
-    }
-
-    private fun showElderlyConfirmationThenAdvance(row: DoseRow, action: String) {
-        val list = findViewById<LinearLayout>(R.id.alarm_dose_list)
-        list.removeAllViews()
-        list.addView(answeredView(LayoutInflater.from(this), list, row, action))
-        findViewById<Button>(R.id.alarm_snooze).visibility = View.GONE
+        // Confirm on the row before the focus moves. Advancing instantly makes
+        // four taps feel like one mis-registered tap.
         confirming = true
-        // postDelayed, not removeCallbacks-then-post: armAutoDismiss() has
-        // already cleared the queue and re-armed the silence timer by the time
-        // this runs, so this advance is the only other thing pending.
+        render()
+        handler.removeCallbacksAndMessages(null)
         handler.postDelayed({
             confirming = false
-            if (!closing) render()
-        }, ELDERLY_ADVANCE_MS)
+            if (closing) return@postDelayed
+            if (focus.focused == null) finishHandful() else { armRingWindow(); render() }
+        }, ADVANCE_MS)
     }
 
     /**
-     * Every dose in the handful is answered. Stop ringing immediately, show it,
+     * The focused dose's ring window expired.
+     *
+     * It YIELDS — not resolved, not recorded, no outcome invented. Its ladder
+     * keeps running and it will be in the missed notice; it simply stops holding
+     * the screen so the next dose can be asked. Before this existed, one
+     * unanswered dose meant the rest of the handful was never asked at all.
+     */
+    private fun onRingWindowExpired() {
+        val yielded = focus.focused
+        val next = focus.yieldFocus()
+        Log.i(
+            AlarmScheduler.TAG,
+            "med $yielded rang ${ringMs / 1000}s with no answer — yielding to " +
+                (next?.let { "med $it" } ?: "nothing; the handful is done"),
+        )
+        if (next == null) finishHandful() else { armRingWindow(); render() }
+    }
+
+    /**
+     * Every dose has had its turn. Some may still be unanswered — that is exactly
+     * what the missed notice and the server escalation ladder are for.
+     */
+    private fun finishHandful() {
+        if (closing) return
+        closing = true
+        Log.i(AlarmScheduler.TAG, "every dose due $doseInstantIso has had its turn; closing")
+        dismissUnattended()
+    }
+
+    /**
+     * Every dose in the handful is ANSWERED. Stop ringing immediately, show it,
      * and close.
      *
      * The notification is cleared by [DoseActionQueue.record], which every answer
@@ -546,12 +647,13 @@ class AlarmActivity : Activity() {
      *    device-only snooze would produce a false escalation alert — which is
      *    why `snooze_reminder_event` exists at all.
      *
-     * ONE BUTTON FOR THE HANDFUL, and only for what is still outstanding.
-     * "Not now" means the same thing whether it covers one medicine or four, and
-     * a dose already answered is not un-answered by deferring the rest.
+     * ONE BUTTON FOR THE HANDFUL, and only for what is still outstanding —
+     * including doses that already yielded. "Not now" means the same thing
+     * whether it covers one medicine or four, and a dose already answered is not
+     * un-answered by deferring the rest.
      */
     private fun snoozeRemaining() {
-        val remaining = outstandingRows()
+        val remaining = focus.outstanding().mapNotNull { rows[it] }
         if (remaining.isEmpty()) return
 
         val fireAt = Instant.now().plusSeconds(SNOOZE_MINUTES * 60L)
@@ -621,17 +723,16 @@ class AlarmActivity : Activity() {
     // -- LEAVING -------------------------------------------------------------
 
     /**
-     * Nobody answered — auto-timeout, or the alarm stopped being visible.
+     * The screen is over with doses unanswered — every dose had its turn, the
+     * window was closed, or the alarm stopped being visible.
      *
      * Crucially this does NOT just cancel the notification and vanish, which is
      * what the old dismiss()-on-timeout did: a patient who slept through a dose
      * woke to no trace of it at all. The ringing alarm notification is replaced
      * with a quiet, persistent "Missed" notice so the reminder survives.
      *
-     * **Only the doses still unanswered are affected.** Answering two of four
-     * and walking away leaves those two answered and the other two chased — the
-     * unanswered ones keep their ladders and get the missed notice, and nothing
-     * re-opens a question the patient already closed.
+     * **Only the doses still unanswered are affected.** Answering two of four and
+     * walking away leaves those two answered and the other two chased.
      *
      * Those doses are deliberately left UNRESOLVED — the server pipeline still
      * owns missed-dose escalation, exactly as it does for web-only users.
@@ -680,35 +781,45 @@ class AlarmActivity : Activity() {
         )
     }
 
-    /** Sound, vibration and the silence timer — re-armable, for the hand-over case. */
+    /** Sound, vibration and the first ring window — re-armable, for the hand-over case. */
     private fun startRinging() {
         released = false
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         startAlarmSound()
         startVibration()
-        armAutoDismiss()
+        armRingWindow()
     }
 
-    private fun armAutoDismiss() {
+    /**
+     * Start (or restart) the focused dose's ring window.
+     *
+     * postDelayed on the MAIN looper is correct here specifically because this
+     * activity keeps the screen on: uptimeMillis (which postDelayed uses) only
+     * stalls in deep sleep, and the device cannot be in deep sleep while this
+     * window is visible. So the timeout is guaranteed to run — including over the
+     * lock screen, which is just a normal visible window as far as the looper is
+     * concerned.
+     */
+    private fun armRingWindow() {
         handler.removeCallbacksAndMessages(null)
-        // Unattended-alarm safety net. postDelayed on the MAIN looper is correct
-        // here specifically because this activity keeps the screen on:
-        // uptimeMillis (which postDelayed uses) only stalls in deep sleep, and
-        // the device cannot be in deep sleep while this window is visible. So the
-        // timeout is guaranteed to run — including over the lock screen, which is
-        // just a normal visible window as far as the looper is concerned.
-        handler.postDelayed({
-            Log.i(AlarmScheduler.TAG, "alarm auto-dismissed after ${AUTO_DISMISS_MS}ms of silence")
-            dismissUnattended()
-        }, AUTO_DISMISS_MS)
+        handler.postDelayed({ onRingWindowExpired() }, ringMs)
     }
 
+    /**
+     * ONE sound for the whole handful, started once.
+     *
+     * Deliberately not per row: restarting the tone each time the focus moves
+     * would stutter the alarm down the list, at exactly the moment someone is
+     * trying to read a medicine name.
+     */
     private fun startAlarmSound() {
-        if (player != null) return
+        playAlarm(AlarmMedia.resolveSound(this, seed?.audioPath))
+    }
+
+    private fun playAlarm(localVoice: File?) {
         // A care-circle voice recording wins over the default tone when one is
         // on disk. Local file only — never a stream, so this works in airplane
         // mode (CLAUDE.md's non-negotiable for the voice feature).
-        val localVoice = audioFile
         val uri = if (localVoice != null) {
             Uri.fromFile(localVoice)
         } else {
@@ -804,8 +915,8 @@ class AlarmActivity : Activity() {
 
     /**
      * Back is deliberately inert: an alarm should be answered, not swiped away
-     * by accident while half asleep. The 60s auto-dismiss is the escape hatch,
-     * so this can never trap anyone.
+     * by accident while half asleep. The per-dose ring window is the escape
+     * hatch, so this can never trap anyone.
      */
     @Deprecated("Activity.onBackPressed is deprecated; intentional no-op for an alarm screen")
     override fun onBackPressed() {

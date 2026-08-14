@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The dose being asked about right now. A stronger border than the plain card,
+     not a coloured fill: the accent belongs to the Taken button, and two accents
+     on one screen is exactly what the one-accent rule exists to prevent. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="#FFFFFF" />
+    <corners android:radius="24dp" />
+    <stroke android:width="2dp" android:color="@color/alarm_primary" />
+</shape>

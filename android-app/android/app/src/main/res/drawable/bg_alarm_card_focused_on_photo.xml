@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The dose being asked about, over a backdrop. Darker than the quiet rows so
+     the focused medicine still separates from the picture, and it keeps the
+     accent border so "which one am I answering" survives any photograph.
+
+     The BUTTONS inside it stay fully opaque — that is what makes the contrast
+     floor independent of whatever image the user chose. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="#73000000" />
+    <corners android:radius="24dp" />
+    <stroke android:width="2dp" android:color="@color/alarm_primary" />
+</shape>

@@ -120,6 +120,45 @@ export interface ActiveLadder {
   scheduledFor: string;
 }
 
+/**
+ * The alarm's backdrop and sound.
+ *
+ * **Native owns the files, and this direction is the reverse of every other
+ * bridge value.** `elderly` and `ringSeconds` are web data the device mirrors;
+ * these are device data the web displays. The webview cannot write to Android
+ * app-private storage, and the alarm has to show its picture and play its sound
+ * in airplane mode with the app process dead — so the picker runs in Kotlin, the
+ * bytes are copied there, and the web only ever learns which choice is active.
+ *
+ * That copy is also what makes "delete the original from your gallery" safe: the
+ * alarm never refers to the picked file again.
+ *
+ * GLOBAL, not per medication (2026-08-14) — one picture and one sound for every
+ * alarm. A per-medication override is the natural next step and is already half
+ * built: `Medication.alarmAudioPath`/`alarmPhotoPath` exist in Room, the alarm
+ * already prefers them, and what is missing is somewhere to set them (per-med UI,
+ * a server column, a migration). Global costs nothing later — the resolution
+ * order IS the override's mechanism, with one of its two inputs populated.
+ */
+export interface AlarmMediaState {
+  /** A bundled key (see `bundled`), `custom`, or `none`. */
+  imageChoice: string;
+  /** `default` (the system alarm tone) or `custom`. */
+  soundChoice: string;
+  /** Keys of the images shipped inside the APK, in display order. */
+  bundled: string[];
+  hasCustomImage: boolean;
+  hasCustomSound: boolean;
+}
+
+/** `picked: false` means the user cancelled the file picker — not an error. */
+export interface AlarmPickResult {
+  picked: boolean;
+  imageChoice?: string;
+  soundChoice?: string;
+  error?: string;
+}
+
 /** Android hardware back button payload — see lib/native/app-bridge.ts. */
 export interface BackButtonEvent {
   /** Capacitor's own read of whether the webview has history to pop. */
@@ -154,6 +193,7 @@ declare global {
             medications: MedicationPayload[];
             userId?: string;
             elderly?: boolean;
+            ringSeconds?: number;
           }) => Promise<{ synced: number; canScheduleExactAlarms: boolean }>;
           /**
            * Optional: an APK older than 2026-08-14 has neither. Every caller must
@@ -163,6 +203,12 @@ declare global {
            */
           doseResolved?: (options: { doses: ResolvedDose[] }) => Promise<{ applied: number }>;
           getActiveLadders?: () => Promise<{ ladders: ActiveLadder[] }>;
+          /** Alarm backdrop + sound. Native owns the files — see AlarmMediaState. */
+          getAlarmMedia?: () => Promise<AlarmMediaState>;
+          setAlarmImage?: (options: { choice: string }) => Promise<AlarmMediaState>;
+          pickAlarmImage?: () => Promise<AlarmPickResult>;
+          pickAlarmSound?: () => Promise<AlarmPickResult>;
+          clearAlarmSound?: () => Promise<AlarmMediaState>;
           clearSchedule: () => Promise<{
             cleared: boolean;
             syncedBeforeClear: number;
@@ -228,6 +274,13 @@ export async function syncScheduleToNative(
    * at a time instead of as a list.
    */
   elderly?: boolean,
+  /**
+   * How long EACH dose rings before the alarm screen moves on to the next one in
+   * the same handful. `profiles.alarm_ring_seconds`; undefined leaves whatever
+   * the device already has, so an APK newer than the migration keeps its 60s
+   * default rather than being reset by an absent field.
+   */
+  ringSeconds?: number,
 ): Promise<{ synced: number; canScheduleExactAlarms: boolean } | null> {
   if (!isNativeApp()) return null;
   const bridge = window.Capacitor?.Plugins?.ScheduleBridge;
@@ -235,7 +288,7 @@ export async function syncScheduleToNative(
   // userId keys the native store to one identity. Without it, signing in as a
   // guest left the previous account's medications in place and ringing for
   // doses the current user doesn't have (found on-device 2026-08-11).
-  return bridge.syncSchedule({ medications, userId, elderly });
+  return bridge.syncSchedule({ medications, userId, elderly, ringSeconds });
 }
 
 /**
@@ -262,6 +315,50 @@ export async function notifyNativeDoseResolved(doses: ResolvedDose[]): Promise<v
   } catch (err) {
     console.error('[ScheduleBridge] doseResolved failed:', err);
   }
+}
+
+/**
+ * The alarm's current backdrop and sound, or null when this device cannot say —
+ * a browser, or an APK older than the media picker. Null means "do not render
+ * the section", never "no image chosen": showing "None selected" to someone
+ * whose alarm has a picture would invite them to fix something that is not
+ * broken.
+ */
+export async function getAlarmMedia(): Promise<AlarmMediaState | null> {
+  if (!isNativeApp()) return null;
+  const bridge = window.Capacitor?.Plugins?.ScheduleBridge;
+  if (!bridge?.getAlarmMedia) return null;
+  try {
+    return await bridge.getAlarmMedia();
+  } catch (err) {
+    console.error('[ScheduleBridge] getAlarmMedia failed:', err);
+    return null;
+  }
+}
+
+export async function setAlarmImage(choice: string): Promise<AlarmMediaState | null> {
+  const bridge = window.Capacitor?.Plugins?.ScheduleBridge;
+  if (!isNativeApp() || !bridge?.setAlarmImage) return null;
+  return bridge.setAlarmImage({ choice });
+}
+
+/** Opens Android's document picker. Resolves with `picked: false` if cancelled. */
+export async function pickAlarmImage(): Promise<AlarmPickResult> {
+  const bridge = window.Capacitor?.Plugins?.ScheduleBridge;
+  if (!isNativeApp() || !bridge?.pickAlarmImage) return { picked: false };
+  return bridge.pickAlarmImage();
+}
+
+export async function pickAlarmSound(): Promise<AlarmPickResult> {
+  const bridge = window.Capacitor?.Plugins?.ScheduleBridge;
+  if (!isNativeApp() || !bridge?.pickAlarmSound) return { picked: false };
+  return bridge.pickAlarmSound();
+}
+
+export async function clearAlarmSound(): Promise<AlarmMediaState | null> {
+  const bridge = window.Capacitor?.Plugins?.ScheduleBridge;
+  if (!isNativeApp() || !bridge?.clearAlarmSound) return null;
+  return bridge.clearAlarmSound();
 }
 
 /**

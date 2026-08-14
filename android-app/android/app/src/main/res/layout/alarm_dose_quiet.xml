@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Every dose in the handful that is NOT the one being asked about right now.
+
+  One layout for all three of the quiet states, because they differ only in the
+  word on the left and whether the row does anything when tapped:
+
+    waiting       "Waiting"       tappable  — jump the queue, any order
+    not answered  "Not answered"  tappable  — its window passed; tap for another
+    answered      "✓ Taken" / "✓ Skipped" / "✓ Recorded"   inert
+
+  ANSWERED ROWS STAY. Watching a row vanish after you tap Taken leaves you
+  counting what is left to work out whether the tap registered. It is also the
+  only receipt the patient gets — the queue write is invisible and the server may
+  be hours away.
+
+  Answered rows are deliberately NOT tappable: correcting a dose is a judgement
+  about the past and belongs on the caregiver's history surface, not on a 3am
+  alarm screen.
+
+  56dp minimum height, above the 44dp floor, because these are real tap targets
+  for someone half awake.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:minHeight="56dp"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:layout_marginTop="8dp"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    android:paddingTop="12dp"
+    android:paddingBottom="12dp">
+
+    <TextView
+        android:id="@+id/dose_verdict"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        android:textColor="@color/verdict_taken" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_weight="1"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/dose_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="17sp"
+            android:textStyle="bold"
+            android:textColor="@color/alarm_ink" />
+
+        <TextView
+            android:id="@+id/dose_amount"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="14sp"
+            android:textColor="@color/alarm_ink_muted" />
+    </LinearLayout>
+</LinearLayout>

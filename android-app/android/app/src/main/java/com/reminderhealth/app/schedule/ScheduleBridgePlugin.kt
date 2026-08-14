@@ -1,11 +1,16 @@
 package com.reminderhealth.app.schedule
 
+import android.app.Activity
+import android.content.Intent
+import android.net.Uri
 import android.util.Log
+import androidx.activity.result.ActivityResult
 import com.getcapacitor.JSArray
 import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
+import com.getcapacitor.annotation.ActivityCallback
 import com.getcapacitor.annotation.CapacitorPlugin
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -89,6 +94,11 @@ class ScheduleBridgePlugin : Plugin() {
         // alone rather than resetting someone to the standard screen — see
         // [AlarmPrefs].
         call.getBoolean("elderly")?.let { AlarmPrefs.setElderly(context, it) }
+        // Same argument: the alarm screen cannot read profiles.alarm_ring_seconds.
+        // Clamped on arrival — the DB CHECK is the real limit, but this value
+        // drives a lit, ringing screen and the device must be safe against a bad
+        // sync as well as a bad form.
+        call.getInt("ringSeconds")?.let { AlarmPrefs.setRingSeconds(context, it) }
 
         scope.launch {
             val dao = ScheduleDatabase.getInstance(context).medicationDao()
@@ -420,6 +430,107 @@ class ScheduleBridgePlugin : Plugin() {
             val result = JSObject()
             result.put("ladders", arr)
             call.resolve(result)
+        }
+    }
+
+    // -- ALARM MEDIA ---------------------------------------------------------
+    //
+    // NATIVE OWNS THE FILES, and that is not a detail. The webview cannot write to
+    // app-private storage, and the alarm must show its picture and play its sound
+    // in airplane mode with the process dead — so the picker runs here, the bytes
+    // are copied here, and the web only ever learns WHICH choice is active. That
+    // is the opposite direction from `elderly` and `ringSeconds`, which are web
+    // data the device mirrors. See BRIDGE_CONTRACT.md §1c.
+    //
+    // ACTION_OPEN_DOCUMENT rather than the photo picker or MediaStore: it needs no
+    // permission on any API level this app supports, so the manifest's permission
+    // list is unchanged. CLAUDE.md treats that list as a promise, and "the user
+    // picked a wallpaper" is not a reason to start reading their photo library.
+
+    @PluginMethod
+    fun getAlarmMedia(call: PluginCall) {
+        val result = JSObject()
+        result.put("imageChoice", AlarmPrefs.imageChoice(context))
+        result.put("soundChoice", AlarmPrefs.soundChoice(context))
+        result.put("bundled", JSArray(AlarmMedia.BUNDLED.keys.toList()))
+        result.put("hasCustomImage", AlarmMedia.imageFile(context).let { it.isFile && it.length() > 0L })
+        result.put("hasCustomSound", AlarmMedia.soundFile(context).let { it.isFile && it.length() > 0L })
+        call.resolve(result)
+    }
+
+    /** Select a bundled backdrop by key, or `none`. Custom is set by [pickAlarmImage]. */
+    @PluginMethod
+    fun setAlarmImage(call: PluginCall) {
+        val choice = call.getString("choice") ?: AlarmMedia.IMAGE_NONE
+        if (choice != AlarmMedia.IMAGE_NONE && !AlarmMedia.BUNDLED.containsKey(choice)) {
+            call.reject("unknown alarm image choice: $choice")
+            return
+        }
+        // Selecting a bundled image also drops the copied file. Keeping it would
+        // leave a megabyte of someone's photo on disk that nothing can reach.
+        if (choice == AlarmMedia.IMAGE_NONE) AlarmMedia.clearImage(context) else {
+            runCatching { AlarmMedia.imageFile(context).delete() }
+            AlarmPrefs.setImageChoice(context, choice)
+        }
+        getAlarmMedia(call)
+    }
+
+    @PluginMethod
+    fun clearAlarmSound(call: PluginCall) {
+        AlarmMedia.clearSound(context)
+        getAlarmMedia(call)
+    }
+
+    @PluginMethod
+    fun pickAlarmImage(call: PluginCall) {
+        startActivityForResult(call, openDocument("image/*"), "onAlarmImagePicked")
+    }
+
+    @PluginMethod
+    fun pickAlarmSound(call: PluginCall) {
+        startActivityForResult(call, openDocument("audio/*"), "onAlarmSoundPicked")
+    }
+
+    private fun openDocument(mime: String): Intent =
+        Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = mime
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+
+    @ActivityCallback
+    private fun onAlarmImagePicked(call: PluginCall?, result: ActivityResult) {
+        finishPick(call, result) { uri -> AlarmMedia.importImage(context, uri) != null }
+    }
+
+    @ActivityCallback
+    private fun onAlarmSoundPicked(call: PluginCall?, result: ActivityResult) {
+        finishPick(call, result) { uri -> AlarmMedia.importSound(context, uri) != null }
+    }
+
+    /**
+     * Cancelling is not an error — it is the commonest outcome of opening a file
+     * picker, and rejecting the call would surface a failure message for someone
+     * who simply changed their mind. Resolves with `picked: false` and the state
+     * untouched.
+     */
+    private fun finishPick(call: PluginCall?, result: ActivityResult, importer: (Uri) -> Boolean) {
+        if (call == null) return
+        val uri = result.data?.data
+        if (result.resultCode != Activity.RESULT_OK || uri == null) {
+            val out = JSObject()
+            out.put("picked", false)
+            call.resolve(out)
+            return
+        }
+        scope.launch {
+            val ok = runCatching { importer(uri) }.getOrDefault(false)
+            val out = JSObject()
+            out.put("picked", ok)
+            out.put("imageChoice", AlarmPrefs.imageChoice(context))
+            out.put("soundChoice", AlarmPrefs.soundChoice(context))
+            if (!ok) out.put("error", "The file could not be copied. It may be too large or unreadable.")
+            call.resolve(out)
         }
     }
 

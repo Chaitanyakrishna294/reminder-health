@@ -199,6 +199,34 @@ export default function ScheduleSync() {
 
       if (cancelled) return;
 
+      /*
+       * How long each dose rings, mirrored to the device.
+       *
+       * ITS OWN QUERY, IN ITS OWN TRY. `profiles.alarm_ring_seconds` arrives with
+       * migration_alarm_ring_seconds_2026_08_14.sql, and PostgREST fails the
+       * ENTIRE select on a column it does not know — folding this into the
+       * medication query would mean deploying before the migration stops
+       * `syncSchedule` outright and every device silently goes stale. That is the
+       * exact failure the retry-ladder ordering note warns about; here it is
+       * avoidable, so it is avoided.
+       */
+      let ringSeconds: number | undefined;
+      if (session?.user.id) {
+        try {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('alarm_ring_seconds')
+            .eq('id', session.user.id)
+            .maybeSingle();
+          if (profile?.alarm_ring_seconds) ringSeconds = profile.alarm_ring_seconds;
+        } catch {
+          // Not applied yet. The device keeps its 60s default, which is the
+          // behaviour it already had.
+        }
+      }
+
+      if (cancelled) return;
+
       const { data, error } = await supabase.from('medications').select(MEDICATION_COLUMNS);
 
       if (cancelled) return;
@@ -230,11 +258,12 @@ export default function ScheduleSync() {
       }));
 
       try {
-        const result = await syncScheduleToNative(medications, session?.user.id, isElderly);
+        const result = await syncScheduleToNative(medications, session?.user.id, isElderly, ringSeconds);
         if (cancelled) return;
         console.log(
           `[ScheduleSync] synced ${medications.length} medication(s) to the native store` +
-            ` (exact alarms allowed: ${result?.canScheduleExactAlarms}, elderly: ${isElderly})`,
+            ` (exact alarms allowed: ${result?.canScheduleExactAlarms}, elderly: ${isElderly},` +
+            ` ring: ${ringSeconds ?? 'default'}s)`,
         );
       } catch (err) {
         console.error('[ScheduleSync] syncSchedule failed:', err);

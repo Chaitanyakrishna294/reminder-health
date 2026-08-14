@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Bundled alarm backdrop 2 of 3 — "Daylight". See alarm_bg_dawn.xml for why
+     these are authored gradients rather than photographs. Built on the
+     slot_midday token. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="270"
+                android:startColor="#8FC9DE"
+                android:centerColor="#59A6C6"
+                android:endColor="#2A5D77" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="radial"
+                android:gradientRadius="80%p"
+                android:centerX="0.5"
+                android:centerY="0.22"
+                android:startColor="#59FFFFFF"
+                android:endColor="#00FFFFFF" />
+        </shape>
+    </item>
+</layer-list>

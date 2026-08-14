@@ -9,11 +9,15 @@
  * Account with nothing highlighted. A row that goes nowhere is worse than no row: it
  * teaches people the app is broken.
  *
- * This is what genuinely exists today: browser/PWA push permission. Sound, vibration
- * and escalation timing are NOT here, because they are not settings yet — the alarm
- * sound is the native AlarmActivity's, and escalation timing is server-side in the
- * ladder. Inventing switches for them would mean shipping controls that change
- * nothing, which is the same lie in a nicer shape.
+ * What exists here is what genuinely does something: browser/PWA push permission,
+ * how long each dose alarm rings, and the picture and sound the full-screen alarm
+ * uses. The rule has not changed — a control that changes nothing is a lie in a
+ * nicer shape — the second and third simply stopped being nothing when the alarm
+ * screen learned to read them (2026-08-14).
+ *
+ * ESCALATION TIMING IS STILL NOT HERE, and should not be: it is server-side in the
+ * ladder, it is what protects a dose nobody answers, and it is not the patient's
+ * to loosen from their own phone.
  *
  * THE HONEST FRAMING: push is the WEB channel. It is not what makes a dose alarm
  * fire on Android — that is a native AlarmManager registration, independent of the
@@ -26,10 +30,21 @@ import Link from 'next/link';
 import { Bell, BellOff, ShieldCheck, ArrowRight } from 'lucide-react';
 import { useUiMode } from '@/context/ui-mode-context';
 import { registerPush } from '@/lib/push/register-push';
+import AlarmRingDuration from '@/components/settings/alarm-ring-duration';
+import AlarmAppearance from '@/components/settings/alarm-appearance';
 
 type Permission = 'unsupported' | 'default' | 'granted' | 'denied';
 
-export default function NotificationsClientView({ telegramChatId }: { telegramChatId: string }) {
+export default function NotificationsClientView({
+  telegramChatId,
+  ringSeconds,
+  largestHandful,
+}: {
+  telegramChatId: string;
+  ringSeconds: number;
+  /** Doses at the user's busiest reminder time — the ring-duration hint's input. */
+  largestHandful: number;
+}) {
   const { isElderly } = useUiMode();
   const [permission, setPermission] = useState<Permission>('unsupported');
   const [busy, setBusy] = useState(false);
@@ -114,6 +129,13 @@ export default function NotificationsClientView({ telegramChatId }: { telegramCh
 
         {note && <p className={`font-bold text-muted-foreground ${body}`} role="status">{note}</p>}
       </section>
+
+      {/* Both of these configure the NATIVE alarm, which is why they sit under
+          the reassurance below rather than above it: push is the web channel,
+          and these two are the thing that actually rings. */}
+      <AlarmRingDuration initialSeconds={ringSeconds} largestHandful={largestHandful} />
+
+      <AlarmAppearance />
 
       {/* The line that matters most on this page. */}
       <section className="rounded-3xl border border-info/30 bg-info/5 p-5">

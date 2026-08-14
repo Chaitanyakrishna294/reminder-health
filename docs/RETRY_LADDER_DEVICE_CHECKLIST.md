@@ -9,8 +9,11 @@ APK and the deployed web ship separately:
 - `migration_retry_ladder_2026_08_14.sql` applied ✅ (you did this)
 - web deployed ✅ (`d0zwujw95`)
 - fresh APK installed ← rebuild for the coalesced ring + the 2b fix
-- **web re-deployed** ← required for 2b/2c, and for elderly to reach the alarm
-  screen at all; `server.url` means the two halves ship separately
+- **web re-deployed** ← required for 2b/2c, and for elderly + ring duration to
+  reach the alarm screen at all; `server.url` means the two halves ship separately
+- `migration_alarm_ring_seconds_2026_08_14.sql` applied ← needed before the
+  ring-duration control can save. Everything else works without it (the device
+  keeps its 60s default), so this one is not a hard ordering constraint
 
 Then open the app once so `syncSchedule` pushes `priorityLevel` and the ladder
 columns into the native store. **Nothing below works until that sync has run** —
@@ -141,70 +144,122 @@ Let B ring, tap **Snooze 10 min** on the first ring.
 - logcat shows the snooze re-fire carrying **the original dose instant**.
 - After the re-prompt, if still unanswered, a **fresh** ladder starts.
 
-## 7 · The coalesced multi-dose ring — **the acceptance test**
+## 7 · The focused list — **the acceptance test**
 
 Meds **A** and **D** already share a reminder time. Add two more at that same
 time so **four doses land on one instant** — the scenario the rewrite exists for,
 and the one that failed on 2026-08-14 with two doses fighting for the full screen
 while the other two sat as notifications nobody opened.
 
+**Set the ring window to 1 minute first** (Settings → Notifications → "How long
+each alarm rings"), or 7c takes four minutes per run.
+
 **7a — the ring itself.** Let the shared time pass with the phone **locked**.
 
 **Pass:**
 - **ONE** notification, not four. Title reads **"Time for 4 medicines"**;
   expanding it lists all four by name.
-- **ONE** full-screen alarm screen, listing four cards each with its own
-  Taken / Skip. Header reads `Dose due · <time>` with `4 medicines` beneath.
+- **ONE** full-screen alarm screen. All four doses are listed; the FIRST one is
+  focused — bigger, accent-bordered, with Taken / Skip. The other three show
+  **Waiting**.
 - logcat: one `notification <id> posted for 4 dose(s) due <T>` and one
   `coalesced 4 doses due <T> into one notification`. **The same notification id
   for all four** — a second id means the grouping did not take.
 
-**7b — per-dose answering.** Tap **Taken** on the first card, **Skip** on the
-second.
+**7b — focus advances on an ANSWER.** Tap **Taken** on the focused dose.
 
 **Pass:**
-- Each answered card turns into `✓ Taken` / `✓ Skipped` **and stays on screen**.
-  The screen does NOT close.
-- The notification narrows to the two still outstanding.
-- The remaining two keep ringing.
-- Answering the last one shows **All done**, then the screen closes itself.
+- Its row turns to `✓ Taken` and **stays on screen**; the next dose becomes
+  focused and starts its own ring window.
+- The notification narrows to the three still outstanding.
+- Answer the rest: the last one shows **All done** and the screen closes itself.
 
-**7c — dismissal marks only the remainder.** Repeat 7a, answer two, then press
-the power button (or just wait out the 60s of silence).
+**7c — focus advances on a TIMEOUT.** Repeat 7a and answer nothing.
 
 **Pass:**
-- A missed notice for **2 medicines**, not four. The two you answered are absent.
-- Only those two keep laddering (`retry ladder started` / `advanced` for their
-  ids alone).
-- The 60s timer **re-arms on every answer** — it counts silence, not the age of
-  the screen, so answering four doses in turn cannot race it.
+- After the ring window, the focused dose becomes **Not answered** and the NEXT
+  dose takes focus and rings. logcat:
+  `med N rang 60s with no answer — yielding to med M`.
+- This repeats through all four, then the screen closes.
+- A missed notice for **4 medicines**, and every ladder still running — yielding
+  is not an answer, and nothing was recorded for any of them.
+- Now repeat answering only the first two: the missed notice must name **2**, not
+  four.
 
-**7d — a rung joins the group.** Let the group ring and answer nothing. When one
-medication's rung fires, it must land on the **same notification id**, and the
-screen must still list every unanswered dose at that instant.
+**7d — tap to jump the queue.** During 7a, tap the LAST dose in the list.
 
-**Pass:** no second notification appears; the rung updates the existing one. This
-is the edge the whole derivation was built for — the group comes from the
-schedule, so a rung computes the same handful the first ring did.
+**Pass:** it becomes focused immediately with a fresh ring window; the one that
+was focused goes back to **Waiting**. Answer it, and focus returns to the first
+unanswered dose. Also tap a dose that already shows **Not answered** — it must
+take focus again rather than being a dead row.
 
-**7e — elderly asks one at a time.** Turn on elderly mode, **re-open the app once**
-so `syncSchedule` carries the flag (look for `elderly=true` on the
+**7e — a rung arrives mid-presentation.** Use med **B** (1 × 3) as one of the
+four, and let its rung fire while the screen is still working through the list.
+
+**Pass:** no second notification and no second screen. The rung gives med B the
+focus, and the list still shows exactly the still-unanswered doses — anything
+already answered stays `✓`, and is not asked again. logcat:
+`a rung for med N arrived mid-screen; giving it the focus`.
+
+**7f — elderly is one question at a time.** Turn on elderly mode, **re-open the
+app once** so `syncSchedule` carries the flag (look for `elderly=true` on the
 `AlarmActivity shown` line), then repeat 7a.
 
 **Pass:**
-- **ONE** dose fills the screen at the original large size, with `1 of 4` under
-  the time.
-- Answering shows the confirmation, then the next dose appears.
-- All four are still outstanding underneath — only the presentation is
-  one-at-a-time.
+- **ONE** dose on screen at the original large size, with `1 of 4` under the time.
+  No list.
+- Answering shows the confirmation, then the next dose appears. Timing out
+  advances the same way.
+- Settings → Notifications shows the ring-duration control but **not** the
+  "Notification style" pickers — elderly sees the result, not the file browser.
 
-**7f — the single-dose alarm has NOT regressed.** Let med **C** ring on its own.
+**7g — the single-dose alarm has NOT regressed.** Let med **C** ring on its own.
 
 **Pass:** identical to what you signed off on 2026-08-11 — big centred name,
 full-width `Taken`, `Skip` beneath it, `Snooze` smallest, and the buttons **low on
 the screen**. This is the regression risk of the whole rewrite: the single dose
 now renders through the same list the group does. If the buttons have drifted
 upward or the name has shrunk, report it before anything else.
+
+---
+
+## 8 · Alarm media — picture and sound
+
+Settings → Notifications → **Notification style**. All of this is device-local;
+none of it touches Supabase.
+
+**8a — the three bundled images.** Choose each of Sunrise / Daylight / Night and
+let an alarm ring on each.
+
+**Pass:** the image fills the screen behind the dose, and **Taken / Skip / Snooze
+stay clearly readable on all three**. The buttons keep their own solid fills, so
+if any of them is hard to read against a backdrop, that is a real bug — report
+it.
+
+**8b — a photo from the gallery.** Choose photo, pick one, let an alarm ring.
+**Then delete that photo from the gallery** and let another alarm ring.
+
+**Pass:** the alarm still shows it. The file was copied into app storage at pick
+time, which is the whole point — if it vanishes, the copy did not happen.
+
+**8c — airplane mode.** Turn airplane mode on, force-stop the app, let an alarm
+ring.
+
+**Pass:** picture shows, custom sound plays. This is the proof that nothing is
+fetched at fire time.
+
+**8d — a custom sound.** Choose a sound file, let an alarm ring, then switch back
+to **Default tone**.
+
+**Pass:** the chosen sound replaces the alarm tone and loops; Default tone
+restores the system alarm sound. In a four-dose handful it is **one sound for the
+whole screen** — it must not restart as the focus moves down the list.
+
+**8e — a very large photo.** Pick the biggest image on the phone.
+
+**Pass:** the alarm shows it without crashing. Images are decoded downsampled
+precisely because a full-size modern phone photo is an OutOfMemoryError on this
+screen.
 
 ---
 

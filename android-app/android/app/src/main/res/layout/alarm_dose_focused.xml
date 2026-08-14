@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  THE DOSE THE ALARM IS ASKING ABOUT RIGHT NOW, inside a handful.
+
+  One dose is active at a time even though all of them are on screen: this card
+  rings and carries the big Taken / Skip, the others sit below it in
+  alarm_dose_quiet.xml with their state showing. Four equally-weighted cards each
+  with two buttons is eight equal choices at 3am, which is not a screen anyone
+  can act on quickly.
+
+  Shares its ids with alarm_dose_solo.xml, so AlarmActivity binds all three
+  presentations with one function and none of them can grow its own behaviour.
+
+  Taken stays full-width and on top, Skip full-size and neutral beneath it — the
+  S30 hierarchy, just at the scale a list allows.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:layout_marginTop="6dp"
+    android:layout_marginBottom="6dp"
+    android:padding="18dp"
+    android:background="@drawable/bg_alarm_card_focused">
+
+    <TextView
+        android:id="@+id/dose_name"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="27sp"
+        android:textStyle="bold"
+        android:textColor="@color/alarm_ink"
+        android:gravity="center"
+        android:lineSpacingMultiplier="1.05" />
+
+    <TextView
+        android:id="@+id/dose_amount"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="16dp"
+        android:textSize="18sp"
+        android:textColor="@color/alarm_ink_muted"
+        android:gravity="center" />
+
+    <Button
+        android:id="@+id/dose_taken"
+        android:layout_width="match_parent"
+        android:layout_height="62dp"
+        android:text="@string/alarm_taken"
+        android:textSize="19sp"
+        android:textStyle="bold"
+        android:textAllCaps="false"
+        android:textColor="@color/alarm_on_primary"
+        android:background="@drawable/bg_alarm_primary" />
+
+    <Button
+        android:id="@+id/dose_skip"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_marginTop="10dp"
+        android:text="@string/alarm_skip"
+        android:textSize="17sp"
+        android:textStyle="bold"
+        android:textAllCaps="false"
+        android:textColor="@color/alarm_ink"
+        android:background="@drawable/bg_alarm_secondary" />
+</LinearLayout>

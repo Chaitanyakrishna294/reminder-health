@@ -43,4 +43,12 @@
     <string name="alarm_recorded_skipped">✓ Skipped</string>
     <string name="alarm_recorded">✓ Recorded</string>
     <string name="alarm_all_done">All done</string>
+
+    <!-- The quiet states in a focused list. "Not answered" is a fact, not a
+         verdict: the dose's ring window passed, nothing was decided, and tapping
+         the row starts it again. Never "You missed", never a count. -->
+    <string name="alarm_waiting">Waiting</string>
+    <string name="alarm_not_answered">Not answered</string>
+    <!-- Read out for the tappable rows; the visual affordance is the card. -->
+    <string name="alarm_tap_to_answer">Tap to answer this one now</string>
 </resources>

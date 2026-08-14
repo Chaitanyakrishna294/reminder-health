@@ -155,10 +155,20 @@ keep in sync and less that goes stale on the device.
 ### Call-level fields alongside `medications`
 
 ```ts
-syncSchedule({ medications, userId?: string, elderly?: boolean })
+syncSchedule({ medications, userId?: string, elderly?: boolean, ringSeconds?: number })
 ```
 
 - **`userId`** keys the native store to one identity (account-switch guard, 2026-08-11).
+- **`ringSeconds`** (2026-08-14) is `profiles.alarm_ring_seconds` — how long **each
+  dose** rings before the alarm screen moves on to the next dose in the same handful.
+  **Per dose, not per screen:** four medicines at two minutes each is a lit, ringing
+  phone for eight, which is why the settings copy states the total instead of leaving
+  it to be discovered at 3am. Clamped to 60-300s on arrival as well as by the DB CHECK —
+  it drives a wake-lit screen, so the device is safe against a bad sync as well as a bad
+  form. Absent leaves the stored value alone (default 60s, today's behaviour).
+  **Its query is deliberately separate on the web side**: PostgREST fails an entire
+  select on an unknown column, so folding it into the medication read would mean
+  deploying before the migration stops `syncSchedule` outright.
 - **`elderly`** (2026-08-14) mirrors CLAUDE.md's third density so the **Kotlin alarm screen**
   can honour it. This is the same argument the planned `language` field rests on: the alarm is
   a separate process with no webview running, so it cannot read a React context, `localStorage`,
@@ -168,6 +178,57 @@ syncSchedule({ medications, userId?: string, elderly?: boolean })
   `SessionStore`, which is wiped on sign-out — wiping "this person needs the simplified screen"
   at sign-out resets the person least able to put it back). Absent leaves the stored value
   alone, so an APK newer than the deployed web keeps whatever it last learned.
+
+---
+
+## 1c. Alarm media — the one bridge area where NATIVE owns the data (2026-08-14)
+
+```ts
+getAlarmMedia()  -> { imageChoice, soundChoice, bundled: string[], hasCustomImage, hasCustomSound }
+setAlarmImage({ choice })   -> AlarmMediaState   // a bundled key, or 'none'
+pickAlarmImage()            -> { picked, imageChoice?, error? }
+pickAlarmSound()            -> { picked, soundChoice?, error? }
+clearAlarmSound()           -> AlarmMediaState
+```
+
+**Direction matters and it is the opposite of everything else here.** `elderly` and
+`ringSeconds` are web data the device mirrors. The alarm's picture and sound are
+**device data the web displays**: the webview cannot write to Android app-private
+storage, and the alarm must show and play them in airplane mode with the app process
+dead. So the picker runs in Kotlin, the bytes are copied in Kotlin, and the web only
+ever learns *which* choice is active.
+
+- **Files live in `filesDir/alarm-media/`, never Supabase, never a URL.** The copy is
+  the feature: a gallery pick hands back a `content://` URI belonging to another app
+  that can be revoked or deleted. Copying the bytes is what lets someone tidy their
+  photos without their alarm quietly reverting to a grey screen.
+- **`ACTION_OPEN_DOCUMENT`, not the photo picker or MediaStore** — it needs no
+  permission on any API level this app supports, so the manifest's permission list is
+  unchanged. CLAUDE.md treats that list as a promise; "the user picked a wallpaper" is
+  not a reason to start reading their photo library.
+- **Three bundled backdrops** ship in the APK as authored gradients (`alarm_bg_dawn`,
+  `alarm_bg_calm`, `alarm_bg_night`), not photographs: legible by construction, about a
+  kilobyte each, nothing to license. A photograph can arrive with a bright corner
+  exactly where the medicine name sits.
+- **Contrast is structural, not per-image.** Every backdrop sits under the same 55%
+  black scrim, and the buttons keep their own opaque fills — so no image, bundled or
+  picked, can affect whether Taken/Skip/Snooze are readable.
+- **A picked image is decoded DOWNSAMPLED.** A 50-megapixel photo decoded whole is an
+  OutOfMemoryError on a cheap phone, on the one screen that must never crash, and the
+  picker puts exactly that file one tap away.
+- **`picked: false` is a cancel, not an error.** Cancelling is the commonest outcome of
+  opening a file picker; rejecting the call would show a failure to someone who simply
+  changed their mind.
+
+**GLOBAL, not per medication.** One image and one sound for every alarm, and in a
+coalesced handful they belong to the *presentation* — one backdrop, one tone, not one
+per row; swapping either as the focus moves would flicker the screen and stutter the
+sound while someone is reading a medicine name. Per-medication override is the natural
+next step and is **already half built**: `Medication.alarmAudioPath`/`alarmPhotoPath`
+exist in Room v2, `AlarmMedia.resolveImage`/`resolveSound` already prefer them, and
+`AlarmActivity` already passes them. What is missing is somewhere to *set* them — a
+server column, a migration, per-medication UI. Global costs nothing later, because the
+resolution order **is** the override's mechanism with one of its two inputs populated.
 
 ---
 
