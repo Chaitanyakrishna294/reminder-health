@@ -96,13 +96,23 @@ $function$;
 COMMENT ON FUNCTION public.resend_caregiver_request(uuid) IS
   'Re-notifies the invitee of a PENDING care-circle request. Patient-only and pending-only: a caregiver resending their own invitation would be nagging, and re-asking after a decline is what this must never become. Creates no connection row — it touches updated_at and re-inserts the request notification. Exists so the client never needs the invitee''s profile id, which active_caregiver_links deliberately does not expose.';
 
--- ── PRIVILEGE FOOTER — both revokes, always ─────────────────────────────────
+-- ── PRIVILEGE FOOTER — THREE revokes ────────────────────────────────────────
 -- A NULL proacl means Postgres's default of EXECUTE to PUBLIC, and every role is
--- PUBLIC — including anon, the key shipped inside the APK. Supabase's ALTER
--- DEFAULT PRIVILEGES separately adds a direct grant to anon. Two doors.
+-- PUBLIC — including anon, the key shipped inside the APK. Supabase separately
+-- runs ALTER DEFAULT PRIVILEGES ... GRANT ALL ON FUNCTIONS TO anon,
+-- authenticated, service_role, which puts a DIRECT grant on all three before
+-- anyone has written one.
+--
+-- So writing no GRANT does not mean no grant, for ANY of them. This file
+-- originally revoked PUBLIC and anon and merely commented that service_role was
+-- not granted; validation check 4 came back FAIL with service_role=X/postgres.
+-- Fixed here and in migration_resend_revoke_service_role_2026_08_14.sql, which
+-- is what to apply to a database that already ran the earlier version.
 REVOKE ALL ON FUNCTION public.resend_caregiver_request(uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.resend_caregiver_request(uuid) FROM anon;
+-- Not a leak — service_role is server-side only and bypasses RLS anyway — but
+-- the bot and the cron have no reason to re-notify someone about access to
+-- another person's medication history, and a footer that describes an ACL the
+-- database does not have is worse than no footer.
+REVOKE ALL ON FUNCTION public.resend_caregiver_request(uuid) FROM service_role;
 GRANT EXECUTE ON FUNCTION public.resend_caregiver_request(uuid) TO authenticated;
--- No service_role grant: the bot and the cron have no reason to resend a human's
--- invitation, and this is not a function to leave reachable by anything that
--- does not need it.

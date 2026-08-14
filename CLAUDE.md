@@ -23,6 +23,18 @@ are stale. Keep it updated when you add or move anything.
   This matters more here than in most projects: **anon is the key shipped inside the APK**,
   which anyone can unpack, so anon's reach is the product's worst case. Validations must
   assert `NOT has_function_privilege('anon', …)` **and** that `proacl` is not NULL.
+  - **THE RULE GENERALISES PAST anon — it is really THREE revokes.** Supabase's
+    `ALTER DEFAULT PRIVILEGES` grants to `anon`, `authenticated` **and
+    `service_role`**, so **writing no GRANT does not mean no grant for any of
+    them**. Revoke all three, then grant back only what actually calls the
+    function. Paid for 2026-08-14: `resend_caregiver_request` shipped with a
+    footer literally commenting "no service_role grant" above an ACL reading
+    `service_role=X/postgres`. Milder than the anon case — service_role is
+    server-side and bypasses RLS anyway — but a privilege footer that describes
+    an ACL the database does not have is worse than no footer, and the same
+    blind spot with `anon` in it is a leak. Validations should assert
+    `NOT has_function_privilege('service_role', …)` whenever it is not a caller;
+    that check is what caught this.
 - **IF AN RLS POLICY CALLS A FUNCTION, THE CALLER NEEDS EXECUTE ON IT — `SECURITY DEFINER`
   does not waive that.** A policy expression is evaluated with the privileges of the role
   running the query; there is no system exemption. DEFINER governs which role the *body*
