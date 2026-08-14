@@ -259,6 +259,9 @@ export default function DashboardMainLayout({
   };
 
   const navItems = getNavItems();
+  // Which tab the indicator sits over. -1 on a sub-page, where no tab is
+  // current and the indicator should not be showing at all.
+  const activeNavIndex = navItems.findIndex((item) => isLinkActive(item.href));
 
   const shouldPrefetch = (path: string) => {
     const allowed = ['/dashboard', '/medications', '/care-circle', '/health-vault'];
@@ -320,6 +323,30 @@ export default function DashboardMainLayout({
             : 'w-[72px] py-8 space-y-6'
         }`}
       >
+        {/* THE SLIDING INDICATOR. One pink pill that MOVES between tabs rather
+            than a colour block that appears and disappears — the movement is
+            what tells you where you came from, which a block cannot.
+
+            Absolutely positioned behind the tabs and driven by the active index,
+            so it is one composited translateX and never touches layout. Elderly
+            keeps its solid block: that density is excluded from this round, and
+            a moving target is the wrong idea there anyway. */}
+        {!isElderly && activeNavIndex >= 0 && (
+          <span
+            aria-hidden
+            className="absolute top-2 bottom-2 left-4 right-4 pointer-events-none"
+          >
+            <span
+              className="absolute top-0 bottom-0 rounded-2xl bg-primary-strong shadow-md shadow-primary/20 motion-reduce:transition-none"
+              style={{
+                width: `${100 / navItems.length}%`,
+                transform: `translateX(${activeNavIndex * 100}%)`,
+                transition: 'transform 260ms cubic-bezier(0.22, 1, 0.36, 1)',
+              }}
+            />
+          </span>
+        )}
+
         {navItems.map((item) => {
           const active = isLinkActive(item.href);
           return (
@@ -363,7 +390,7 @@ export default function DashboardMainLayout({
       <nav
         data-tour="dash-nav"
         aria-label="Main navigation"
-        className={`md:hidden fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-40 rounded-[32px] bg-white/85 dark:bg-card/80 backdrop-blur-xl border border-border/70 shadow-lg flex items-center justify-around px-4 transition-all duration-300 ${
+        className={`md:hidden fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-40 rounded-[32px] bg-white/85 dark:bg-card/80 backdrop-blur-xl border border-border/70 card-overlay flex items-center justify-around px-4 transition-all duration-300 ${
           isElderly
             ? 'w-[94%] h-[104px] border-2 border-primary/50'
             : `w-[92%] max-w-[480px] ${showNavLabels ? 'h-[84px]' : 'h-[72px]'}`
@@ -388,10 +415,13 @@ export default function DashboardMainLayout({
                   ? `h-[84px] flex-1 ${
                       active ? 'bg-primary-strong text-primary-strong-foreground shadow-lg' : 'text-foreground bg-muted/40'
                     }`
-                  : `${showNavLabels ? 'h-[68px]' : 'h-12 max-w-[56px]'} flex-1 ${
-                      active 
-                        ? 'bg-primary-strong text-primary-strong-foreground shadow-md shadow-primary/20' 
-                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                  : `${showNavLabels ? 'h-[68px]' : 'h-12 max-w-[56px]'} flex-1 relative z-10 ${
+                      active
+                        // No fill here: the sliding indicator behind is the fill.
+                        // White on --primary-strong is 4.75:1, the same pairing
+                        // the block used.
+                        ? 'text-primary-strong-foreground'
+                        : 'text-muted-foreground hover:text-foreground'
                     }`
               }`}
               title={item.label}

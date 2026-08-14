@@ -1031,7 +1031,12 @@ export default function DashboardClientView({
             )}
           </div>
           <div className="min-w-0">
-            <h1 className="text-lg font-black text-foreground tracking-[-0.01em] flex items-center gap-2">
+            {/* ROUND TWO: the greeting becomes a STATEMENT. It was 18px sitting
+                beside a 40px avatar, which made the first thing on the app's
+                main screen its least confident element. It is still not the
+                hero — the due-now dose is — but it should read as the app
+                addressing you rather than as a caption. */}
+            <h1 className="title-page text-foreground flex items-center gap-2">
               {getGreetingIcon()}
               <span>{getGreeting()}, {userName}</span>
               <GuideButton tour="dashboard" />

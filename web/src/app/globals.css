@@ -140,8 +140,21 @@
   --surface: #ffffff;       /* a card */
   --surface-sunk: #F7F3F6;  /* inputs and wells: they RECEIVE content, so they sit below */
 
-  --lift-1: 0 1px 2px rgba(15, 28, 90, 0.05), 0 2px 8px rgba(15, 28, 90, 0.05);
-  --lift-2: 0 2px 4px rgba(15, 28, 90, 0.06), 0 8px 24px rgba(15, 28, 90, 0.08);
+  /* ROUND TWO. Round one's steps were correct and invisible — a system nobody
+     can see is a system that is not doing its job. Each step is now VISIBLY
+     distinct at arm's length, which is the actual requirement, while staying
+     two-layer (contact + diffuse) so it still reads as an object rather than a
+     drop shadow. */
+  --lift-1: 0 1px 2px rgba(15, 28, 90, 0.06), 0 4px 14px rgba(15, 28, 90, 0.07);
+  --lift-2: 0 2px 6px rgba(15, 28, 90, 0.08), 0 14px 34px rgba(15, 28, 90, 0.12);
+  /* Overlay: dialogs, the dose gate, the nav pill. The top of the ladder. */
+  --lift-3: 0 4px 10px rgba(15, 28, 90, 0.10), 0 24px 56px rgba(15, 28, 90, 0.18);
+
+  /* Gradient grounds for the two cards that carry the app: the due-now dose and
+     the tumbler. Derived from tokens already in the palette, never new hues —
+     the one-accent rule holds, this is the SAME pink at two opacities. */
+  --ground-hero: linear-gradient(160deg, #FFFFFF 0%, #FFF7F9 58%, #FDEEF2 100%);
+  --ground-hydration: linear-gradient(160deg, #FFFFFF 0%, #F4FAFD 58%, #E8F4FA 100%);
 
   /* ── RADIUS: one scale, three steps (§2) ──
      20 cards and sheets · 14 buttons, inputs, chips · 10 swatches and badges.
@@ -202,11 +215,26 @@
   /* The board on navy. Shadows do almost nothing on a dark ground, so the
      separation becomes a lightness step and a hairline ring instead — the same
      system, re-derived rather than re-decided. Fully applied in stage 2. */
-  --board: #0C1748;
-  --surface: #1A2A66;
-  --surface-sunk: #142153;
-  --lift-1: 0 0 0 1px rgba(255, 255, 255, 0.06);
-  --lift-2: 0 0 0 1px rgba(255, 255, 255, 0.10), 0 8px 24px rgba(0, 0, 0, 0.35);
+  /* TUNED BY HAND, round two. Round one derived itself correctly from the token
+     graph and nobody had looked at it. Judged now:
+
+     The ground goes near-black rather than navy. On an OLED phone — which is
+     most of this audience's price bracket — a #0C1748 field is a panel that is
+     always lit, and it made the whole app feel heavier at night than by day. A
+     deep near-black ground lets the cards BE the light, which is the same
+     figure/ground relationship the light theme has, rather than its inverse.
+
+     Separation is a lightness step plus a hairline ring, because shadows do
+     almost nothing on a dark ground. The steps are wider apart than in light
+     mode for the same reason. */
+  --board: #070B1E;
+  --surface: #131A3A;
+  --surface-sunk: #0C1229;
+  --lift-1: 0 0 0 1px rgba(255, 255, 255, 0.07);
+  --lift-2: 0 0 0 1px rgba(255, 255, 255, 0.11), 0 10px 30px rgba(0, 0, 0, 0.5);
+  --lift-3: 0 0 0 1px rgba(255, 255, 255, 0.14), 0 20px 52px rgba(0, 0, 0, 0.65);
+  --ground-hero: linear-gradient(160deg, #1B2247 0%, #1A1E42 58%, #221B3C 100%);
+  --ground-hydration: linear-gradient(160deg, #12203C 0%, #102138 58%, #0E2236 100%);
 
   /* Hydration, lifted for the navy ground. Scoped to the water surfaces only —
      see the light-mode block for why this is the one exception to one accent. */
@@ -773,4 +801,129 @@ h1, h2 {
     animation: none;
     opacity: 1;
   }
+}
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+   LOOKS MAXX — round two. Round one built the system; this makes it VISIBLE.
+
+   Every rule here is presentation. The hard lines survive unchanged: one accent,
+   slot tints stay surfaces, 44px targets, 4.5:1, light default, and NOTHING
+   IDLE-ANIMATES — every animation below is triggered by arrival or by a touch.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ── TYPE: hierarchy you can feel from arm's length ── */
+
+/* Page titles. Tight tracking is what stops a large title reading as merely big;
+   it is the single cheapest thing that separates composed from enlarged. */
+.title-page {
+  font-size: 30px;
+  line-height: 1.08;
+  font-weight: 800;
+  letter-spacing: -0.028em;
+  text-wrap: balance;
+}
+@media (min-width: 640px) {
+  .title-page { font-size: 34px; }
+}
+
+.title-section {
+  font-size: 20px;
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* HERO NUMERALS. A count is the answer to the question the screen was opened to
+   ask, so it gets to be the largest thing on it. Tabular so the digits do not
+   shift as they change — a number that jiggles while it updates reads as broken,
+   and this one updates every time a dose is answered. */
+.numeral-hero {
+  font-size: 44px;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+.numeral-lg {
+  font-size: 28px;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── DEPTH: four steps, each one visible ── */
+
+.card-raised { box-shadow: var(--lift-2); }
+.card-overlay { box-shadow: var(--lift-3); }
+
+/* The two cards that carry the app. A gradient ground, derived from tokens
+   already in the palette — the same pink at two opacities, not a new hue. */
+.ground-hero { background: var(--ground-hero); }
+.ground-hydration { background: var(--ground-hydration); }
+
+/* ── MOTION ── */
+
+/* Press-sink, for every tappable card. The card meets the board: one composited
+   transform and one shadow, no colour change. */
+.press-sink {
+  transition: box-shadow 120ms var(--ease-standard), transform 120ms var(--ease-standard);
+}
+.press-sink:active {
+  box-shadow: var(--lift-1);
+  transform: scale(0.982);
+}
+
+/* Page transition — shared axis. Entering content slides in along the axis of
+   travel rather than fading in place, which is what makes a navigation feel like
+   movement between rooms instead of a redraw. */
+.page-enter {
+  animation: page-enter 250ms var(--ease-out) both;
+}
+@keyframes page-enter {
+  from { opacity: 0; transform: translate3d(0, 10px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Tab switch — a cross-fade, deliberately shorter than a push. Tabs are peers;
+   sliding between them would imply a hierarchy that is not there. */
+.tab-enter { animation: tab-enter 180ms var(--ease-out) both; }
+@keyframes tab-enter {
+  from { opacity: 0; transform: scale(0.995); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Number tick. Fires when a count changes, never on load. */
+.numeral-tick { animation: numeral-tick 260ms var(--ease-out) both; }
+@keyframes numeral-tick {
+  0%   { transform: translate3d(0, 6px, 0); opacity: 0; }
+  100% { transform: none; opacity: 1; }
+}
+
+/* THE DOSE-RESOLVE MOMENT. The check draws itself in — the one place a small
+   flourish is earned, because it is the confirmation of the single action this
+   whole product exists for. Stroke animation on an SVG path: one property, GPU
+   friendly, and it stops. */
+.check-draw {
+  stroke-dasharray: 32;
+  stroke-dashoffset: 32;
+  animation: check-draw 340ms var(--ease-out) 60ms forwards;
+}
+@keyframes check-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+/* NOTHING ABOVE LOOPS. Every animation is triggered by arrival, by a touch, or
+   by a value changing, and every one of them ends. The calm rule stands:
+   motion-design's "always include an ambient layer" is refused for the fourth
+   time and is now a standing refusal, recorded in CLAUDE.md. */
+
+@media (prefers-reduced-motion: reduce) {
+  /* A REAL BRANCH: transforms and draw-ins off, opacity kept so arrival is still
+     legible. Not a shortened duration — this is an elderly app and motion
+     sensitivity is real. */
+  .press-sink, .press-sink:active { transition: none; transform: none; }
+  .page-enter, .tab-enter, .numeral-tick { animation: none; opacity: 1; transform: none; }
+  .check-draw { animation: none; stroke-dashoffset: 0; }
 }
