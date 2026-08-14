@@ -11,10 +11,10 @@ and the auth pass. Reviewed on device and approved.
 language + proof screens · Vault · Care Circle · Settings rooms · forms ·
 dashboard remainder · auth + corrections.
 
-**Preview:** https://reminder-health-5720h56ia-chaitanya-krishnas-projects-397d3a53.vercel.app
+**Preview (stable alias, whitelisted in Turnstile):** https://reminder-health-refresh.vercel.app
 
 **Spec:** [`docs/design/visual-refresh-2026-08-14.md`](visual-refresh-2026-08-14.md) —
-read this first; the PR is that spec made true on three screens.
+read this first; the PR is that spec made true across the app.
 
 ---
 
