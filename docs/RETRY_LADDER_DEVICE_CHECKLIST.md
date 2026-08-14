@@ -236,6 +236,21 @@ stay clearly readable on all three**. The buttons keep their own solid fills, so
 if any of them is hard to read against a backdrop, that is a real bug — report
 it.
 
+**8a-preview — the embedded miniature.** Open Settings → Notifications →
+Notification style.
+
+**Pass:**
+- A miniature of the alarm sits at the top of the section, showing the backdrop,
+  the scrim, `Sample medicine · 1 tablet`, and Taken / Skip / Snooze.
+- Tapping **inside the miniature does nothing** — it is a picture of the screen,
+  not the screen.
+- Choosing a different gradient updates it **immediately**.
+- **Compare it against the real alarm from 8a.** They must match: this is a
+  render of the same layout, so any difference is a real bug, not a preview
+  approximation. That is the whole reason it is a bitmap and not CSS.
+- **Hear the sound** plays the chosen tone and stops itself after ~10s; Stop
+  works; leaving the page stops it.
+
 **8b — a photo from the gallery.** Choose photo, pick one, let an alarm ring.
 **Then delete that photo from the gallery** and let another alarm ring.
 

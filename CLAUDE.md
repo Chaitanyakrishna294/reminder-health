@@ -271,6 +271,17 @@ are stale. Keep it updated when you add or move anything.
     - **This is the one bridge area where NATIVE owns the data.** The webview cannot
       write to app-private storage, so the picker is Kotlin and the web only learns
       which choice is active. See BRIDGE_CONTRACT.md §1c.
+    - **THE SETTINGS MINIATURE IS A RENDER OF THE REAL SCREEN, NEVER A LOOKALIKE.**
+      `renderAlarmPreview` inflates the same XML, binds it through the same
+      `AlarmScreenBinder`, and draws it to a bitmap the webview shows in an `<img>`.
+      A CSS recreation would be a second implementation of the most safety-critical
+      screen in the product, and a preview that quietly stops matching is worse than
+      no preview — it is a promise about a screen the user next sees at 3am, with no
+      way to check it until then. **`AlarmScreenBinder` exists only to make the two
+      paths one; if a future change composes the alarm without it, the guarantee is
+      gone.** Measured at real screen size then scaled, or long names would wrap
+      differently in the preview than on the alarm. Sound is previewed by playing it
+      (`USAGE_ALARM`, non-looping, self-stopping) — it cannot be shown.
     - **Global image/sound, not per medication** — decided 2026-08-14. Per-medication
       override is half built already (`Medication.alarmAudioPath`/`alarmPhotoPath` in
       Room v2, and the resolution order already prefers them); it needs a server column

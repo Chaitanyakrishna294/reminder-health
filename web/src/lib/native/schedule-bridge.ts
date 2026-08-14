@@ -209,6 +209,10 @@ declare global {
           pickAlarmImage?: () => Promise<AlarmPickResult>;
           pickAlarmSound?: () => Promise<AlarmPickResult>;
           clearAlarmSound?: () => Promise<AlarmMediaState>;
+          /** A rendered picture of the real alarm screen — see renderAlarmPreview. */
+          renderAlarmPreview?: (options: { width?: number }) => Promise<{ dataUri: string | null }>;
+          previewAlarmSound?: () => Promise<{ playing: boolean }>;
+          stopAlarmSoundPreview?: () => Promise<{ playing: boolean }>;
           clearSchedule: () => Promise<{
             cleared: boolean;
             syncedBeforeClear: number;
@@ -333,6 +337,52 @@ export async function getAlarmMedia(): Promise<AlarmMediaState | null> {
   } catch (err) {
     console.error('[ScheduleBridge] getAlarmMedia failed:', err);
     return null;
+  }
+}
+
+/**
+ * A rendered picture of the REAL alarm screen, as a `data:` URI for an `<img>`.
+ *
+ * Native inflates the same layouts the alarm uses and draws them to a bitmap, so
+ * the Settings miniature cannot drift from the screen it previews. A CSS
+ * recreation would have been a second implementation of the most safety-critical
+ * screen in the product, and a preview that quietly stops matching is worse than
+ * no preview — it is a promise about a screen the user next sees at 3am.
+ *
+ * Null means "no preview available": a browser, an older APK, or a render that
+ * failed. Never an error the settings screen surfaces.
+ */
+export async function renderAlarmPreview(width = 420): Promise<string | null> {
+  const bridge = window.Capacitor?.Plugins?.ScheduleBridge;
+  if (!isNativeApp() || !bridge?.renderAlarmPreview) return null;
+  try {
+    const { dataUri } = await bridge.renderAlarmPreview({ width });
+    return dataUri ?? null;
+  } catch (err) {
+    console.error('[ScheduleBridge] renderAlarmPreview failed:', err);
+    return null;
+  }
+}
+
+/** Hear the chosen alarm sound. Non-looping and self-stopping after ~10s. */
+export async function previewAlarmSound(): Promise<boolean> {
+  const bridge = window.Capacitor?.Plugins?.ScheduleBridge;
+  if (!isNativeApp() || !bridge?.previewAlarmSound) return false;
+  try {
+    const { playing } = await bridge.previewAlarmSound();
+    return playing;
+  } catch {
+    return false;
+  }
+}
+
+export async function stopAlarmSoundPreview(): Promise<void> {
+  const bridge = window.Capacitor?.Plugins?.ScheduleBridge;
+  if (!isNativeApp() || !bridge?.stopAlarmSoundPreview) return;
+  try {
+    await bridge.stopAlarmSoundPreview();
+  } catch {
+    /* stopping is best-effort; it self-stops anyway */
   }
 }
 

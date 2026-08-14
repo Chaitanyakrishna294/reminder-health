@@ -160,8 +160,13 @@ class AlarmActivity : Activity() {
      */
     private var backdrop: AlarmMedia.Image = AlarmMedia.Image.None
 
-    /** True when a backdrop is actually on screen, so content switches to its over-photo treatment. */
-    private val onPhoto: Boolean get() = backdrop !is AlarmMedia.Image.None
+    /**
+     * True when a backdrop actually RENDERED — the binder's return value, not a
+     * test of which choice is set. A picked photo that fails to decode falls back
+     * to no backdrop, and content that assumed otherwise would be white text on a
+     * light ground.
+     */
+    private var onPhoto: Boolean = false
 
     /**
      * A dose at this instant was answered somewhere else — the notification's
@@ -346,11 +351,7 @@ class AlarmActivity : Activity() {
                     .format(Instant.parse(iso))
             }.getOrNull()
         }
-        findViewById<TextView>(R.id.alarm_eyebrow).text = if (whenText != null) {
-            "${getString(R.string.alarm_eyebrow_prefix)} · $whenText"
-        } else {
-            getString(R.string.alarm_eyebrow_prefix)
-        }
+        findViewById<TextView>(R.id.alarm_eyebrow).text = AlarmScreenBinder.eyebrowText(this, whenText)
     }
 
     private fun render() {
@@ -403,31 +404,12 @@ class AlarmActivity : Activity() {
             parent,
             false,
         )
-        if (solo) {
-            // The solo dose owns the whole scroll area, which is what lets its
-            // identity block absorb the slack and its action band stay pinned
-            // low — the geometry verified on device 2026-08-11. The ScrollView's
-            // fillViewport is the other half: it stretches the list to the
-            // viewport, so MATCH_PARENT here resolves to a full screen rather
-            // than to the height of the text.
-            view.layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.MATCH_PARENT,
-            )
-        }
-        view.findViewById<TextView>(R.id.dose_name).text = row.drugName
-        view.findViewById<TextView>(R.id.dose_amount).apply {
-            text = row.doseLabel ?: ""
-            visibility = if (row.doseLabel.isNullOrBlank()) View.GONE else View.VISIBLE
-        }
+        if (solo) view.layoutParams = AlarmScreenBinder.soloLayoutParams()
+        AlarmScreenBinder.bindDoseText(view, row.drugName, row.doseLabel, onPhoto)
+        if (onPhoto && !solo) view.setBackgroundResource(R.drawable.bg_alarm_card_focused_on_photo)
+
         view.findViewById<Button>(R.id.dose_taken).setOnClickListener { answer(row, DoseAction.ACTION_TAKEN) }
         view.findViewById<Button>(R.id.dose_skip).setOnClickListener { answer(row, DoseAction.ACTION_SKIP) }
-
-        if (onPhoto) {
-            if (!solo) view.setBackgroundResource(R.drawable.bg_alarm_card_focused_on_photo)
-            view.findViewById<TextView>(R.id.dose_name).setTextColor(Color.WHITE)
-            view.findViewById<TextView>(R.id.dose_amount).setTextColor(Color.WHITE)
-        }
         return view
     }
 
@@ -461,16 +443,7 @@ class AlarmActivity : Activity() {
             }
         }
 
-        view.findViewById<TextView>(R.id.dose_name).text = row.drugName
-        view.findViewById<TextView>(R.id.dose_amount).apply {
-            text = row.doseLabel ?: ""
-            visibility = if (row.doseLabel.isNullOrBlank()) View.GONE else View.VISIBLE
-        }
-
-        if (onPhoto) {
-            view.findViewById<TextView>(R.id.dose_name).setTextColor(Color.WHITE)
-            view.findViewById<TextView>(R.id.dose_amount).setTextColor(Color.WHITE)
-        }
+        AlarmScreenBinder.bindDoseText(view, row.drugName, row.doseLabel, onPhoto)
 
         if (isAnswered) {
             // Inert. Correcting a dose is a judgement about the past and belongs
@@ -495,51 +468,16 @@ class AlarmActivity : Activity() {
     }
 
     /**
-     * Draws the chosen backdrop behind everything, under a fixed scrim.
-     *
-     * THE SCRIM IS NOT DECORATION. A user-chosen photograph is arbitrary — it can
-     * be bright, busy, or light-on-light — so text over it needs a guaranteed
-     * floor rather than the hope that the picture cooperates. Every backdrop,
-     * bundled or picked, gets the same 55% black, which is what lets white text
-     * clear 4.5:1 without anyone checking each image.
-     *
-     * The BUTTONS are a separate guarantee: they keep their own opaque fills, so
-     * no photograph can affect their contrast at all.
+     * The backdrop, drawn by [AlarmScreenBinder] — the same call the Settings
+     * miniature makes, which is what stops the two from drifting apart.
      */
     private fun bindBackdrop() {
-        val photo = findViewById<ImageView>(R.id.alarm_photo)
-        val scrim = findViewById<View>(R.id.alarm_photo_scrim)
-
-        when (val image = backdrop) {
-            is AlarmMedia.Image.None -> {
-                photo.visibility = View.GONE
-                scrim.visibility = View.GONE
-                return
-            }
-            is AlarmMedia.Image.Bundled -> photo.setImageResource(image.resId)
-            is AlarmMedia.Image.Local -> {
-                // Downsampled: a 50-megapixel gallery photo decoded whole is an
-                // OutOfMemoryError on a cheap phone, on the one screen that must
-                // never crash. The picker puts exactly that file one tap away.
-                val metrics = resources.displayMetrics
-                val bitmap = AlarmMedia.decodeSampled(image.file, metrics.widthPixels, metrics.heightPixels)
-                if (bitmap == null) {
-                    Log.w(AlarmScheduler.TAG, "alarm backdrop could not be decoded — falling back to none")
-                    backdrop = AlarmMedia.Image.None
-                    photo.visibility = View.GONE
-                    scrim.visibility = View.GONE
-                    return
-                }
-                photo.setImageBitmap(bitmap)
-            }
-        }
-
-        photo.visibility = View.VISIBLE
-        scrim.visibility = View.VISIBLE
-
-        val ink = Color.WHITE
-        findViewById<TextView>(R.id.alarm_eyebrow).setTextColor(ink)
-        findViewById<TextView>(R.id.alarm_group_count).setTextColor(ink)
+        onPhoto = AlarmScreenBinder.bindBackdrop(
+            findViewById(android.R.id.content),
+            backdrop,
+            resources.displayMetrics,
+        )
+        if (!onPhoto) backdrop = AlarmMedia.Image.None
     }
 
     /**

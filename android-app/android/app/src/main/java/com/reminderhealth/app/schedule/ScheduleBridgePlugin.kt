@@ -481,6 +481,48 @@ class ScheduleBridgePlugin : Plugin() {
         getAlarmMedia(call)
     }
 
+    /**
+     * `renderAlarmPreview({ width? })` — a picture of the REAL alarm screen.
+     *
+     * Native inflates the same layouts, binds them through the same
+     * [AlarmScreenBinder], and draws the result to a bitmap. The webview shows it
+     * in an `<img>`. That is the point: a CSS recreation in Settings would be a
+     * second implementation of the most safety-critical screen in the product,
+     * and the moment the two diverged the preview would be a lie about what
+     * someone sees at 3am — with no way to check until then.
+     *
+     * Resolves with a null `dataUri` rather than rejecting when the render fails:
+     * a settings screen must not break because a picture could not be drawn.
+     */
+    @PluginMethod
+    fun renderAlarmPreview(call: PluginCall) {
+        val width = call.getInt("width") ?: 420
+        scope.launch {
+            val uri = runCatching { AlarmPreview.renderDataUri(context, width.coerceIn(160, 1080)) }
+                .getOrNull()
+            val result = JSObject()
+            result.put("dataUri", uri)
+            call.resolve(result)
+        }
+    }
+
+    /** Hear the chosen sound. Non-looping and self-stopping — see [AlarmSoundPreview]. */
+    @PluginMethod
+    fun previewAlarmSound(call: PluginCall) {
+        val started = runCatching { AlarmSoundPreview.play(context) }.getOrDefault(false)
+        val result = JSObject()
+        result.put("playing", started)
+        call.resolve(result)
+    }
+
+    @PluginMethod
+    fun stopAlarmSoundPreview(call: PluginCall) {
+        runCatching { AlarmSoundPreview.stop() }
+        val result = JSObject()
+        result.put("playing", false)
+        call.resolve(result)
+    }
+
     @PluginMethod
     fun pickAlarmImage(call: PluginCall) {
         startActivityForResult(call, openDocument("image/*"), "onAlarmImagePicked")

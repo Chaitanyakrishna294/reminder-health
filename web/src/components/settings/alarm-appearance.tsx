@@ -20,8 +20,8 @@
  * alarm still shows whatever was chosen; that is the part elderly mode is for.
  */
 
-import React, { useEffect, useState } from 'react';
-import { Image as ImageIcon, Music, Check } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Image as ImageIcon, Music, Check, Play, Square } from 'lucide-react';
 import { useUiMode } from '@/context/ui-mode-context';
 import {
   clearAlarmSound,
@@ -29,7 +29,10 @@ import {
   isNativeApp,
   pickAlarmImage,
   pickAlarmSound,
+  previewAlarmSound,
+  renderAlarmPreview,
   setAlarmImage,
+  stopAlarmSoundPreview,
   type AlarmMediaState,
 } from '@/lib/native/schedule-bridge';
 
@@ -52,18 +55,31 @@ export default function AlarmAppearance() {
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  /**
+   * A JPEG of the REAL alarm screen, rendered natively from the same layouts the
+   * alarm uses. Not a mock-up — see renderAlarmPreview.
+   */
+  const [preview, setPreview] = useState<string | null>(null);
+  const [playing, setPlaying] = useState(false);
+
+  const refreshPreview = useCallback(async () => {
+    setPreview(await renderAlarmPreview(420));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
-    getAlarmMedia().then((state) => {
+    getAlarmMedia().then(async (state) => {
       if (cancelled) return;
       setMedia(state);
       setLoaded(true);
+      if (state) await refreshPreview();
     });
     return () => {
       cancelled = true;
+      // Leaving the page must not leave a tone playing behind it.
+      void stopAlarmSoundPreview();
     };
-  }, []);
+  }, [refreshPreview]);
 
   const label = isElderly ? 'text-xl' : 'text-sm';
   const body = isElderly ? 'text-base' : 'text-xs';
@@ -99,9 +115,11 @@ export default function AlarmAppearance() {
         else if (cancelledNote) setNote(null);
         // Re-read: a cancel changes nothing, but a failed import may have.
         setMedia(await getAlarmMedia());
+        await refreshPreview();
         return;
       }
       setMedia(await getAlarmMedia());
+      await refreshPreview();
       setNote('Saved. Your next alarm will use it.');
     } catch {
       setNote('Could not change that. Please try again.');
@@ -161,6 +179,57 @@ export default function AlarmAppearance() {
           </p>
         </div>
       </div>
+
+      {preview && (
+        <div className="flex items-start gap-3">
+          {/*
+            A picture of the screen, not the screen: `pointer-events-none` and
+            aria-hidden because taps inside it must do nothing, and a screen
+            reader announcing a fake Taken button would be worse than useless.
+            The alt text on the image carries the meaning instead.
+          */}
+          <div
+            className="rounded-2xl overflow-hidden border border-border shrink-0 pointer-events-none select-none"
+            style={{ width: 168 }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={preview}
+              alt="A preview of your full-screen alarm, showing a sample medicine with the Taken, Skip and Snooze buttons."
+              className="block w-full h-auto"
+              draggable={false}
+            />
+          </div>
+
+          <div className="min-w-0 space-y-2">
+            <p className={`font-bold text-foreground ${body}`}>This is how your alarm will look</p>
+            <p className={`text-muted-foreground font-semibold text-balance ${body}`}>
+              A sample medicine, shown with your current picture.
+            </p>
+            {/* Sound cannot be shown, so it gets a listen instead. */}
+            <button
+              type="button"
+              onClick={async () => {
+                if (playing) {
+                  await stopAlarmSoundPreview();
+                  setPlaying(false);
+                  return;
+                }
+                const started = await previewAlarmSound();
+                setPlaying(started);
+                // It stops itself after ~10s; reflect that without polling.
+                if (started) window.setTimeout(() => setPlaying(false), 10_000);
+              }}
+              className={`inline-flex items-center gap-2 rounded-2xl px-4 font-black bg-muted text-foreground hover:bg-muted/70 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                isElderly ? 'min-h-16 text-lg' : 'min-h-12 text-sm'
+              }`}
+            >
+              {playing ? <Square aria-hidden className="w-4 h-4" /> : <Play aria-hidden className="w-4 h-4" />}
+              {playing ? 'Stop' : 'Hear the sound'}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div>
         <p className={`font-bold text-foreground mb-2 ${body}`}>Full-screen image</p>

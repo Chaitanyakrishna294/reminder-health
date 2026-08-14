@@ -189,7 +189,28 @@ setAlarmImage({ choice })   -> AlarmMediaState   // a bundled key, or 'none'
 pickAlarmImage()            -> { picked, imageChoice?, error? }
 pickAlarmSound()            -> { picked, soundChoice?, error? }
 clearAlarmSound()           -> AlarmMediaState
+renderAlarmPreview({ width? }) -> { dataUri: string | null }   // a JPEG data: URI
+previewAlarmSound()         -> { playing: boolean }
+stopAlarmSoundPreview()     -> { playing: false }
 ```
+
+**`renderAlarmPreview` returns a picture of the REAL screen, not a mock-up.**
+Native inflates the same XML the alarm uses, binds it through the same
+`AlarmScreenBinder`, resolves the backdrop through the same `AlarmMedia`, and draws
+the result to a bitmap. A CSS recreation in Settings would have been a second
+implementation of the most safety-critical screen in the product, and the moment the
+two diverged the preview would be a lie about what someone sees at 3am — with no way
+for them to check until then. `AlarmScreenBinder` exists solely so the two paths are
+one; if the alarm layout changes, the miniature changes with it.
+
+- **Measured at real screen size, then scaled.** Laying out at preview size would
+  re-wrap the text and re-balance the weighted identity block, so a long medicine name
+  could look fine in the miniature and overflow on the alarm.
+- **Never rejects.** A null `dataUri` means "no preview"; a settings screen must not
+  break because a picture could not be drawn. `Throwable` is caught, not `Exception` —
+  an OOM drawing a full-screen bitmap is the realistic failure.
+- **Sound is previewed by playing it** (`USAGE_ALARM`, so it answers "what will
+  actually wake me"), non-looping and hard-stopped after 10s.
 
 **Direction matters and it is the opposite of everything else here.** `elderly` and
 `ringSeconds` are web data the device mirrors. The alarm's picture and sound are
