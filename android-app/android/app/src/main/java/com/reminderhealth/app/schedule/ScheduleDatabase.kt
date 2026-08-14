@@ -23,8 +23,8 @@ import java.io.File
  * Supabase client instance instead of creating a new one per call.
  */
 @Database(
-    entities = [Medication::class, DoseAction::class, PendingSnooze::class],
-    version = 4,
+    entities = [Medication::class, DoseAction::class, PendingSnooze::class, PendingRetry::class],
+    version = 5,
     exportSchema = false,
 )
 @TypeConverters(ScheduleConverters::class)
@@ -32,6 +32,7 @@ abstract class ScheduleDatabase : RoomDatabase() {
     abstract fun medicationDao(): MedicationDao
     abstract fun doseActionDao(): DoseActionDao
     abstract fun pendingSnoozeDao(): PendingSnoozeDao
+    abstract fun pendingRetryDao(): PendingRetryDao
 
     companion object {
         /**
@@ -92,6 +93,38 @@ abstract class ScheduleDatabase : RoomDatabase() {
                         medicationId INTEGER NOT NULL PRIMARY KEY,
                         doseAt TEXT NOT NULL,
                         fireAt TEXT NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+            }
+        }
+
+        /**
+         * v5 adds the retry ladder: the three synced columns it reads, and the
+         * table that lets an in-flight ladder survive a reboot.
+         *
+         * Same migrate-don't-drop reasoning as v2/v3/v4 — the boot receiver
+         * rebuilds alarms from this database, so a destructive fallback is a
+         * silent gap in someone's reminders. Here it would also discard live
+         * ladders on upgrade, which is the exact failure this version exists to
+         * prevent.
+         *
+         * The three medication columns are added NULLABLE with no default: null
+         * means "use the priority default", which is the normal state, and every
+         * pre-upgrade row is genuinely in it. The next `syncSchedule` fills them
+         * from the server.
+         */
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE medications ADD COLUMN priorityLevel TEXT")
+                db.execSQL("ALTER TABLE medications ADD COLUMN retryLadderIntervalMinutes INTEGER")
+                db.execSQL("ALTER TABLE medications ADD COLUMN retryLadderCount INTEGER")
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS pending_retries (
+                        medicationId INTEGER NOT NULL PRIMARY KEY,
+                        doseAt TEXT NOT NULL,
+                        remainingOffsets TEXT NOT NULL
                     )
                     """.trimIndent(),
                 )
@@ -267,7 +300,7 @@ abstract class ScheduleDatabase : RoomDatabase() {
 
         private fun builder(context: Context, name: String) = Room.databaseBuilder(
             context, ScheduleDatabase::class.java, name,
-        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
 
         private fun builder(context: Context) = builder(context, DB_NAME)
 
