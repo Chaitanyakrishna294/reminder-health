@@ -862,7 +862,9 @@ export default function DashboardClientView({
     <>
       {dueGate}
       {refillGate}
-      {viewMode !== 'PATIENT_MONITOR' && <GuideAutoStart tour="dashboard" />}
+      {viewMode !== 'PATIENT_MONITOR' && (
+        <GuideAutoStart tour="dashboard" accountHasData={medications.length > 0} />
+      )}
       <div className={`space-y-8 w-full transition-all duration-500 relative ${isGravityState ? 'gravity-active' : ''}`}>
       {missedStrip}
       {refillStrip}

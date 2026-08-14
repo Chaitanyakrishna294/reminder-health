@@ -984,7 +984,12 @@ export default function NewMedicationPage() {
         </div>
       )}
 
-      {/* Auto-start the guided tour once for first-time users (then summonable via the ? button). */}
+      {/* Auto-start the guided tour once for first-time users (then summonable via
+          the ? button). No `accountHasData` here: this page never loads the
+          medication list, and adding a query for a count the dashboard and the
+          medications page both already have would be a round trip to learn
+          nothing new. Whichever of them the user came through has recorded it —
+          see GuideAutoStart's ESTABLISHED_KEY. */}
       {targetTelegramChatId && <GuideAutoStart tour="newMedication" />}
     </div>
   );

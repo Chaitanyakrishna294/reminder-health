@@ -351,8 +351,10 @@ export default function MedicationList({
 
   return (
     <div className="space-y-5">
-      {/* Auto-start the guided tour once for first-time users (then summonable via the ? button). */}
-      <GuideAutoStart tour="medications" />
+      {/* Auto-start the guided tour once, for a genuinely new account only (always
+          summonable via the ? button). `initialMeds`, not the filtered `meds` — a
+          long-standing user who has paused everything is still a long-standing user. */}
+      <GuideAutoStart tour="medications" accountHasData={initialMeds.length > 0} />
       {/* Header */}
       <div data-tour="med-hero" className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
         <div>
