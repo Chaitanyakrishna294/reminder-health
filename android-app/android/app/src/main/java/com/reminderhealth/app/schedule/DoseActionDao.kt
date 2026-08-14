@@ -25,6 +25,20 @@ interface DoseActionDao {
     @Query("SELECT * FROM dose_actions WHERE synced = 0 ORDER BY recordedAt ASC")
     suspend fun allUnsynced(): List<DoseAction>
 
+    /**
+     * Medications already answered for one exact dose instant — the coalesced
+     * alarm screen's "who is still waiting" test.
+     *
+     * NOT filtered on `synced`: a dose answered offline is answered. Waiting for
+     * a sync before believing the patient would re-ask them for the dose they
+     * just took, which is the one thing this screen must never do.
+     *
+     * SNOOZE is excluded deliberately — a snooze defers the question, it does not
+     * answer it, so a snoozed dose is still outstanding.
+     */
+    @Query("SELECT medicationId FROM dose_actions WHERE scheduledFor = :scheduledFor AND action != 'SNOOZE'")
+    suspend fun answeredMedicationIdsAt(scheduledFor: String): List<Long>
+
     @Query("UPDATE dose_actions SET synced = 1, syncError = NULL WHERE id = :id")
     suspend fun markSynced(id: String)
 
