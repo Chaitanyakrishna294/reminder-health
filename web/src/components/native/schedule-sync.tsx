@@ -13,7 +13,7 @@ import {
 /**
  * ORDERING CONSTRAINT — APPLY THE MIGRATION BEFORE DEPLOYING THIS.
  *
- * `retry_interval_minutes` and `retry_count` arrive with
+ * `retry_ladder_interval_minutes` and `retry_ladder_count` arrive with
  * migration_retry_ladder_2026_08_14.sql. PostgREST does not ignore a column it
  * does not know: it fails the ENTIRE select with "column ... does not exist".
  * So shipping this web build first does not degrade the retry ladder — it stops
@@ -25,7 +25,7 @@ import {
  * Migration first, then deploy.
  */
 const MEDICATION_COLUMNS =
-  'id, drug_name, dosage, dosage_amount, unit_type, reminder_times, dose_days, timezone, next_reminder_at, active, medication_reason, priority_level, retry_interval_minutes, retry_count';
+  'id, drug_name, dosage, dosage_amount, unit_type, reminder_times, dose_days, timezone, next_reminder_at, active, medication_reason, priority_level, retry_ladder_interval_minutes, retry_ladder_count';
 
 /**
  * Renders nothing. Pushes the current medication list into the native schedule
@@ -127,8 +127,8 @@ export default function ScheduleSync() {
         // against the columns being absent. See the ORDERING note on
         // MEDICATION_COLUMNS: they are not optional at the query level.
         priorityLevel: row.priority_level ?? null,
-        retryIntervalMinutes: row.retry_interval_minutes ?? null,
-        retryCount: row.retry_count ?? null,
+        retryIntervalMinutes: row.retry_ladder_interval_minutes ?? null,
+        retryCount: row.retry_ladder_count ?? null,
         doseDays: row.dose_days,
         timezone: row.timezone,
         nextReminderAt: row.next_reminder_at,

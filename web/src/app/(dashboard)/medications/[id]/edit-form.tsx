@@ -43,8 +43,8 @@ interface EditMedicationFormProps {
     reminder_times: string[];
     tablet_count: number;
     priority_level: string;
-    retry_interval_minutes?: number | null;
-    retry_count?: number | null;
+    retry_ladder_interval_minutes?: number | null;
+    retry_ladder_count?: number | null;
     active: boolean;
     low_stock_alert_enabled: boolean;
     unit_type?: string;
@@ -111,10 +111,10 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
   // priority default", so the inputs start EMPTY rather than pre-filled with the
   // default — a filled box reads as a choice somebody made.
   const [retryInterval, setRetryInterval] = useState<string>(
-    medication.retry_interval_minutes != null ? String(medication.retry_interval_minutes) : '',
+    medication.retry_ladder_interval_minutes != null ? String(medication.retry_ladder_interval_minutes) : '',
   );
   const [retryCount, setRetryCount] = useState<string>(
-    medication.retry_count != null ? String(medication.retry_count) : '',
+    medication.retry_ladder_count != null ? String(medication.retry_ladder_count) : '',
   );
 
   const [priority, setPriority] = useState<'normal' | 'important' | 'critical'>(
@@ -218,9 +218,9 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
     // Both or neither, and under the cap. The DB CHECK enforces this too — the
     // form check is so nobody discovers it as a save failure.
     const ladderTouched = retryInterval.trim() !== '' || retryCount.trim() !== '';
-    let retryFields: { retry_interval_minutes: number | null; retry_count: number | null } = {
-      retry_interval_minutes: null,
-      retry_count: null,
+    let retryFields: { retry_ladder_interval_minutes: number | null; retry_ladder_count: number | null } = {
+      retry_ladder_interval_minutes: null,
+      retry_ladder_count: null,
     };
     if (ladderTouched) {
       const iv = Number(retryInterval);
@@ -231,7 +231,7 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
         setLoading(false);
         return;
       }
-      retryFields = { retry_interval_minutes: iv, retry_count: ct };
+      retryFields = { retry_ladder_interval_minutes: iv, retry_ladder_count: ct };
     }
 
     try {

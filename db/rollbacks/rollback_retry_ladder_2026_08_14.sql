@@ -18,5 +18,5 @@ ALTER TABLE public.medications
   DROP CONSTRAINT IF EXISTS medications_retry_ladder_within_cap;
 
 ALTER TABLE public.medications
-  DROP COLUMN IF EXISTS retry_interval_minutes,
-  DROP COLUMN IF EXISTS retry_count;
+  DROP COLUMN IF EXISTS retry_ladder_interval_minutes,
+  DROP COLUMN IF EXISTS retry_ladder_count;

@@ -115,8 +115,8 @@ interface MedicationPayload {
   unitType: string | null;        // medications.unit_type
   reminderTimes: string[];        // medications.reminder_times (jsonb array of "HH:MM")
   priorityLevel: string | null;   // medications.priority_level — 'normal' | 'important' | 'critical'
-  retryIntervalMinutes: number|null; // medications.retry_interval_minutes, NULL = priority default
-  retryCount: number | null;      // medications.retry_count, NULL = priority default
+  retryIntervalMinutes: number|null; // medications.retry_ladder_interval_minutes, NULL = priority default
+  retryCount: number | null;      // medications.retry_ladder_count, NULL = priority default
   doseDays: number[] | null;      // medications.dose_days (smallint[]); null = every day, 0=Sun..6=Sat
   timezone: string;               // medications.timezone (IANA tz string, e.g. "Asia/Kolkata")
   nextReminderAt: string;         // medications.next_reminder_at, ISO 8601 UTC — a server-computed

@@ -10,9 +10,9 @@
 
 WITH cols AS (
   SELECT
-    count(*) FILTER (WHERE column_name = 'retry_interval_minutes') AS has_interval,
-    count(*) FILTER (WHERE column_name = 'retry_count')            AS has_count,
-    count(*) FILTER (WHERE column_name IN ('retry_interval_minutes','retry_count')
+    count(*) FILTER (WHERE column_name = 'retry_ladder_interval_minutes') AS has_interval,
+    count(*) FILTER (WHERE column_name = 'retry_ladder_count')            AS has_count,
+    count(*) FILTER (WHERE column_name IN ('retry_ladder_interval_minutes','retry_ladder_count')
                        AND is_nullable = 'YES')                    AS nullable_both
   FROM information_schema.columns
   WHERE table_schema = 'public' AND table_name = 'medications'
@@ -43,25 +43,25 @@ SELECT 3, 'cap constraint exists',
 UNION ALL
 -- Nothing was backfilled, so every existing medication still uses its default.
 SELECT 4, 'INFO — medications with a custom ladder',
-       (SELECT count(*)::text FROM public.medications WHERE retry_interval_minutes IS NOT NULL),
+       (SELECT count(*)::text FROM public.medications WHERE retry_ladder_interval_minutes IS NOT NULL),
        'INFO'
 
 UNION ALL
 SELECT 5, 'no row already violates the cap',
        (SELECT count(*)::text FROM public.medications
-        WHERE retry_interval_minutes IS NOT NULL
-          AND retry_interval_minutes * retry_count > 30),
+        WHERE retry_ladder_interval_minutes IS NOT NULL
+          AND retry_ladder_interval_minutes * retry_ladder_count > 30),
        CASE WHEN (SELECT count(*) FROM public.medications
-                  WHERE retry_interval_minutes IS NOT NULL
-                    AND retry_interval_minutes * retry_count > 30) = 0
+                  WHERE retry_ladder_interval_minutes IS NOT NULL
+                    AND retry_ladder_interval_minutes * retry_ladder_count > 30) = 0
             THEN 'DONE' ELSE 'FAIL' END
 
 UNION ALL
 SELECT 6, 'no half-configured row (one column set, the other NULL)',
        (SELECT count(*)::text FROM public.medications
-        WHERE (retry_interval_minutes IS NULL) <> (retry_count IS NULL)),
+        WHERE (retry_ladder_interval_minutes IS NULL) <> (retry_ladder_count IS NULL)),
        CASE WHEN (SELECT count(*) FROM public.medications
-                  WHERE (retry_interval_minutes IS NULL) <> (retry_count IS NULL)) = 0
+                  WHERE (retry_ladder_interval_minutes IS NULL) <> (retry_ladder_count IS NULL)) = 0
             THEN 'DONE' ELSE 'FAIL' END
 
 ORDER BY chk;
@@ -76,10 +76,10 @@ ORDER BY chk;
 -- and a critical medication could be configured to out-run its own escalation.
 --
 --   BEGIN;
---     UPDATE public.medications SET retry_interval_minutes = 5,  retry_count = 5
+--     UPDATE public.medications SET retry_ladder_interval_minutes = 5,  retry_ladder_count = 5
 --      WHERE id = (SELECT id FROM public.medications LIMIT 1);   -- expect: OK
---     UPDATE public.medications SET retry_interval_minutes = 10, retry_count = 4
+--     UPDATE public.medications SET retry_ladder_interval_minutes = 10, retry_ladder_count = 4
 --      WHERE id = (SELECT id FROM public.medications LIMIT 1);   -- expect: ERROR
---     UPDATE public.medications SET retry_interval_minutes = 5,  retry_count = NULL
+--     UPDATE public.medications SET retry_ladder_interval_minutes = 5,  retry_ladder_count = NULL
 --      WHERE id = (SELECT id FROM public.medications LIMIT 1);   -- expect: ERROR
 --   ROLLBACK;
