@@ -88,7 +88,7 @@ function Row({
 }
 
 export default function DisplayClientView() {
-  const { isElderly, toggleMode, uiModeLocked, setUiModeLocked } = useUiMode();
+  const { isElderly, toggleMode, uiModeLocked, setUiModeLocked, navLabelsPreference, setNavLabels } = useUiMode();
   const { theme, setTheme } = useTheme();
 
   return (
@@ -140,6 +140,29 @@ export default function DisplayClientView() {
             />
           </Row>
         )}
+
+        {/* Sits with the other "how much do you want on screen" controls rather
+            than in a nav section, because that is the question it answers.
+
+            Reads navLabelsPreference, NOT showNavLabels: in elderly the switch
+            must show what the user chose, while the row's own description says
+            plainly that large text is overriding it. A switch that silently reads
+            back "on" because something else forced it teaches people their choice
+            did not save. */}
+        <Row
+          isElderly={isElderly}
+          title="Names under the icons"
+          description={isElderly
+            ? 'Large text always shows the names, so the buttons at the bottom are easy to tell apart.'
+            : 'Shows a word under each button at the bottom — Today, Care, Meds, Vault, Settings.'}
+        >
+          <Switch
+            isElderly={isElderly}
+            checked={isElderly || navLabelsPreference}
+            disabled={isElderly}
+            onClick={() => setNavLabels(!navLabelsPreference)}
+          />
+        </Row>
 
         <Row
           isElderly={isElderly}

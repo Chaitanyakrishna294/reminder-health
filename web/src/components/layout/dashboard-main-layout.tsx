@@ -104,7 +104,7 @@ export default function DashboardMainLayout({
   patientPhone?: string;
   patientChatId?: string | null;
 }) {
-  const { isElderly, viewMode, setViewMode } = useUiMode();
+  const { isElderly, viewMode, setViewMode, showNavLabels } = useUiMode();
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
@@ -214,12 +214,17 @@ export default function DashboardMainLayout({
     // Scheduler is still one tap from the Medications page and the profile menu.
     // Medications holds the CENTER slot: it is the app's core object and the thumb's
     // natural resting position on a phone dock.
+    // `label` is the accessible name and stays the full destination. `short` is
+    // what fits UNDER the icon at five-up on a 375px phone; `shortElderly`
+    // overrides it where the elderly nav's four tabs leave room for the plainer
+    // word — "Meds" is idiomatic rather than plain, and elderly mode is the one
+    // density that can afford "Medicines".
     const baseItems = [
-      { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-      { href: '/care-circle', label: 'Care Circle', icon: Users },
-      { href: '/medications', label: 'Medications', icon: Pill },
-      { href: '/health-vault', label: 'Health Vault', icon: FolderHeart },
-      { href: '/settings', label: 'Settings', icon: Settings },
+      { href: '/dashboard', label: 'Dashboard', short: 'Today', icon: LayoutDashboard },
+      { href: '/care-circle', label: 'Care Circle', short: 'Care', icon: Users },
+      { href: '/medications', label: 'Medications', short: 'Meds', shortElderly: 'Medicines', icon: Pill },
+      { href: '/health-vault', label: 'Health Vault', short: 'Vault', icon: FolderHeart },
+      { href: '/settings', label: 'Settings', short: 'Settings', icon: Settings },
     ];
 
     // ELDERLY = the third density, and its nav collapses with everything else.
@@ -326,10 +331,10 @@ export default function DashboardMainLayout({
                  from tabs, and it buries the exit. See lib/navigation/stack.ts. */
               replace
               prefetch={shouldPrefetch(item.href)}
-              className={`flex flex-col items-center justify-center rounded-[20px] transition-all relative group ${
+              className={`flex flex-col items-center justify-center gap-1 rounded-[20px] transition-all relative group ${
                 isElderly
-                  ? `w-20 h-20 text-3xl ${active ? 'bg-primary-strong text-primary-strong-foreground shadow-lg' : 'text-foreground hover:bg-muted/80'}`
-                  : `w-14 h-14 text-xl ${
+                  ? `w-20 py-2.5 ${active ? 'bg-primary-strong text-primary-strong-foreground shadow-lg' : 'text-foreground hover:bg-muted/80'}`
+                  : `w-16 py-2 ${
                       active 
                         ? 'bg-primary-strong text-primary-strong-foreground shadow-md shadow-primary/20' 
                         : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
@@ -341,9 +346,12 @@ export default function DashboardMainLayout({
             >
               <NavPending />
               <NavIcon icon={item.icon} size={isElderly ? 'w-7 h-7' : 'w-5 h-5'} />
-              {!isElderly && (
-                <span className="absolute left-20 scale-0 group-hover:scale-100 transition-all duration-200 bg-foreground text-background text-xs font-bold px-2.5 py-1 rounded shadow-sm pointer-events-none whitespace-nowrap z-50 font-mono">
-                  {item.label}
+              {/* OFF by default, forced on in elderly — see showNavLabels in
+                  ui-mode-context. The hover tooltip it replaced was worse than
+                  nothing on touch, where hover does not exist. */}
+              {showNavLabels && (
+                <span className={`font-bold leading-none ${isElderly ? 'text-sm' : 'text-xs'}`}>
+                  {(isElderly && item.shortElderly) || item.short}
                 </span>
               )}
             </Link>
@@ -357,8 +365,8 @@ export default function DashboardMainLayout({
         aria-label="Main navigation"
         className={`md:hidden fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-40 rounded-[32px] bg-white/85 dark:bg-card/80 backdrop-blur-xl border border-border/70 shadow-lg flex items-center justify-around px-4 transition-all duration-300 ${
           isElderly
-            ? 'w-[92%] h-24 border-2 border-primary/50'
-            : 'w-[90%] max-w-[480px] h-[72px]'
+            ? 'w-[94%] h-[104px] border-2 border-primary/50'
+            : `w-[92%] max-w-[480px] ${showNavLabels ? 'h-[84px]' : 'h-[72px]'}`
         }`}
       >
         {navItems.map((item) => {
@@ -372,12 +380,15 @@ export default function DashboardMainLayout({
                  from tabs, and it buries the exit. See lib/navigation/stack.ts. */
               replace
               prefetch={shouldPrefetch(item.href)}
-              className={`flex items-center justify-center rounded-full transition-all ${
+              /* Was an aspect-square pill. Squares cannot hold a word, so the tabs
+                 now share the dock's width evenly and run icon-over-label. Both
+                 densities stay well past the 44px target in each dimension. */
+              className={`flex items-center justify-center rounded-2xl transition-all min-w-0 ${
                 isElderly
-                  ? `h-16 flex-1 max-w-[64px] aspect-square ${
+                  ? `h-[84px] flex-1 ${
                       active ? 'bg-primary-strong text-primary-strong-foreground shadow-lg' : 'text-foreground bg-muted/40'
                     }`
-                  : `h-12 flex-1 max-w-[48px] aspect-square ${
+                  : `${showNavLabels ? 'h-[68px]' : 'h-12 max-w-[56px]'} flex-1 ${
                       active 
                         ? 'bg-primary-strong text-primary-strong-foreground shadow-md shadow-primary/20' 
                         : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
@@ -389,9 +400,18 @@ export default function DashboardMainLayout({
             >
               {/* `relative` so the pending wash positions against this tab and not
                   the dock — without it every tap would flash the whole bar. */}
-              <span className="relative flex items-center justify-center w-full h-full rounded-full">
+              <span className="relative flex flex-col items-center justify-center gap-1 w-full h-full rounded-2xl px-0.5">
                 <NavPending />
                 <NavIcon icon={item.icon} size={isElderly ? 'w-7 h-7' : 'w-5 h-5'} />
+                {/* aria-label always carries the FULL destination name, labels or
+                    not — the visible short label is only what fits under a 61px
+                    tab, and turning it off must never cost a screen reader user
+                    the name of the tab. */}
+                {showNavLabels && (
+                  <span className={`font-bold leading-none ${isElderly ? 'text-sm' : 'text-xs'}`}>
+                    {(isElderly && item.shortElderly) || item.short}
+                  </span>
+                )}
               </span>
             </Link>
           );
@@ -407,8 +427,8 @@ export default function DashboardMainLayout({
       <main
         className={`flex-1 w-full max-w-[1600px] mx-auto transition-all duration-300 ${
           isElderly
-            ? 'p-8 md:p-12 md:pl-40 pb-[calc(9.5rem+env(safe-area-inset-bottom))] md:pb-12'
-            : 'p-6 md:p-8 md:pl-32 pb-[calc(7.5rem+env(safe-area-inset-bottom))] md:pb-8'
+            ? 'p-8 md:p-12 md:pl-40 pb-[calc(11rem+env(safe-area-inset-bottom))] md:pb-12'
+            : `p-6 md:p-8 md:pl-32 md:pb-8 ${showNavLabels ? 'pb-[calc(9rem+env(safe-area-inset-bottom))]' : 'pb-[calc(7.5rem+env(safe-area-inset-bottom))]'}`
         }`}
       >
         {viewMode === 'PATIENT_MONITOR' && (

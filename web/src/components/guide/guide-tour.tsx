@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, X, Check } from 'lucide-react';
 import BrainMascot from '@/components/dashboard/brain-mascot';
 import { useGuide } from './guide-context';
 import { TOURS } from './guide-content';
+import { useDensity } from '@/context/density-context';
 
 const CARD_W = 320;
 
@@ -26,7 +27,19 @@ function GuiderMascot({ size }: { size: number }) {
 
 export default function GuideTour() {
   const { activeTour, stopTour, stepIndex: index, setStepIndex } = useGuide();
-  const steps = activeTour ? TOURS[activeTour] : null;
+  const { density } = useDensity();
+  /**
+   * Steps whose target this density does not render are dropped, so "step 2 of 3"
+   * counts what the user will actually be shown.
+   *
+   * NOTE for anyone adding `densities` to the newMedication tour:
+   * medications/new/page.tsx reads `TOURS.newMedication[stepIndex]` to drive the
+   * wizard, so filtering that tour would put the two out of step. Give that page
+   * the same filter at the same time, or leave newMedication unfiltered.
+   */
+  const steps = activeTour
+    ? TOURS[activeTour].filter((s) => !s.densities || s.densities.includes(density))
+    : null;
   const [rect, setRect] = useState<DOMRect | null>(null);
   const [vw, setVw] = useState(0);
   const [vh, setVh] = useState(0);
@@ -140,7 +153,7 @@ export default function GuideTour() {
 
       {/* Step bubble — the guider mascot lives inside it. */}
       <div
-        className="absolute bg-card border border-border rounded-3xl shadow-2xl p-5 transition-all duration-300 animate-fade-in pointer-events-auto"
+        className="absolute card-lift card-lift-2 shadow-2xl p-5 transition-all duration-300 animate-fade-in pointer-events-auto"
         style={{ top: cardTop, left: cardLeft, width: cardW }}
       >
         <div className="flex items-start gap-3">

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Bundled alarm backdrop 1 of 3 — "Sunrise".
+
+  Authored gradients, not photographs. Three reasons, in order of weight:
+    1. LEGIBILITY BY CONSTRUCTION. A photograph can arrive with a bright corner
+       exactly where the medicine name sits. A gradient cannot.
+    2. They cost about a kilobyte each in the APK, against megabytes for photos
+       on a product whose users are on cheap Android phones and metered data.
+    3. Nothing to license, and nothing that looks like a stock photo of someone
+       else's family on a screen about your own medication.
+  A user who wants a real photograph has the gallery picker, which is the honest
+  way to get one.
+
+  A shape/gradient drawable rather than a vector: gradient fills inside <vector>
+  need API 24, and this app's minSdk is 23.
+
+  Every backdrop is drawn under the same 55% black scrim, so white text clears
+  4.5:1 over all three without any of them needing to be individually checked.
+  Colours are the slot tokens from alarm_colors.xml — the same morning/midday/
+  night language the rest of the product already speaks.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="270"
+                android:startColor="#F6C98A"
+                android:centerColor="#E8A44E"
+                android:endColor="#8A4A2E" />
+        </shape>
+    </item>
+    <!-- A soft low glow, so it reads as a sunrise rather than a colour swatch. -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="radial"
+                android:gradientRadius="70%p"
+                android:centerX="0.5"
+                android:centerY="0.88"
+                android:startColor="#66FFE2B8"
+                android:endColor="#00FFE2B8" />
+        </shape>
+    </item>
+</layer-list>

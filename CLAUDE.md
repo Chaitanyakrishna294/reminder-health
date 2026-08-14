@@ -23,6 +23,84 @@ are stale. Keep it updated when you add or move anything.
   This matters more here than in most projects: **anon is the key shipped inside the APK**,
   which anyone can unpack, so anon's reach is the product's worst case. Validations must
   assert `NOT has_function_privilege('anon', …)` **and** that `proacl` is not NULL.
+  - **THE RULE GENERALISES PAST anon — it is really THREE revokes.** Supabase's
+    `ALTER DEFAULT PRIVILEGES` grants to `anon`, `authenticated` **and
+    `service_role`**, so **writing no GRANT does not mean no grant for any of
+    them**. Revoke all three, then grant back only what actually calls the
+    function. Paid for 2026-08-14: `resend_caregiver_request` shipped with a
+    footer literally commenting "no service_role grant" above an ACL reading
+    `service_role=X/postgres`. Milder than the anon case — service_role is
+    server-side and bypasses RLS anyway — but a privilege footer that describes
+    an ACL the database does not have is worse than no footer, and the same
+    blind spot with `anon` in it is a leak. Validations should assert
+    `NOT has_function_privilege('service_role', …)` whenever it is not a caller;
+    that check is what caught this.
+- **IF AN RLS POLICY CALLS A FUNCTION, THE CALLER NEEDS EXECUTE ON IT — `SECURITY DEFINER`
+  does not waive that.** A policy expression is evaluated with the privileges of the role
+  running the query; there is no system exemption. DEFINER governs which role the *body*
+  runs as, and that is checked **after** the EXECUTE privilege, not instead of it. Being
+  definer is precisely what makes it feel like the rule shouldn't apply.
+  - Paid for 2026-08-13: `vault_can_accept_upload()` was granted to nobody "because the
+    policy evaluates it, not the client", and **every authenticated Health Vault upload
+    failed** with `permission denied for function`. Fixed by
+    `migration_vault_can_accept_grant_2026_08_13.sql`. The counter-example was in the same
+    policy — `is_anonymous_user()`, one conjunct earlier, carries a grant and evaluated fine.
+  - **This one fails CLOSED**, which is the opposite of the missing-revoke bug above: loud,
+    immediate, caught by the first real call. Both are privilege-doctrine mistakes; one costs
+    a leak, this one costs an outage. Neither is caught by reading the function.
+  - So a policy-referenced function is granted to every role that performs the guarded
+    operation (usually `authenticated`), and **the validation asserts it generically** — read
+    the names out of `pg_get_expr(polwithcheck, polrelid)` and check
+    `has_function_privilege('authenticated', …)` for each, so a conjunct added later is
+    covered without editing the check. Pattern: `validation_vault_upload_limits_2026_08_13.sql`
+    check 13.
+- **THE BROWSER UPLOADS STRAIGHT TO SUPABASE STORAGE — so a form check is never a limit.**
+  The Health Vault and the avatar picker both call the Storage API from the client with the
+  anon key. Our Next.js server is not in that path at all, which means every size, type and
+  quota check written in a component is *advice to whoever chooses to use our form*, and the
+  person worth defending against is exactly the one who does not. **The only real places to
+  refuse are `storage.buckets.file_size_limit` / `.allowed_mime_types` and the RLS policy on
+  `storage.objects`.** Anything new that accepts a file gets its ceiling there first, and the
+  UI copy second.
+  - **Vault quota, set 2026-08-13** (`migration_vault_upload_limits_2026_08_13.sql`):
+    **5 files per user, 5 MB per file, images + PDF only.** Counted as **storage objects, not
+    `health_records` rows** — a direct API upload creates an object and no row, so a row count
+    would sit at zero while the bucket filled.
+  - **Trash occupies a slot until it is purged**, and the UI says so. A soft delete keeps the
+    object in the bucket so Restore can work; `cleanup_expired_trash` removes it at 30 days.
+    Since the limit counts objects, a trashed file is still a file — the honest options were
+    "say so and offer permanent delete" or "break the restore we promised", and it is the
+    first. Do not "fix" the counter to ignore trash; that would make it disagree with the
+    policy, and a counter that disagrees with the limit is worse than no counter.
+  - **The count function must stay SECURITY DEFINER owned by a BYPASSRLS role.** A policy on
+    `storage.objects` that itself selects from `storage.objects` raises `infinite recursion
+    detected in policy`. Check 5 of the validation asserts this; if it ever reads FAIL, roll
+    back rather than debug live — every vault upload is failing.
+  - **`vault_can_accept_upload()` takes a per-user advisory lock.** Without it, fifty
+    parallel uploads all read the same count and all pass, which is precisely the attack the
+    quota exists to stop. A polite client was never the threat. It **is** granted to
+    `authenticated` — the policy calls it, and a policy runs as the caller (see the rule
+    above); granting nobody took vault upload down on 2026-08-13.
+  - **Existing users over the limit keep every file.** The rule is `count < 5` on INSERT only.
+    Never enforce a new quota by deleting someone's medical records.
+  - **DELETING AN ACCOUNT ORPHANS ITS FILES, EVERY TIME — this is a standing chore, not a
+    one-off.** `storage.objects.owner` is FK to `auth.users` `ON DELETE SET NULL`, so each
+    deletion converts that account's remaining objects into ones no policy can match:
+    unlistable, undeletable through the app, billed forever (114 in `health-vault` on
+    2026-08-13). `delete_my_account` **cannot** clean them — Supabase blocks `DELETE FROM
+    storage.objects`, the 42501 that once broke all in-app account deletion (APPLIED.md #61).
+    Bytes only move through the Storage API, so the companion is
+    **`db/scripts/purge-orphan-storage.mjs`** (service_role; dry run by default,
+    `--delete --confirm DELETE` to act). Run it after a batch of deletions.
+    **It must never test `owner IS NULL`** — `avatars` policies key on the path's first
+    segment, not on `owner`, so that test deletes live users' photos. It asks whether the
+    account named by the first path segment still exists, and skips whatever it cannot
+    classify.
+  - **Still open (audited 2026-08-13, `db/audits/audit_unbounded_growth_2026_08_13.sql`):**
+    `audit_logs` has `FOR ALL TO authenticated`, so the client can append rows without bound
+    and the vault does exactly that on every action; and the `avatars` policy checks only the
+    first path segment, so one user can hold unlimited objects under `{uid}/…`. Both are
+    reachable by a guest, and guest sign-in is one tap.
 - **moment-timezone stays** — `src/utils.js` and `web/src/lib/medication-utils.ts` must keep identical DST math. No Intl migration.
 - **Dashboard nav = exactly 5 icons** (`dashboard-main-layout.tsx`); secondary pages go in the profile dropdown.
 - **LIGHT MODE IS THE DEFAULT, ALWAYS.** The product never auto-follows the OS theme. **Do not write
@@ -48,6 +126,44 @@ are stale. Keep it updated when you add or move anything.
     `drawable-*-night-*` variants) — Android auto-selects these in dark mode, so the splash still
     follows the OS. Delete them when the new app icon and paper-token splash are built (launch
     layer (a)); they are Capacitor template placeholders being replaced anyway.
+- **THREE DENSITIES, ONE SYSTEM (built 2026-08-13).** The same routes, the same data and
+  the same derivations render at three densities. `web/src/lib/design/density.ts` holds the
+  type, the resolution rule and `DENSITY_LAYOUT` — **a table, so the entire difference
+  between the densities is readable in one place**; `web/src/context/density-context.tsx`
+  resolves it and `useDensity()` hands out `{ density, layout, isApp, isBrowser }`.
+  - **browser** — the full view, including the side column the redesign spec calls the
+    *analytics column* (compliance ring · care circle · medication inventory). Health
+    Insights is NOT in it: that card and its server-side 7-day aggregation were deleted
+    2026-08-12 (the compliance ring is the adherence surface now). Any future dataviz pass
+    lands in this column, at this density.
+  - **app** — inside Capacitor (`isNativeApp()`, i.e. `Capacitor.isNativePlatform()`).
+    A calm today-view: the analytics column is dropped whole, and so is the "Enable
+    Browser Notifications" prompt, which offers a channel the app does not use. **Nothing
+    is lost, only un-duplicated** — care circle and inventory are both tabs in the
+    five-icon nav, and low stock still reaches Today via the refill gate, the refill strip
+    and the per-dose "N left" chip.
+  - **elderly** — the minimal presentation below. Outranks everything, including the dev
+    override: `?preview=` is a developer's convenience, elderly is somebody's ability to
+    read the screen.
+  - **`?preview=app` / `?preview=browser`** forces a density from a desktop browser. It is
+    **sticky for the session** (sessionStorage) so you can walk the app rather than
+    re-appending a param to every URL — and because sticky invisible state is a trap, a
+    badge says which density is forced and offers Exit. The two ship together.
+  - **PRESENTATION ONLY.** No density may gate a derivation, a query, a write path or a
+    safety check. If one ever needs its own copy of dose logic, the split is in the wrong
+    place — that is exactly how the old elderly dashboard rotted.
+  - **The first-paint half is deliberate duplication.** The server cannot know it is
+    rendering into the Capacitor webview, so every page streams the *browser* density; the
+    pre-paint script in `app/layout.tsx` stamps `data-density` on `<html>` and one rule in
+    `globals.css` hides `.browser-only` until React catches up. **React is always the
+    authority** — the attribute is an approximation (it cannot know about elderly, and it
+    learns "this is the app" from a flag written on a previous load, so the first launch
+    after install still flashes once). Never rely on `.browser-only` alone to keep
+    something off the app.
+  - **Tour steps carry `densities?: Density[]`** (`guide-content.ts`), filtered in
+    `guide-tour.tsx`, so the app tour does not spend a step describing a card that is not
+    on screen. `medications/new/page.tsx` indexes `TOURS.newMedication` directly — filter
+    that tour and you must filter it there too, or the wizard and the tour drift apart.
 - **ELDERLY IS THE THIRD DENSITY — browser · app · elderly-minimal.** Treat all three
   as one system; the density-split work must account for elderly, not bolt it on after.
   - **Elderly renders FEWER elements, not bigger ones.** Scaling the standard UI up was
@@ -105,12 +221,143 @@ are stale. Keep it updated when you add or move anything.
   - Mascot placement is a registry, not a convention: `MASCOT_SLOTS` in `brain-mascot.tsx`.
     Adding a slot is a design decision — make it there, on purpose.
 - **Medication catalog links are human-select-only** — never auto-match a nickname to a real drug (patient safety).
-- **The dose gate and the rail's due-now card must never disagree.** Both ask "did you take it?"
-  about a dose, and both are kept deliberately: the gate is the full-screen interruption on app
-  open, the rail's due-now card is the in-page version. The invariant that makes two surfaces safe
-  is that **both pick the EARLIEST overdue dose** — `buildGateQueue` orders due-now-first ascending,
-  and `DayRail` sorts overdue doses ascending and promotes `[0]`. If either ordering changes, change
-  both, or the app will ask about one dose while highlighting another.
+- **WATER INTAKE IS THE QUIET TIER, AND THAT IS THE WHOLE DESIGN (2026-08-14).**
+  Opt-in, OFF by default, and deliberately the least insistent thing in the
+  product: a normal swipeable notification on its own low-importance channel,
+  **never the full-screen alarm path**, no retry ladder, no missed tracking, no
+  escalation, no streaks. Ignoring a nudge records nothing; a missed water day
+  says nothing about anybody. If the goal is already met, remaining nudges
+  silently skip.
+  - **Water yields to medicine.** A nudge within 10 minutes of a scheduled dose is
+    DROPPED, not moved — moving it puts the cup somewhere the user did not choose
+    and can cascade into the next one. `withoutDoseClashes` in
+    `web/src/lib/water/hydration.ts`.
+  - **Nudges are INEXACT** (WorkManager / inexact alarms). Exact alarms stay
+    medication-only — that is a hard rule and a glass of water does not earn one.
+  - **The goal is a rule of thumb, never advice**: weight × 35 ml/kg, 25 ml/kg at
+    65+, ÷ cup size, rounded to whole cups. Editable, shown as a suggestion, and
+    the setup screen carries the safety line FIRST, not as a footnote: "If you
+    have heart or kidney conditions or take fluid pills, ask your doctor about
+    your water goal." For someone on a fluid restriction, a cheerful app telling
+    them to drink ten glasses is the one genuinely unsafe thing here.
+  - **`--hydration-*` is a SCOPED accent — the only exception to the one-accent
+    rule.** Sky blue exists so a glass of water is never mistaken for a dose. It
+    belongs to the water widget and its settings room and nowhere else; if it ever
+    appears on a dose card, a rail, a gate or the alarm, that is the bug.
+    `--hydration-ink` for any text (the raw hue is ~2.6:1 on paper).
+  - **The tumbler animates only as feedback to a touch.** No idle loop, no
+    breathing, nothing that moves while someone reads the screen. One composited
+    `translateY` on the fill plus one small slosh, and `prefers-reduced-motion`
+    snaps both — a real branch, not a shortened duration, because this is an
+    elderly app.
+  - **Sync is last-write-wins on `water_logs`, NOT "larger count wins".** Taking
+    the larger number is the obvious rule for a counter and the wrong one: it
+    makes undo impossible by resurrecting the count the user just corrected. Local
+    first (`localStorage`), the row is the shared truth. The cost — an offline
+    change can be overwritten by another device — is acceptable precisely because
+    nothing else reads this data.
+  - **No caregiver read.** `water_settings` / `water_logs` are own-row only.
+    Nobody escalates on water, and a caregiver seeing whether someone drank enough
+    is surveillance without a purpose.
+- **THE GATE AND THE RAIL MUST NEVER DISAGREE ABOUT WHICH DOSES ARE OUTSTANDING.** Both ask
+  "did you take it?", and both are kept deliberately: the gate is the full-screen interruption
+  on app open, the rail's due-now card is the in-page version.
+  - **Doses at the SAME INSTANT are presented together and answered independently.** A noon
+    handful is one handful; asking about it one pill at a time means the second question
+    arrives after the person has already swallowed all four, and they answer it from memory.
+  - **Earliest-first ordering still governs ACROSS different instants** — an unanswered 08:00
+    dose still outranks a 14:00 one on both surfaces.
+  - **Elderly asks one question at a time**, per the one-question philosophy. That is the one
+    density where the grouping is presentation-only: the doses are still all outstanding, the
+    screen just shows them one at a time.
+  - Narrowed from "both pick the EARLIEST overdue dose" on 2026-08-14. That wording was built
+    on there being exactly one earliest, which is false for the case it most needed to cover:
+    four medications at 08:00 have no earliest, and a 4-med device test found two fighting for
+    the full screen while two sat as notifications. The safety property was never "one dose at
+    a time" — it was "the two surfaces show the same work", and that is what the rule now says.
+  - `buildGateQueue` (`lib/schedule/dose-attention.ts`) and `DayRail` are the two
+    implementations. **If either ordering or grouping changes, change both**, or the app will
+    ask about one dose while highlighting another.
+  - **THE NATIVE ALARM IS THE THIRD SURFACE, and it obeys the same rule (2026-08-14).** One
+    notification id per dose *instant*, one `singleInstance` `AlarmActivity` reading
+    `DosesAtInstant.rowsAt`, per-dose answering. `AlarmPrefs.elderly` (bridged from the web)
+    is what makes elderly ask one at a time there too.
+    - **THE FOCUSED LIST.** All same-instant doses are on screen, but exactly ONE is
+      active: it rings with big Taken/Skip, the rest sit below showing their state and
+      can be tapped to jump the queue in any order. Answering advances the focus; so
+      does running out of ring time, which **yields** — that dose stops taking the
+      screen's attention *without being resolved*, so its ladder and its missed notice
+      carry on as if the screen had never opened. When every dose has had its turn, the
+      screen closes. Four cards with two buttons each is eight equal choices at 3am, and
+      it also let one unanswered dose hold the screen while the other three were never
+      asked at all.
+    - **The rotation lives in `DoseFocus`, not the Activity.** A dose quietly dropped
+      from it is a dose never asked about, which on screen is indistinguishable from a
+      dose that was never due. An Activity cannot be unit-tested; three sets can.
+    - **Ring duration is `profiles.alarm_ring_seconds`, 60-300s, PER DOSE** — so a
+      handful of four at 2 minutes runs for 8. The setting says the total out loud
+      rather than leaving it to be discovered at 3am. Bridged like `elderly`.
+    - **The backdrop and the sound are DEVICE-LOCAL and belong to the PRESENTATION** —
+      one picture and one tone for the whole handful, never per row. Files live in
+      app-private storage (`AlarmMedia`), never Supabase, never a URL, so the alarm
+      shows and plays them in airplane mode with the process dead. Three bundled
+      gradients ship in the APK; a gallery pick is COPIED IN, so deleting the original
+      cannot break the alarm. **Contrast is structural**: every backdrop sits under the
+      same 55% black scrim and the buttons keep opaque fills, so no image can make them
+      hard to see. Picked images are decoded downsampled — a 50MP photo decoded whole is
+      an OOM on the one screen that must never crash.
+    - **This is the one bridge area where NATIVE owns the data.** The webview cannot
+      write to app-private storage, so the picker is Kotlin and the web only learns
+      which choice is active. See BRIDGE_CONTRACT.md §1c.
+    - **THE SETTINGS MINIATURE IS A RENDER OF THE REAL SCREEN, NEVER A LOOKALIKE.**
+      `renderAlarmPreview` inflates the same XML, binds it through the same
+      `AlarmScreenBinder`, and draws it to a bitmap the webview shows in an `<img>`.
+      A CSS recreation would be a second implementation of the most safety-critical
+      screen in the product, and a preview that quietly stops matching is worse than
+      no preview — it is a promise about a screen the user next sees at 3am, with no
+      way to check it until then. **`AlarmScreenBinder` exists only to make the two
+      paths one; if a future change composes the alarm without it, the guarantee is
+      gone.** Measured at real screen size then scaled, or long names would wrap
+      differently in the preview than on the alarm. Sound is previewed by playing it
+      (`USAGE_ALARM`, non-looping, self-stopping) — it cannot be shown.
+    - **Global image/sound, not per medication** — decided 2026-08-14. Per-medication
+      override is half built already (`Medication.alarmAudioPath`/`alarmPhotoPath` in
+      Room v2, and the resolution order already prefers them); it needs a server column
+      and per-med UI, not a rewrite.
+    - **The group is derived from the SCHEDULE, never from alarm state.** That is what makes a
+      retry rung, a rung rebuilt after a reboot, and the original ring all compute the same
+      group without knowing about each other. Asking "which alarms are pending" would be wrong
+      exactly when it matters — a rung races the original, and after a reboot nothing is pending
+      until `rescheduleAll` has run.
+    - **Closing the screen with doses unanswered marks ONLY those doses unattended.** Their
+      ladders keep running and their missed notice posts; the answered ones stay answered.
+    - **The alarm that rang is never swallowed.** The schedule decides the group, but a
+      medication edited out of that instant between registration and firing still gets asked —
+      `DosesAtInstant.mergeWithFallback`. A stale question can be answered Skip; a question
+      never asked has no move at all.
+- **A RETRY LADDER MUST DIE ON ANY RESOLVE THE DEVICE LEARNS ABOUT — from any surface, including
+  ones it was not part of.** The ladder is native (chained exact alarms), so cancellation is
+  native, and the choke point is `DoseActionQueue.record` — every answer routes through it and it
+  is what calls `cancelLadder`.
+  - Paid for 2026-08-14: that choke point only ever saw **native-originated** answers. A dose
+    marked SKIP from the app's own rail resolved on the server and the device never heard, so two
+    **critical** medications read as skipped everywhere on screen while the phone re-asked every
+    five minutes. Being chased for a dose you already dealt with is how people learn to ignore the
+    alarm — the exact opposite of what a retry ladder is for. The notification path had always
+    worked, which is what made the gap invisible.
+  - Fixed with `ScheduleBridge.doseResolved` (immediate, called from
+    `web/src/lib/reminder-events.ts` — the one function every web surface resolves through) plus
+    `getActiveLadders` reconciliation in `ScheduleSync` for answers the device was never part of,
+    i.e. **a caregiver resolving from their own phone**. See BRIDGE_CONTRACT.md §1b.
+  - **Report resolves through `record(alreadyOnServer = true)`, never straight to
+    `cancelLadder`.** An answer also has to leave the dose out of the coalesced alarm group,
+    narrow or clear the notification, and reach a visible alarm screen. A second cancellation
+    path covers the first of those and silently misses the rest — which is the same shape as the
+    bug it would be fixing.
+  - **Honest bound, do not overstate it:** reconciliation runs when the webview runs, so a
+    caregiver's remote answer can leave the phone re-asking until the app is next opened
+    (at most one ladder, ≤30 min). Closing that gap means the device polling the server, which is
+    forbidden and would break the offline guarantee the alarm core exists for.
 - Web deploys from **repo root**: `npx vercel deploy --prod --yes --scope chaitanya-krishnas-projects-397d3a53`. **The `--scope` is required** — without it the CLI returns `Not authorized` even though `vercel whoami` succeeds, because `.vercel/repo.json` pins an `orgId` that no longer resolves for the logged-in user. Root `.vercel/repo.json` maps the repo to project `reminder-health` with `directory: web`, so deploy from the ROOT, never from `web/`. Vercel ships the **working tree, not the commit** — check `git status` first, or uncommitted work goes to production too.
 - For nontrivial Next.js work, heed `web/AGENTS.md`: this Next 16 differs from training data; check `node_modules/next/dist/docs/`.
 - Exclude `.claude/worktrees/` from repo-wide greps (stale full checkout).
@@ -365,30 +612,14 @@ service). The design consequence is that **the notification must be fully answer
   `setAutoCancel(false)`) and stay until the dose is actually resolved. The missed fallback carries
   the same three buttons — it has to, since a persistent notification with no way to answer it is
   just a stuck notification.
-- **Android 14+ caveat:** a user can still *deliberately* dismiss an ongoing notification; the
-  platform stopped treating `setOngoing` as absolute. Accepted, not fought — the missed-dose
-  fallback and above all the **server-side escalation ladder** are the real backstop. A
-  notification the OS lets someone dismiss was never the last line of defence.
-
-**Alarm presentation: two shapes, both correct (confirmed on device 2026-08-11 — do not "fix").**
-Android decides how to present the dose alarm's full-screen intent:
-- phone **locked or idle** → the full-screen `AlarmActivity` takes over the screen;
-- phone **unlocked and in active use** → a **heads-up notification** instead (tapping it opens the
-  full alarm screen).
-
-That second case is Android deliberately not hijacking the screen of someone who is demonstrably
-already using their phone. It is correct and desirable. **Never attempt to override it** — the ways
-to do so are exactly the ones CLAUDE.md already forbids (`SYSTEM_ALERT_WINDOW`, a foreground
-service). The design consequence is that **the notification must be fully answerable on its own**:
-- **Taken / Skip / Snooze 10 min are action buttons on the notification itself**, handled by
-  `DoseActionReceiver` (a BroadcastReceiver — no UI opens) and routed through the *same*
-  `DoseActionQueue` as the full-screen buttons. Snooze does both halves: local re-registration
-  **and** `snooze_reminder_event`. Nobody should have to open a takeover screen to answer a dose
-  they are awake for.
-- Both the live alarm and the "Missed: take X" fallback are **persistent** (`setOngoing(true)` +
-  `setAutoCancel(false)`) and stay until the dose is actually resolved. The missed fallback carries
-  the same three buttons — it has to, since a persistent notification with no way to answer it is
-  just a stuck notification.
+- **A HANDFUL GETS ONE NOTIFICATION, not one per medicine (2026-08-14).** The id is derived from
+  the dose *instant*, so four medications at 12:00 update a single notification with a single
+  full-screen intent instead of racing to launch four alarm screens. A notification has three
+  action slots and a handful can have four doses, so the grouped one carries **Taken all · Open ·
+  Snooze**: "Taken all" is the one answer that is honest for a whole handful, "Open" is how you
+  answer them individually, and **Skip-all is deliberately not a one-tap on a lock screen** —
+  declining every medicine at once deserves the screen that shows you which ones. The single-dose
+  notification keeps Taken / Skip / Snooze exactly as before.
 - **Android 14+ caveat:** a user can still *deliberately* dismiss an ongoing notification; the
   platform stopped treating `setOngoing` as absolute. Accepted, not fought — the missed-dose
   fallback and above all the **server-side escalation ladder** are the real backstop. A
@@ -481,6 +712,20 @@ service). The design consequence is that **the notification must be fully answer
     no separate app entry. Verified live on that origin: widget renders
     (`cf-chl-widget-…_response`), a real **794-char token** is issued, no error fallback, submit
     enabled.
+    - **PREVIEW DEPLOYMENTS BREAK LOGIN, and this will recur on every design review.**
+      A Vercel preview lands on its own hostname
+      (`reminder-health-<hash>-<team>.vercel.app`), which is NOT in the site key's
+      allowed domains — so Turnstile fails and nobody can sign in to review the
+      branch. Nothing is wrong with the branch; it is the domain lock doing its job.
+      **Fix: alias the preview to ONE stable hostname and whitelist that once** —
+      `npx vercel alias set <deployment-url> reminder-health-refresh.vercel.app --scope …`,
+      then add `reminder-health-refresh.vercel.app` in Cloudflare → Turnstile →
+      the widget → Settings → Domains. Re-point the same alias at each new preview
+      and the whitelist never needs touching again.
+      **Do NOT "fix" it by pointing Preview at Turnstile's always-passes test key**
+      (`1x00000000000000000000AA`): Supabase verifies the token against the real
+      SECRET key, so a dummy site key produces a token Supabase rejects, and login
+      breaks in a more confusing way than it does now.
     - **What would break it:** moving to bundled assets — the M5 "static export or RN migration"
       option — changes the origin to `capacitor://localhost` / `https://localhost`, which is NOT in
       the site key's allowed domains. CAPTCHA would then fail on the app while still working on the
@@ -625,6 +870,40 @@ explicitly *not* for marketing pages, which is right for this app). Alongside it
 restraint, `verification-before-completion` for evidence-before-claims, `dataviz` for the adherence
 heatmap and stat tiles, `motion-design` + `gsap-*` for the launch idle animation and
 micro-interactions, and `artifact-design` only when publishing a proposal artifact.
+
+**SKILL VERDICT, recorded 2026-08-13 so it stops being re-decided per task.**
+- **`ux-copy` and `project-a11y` are NOT OPTIONAL.** They trigger on *any* change
+  that adds user-facing words or touches UI, and they are invoked at the START of
+  the work, not as a review afterwards — both exist because these checks were
+  failing when left to judgement (pink-on-white shipped at 2.9:1 twice; a slot
+  tint shipped as label text at ~1.9:1).
+- **`interface-design` is for VISUAL DIRECTION**, not mechanics. Use it when a
+  screen's hierarchy, layout or information design is genuinely open. Do not
+  invoke it for plumbing — a flow conversion, a nav label, a gesture handler —
+  where the design is already decided and the work is making it true.
+- **`ponytail` is applied as a principle rather than invoked per task.** Its whole
+  content is "reuse what exists": the 2026-08-13 batch reused `CodeInput` for the
+  reset code screen and navigated to the existing `/update-password` instead of
+  building a second password form. If a task is tempted toward a parallel
+  implementation of something the repo already has, that is the signal to reach
+  for it explicitly.
+- Everything in the "Deliberately NOT used" list below stays out. That list is
+  about competing visual directions, and it does not expire.
+- **`motion-design` — consulted 2026-08-14 for the water tumbler, verdict: USE IT
+  FOR THE NUMBERS, NOT THE AMBITION.** Its timing/easing/material tables are
+  genuinely useful (fluid material → ~1.5× duration and a settle rather than a
+  bounce is why the fill is 380ms on `cubic-bezier(0.34,1.06,0.64,1)`). But its
+  "always three motion layers — primary, secondary, **ambient**" rule is a direct
+  conflict with the calm rule and was **refused**: an ambient layer is a looping
+  idle animation, and nothing on Today may move for attention. Flagged per the
+  conflict rule rather than followed. Same for its "success = particle burst".
+- **`interface-design` — consulted for the same work, verdict: correct call, and
+  its "use what exists" half did the most work.** The water card ended up on the
+  page's existing card conventions and spacing scale rather than inventing a
+  surface, which is what keeps it part of Today rather than a sticker on it. Its
+  domain-exploration phase is for screens whose direction is open; the water
+  direction was already decided in the request, so that half was skipped on
+  purpose.
 
 **SKILLS SERVE THE DESIGN SYSTEM; THEY NEVER OVERRIDE IT.** The approved proposal — tokens, the
 one-accent rule, slot tints as surfaces only, Remi's five-part palette, the sticker-flat rendering

@@ -112,7 +112,7 @@ export default async function PatientConsolePage({ params }: PageProps) {
 
   if (!connection || connection.connection_status !== 'ACCEPTED') {
     return (
-      <div className="max-w-xl mx-auto mt-12 p-8 bg-card border border-border rounded-3xl text-center space-y-6 shadow-sm">
+      <div className="max-w-xl mx-auto mt-12 p-8 card-lift text-center space-y-6 shadow-sm">
         <ShieldAlert className="w-12 h-12 mx-auto text-danger" />
         <h2 className="text-xl font-black text-foreground">Access Restricted</h2>
         <p className="text-xs text-muted-foreground">
@@ -224,7 +224,7 @@ export default async function PatientConsolePage({ params }: PageProps) {
       )}
 
       {/* 2. Relationship Header Card */}
-      <div className="bg-card border border-border rounded-3xl p-6 md:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-sm">
+      <div className="card-lift p-6 md:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-sm">
         <div className="flex items-center gap-4">
           <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center font-extrabold border border-primary/20 text-2xl overflow-hidden">
             {patientAvatarUrl ? (
@@ -273,7 +273,7 @@ export default async function PatientConsolePage({ params }: PageProps) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         
         {/* Adherence Rate */}
-        <div className="bg-card border border-border rounded-2xl p-5 flex flex-col justify-between shadow-sm">
+        <div className="card-lift p-5 flex flex-col justify-between shadow-sm">
           <div>
             <span className="text-[10px] text-muted-foreground font-bold tracking-wider uppercase">30d Adherence</span>
             <h3 className="text-3xl font-extrabold text-foreground mt-1.5">{metrics.adherenceRate}%</h3>
@@ -284,7 +284,7 @@ export default async function PatientConsolePage({ params }: PageProps) {
         </div>
 
         {/* Active Medications */}
-        <div className="bg-card border border-border rounded-2xl p-5 flex flex-col justify-between shadow-sm">
+        <div className="card-lift p-5 flex flex-col justify-between shadow-sm">
           <div>
             <span className="text-[10px] text-muted-foreground font-bold tracking-wider uppercase">Active Medications</span>
             <h3 className="text-3xl font-extrabold text-foreground mt-1.5">{metrics.activeMedicationsCount}</h3>
@@ -305,7 +305,7 @@ export default async function PatientConsolePage({ params }: PageProps) {
         />
 
         {/* Missed Doses */}
-        <div className="bg-card border border-border rounded-2xl p-5 flex flex-col justify-between shadow-sm">
+        <div className="card-lift p-5 flex flex-col justify-between shadow-sm">
           <div>
             <span className="text-[10px] text-muted-foreground font-bold tracking-wider uppercase">Missed Doses Today</span>
             <h3 className="text-3xl font-extrabold text-foreground mt-1.5">{metrics.missedDosesCountToday}</h3>
@@ -328,7 +328,7 @@ export default async function PatientConsolePage({ params }: PageProps) {
         <div className="space-y-6 lg:col-span-1">
           
           {/* Routine Stability Card */}
-          <div className="bg-card border border-border rounded-3xl p-6 space-y-4 shadow-sm">
+          <div className="card-lift p-6 space-y-4 shadow-sm">
             <h3 className="text-xs font-black text-foreground uppercase tracking-wider">Routine Stability</h3>
             <div className="flex items-baseline gap-2">
               <span className="text-5xl font-black text-foreground">{metrics.relationshipHealthScore}</span>
@@ -346,7 +346,7 @@ export default async function PatientConsolePage({ params }: PageProps) {
           </div>
 
           {/* Caregiving Milestones Card */}
-          <div className="bg-card border border-border rounded-3xl p-6 space-y-4 shadow-sm">
+          <div className="card-lift p-6 space-y-4 shadow-sm">
             <h3 className="text-xs font-black text-foreground uppercase tracking-wider">Caregiving Milestones</h3>
             <div className="space-y-3 text-xs text-foreground font-medium">
               <div className="flex justify-between items-center py-1.5 border-b border-border">
@@ -365,7 +365,7 @@ export default async function PatientConsolePage({ params }: PageProps) {
           </div>
 
           {/* Relationship Permissions (Trust-Oriented Copy) */}
-          <div className="bg-card border border-border rounded-3xl p-6 space-y-4 shadow-sm">
+          <div className="card-lift p-6 space-y-4 shadow-sm">
             <h3 className="text-xs font-black text-foreground uppercase tracking-wider">Shared Trust</h3>
             
             <div className="space-y-3 text-xs text-foreground font-medium">
@@ -428,7 +428,7 @@ export default async function PatientConsolePage({ params }: PageProps) {
           />
 
           {/* Medications schedule card */}
-          <div className="bg-card border border-border rounded-3xl p-6 space-y-4 shadow-sm">
+          <div className="card-lift p-6 space-y-4 shadow-sm">
             <div className="flex justify-between items-center">
               <h3 className="text-xs font-black text-foreground uppercase tracking-wider flex items-center gap-2">
                 <Clock className="w-4 h-4 text-primary" /> Schedule List
@@ -473,7 +473,7 @@ export default async function PatientConsolePage({ params }: PageProps) {
           </div>
 
           {/* Adherence log card */}
-          <div className="bg-card border border-border rounded-3xl p-6 space-y-4 shadow-sm">
+          <div className="card-lift p-6 space-y-4 shadow-sm">
             <h3 className="text-xs font-black text-foreground uppercase tracking-wider flex items-center gap-2">
               <BarChart3 className="w-4 h-4 text-primary" /> Recent Compliance Logs
             </h3>
@@ -520,7 +520,7 @@ export default async function PatientConsolePage({ params }: PageProps) {
           </div>
 
           {/* Health Vault Documents Card */}
-          <div className="bg-card border border-border rounded-3xl p-6 space-y-4 shadow-sm">
+          <div className="card-lift p-6 space-y-4 shadow-sm">
             <h3 className="text-xs font-black text-foreground uppercase tracking-wider flex items-center gap-2">
               <FileText className="w-4 h-4 text-primary" /> Documents Shared by {patientName}
             </h3>

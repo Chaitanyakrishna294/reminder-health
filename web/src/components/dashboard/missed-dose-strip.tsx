@@ -89,7 +89,7 @@ export default function MissedDoseStrip({ events, userRole, onResolved, onUnreso
         {events.map(e => (
           <li
             key={e.id}
-            className="flex flex-wrap items-center justify-between gap-3 bg-card border border-border rounded-2xl px-4 py-3"
+            className="flex flex-wrap items-center justify-between gap-3 card-lift px-4 py-3"
           >
             <div className="min-w-0">
               <p className={`font-black text-foreground truncate ${isElderly ? 'text-xl' : 'text-sm'}`}>

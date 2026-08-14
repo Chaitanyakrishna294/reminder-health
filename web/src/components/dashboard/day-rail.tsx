@@ -22,6 +22,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Check, Clock, SkipForward, AlertCircle, Pill, ChevronDown, Package } from 'lucide-react';
 import { groupBySlot, type SlotMeta } from '@/lib/design/slots';
+import { earliestDoseGroup } from '@/lib/schedule/dose-attention';
 import { unitPhrase } from '@/components/medications/medication-form-options';
 import type { ReminderEvent } from '@/components/dashboard/todays-schedule';
 
@@ -159,13 +160,23 @@ export default function DayRail({
 
   if (groups.length === 0) return null;
 
-  // Only ONE card may break the rhythm. If several doses are overdue, the earliest
-  // wins — asking about the oldest first matches the gate's queue order, so the two
-  // surfaces never disagree about which dose is "the" one right now.
+  // EVERY dose at the earliest outstanding instant breaks the rhythm, not just
+  // one of them. A noon handful is one handful, and the gate groups it the same
+  // way — `earliestDoseGroup` is the single definition both surfaces call, so
+  // they cannot disagree about which doses are outstanding.
+  //
+  // Across DIFFERENT instants the earliest still wins: an unanswered 08:00 dose
+  // outranks a 14:00 one here exactly as it does in the gate's queue.
+  //
   // A past day has no due-now card at all: verdictOf never returns 'due' for one.
-  const dueNowId = events
-    .filter((e) => verdictOf(e.reminder_status, e.scheduled_for, nowMs, isPastDay) === 'due')
-    .sort((a, b) => new Date(a.scheduled_for).getTime() - new Date(b.scheduled_for).getTime())[0]?.id;
+  const dueNowIds = new Set(
+    earliestDoseGroup(
+      events.filter((e) => verdictOf(e.reminder_status, e.scheduled_for, nowMs, isPastDay) === 'due'),
+    ).map((e) => e.id),
+  );
+  // The tour still spotlights ONE card — a spotlight over four is not a
+  // spotlight — so it takes the first of the group.
+  const dueNowId = [...dueNowIds][0];
 
   // The guided tour's "your next dose" step used to spotlight the hero card. This
   // rail is the hero's successor, so the anchor moves to the dose the rail is
@@ -197,7 +208,7 @@ export default function DayRail({
           key={slot.id}
           slot={slot}
           items={items}
-          dueNowId={dueNowId}
+          dueNowIds={dueNowIds}
           tourAnchorId={tourAnchorId}
           selectedEventId={selectedEventId}
           // A shut drawer never hides the dose you just asked to see.
@@ -221,14 +232,15 @@ export default function DayRail({
 }
 
 function SlotGroup({
-  slot, items, dueNowId, tourAnchorId, selectedEventId, expanded, onToggle,
+  slot, items, dueNowIds, tourAnchorId, selectedEventId, expanded, onToggle,
   nowMs, timeOf, timeZoneFor,
   canResolve, onResolve, canCorrect, onCorrect, isPastDay = false, lowStockLeft,
   updatingId, isElderly,
 }: {
   slot: SlotMeta;
   items: ReminderEvent[];
-  dueNowId?: number;
+  /** Every dose sharing the earliest outstanding instant — see earliestDoseGroup. */
+  dueNowIds: Set<number>;
   tourAnchorId?: number;
   expanded: boolean;
   onToggle: () => void;
@@ -294,7 +306,7 @@ function SlotGroup({
               key={event.id}
               event={event}
               slotChip={c.chip}
-              isDueNow={event.id === dueNowId}
+              isDueNow={dueNowIds.has(event.id)}
               isTourAnchor={event.id === tourAnchorId}
               isSelected={event.id === selectedEventId}
               nowMs={nowMs}

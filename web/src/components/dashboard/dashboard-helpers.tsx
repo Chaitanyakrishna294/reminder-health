@@ -6,7 +6,7 @@ import React from 'react';
 
 // Single source of truth for the unit-type icon map lives in custom-icons.tsx;
 // re-exported here so existing '@/components/dashboard/dashboard-helpers' imports keep working.
-export { getUnitIcon } from '@/components/ui/custom-icons';
+export { getUnitIcon } from '@/lib/design/dose-forms';
 
 /**
  * Human-readable countdown / overdue text for a scheduled dose time.

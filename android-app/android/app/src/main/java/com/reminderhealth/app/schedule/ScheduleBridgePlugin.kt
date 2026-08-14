@@ -1,11 +1,16 @@
 package com.reminderhealth.app.schedule
 
+import android.app.Activity
+import android.content.Intent
+import android.net.Uri
 import android.util.Log
+import androidx.activity.result.ActivityResult
 import com.getcapacitor.JSArray
 import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
+import com.getcapacitor.annotation.ActivityCallback
 import com.getcapacitor.annotation.CapacitorPlugin
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -65,6 +70,16 @@ class ScheduleBridgePlugin : Plugin() {
                     nextReminderAt = m.getString("nextReminderAt"),
                     active = m.getBoolean("active"),
                     medicationReason = m.stringOrNull("medicationReason"),
+                    // Retry ladder (BRIDGE_CONTRACT.md section 0). All three are
+                    // tolerated as absent so an APK newer than the deployed web
+                    // still syncs -- server.url means the two halves ship
+                    // separately, and a payload from an older build must not
+                    // fail the whole parse and leave the device with no
+                    // schedule at all. Absent means null means "use the priority
+                    // default", which is the correct behaviour anyway.
+                    priorityLevel = m.stringOrNull("priorityLevel"),
+                    retryLadderIntervalMinutes = m.intOrNull("retryIntervalMinutes"),
+                    retryLadderCount = m.intOrNull("retryCount"),
                 )
             }
         } catch (e: Exception) {
@@ -73,6 +88,17 @@ class ScheduleBridgePlugin : Plugin() {
         }
 
         val incomingUserId = call.getString("userId")
+
+        // The alarm screen is Kotlin and cannot read the web's UI mode, so the
+        // web sends it. Absent (an older deployed build) leaves the stored value
+        // alone rather than resetting someone to the standard screen — see
+        // [AlarmPrefs].
+        call.getBoolean("elderly")?.let { AlarmPrefs.setElderly(context, it) }
+        // Same argument: the alarm screen cannot read profiles.alarm_ring_seconds.
+        // Clamped on arrival — the DB CHECK is the real limit, but this value
+        // drives a lit, ringing screen and the device must be safe against a bad
+        // sync as well as a bad form.
+        call.getInt("ringSeconds")?.let { AlarmPrefs.setRingSeconds(context, it) }
 
         scope.launch {
             val dao = ScheduleDatabase.getInstance(context).medicationDao()
@@ -94,6 +120,11 @@ class ScheduleBridgePlugin : Plugin() {
                 // A pending snooze is one account's deferred dose; it must not
                 // survive into another's schedule.
                 runCatching { ScheduleDatabase.getInstance(context).pendingSnoozeDao().clearAll() }
+                // A ladder belongs to the account that started it. Left behind,
+            // it would re-ask the NEXT person to sign in about medication
+            // that is not theirs -- the same failure clearSchedule exists
+            // to prevent, verified on device 2026-08-11.
+            runCatching { ScheduleDatabase.getInstance(context).pendingRetryDao().clearAll() }
             }
             if (incomingUserId != null) {
                 SessionStore.setOwnerUserId(context, incomingUserId)
@@ -147,6 +178,11 @@ class ScheduleBridgePlugin : Plugin() {
             AlarmScheduler.cancelAllKnown(context)
             ScheduleDatabase.getInstance(context).medicationDao().deleteAll()
             runCatching { ScheduleDatabase.getInstance(context).pendingSnoozeDao().clearAll() }
+            // A ladder belongs to the account that started it. Left behind,
+            // it would re-ask the NEXT person to sign in about medication
+            // that is not theirs -- the same failure clearSchedule exists
+            // to prevent, verified on device 2026-08-11.
+            runCatching { ScheduleDatabase.getInstance(context).pendingRetryDao().clearAll() }
 
             val stranded = runCatching {
                 ScheduleDatabase.getInstance(context).doseActionDao().allUnsynced().size
@@ -286,6 +322,261 @@ class ScheduleBridgePlugin : Plugin() {
     }
 
     /**
+     * `doseResolved({ doses: [{ medicationId, scheduledFor, action }] })` — the
+     * webview telling the device about an answer the SERVER already has.
+     *
+     * **This is what kills a retry ladder for an in-app answer.** The rail, the
+     * dose gate and elderly mode all resolve straight to Supabase; before this
+     * existed, the device never heard, so `pending_retries` kept ringing every
+     * five minutes at a patient who had answered in the app minutes earlier —
+     * found on-device 2026-08-14 with two critical medications showing as
+     * skipped and still alarming. The notification path had always worked,
+     * which is exactly what made it look like the ladder was fine.
+     *
+     * Deliberately routed through [DoseActionQueue.record] with
+     * `alreadyOnServer = true` rather than calling `cancelLadder` directly.
+     * Cancelling the ladder is only one of the things an answer has to do — it
+     * also has to leave the dose out of the coalesced alarm group, clear or
+     * narrow the notification, and reach a visible alarm screen. A second
+     * cancellation path would have covered the first and quietly missed the
+     * rest.
+     *
+     * Idempotent: re-reporting a dose writes another already-synced row, which
+     * every reader treats the same as the first.
+     */
+    @PluginMethod
+    fun doseResolved(call: PluginCall) {
+        val doses = call.getArray("doses")
+        if (doses == null) {
+            call.reject("doseResolved requires a 'doses' array")
+            return
+        }
+
+        val parsed = try {
+            (0 until doses.length()).map { i ->
+                val d = doses.getJSONObject(i)
+                Triple(
+                    d.getLong("medicationId"),
+                    d.getString("scheduledFor"),
+                    d.stringOrNull("action") ?: DoseAction.ACTION_TAKEN,
+                )
+            }
+        } catch (e: Exception) {
+            call.reject("doseResolved payload parse error: ${e.message}")
+            return
+        }
+
+        scope.launch {
+            var applied = 0
+            parsed.forEach { (medicationId, scheduledFor, action) ->
+                // SNOOZE is not a resolve — it defers the question, so a ladder
+                // must not be cancelled by one arriving down this path.
+                val normalised = if (action == DoseAction.ACTION_SKIP) DoseAction.ACTION_SKIP else DoseAction.ACTION_TAKEN
+                val name = runCatching {
+                    ScheduleDatabase.getInstance(context).medicationDao().getById(medicationId)?.drugName
+                }.getOrNull() ?: "your medication"
+
+                val ok = runCatching {
+                    DoseActionQueue.record(
+                        context = context,
+                        medicationId = medicationId,
+                        drugName = name,
+                        scheduledFor = scheduledFor,
+                        action = normalised,
+                        alreadyOnServer = true,
+                    )
+                }.getOrDefault(false)
+                if (ok) applied++
+            }
+            Log.i(
+                AlarmScheduler.TAG,
+                "doseResolved: mirrored $applied of ${parsed.size} server-side answer(s); " +
+                    "any retry ladder for them is now cancelled",
+            )
+            val result = JSObject()
+            result.put("applied", applied)
+            call.resolve(result)
+        }
+    }
+
+    /**
+     * `getActiveLadders()` — every retry chain still in flight on this device.
+     *
+     * The webview uses it to reconcile: if a ladder is running for a dose the
+     * server already shows as resolved, the answer was made somewhere this
+     * device never saw — most often a CAREGIVER answering from their own phone —
+     * and it reports it back through [doseResolved].
+     *
+     * Asking the device first is what keeps that cheap. Ladders are rare (a dose
+     * has to have gone unanswered), so the reconciling query on the web runs
+     * almost never, and the common app-open does one bridge call and stops.
+     */
+    @PluginMethod
+    fun getActiveLadders(call: PluginCall) {
+        scope.launch {
+            val ladders = runCatching {
+                ScheduleDatabase.getInstance(context).pendingRetryDao().getAll()
+            }.getOrDefault(emptyList())
+
+            val arr = JSArray()
+            ladders.forEach { ladder ->
+                arr.put(
+                    JSObject().apply {
+                        put("medicationId", ladder.medicationId)
+                        put("scheduledFor", ladder.doseAt)
+                    },
+                )
+            }
+            val result = JSObject()
+            result.put("ladders", arr)
+            call.resolve(result)
+        }
+    }
+
+    // -- ALARM MEDIA ---------------------------------------------------------
+    //
+    // NATIVE OWNS THE FILES, and that is not a detail. The webview cannot write to
+    // app-private storage, and the alarm must show its picture and play its sound
+    // in airplane mode with the process dead — so the picker runs here, the bytes
+    // are copied here, and the web only ever learns WHICH choice is active. That
+    // is the opposite direction from `elderly` and `ringSeconds`, which are web
+    // data the device mirrors. See BRIDGE_CONTRACT.md §1c.
+    //
+    // ACTION_OPEN_DOCUMENT rather than the photo picker or MediaStore: it needs no
+    // permission on any API level this app supports, so the manifest's permission
+    // list is unchanged. CLAUDE.md treats that list as a promise, and "the user
+    // picked a wallpaper" is not a reason to start reading their photo library.
+
+    @PluginMethod
+    fun getAlarmMedia(call: PluginCall) {
+        val result = JSObject()
+        result.put("imageChoice", AlarmPrefs.imageChoice(context))
+        result.put("soundChoice", AlarmPrefs.soundChoice(context))
+        result.put("bundled", JSArray(AlarmMedia.BUNDLED.keys.toList()))
+        result.put("hasCustomImage", AlarmMedia.imageFile(context).let { it.isFile && it.length() > 0L })
+        result.put("hasCustomSound", AlarmMedia.soundFile(context).let { it.isFile && it.length() > 0L })
+        call.resolve(result)
+    }
+
+    /** Select a bundled backdrop by key, or `none`. Custom is set by [pickAlarmImage]. */
+    @PluginMethod
+    fun setAlarmImage(call: PluginCall) {
+        val choice = call.getString("choice") ?: AlarmMedia.IMAGE_NONE
+        if (choice != AlarmMedia.IMAGE_NONE && !AlarmMedia.BUNDLED.containsKey(choice)) {
+            call.reject("unknown alarm image choice: $choice")
+            return
+        }
+        // Selecting a bundled image also drops the copied file. Keeping it would
+        // leave a megabyte of someone's photo on disk that nothing can reach.
+        if (choice == AlarmMedia.IMAGE_NONE) AlarmMedia.clearImage(context) else {
+            runCatching { AlarmMedia.imageFile(context).delete() }
+            AlarmPrefs.setImageChoice(context, choice)
+        }
+        getAlarmMedia(call)
+    }
+
+    @PluginMethod
+    fun clearAlarmSound(call: PluginCall) {
+        AlarmMedia.clearSound(context)
+        getAlarmMedia(call)
+    }
+
+    /**
+     * `renderAlarmPreview({ width? })` — a picture of the REAL alarm screen.
+     *
+     * Native inflates the same layouts, binds them through the same
+     * [AlarmScreenBinder], and draws the result to a bitmap. The webview shows it
+     * in an `<img>`. That is the point: a CSS recreation in Settings would be a
+     * second implementation of the most safety-critical screen in the product,
+     * and the moment the two diverged the preview would be a lie about what
+     * someone sees at 3am — with no way to check until then.
+     *
+     * Resolves with a null `dataUri` rather than rejecting when the render fails:
+     * a settings screen must not break because a picture could not be drawn.
+     */
+    @PluginMethod
+    fun renderAlarmPreview(call: PluginCall) {
+        val width = call.getInt("width") ?: 420
+        scope.launch {
+            val uri = runCatching { AlarmPreview.renderDataUri(context, width.coerceIn(160, 1080)) }
+                .getOrNull()
+            val result = JSObject()
+            result.put("dataUri", uri)
+            call.resolve(result)
+        }
+    }
+
+    /** Hear the chosen sound. Non-looping and self-stopping — see [AlarmSoundPreview]. */
+    @PluginMethod
+    fun previewAlarmSound(call: PluginCall) {
+        val started = runCatching { AlarmSoundPreview.play(context) }.getOrDefault(false)
+        val result = JSObject()
+        result.put("playing", started)
+        call.resolve(result)
+    }
+
+    @PluginMethod
+    fun stopAlarmSoundPreview(call: PluginCall) {
+        runCatching { AlarmSoundPreview.stop() }
+        val result = JSObject()
+        result.put("playing", false)
+        call.resolve(result)
+    }
+
+    @PluginMethod
+    fun pickAlarmImage(call: PluginCall) {
+        startActivityForResult(call, openDocument("image/*"), "onAlarmImagePicked")
+    }
+
+    @PluginMethod
+    fun pickAlarmSound(call: PluginCall) {
+        startActivityForResult(call, openDocument("audio/*"), "onAlarmSoundPicked")
+    }
+
+    private fun openDocument(mime: String): Intent =
+        Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = mime
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+
+    @ActivityCallback
+    private fun onAlarmImagePicked(call: PluginCall?, result: ActivityResult) {
+        finishPick(call, result) { uri -> AlarmMedia.importImage(context, uri) != null }
+    }
+
+    @ActivityCallback
+    private fun onAlarmSoundPicked(call: PluginCall?, result: ActivityResult) {
+        finishPick(call, result) { uri -> AlarmMedia.importSound(context, uri) != null }
+    }
+
+    /**
+     * Cancelling is not an error — it is the commonest outcome of opening a file
+     * picker, and rejecting the call would surface a failure message for someone
+     * who simply changed their mind. Resolves with `picked: false` and the state
+     * untouched.
+     */
+    private fun finishPick(call: PluginCall?, result: ActivityResult, importer: (Uri) -> Boolean) {
+        if (call == null) return
+        val uri = result.data?.data
+        if (result.resultCode != Activity.RESULT_OK || uri == null) {
+            val out = JSObject()
+            out.put("picked", false)
+            call.resolve(out)
+            return
+        }
+        scope.launch {
+            val ok = runCatching { importer(uri) }.getOrDefault(false)
+            val out = JSObject()
+            out.put("picked", ok)
+            out.put("imageChoice", AlarmPrefs.imageChoice(context))
+            out.put("soundChoice", AlarmPrefs.soundChoice(context))
+            if (!ok) out.put("error", "The file could not be copied. It may be too large or unreadable.")
+            call.resolve(out)
+        }
+    }
+
+    /**
      * TEST HELPER (step 3) — fires a real alarm `seconds` from now through the
      * exact same AlarmManager path a real dose uses, so alarm timing and
      * delivery can be verified on a device without waiting for a real dose
@@ -348,5 +639,16 @@ class ScheduleBridgePlugin : Plugin() {
  * empty all to a real Kotlin null, which is what [Medication]'s nullable
  * fields actually mean.
  */
+/**
+ * An optional integer from the payload.
+ *
+ * Absent and JSON null both become Kotlin null, which the retry ladder reads as
+ * "use the priority default". Distinct from `optInt`, which returns 0 for a
+ * missing key -- and 0 is a value the ladder would reject, so the difference
+ * between "not configured" and "configured to zero" has to survive.
+ */
+private fun JSONObject.intOrNull(key: String): Int? =
+    if (!has(key) || isNull(key)) null else getInt(key)
+
 private fun JSONObject.stringOrNull(key: String): String? =
     if (!has(key) || isNull(key)) null else optString(key).ifEmpty { null }

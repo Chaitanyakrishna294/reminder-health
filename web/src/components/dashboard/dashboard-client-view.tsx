@@ -5,7 +5,9 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useUiMode } from '@/context/ui-mode-context';
+import { useDensity } from '@/context/density-context';
 import TodaysSchedule, { ReminderEvent } from '@/components/dashboard/todays-schedule';
+import WaterCard, { type WaterCardProps } from '@/components/water/water-card';
 import MedicationReviewQueue from '@/components/dashboard/medication-review-queue';
 import { addStock } from '@/lib/medications/add-stock';
 import { registerPush } from '@/lib/push/register-push';
@@ -73,6 +75,12 @@ interface DashboardClientViewProps {
   caregiverId?: string;
   lastTaken: { drug_name: string; time: string } | null;
   peopleICareFor?: any[];
+  /**
+   * Opt-in hydration. Threaded from the server rather than fetched in the
+   * card, so a feature that is OFF for almost everyone costs nobody an extra
+   * round trip on the one screen that has to paint fast.
+   */
+  water?: WaterCardProps;
   peopleCaringForMe?: any[];
   /** Signed avatar URLs keyed by telegram id, for members who consented to sharing. */
   careCircleAvatars?: Record<string, string>;
@@ -100,11 +108,22 @@ export default function DashboardClientView({
   caregiverId,
   lastTaken,
   peopleICareFor = [],
+  water,
   peopleCaringForMe = [],
   careCircleAvatars = {},
   avatarUrl = null,
 }: DashboardClientViewProps) {
   const { isElderly, toggleMode, viewMode } = useUiMode();
+  /**
+   * THE DENSITY SPLIT. `layout` is the table in lib/design/density.ts — read it
+   * rather than comparing densities by hand here, so the whole difference
+   * between browser and app stays in one readable place instead of spreading
+   * into conditions scattered down a 1500-line file.
+   *
+   * The elderly branch below returns before any of this matters; it is its own
+   * presentation, not a variant of this one.
+   */
+  const { layout } = useDensity();
 
   const [events, setEvents] = useState<ReminderEvent[]>([]);
   // Per-day schedule overrides saved by the Schedule Planner (localStorage). Applied
@@ -616,6 +635,44 @@ export default function DashboardClientView({
       ? projectDay(selectedDayKey!)
       : (pastEventsByDay[selectedDayKey!] ?? []);
 
+  /**
+   * DEEP LINK FROM A NOTIFICATION — `?day=…&med=…&at=…`.
+   *
+   * `day` alone opens the right day; these two name the DOSE, so the rail can
+   * scroll that card into view and ring it. Same selection state a dose-strip
+   * pocket sets, so there is one highlight mechanism rather than a second one
+   * built for notifications.
+   *
+   * Matched on (medication_id, scheduled_for) rather than an event id because
+   * that pair is what `reminder_events` is unique on, and it is the only
+   * identity a notification can carry for a dose whose row may not have existed
+   * when the notification was written.
+   *
+   * Runs when the DAY'S EVENTS ARRIVE, not just on mount: a past day is fetched
+   * asynchronously, so on a cold open the target does not exist yet and a
+   * mount-only effect would silently select nothing.
+   */
+  const medParam = searchParams.get('med');
+  const atParam = searchParams.get('at');
+  useEffect(() => {
+    if (!medParam || !atParam) return;
+    const medId = Number(medParam);
+    if (!Number.isFinite(medId)) return;
+    const atMs = new Date(atParam).getTime();
+    if (Number.isNaN(atMs)) return;
+
+    // Compared as instants, not strings: the URL carries whatever ISO form the
+    // database emitted, and "+00:00" vs "Z" is the same moment written twice.
+    const match = railEvents.find(
+      (e) => e.medication_id === medId && new Date(e.scheduled_for).getTime() === atMs,
+    );
+    if (!match) return;
+
+    // Guarded: without it this re-selects on every render while the params sit in
+    // the URL, which would fight the user the moment they tapped a different dose.
+    setSelectedEvent((prev) => (prev?.id === match.id ? prev : match));
+  }, [medParam, atParam, railEvents]);
+
   const stripDays: WeekStripDay[] = weekKeys.map((key) => {
     const isFuture = key > todayKey;
     const dayEvents = key === todayKey ? events : isFuture ? projectDay(key) : (pastEventsByDay[key] ?? []);
@@ -813,13 +870,18 @@ export default function DashboardClientView({
     <>
       {dueGate}
       {refillGate}
-      {viewMode !== 'PATIENT_MONITOR' && <GuideAutoStart tour="dashboard" />}
+      {viewMode !== 'PATIENT_MONITOR' && (
+        <GuideAutoStart tour="dashboard" accountHasData={medications.length > 0} />
+      )}
       <div className={`space-y-8 w-full transition-all duration-500 relative ${isGravityState ? 'gravity-active' : ''}`}>
       {missedStrip}
       {refillStrip}
 
-      {/* Push Banner */}
-      {showPushBanner && (
+      {/* Push Banner. Browser density only — inside the app a dose alarm is a
+          native AlarmManager registration, so "Enable Browser Notifications"
+          would be offering a channel the app does not use, and ReliabilityCheck
+          already owns the permission that DOES matter there. */}
+      {layout.webPushBanner && showPushBanner && (
         <div className="bg-white/10 dark:bg-slate-900/40 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-3xl p-5 shadow-lg relative overflow-hidden flex flex-col sm:flex-row items-center justify-between gap-4 animate-fade-in z-45">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-primary/10 text-foreground flex items-center justify-center shrink-0">
@@ -1086,8 +1148,14 @@ export default function DashboardClientView({
       {/* Main Workspace Layout Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
-        {/* Layer 2: Today's Medication Timeline (Main Content Zone) */}
-        <div data-tour="dash-today" className="rise-in lg:col-span-8 space-y-6" style={{ ['--rise-delay' as string]: '180ms' }}>
+        {/* Layer 2: Today's Medication Timeline (Main Content Zone).
+            Takes the full twelve columns once the side column is gone, rather
+            than leaving four columns of whitespace beside it on a tablet. */}
+        <div
+          data-tour="dash-today"
+          className={`rise-in space-y-6 ${layout.sideColumn ? 'lg:col-span-8' : 'lg:col-span-12'}`}
+          style={{ ['--rise-delay' as string]: '180ms' }}
+        >
           {/* "Manage Inventory" used to sit here as a solid-pink button, the loudest
               control on the screen. It was answering a question nobody asks while
               looking at today's doses — restocking is a weekly errand, not a today
@@ -1207,15 +1275,37 @@ export default function DashboardClientView({
                 : undefined
             }
           />
+
+          {/* WATER, in the gap under Today's Doses — including the "nothing
+              scheduled" empty state, which is the case it earns most: a day with
+              no doses is an empty screen, and one quiet useful thing beats
+              nothing. Renders null unless the feature is switched on.
+
+              Every density: the app and the browser get the same widget, and
+              elderly gets it larger with the same one tap. It is NOT in the
+              analytics column — this is a thing you do, not a thing you read. */}
+          {water && <WaterCard {...water} />}
         </div>
 
-        {/* Side Workspaces (Insights, Inventory) */}
+        {/* Side Workspaces (Insights, Inventory) — the spec's ANALYTICS COLUMN,
+            and the whole of what the app density drops.
+
+            Nothing here is lost on the app, only un-duplicated: the compliance
+            ring is the one genuinely analytical card and the app is a
+            today-view, while Care circle and Medication inventory are both
+            already tabs in the five-icon nav, one tap away. Low stock still
+            reaches the app through the refill gate, the refill strip and the
+            per-dose "N left" chip, none of which live in this column.
+
+            `browser-only` is the pre-paint half of the same decision — see the
+            note in globals.css. The condition is the real one. */}
         {/* Tail of the cascade. 240ms is the last delay — anything later and the card
             arrives after the user has already started reading the page. */}
-        <div className="rise-in lg:col-span-4 space-y-8" style={{ ['--rise-delay' as string]: '240ms' }}>
+        {layout.sideColumn && (
+        <div className="browser-only rise-in lg:col-span-4 space-y-8" style={{ ['--rise-delay' as string]: '240ms' }}>
 
           <div className="grid grid-cols-[1.1fr_1fr] lg:grid-cols-1 gap-3 sm:gap-6 items-stretch">
-          <div data-tour="dash-compliance" className="bg-card border border-border rounded-3xl p-4 sm:p-6 shadow-sm flex flex-col justify-between text-center relative min-h-0 sm:min-h-[300px]">
+          <div data-tour="dash-compliance" className="card-lift p-4 sm:p-6 shadow-sm flex flex-col justify-between text-center relative min-h-0 sm:min-h-[300px]">
             {/* Half-width now, so the title has to fit one line: "Daily Compliance" wrapped
                 to two and the "Daily dose cycle progress" subtitle took two more, spending
                 four lines of a small card restating its own heading. */}
@@ -1407,7 +1497,7 @@ export default function DashboardClientView({
                 : patients.slice(0, 3).map(p => toMember(p, true));
 
             return (
-              <div className="bg-card border border-border rounded-3xl p-4 sm:p-6 shadow-sm flex flex-col min-h-0">
+              <div className="card-lift p-4 sm:p-6 shadow-sm flex flex-col min-h-0">
                 {/* "See all" sat beside the title and squeezed it to "Care …". It moves to
                     the foot of the card, where it also fills the space a short list leaves. */}
                 <h3 className="font-black text-foreground text-xs sm:text-sm flex items-center gap-1.5 min-w-0">
@@ -1474,7 +1564,7 @@ export default function DashboardClientView({
               app/(dashboard)/dashboard/page.tsx. */}
 
           {/* Layer 4: Medication Inventory */}
-          <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4">
+          <div className="card-lift p-6 shadow-sm space-y-4">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="font-black text-foreground text-sm">Medication Inventory</h3>
@@ -1567,6 +1657,7 @@ export default function DashboardClientView({
           </div>
 
         </div>
+        )}
 
       </div>
 

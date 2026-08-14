@@ -83,7 +83,7 @@ export default function AccountClientView({ fullName, email, role, isGuest }: Ac
       </header>
 
       {/* ── WHO YOU ARE ───────────────────────────────────────────────────── */}
-      <section className="bg-card border border-border rounded-3xl overflow-hidden divide-y divide-border">
+      <section className="card-lift overflow-hidden divide-y divide-border">
         <div className={`flex items-center gap-3 px-5 ${isElderly ? 'py-5' : 'py-4'}`}>
           <span aria-hidden className={`shrink-0 rounded-2xl bg-muted text-muted-foreground flex items-center justify-center ${isElderly ? 'w-14 h-14' : 'w-10 h-10'}`}>
             <UserCircle className={isElderly ? 'w-7 h-7' : 'w-5 h-5'} />
@@ -175,7 +175,7 @@ export default function AccountClientView({ fullName, email, role, isGuest }: Ac
             aria-modal="true"
             aria-labelledby="delete-title"
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-sm bg-card border border-border rounded-3xl shadow-xl p-6 space-y-4"
+            className="w-full max-w-sm card-lift shadow-xl p-6 space-y-4"
           >
             <h2 id="delete-title" className="text-lg font-black text-foreground">Delete this account?</h2>
             <p className="text-xs text-muted-foreground font-semibold text-balance">

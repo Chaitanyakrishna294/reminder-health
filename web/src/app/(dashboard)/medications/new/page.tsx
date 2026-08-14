@@ -20,6 +20,8 @@ import {
   unitPhrase,
 } from '@/components/medications/medication-form-options';
 import { priorityMeta, TONE_VAR } from '@/lib/design/semantics';
+import RetryLadderFields, { isCustomLadder } from '@/components/medications/retry-ladder-fields';
+import { ladderError } from '@/lib/schedule/retry-ladder';
 import { getToneTheme } from '@/lib/severity-theme';
 import MedicationCatalogLink from '@/components/medications/medication-catalog-link';
 import GuideButton from '@/components/guide/guide-button';
@@ -106,6 +108,13 @@ export default function NewMedicationPage() {
   
   // Step 5 states
   const [medicationReason, setMedicationReason] = useState<string>('');
+  /**
+   * Retry ladder, configured at the moment the priority is chosen rather than
+   * on a later visit to the edit form. Empty strings mean "use the usual
+   * pattern for this priority", which is what the database stores as NULL.
+   */
+  const [retryInterval, setRetryInterval] = useState<string>('');
+  const [retryCount, setRetryCount] = useState<string>('');
   const [priority, setPriority] = useState<'normal' | 'important' | 'critical'>('normal');
   
   const [loading, setLoading] = useState(false);
@@ -265,6 +274,23 @@ export default function NewMedicationPage() {
     // added on a Tuesday fires once on the Tuesday before settling in.
     const nextReminder = calculateNextReminder(sortedTimes, timezone, normalizeDoseDays(doseDays));
 
+    /*
+     * The ladder is validated HERE as well as in the fields, for the same reason
+     * the database has a CHECK: a form check is advice. The cap is a safety
+     * property — a ladder longer than 30 minutes would have the phone re-asking
+     * the patient while their caregiver was already being told the dose was
+     * missed — so it is enforced at every layer that can enforce it.
+     */
+    const customLadder = isCustomLadder(retryInterval, retryCount);
+    const ladderProblem = customLadder
+      ? ladderError(Number(retryInterval), Number(retryCount))
+      : null;
+    if (ladderProblem) {
+      setError(ladderProblem);
+      setLoading(false);
+      return;
+    }
+
     try {
       const { error: insertErr } = await supabase.from('medications').insert([
         {
@@ -277,7 +303,13 @@ export default function NewMedicationPage() {
           next_reminder_at: nextReminder.toISOString(),
           active: true,
           refill_confirmed: false,
-          retry_count: 0
+          // The BOT's send-retry counter, not the ladder. Different column,
+          // different feature — the name collision cost a failed migration.
+          retry_count: 0,
+          // NULL means "use the priority default", which is the normal state and
+          // what the database CHECK expects when the pair is unset.
+          retry_ladder_interval_minutes: customLadder ? Number(retryInterval) : null,
+          retry_ladder_count: customLadder ? Number(retryCount) : null,
         }
       ]);
 
@@ -293,7 +325,7 @@ export default function NewMedicationPage() {
   };
 
   const labelClass = `block font-semibold text-foreground ${isElderly ? 'text-xl mb-2' : 'text-sm mb-1.5'}`;
-  const inputClass = `mt-1 block w-full px-4 py-3 rounded-2xl bg-[#F2F2F7] text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm transition-all duration-200 font-[var(--font-sans)] ${
+  const inputClass = `mt-1 block w-full px-4 py-3 min-h-11 rounded-2xl bg-muted text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm transition-all duration-200 font-[var(--font-sans)] ${
     isElderly ? 'py-4 text-xl' : ''
   }`;
 
@@ -351,8 +383,8 @@ export default function NewMedicationPage() {
                           isCompleted
                             ? 'bg-primary-strong text-primary-strong-foreground'
                             : isCurrent
-                              ? 'bg-gradient-to-b from-[#CC3D64] to-[#B52A52] text-white'
-                              : 'bg-[#F2F2F7] text-muted-foreground group-hover/step:bg-[#E5E5EA]'
+                              ? 'bg-primary-strong text-primary-strong-foreground'
+                              : 'bg-muted text-muted-foreground group-hover/step:bg-accent-surface'
                         }`}
                         style={isCurrent ? { boxShadow: '0 6px 16px rgba(242,107,138,0.40)' } : undefined}
                       >
@@ -366,7 +398,7 @@ export default function NewMedicationPage() {
                     </button>
                     {i < stepMeta.length - 1 && (
                       <div className={`flex-1 h-[2px] rounded-full mx-1 mt-[-18px] sm:mt-0 transition-all duration-300 ${
-                        step > stepNum ? 'bg-primary' : 'bg-[#EAEAEF]'
+                        step > stepNum ? 'bg-primary' : 'bg-muted'
                       }`} />
                     )}
                   </React.Fragment>
@@ -380,7 +412,7 @@ export default function NewMedicationPage() {
             <form onSubmit={handleSubmit}>
 
               {/* Current step label */}
-              <div className="flex items-center gap-2 mb-5 pb-4 border-b border-[#0F1C5A]/[0.06]">
+              <div className="flex items-center gap-2 mb-5 pb-4 border-b border-border">
                 <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
                   {stepMeta[step - 1].icon}
                 </div>
@@ -430,7 +462,7 @@ export default function NewMedicationPage() {
                             className={`px-3.5 py-3 rounded-2xl text-left transition-all duration-200 flex items-center justify-between gap-3 cursor-pointer ${
                               isSel
                                 ? 'bg-primary/8 ring-2 ring-primary/25'
-                                : 'bg-[#F6F6F9] hover:bg-[#EFEFF3]'
+                                : 'bg-muted hover:bg-accent-surface'
                             }`}
                           >
                             <div className="flex items-center gap-3 min-w-0">
@@ -471,7 +503,7 @@ export default function NewMedicationPage() {
                           className={`p-4 rounded-2xl text-left transition-all duration-200 flex items-center justify-between cursor-pointer ${
                             frequency === freq.id
                               ? 'bg-primary/8 ring-2 ring-primary/25'
-                              : 'bg-[#F6F6F9] hover:bg-[#EFEFF3]'
+                              : 'bg-muted hover:bg-accent-surface'
                           }`}
                         >
                           <div className="flex items-center gap-3.5">
@@ -495,7 +527,7 @@ export default function NewMedicationPage() {
                     </div>
                   </div>
 
-                  <div className="pt-4 border-t border-[#0F1C5A]/[0.06]">
+                  <div className="pt-4 border-t border-border">
                     <label className={labelClass} id="dose-days-label">Which Days?</label>
                     <p className="text-xs text-muted-foreground mb-3">
                       For medicines taken only on some days — twice a week, alternate days, Sundays only.
@@ -516,7 +548,7 @@ export default function NewMedicationPage() {
                             } ${
                               on
                                 ? 'bg-primary text-white ring-2 ring-primary/25'
-                                : 'bg-[#F6F6F9] text-muted-foreground hover:bg-[#EFEFF3]'
+                                : 'bg-muted text-muted-foreground hover:bg-accent-surface'
                             }`}
                           >
                             {d.short}
@@ -529,12 +561,12 @@ export default function NewMedicationPage() {
                     </p>
                   </div>
 
-                  <div data-tour="mednew-times" className="pt-4 border-t border-[#0F1C5A]/[0.06]">
+                  <div data-tour="mednew-times" className="pt-4 border-t border-border">
                     <label className={labelClass}>Reminder Times</label>
                     <p className="text-xs text-muted-foreground mb-3">Set the time for each dose in 24-hour format.</p>
                     <div className="grid grid-cols-1 gap-2.5">
                       {times.map((time, idx) => (
-                        <div key={idx} className="bg-[#F6F6F9] p-4 rounded-2xl flex items-center justify-between gap-4">
+                        <div key={idx} className="bg-muted p-4 rounded-2xl flex items-center justify-between gap-4">
                           <div className="flex items-center gap-2.5">
                             <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
                               <Clock className="w-4 h-4 text-primary" />
@@ -584,7 +616,7 @@ export default function NewMedicationPage() {
                             className={`min-h-11 px-3.5 py-1.5 text-xs font-semibold rounded-full transition-all cursor-pointer ${
                               strength === s
                                 ? 'bg-primary/10 text-primary-strong font-bold ring-1 ring-primary/30'
-                                : 'bg-[#F2F2F7] hover:bg-[#E9E9EE] text-muted-foreground'
+                                : 'bg-muted hover:bg-accent-surface text-muted-foreground'
                             }`}
                           >
                             {s}
@@ -594,18 +626,18 @@ export default function NewMedicationPage() {
                     )}
                   </div>
 
-                  <div data-tour="mednew-amount" className="pt-4 border-t border-[#0F1C5A]/[0.06]">
+                  <div data-tour="mednew-amount" className="pt-4 border-t border-border">
                     <label className={labelClass}>Dosage Amount</label>
                     <p className="text-xs text-muted-foreground mb-3">Units taken per reminder.</p>
                     <div className="flex items-center gap-3 mt-2">
                       <button
                         type="button"
                         onClick={() => setDosageAmount(prev => Math.max(0.5, prev - 0.5))}
-                        className="w-11 h-11 rounded-full bg-[#F2F2F7] flex items-center justify-center hover:bg-[#E5E5EA] transition-all cursor-pointer"
+                        className="w-11 h-11 rounded-full bg-muted flex items-center justify-center hover:bg-accent-surface transition-all cursor-pointer"
                       >
                         <Minus className="w-4 h-4 text-foreground" strokeWidth={2.5} />
                       </button>
-                      <div className="flex items-center gap-2 bg-[#F2F2F7] rounded-2xl px-4 py-2.5">
+                      <div className="flex items-center gap-2 bg-muted rounded-2xl px-4 py-2.5">
                         <input
                           type="number"
                           step="0.5"
@@ -622,7 +654,7 @@ export default function NewMedicationPage() {
                       <button
                         type="button"
                         onClick={() => setDosageAmount(prev => prev + 0.5)}
-                        className="w-11 h-11 rounded-full bg-[#F2F2F7] flex items-center justify-center hover:bg-[#E5E5EA] transition-all cursor-pointer"
+                        className="w-11 h-11 rounded-full bg-muted flex items-center justify-center hover:bg-accent-surface transition-all cursor-pointer"
                       >
                         <Plus className="w-4 h-4 text-foreground" strokeWidth={2.5} />
                       </button>
@@ -634,7 +666,7 @@ export default function NewMedicationPage() {
               {/* STEP 4: Inventory Tracking */}
               {step === 4 && (
                 <div className="space-y-5">
-                  <div data-tour="mednew-inventory" className="flex items-center justify-between p-4 bg-[#F6F6F9] rounded-2xl">
+                  <div data-tour="mednew-inventory" className="flex items-center justify-between p-4 bg-muted rounded-2xl">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                         <Layers className="w-5 h-5 text-primary" />
@@ -724,7 +756,7 @@ export default function NewMedicationPage() {
                     />
                   </div>
 
-                  <div data-tour="mednew-priority" className="pt-4 border-t border-[#0F1C5A]/[0.06]">
+                  <div data-tour="mednew-priority" className="pt-4 border-t border-border">
                     <label className={labelClass}>Priority Level</label>
                     <p className="text-xs text-muted-foreground mb-3">Determines escalation behavior on missed doses.</p>
                     <div className="grid grid-cols-1 gap-2.5">
@@ -741,7 +773,7 @@ export default function NewMedicationPage() {
                             onClick={() => setPriority(p.id as any)}
                             aria-pressed={isSelected}
                             className={`p-4 rounded-2xl text-left transition-all duration-200 flex items-center justify-between cursor-pointer ${
-                              isSelected ? `${t.bg} ring-2 ${t.border}` : 'bg-[#F6F6F9] hover:bg-[#EFEFF3]'
+                              isSelected ? `${t.bg} ring-2 ${t.border}` : 'bg-muted hover:bg-accent-surface'
                             }`}
                           >
                             <div className="flex items-center gap-3">
@@ -765,6 +797,21 @@ export default function NewMedicationPage() {
                       })}
                     </div>
                   </div>
+
+                  {/* Appears the moment Critical or Important is selected —
+                      configuration at the point of decision, which is when the
+                      person actually knows how urgent this medication is. */}
+                  <RetryLadderFields
+                    priority={priority}
+                    interval={retryInterval}
+                    count={retryCount}
+                    onIntervalChange={setRetryInterval}
+                    onCountChange={setRetryCount}
+                    isElderly={isElderly}
+                    inputClass={inputClass}
+                    labelClass={labelClass}
+                    idPrefix="new-retry"
+                  />
                 </div>
               )}
 
@@ -772,7 +819,7 @@ export default function NewMedicationPage() {
               {step === 6 && (
                 <div className="space-y-5">
                   {/* Summary Card */}
-                  <div data-tour="mednew-review" className="rounded-2xl bg-[#F6F6F9] overflow-hidden">
+                  <div data-tour="mednew-review" className="rounded-2xl bg-muted overflow-hidden">
                     {/* Drug name header */}
                     <div className="bg-primary/8 px-5 py-4">
                       <div className="flex items-center gap-3">
@@ -795,7 +842,7 @@ export default function NewMedicationPage() {
                         Second, every row is a button back to the step that owns it, tagged
                         with that step's own icon, so the review reads as a map of the flow
                         instead of a flat list you can only leave by going Back five times. */}
-                    <div className="divide-y divide-[#0F1C5A]/[0.06]">
+                    <div className="divide-y divide-border">
                       {([
                         { step: 1, icon: stepMeta[0].icon, label: 'Name', value: drugName, mono: true },
                         { step: 1, icon: stepMeta[0].icon, label: 'Form', value: unitLabel(unitType) },
@@ -875,12 +922,12 @@ export default function NewMedicationPage() {
               </div>
 
               {/* ── Wizard Navigation ── */}
-              <div className="flex items-center justify-between pt-5 mt-6 border-t border-[#0F1C5A]/[0.06] gap-3">
+              <div className="flex items-center justify-between pt-5 mt-6 border-t border-border gap-3">
                 {step > 1 ? (
                   <button
                     type="button"
                     onClick={handlePrevStep}
-                    className={`px-5 font-semibold rounded-full text-foreground bg-[#F2F2F7] hover:bg-[#E5E5EA] transition-all duration-200 flex items-center gap-2 cursor-pointer ${
+                    className={`px-5 font-semibold rounded-full text-foreground bg-muted hover:bg-accent-surface transition-all duration-200 flex items-center gap-2 cursor-pointer ${
                       isElderly ? 'h-[72px] text-lg' : 'h-11 text-sm'
                     }`}
                   >
@@ -890,7 +937,7 @@ export default function NewMedicationPage() {
                 ) : (
                   <Link
                     href="/medications"
-                    className={`px-5 font-semibold rounded-full text-foreground bg-[#F2F2F7] hover:bg-[#E5E5EA] transition-all duration-200 flex items-center justify-center gap-2 ${
+                    className={`px-5 font-semibold rounded-full text-foreground bg-muted hover:bg-accent-surface transition-all duration-200 flex items-center justify-center gap-2 ${
                       isElderly ? 'h-[72px] text-lg' : 'h-11 text-sm'
                     }`}
                   >
@@ -930,14 +977,19 @@ export default function NewMedicationPage() {
         </div>
       ) : (
         <div className="bg-white p-12 text-center text-sm text-muted-foreground rounded-[22px]" style={{ boxShadow: CARD_SHADOW }}>
-          <div className="w-10 h-10 rounded-full bg-[#F2F2F7] flex items-center justify-center mx-auto mb-3">
+          <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
             <Activity className="w-5 h-5 text-muted-foreground" />
           </div>
           Loading patient configuration...
         </div>
       )}
 
-      {/* Auto-start the guided tour once for first-time users (then summonable via the ? button). */}
+      {/* Auto-start the guided tour once for first-time users (then summonable via
+          the ? button). No `accountHasData` here: this page never loads the
+          medication list, and adding a query for a count the dashboard and the
+          medications page both already have would be a round trip to learn
+          nothing new. Whichever of them the user came through has recorded it —
+          see GuideAutoStart's ESTABLISHED_KEY. */}
       {targetTelegramChatId && <GuideAutoStart tour="newMedication" />}
     </div>
   );

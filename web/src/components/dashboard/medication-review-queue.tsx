@@ -127,7 +127,7 @@ export default function MedicationReviewQueue({
 
   if (loading) {
     return (
-      <div className="bg-card border border-border rounded-3xl p-6 flex items-center justify-center min-h-[120px] shadow-sm">
+      <div className="card-lift p-6 flex items-center justify-center min-h-[120px] shadow-sm">
         <div className="flex items-center gap-3 text-muted-foreground text-xs font-bold">
           <LoadingMark size={32} className="text-primary-strong" /> Loading review queue…
         </div>
@@ -141,7 +141,7 @@ export default function MedicationReviewQueue({
 
   return (
     <>
-      <div className="bg-card border border-border rounded-3xl p-6 md:p-8 space-y-6 shadow-sm relative overflow-hidden font-sans">
+      <div className="card-lift p-6 md:p-8 space-y-6 shadow-sm relative overflow-hidden font-sans">
         {/* Subtle decorative background gradient */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -z-10 pointer-events-none" />
         

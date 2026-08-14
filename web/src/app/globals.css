@@ -70,6 +70,26 @@
   --success-strong: #1B7A3A;
   --warning-strong: #8A4B00;
   --danger-strong: #B3261E;
+  /* ── HYDRATION: a SCOPED accent, and the only exception to the one-accent rule ──
+     Water is the one surface in this product that is not about medication, and it
+     is deliberately the quietest thing here: opt-in, swipeable, no ladder, no
+     escalation, nothing recorded when it is ignored. Sky blue is what keeps it
+     legible as a different KIND of thing at a glance, so a glass of water can
+     never be mistaken for a dose.
+
+     THE SCOPE IS THE POINT. These tokens are for the water widget and its
+     settings room, and nowhere else. Pink stays the app's single accent on every
+     medication surface; if `--hydration-*` ever appears on a dose card, a rail, a
+     gate or the alarm, that is the bug — two accents on a medication screen is
+     exactly what the one-accent rule exists to prevent.
+
+     `-ink` is the text-on-tint variant, same split as the slot and status tokens:
+     #38A3D1 on paper is ~2.6:1 and fails. Use --hydration-ink for any word. */
+  --hydration: #38A3D1;
+  --hydration-ink: #1F6E96;
+  --hydration-soft: #E8F4FA;
+  --hydration-foreground: #ffffff;
+
   /* SOLID destructive fill — distinct from --danger-strong, which is TEXT sitting on a
      danger tint and therefore flips lightness between modes on purpose. Used as a fill,
      -strong turned Delete Account into a pale pastel in dark mode: softer-looking than
@@ -108,7 +128,37 @@
   --accent-surface: #EAF3FF; /* Accent Surface */
   --accent-surface-foreground: #0F1C5A;
 
-  --radius: 1.75rem; /* 28px rounded corners */
+  /* ── ELEVATION: the board and the cards (visual refresh, §1) ──
+     A dosette box is compartments sitting IN a tray. The board is the tray; the
+     cards are the compartments. That is why this reads as ours rather than as a
+     generic Material trend, and it is why cards lose their borders: a border is
+     doing work that light should do.
+
+     Two layers, always. A contact shadow for the edge, a diffuse one for the
+     float — one layer alone reads as a 2009 drop shadow, two read as an object. */
+  --board: #EFE9EE;         /* paper, deepened ~4% */
+  --surface: #ffffff;       /* a card */
+  --surface-sunk: #F7F3F6;  /* inputs and wells: they RECEIVE content, so they sit below */
+
+  --lift-1: 0 1px 2px rgba(15, 28, 90, 0.05), 0 2px 8px rgba(15, 28, 90, 0.05);
+  --lift-2: 0 2px 4px rgba(15, 28, 90, 0.06), 0 8px 24px rgba(15, 28, 90, 0.08);
+
+  /* ── RADIUS: one scale, three steps (§2) ──
+     20 cards and sheets · 14 buttons, inputs, chips · 10 swatches and badges.
+     Concentric rule: a child's radius = the parent's minus its inset. Today's
+     rounded-3xl on both a card AND a 40px chip is the defect this fixes. */
+  --r-card: 20px;
+  --r-control: 14px;
+  --r-chip: 10px;
+
+  /* ── MOTION (§6): sub-400ms, feedback only, nothing idle ── */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --t-press: 120ms;
+  --t-lift: 160ms;
+  --t-enter: 220ms;
+
+  --radius: 1.75rem; /* 28px rounded corners — legacy, being retired by --r-card */
 
   /* Auth pages' decorative page background (theme-aware). */
   --auth-radial: radial-gradient(120% 80% at 50% 0%, #FDEEF2 0%, #F8F9FB 62%, #EAF3FF 100%);
@@ -148,6 +198,22 @@
 
   --danger: #D45A50;
   --danger-foreground: #ffffff;
+
+  /* The board on navy. Shadows do almost nothing on a dark ground, so the
+     separation becomes a lightness step and a hairline ring instead — the same
+     system, re-derived rather than re-decided. Fully applied in stage 2. */
+  --board: #0C1748;
+  --surface: #1A2A66;
+  --surface-sunk: #142153;
+  --lift-1: 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --lift-2: 0 0 0 1px rgba(255, 255, 255, 0.10), 0 8px 24px rgba(0, 0, 0, 0.35);
+
+  /* Hydration, lifted for the navy ground. Scoped to the water surfaces only —
+     see the light-mode block for why this is the one exception to one accent. */
+  --hydration: #6FC3E8;
+  --hydration-ink: #A7DCF3;
+  --hydration-soft: rgba(111, 195, 232, 0.14);
+  --hydration-foreground: #0F1C5A;
 
   /* Slot tints, lifted so they still separate from the navy page ground. */
   --slot-morning: #F0B364;
@@ -320,6 +386,10 @@ body:has(nav[data-tour="dash-nav"]) .floating-bottom {
   --color-danger-strong: var(--danger-strong);
   --color-danger-solid: var(--danger-solid);
   --color-danger-solid-foreground: var(--danger-solid-foreground);
+  --color-hydration: var(--hydration);
+  --color-hydration-ink: var(--hydration-ink);
+  --color-hydration-soft: var(--hydration-soft);
+  --color-hydration-foreground: var(--hydration-foreground);
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
   --color-info-strong: var(--info-strong);
@@ -357,6 +427,22 @@ body:has(nav[data-tour="dash-nav"]) .floating-bottom {
 
   --animate-fade-in: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
+
+/* ── The density split, first-paint half ───────────────────────────────────
+   `data-density` is stamped on <html> before paint by the script in
+   app/layout.tsx, and re-stamped with the truth by DensityProvider. This rule
+   is what stops the app's home screen from painting the browser layout and then
+   visibly collapsing once React hydrates — the server renders every page long
+   before it can know it is inside the Capacitor webview.
+
+   REACT IS THE AUTHORITY, always: this only covers the window between first
+   paint and hydration, after which the element is genuinely unmounted. So
+   `.browser-only` is a hint about that window, never the mechanism — never rely
+   on it alone to keep something off the app.
+
+   !important because the marked element carries layout utilities and a
+   half-hidden section is worse than either outcome. */
+html[data-density='app'] .browser-only { display: none !important; }
 
 /* ── Entrance choreography ─────────────────────────────────────────────────
    ONE curve, ONE distance, ONE stagger unit for every section of a page, so a
@@ -492,9 +578,26 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-h1, h2, h3, h4, h5, h6, .font-mono, .badge, .metric, .time-tag, .navigation-label {
+/* MONO IS FOR VALUES, NEVER SENTENCES (§4).
+   This rule used to include h1-h6, which put the mono face on every page title
+   and section heading in the app — a direct violation of our own copy
+   constitution, which reserves uppercase mono for structural labels. Headings
+   now take Inter and build their hierarchy from weight and colour.
+
+   What is left here is the honest list: badges, metrics, times, nav labels. Each
+   is a VALUE or a label, never a sentence. */
+.font-mono, .badge, .metric, .time-tag, .navigation-label {
   font-family: var(--font-mono), monospace !important;
   letter-spacing: -0.01em;
+}
+
+/* Headings: Inter, with the weight hierarchy the type scale in the spec sets.
+   Tracking tightens as type grows, which is what makes a large title read as
+   composed rather than merely big. */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-sans), sans-serif;
+  letter-spacing: -0.018em;
+  text-wrap: balance;
 }
 
 /* Tighter rhythm on real display headings so large titles read as composed,
@@ -584,3 +687,90 @@ h1, h2 {
   background-color: rgba(234, 240, 255, 0.32);
 }
 
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+   VISUAL REFRESH — "cards on a board"  (docs/design/visual-refresh-2026-08-14.md)
+
+   Stage 1. Opt-in classes, so nothing changes until a surface asks for it — the
+   three proof screens use them and everything else is untouched until stage 2.
+
+   ELDERLY IS EXCLUDED. It is approved as-is, so none of this is applied inside
+   it; the density branch keeps its own presentation.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* The board. A page ground that things sit ON rather than a page things are
+   drawn on. */
+.board {
+  background: var(--board);
+}
+
+/* A card. No border — the shadow IS the edge. */
+.card-lift {
+  background: var(--surface);
+  border-radius: var(--r-card);
+  box-shadow: var(--lift-1);
+  border: 0;
+}
+
+/* Raised: the dose gate, a dialog, the focused dose. One step, never two. */
+.card-lift-2 {
+  box-shadow: var(--lift-2);
+}
+
+/* PRESS = THE CARD MEETS THE BOARD. Cheaper and more physical than a colour
+   change, and both properties are composited. */
+.card-press {
+  transition: box-shadow var(--t-press) var(--ease-standard),
+              transform var(--t-press) var(--ease-standard);
+}
+.card-press:active {
+  box-shadow: none;
+  transform: scale(0.985);
+}
+
+/* Inputs and wells sit BELOW the card: they receive content. */
+.surface-sunk {
+  background: var(--surface-sunk);
+  border-radius: var(--r-control);
+}
+
+/* List stagger. CAPPED AT SIX — a twenty-item list that cascades for two
+   seconds is an animation the user waits out. Everything past the sixth appears
+   immediately, which is also why the delays are static classes rather than an
+   inline style per row. */
+.stagger-in {
+  animation: stagger-rise var(--t-enter) var(--ease-out) both;
+}
+.stagger-in:nth-child(1) { animation-delay: 0ms; }
+.stagger-in:nth-child(2) { animation-delay: 40ms; }
+.stagger-in:nth-child(3) { animation-delay: 80ms; }
+.stagger-in:nth-child(4) { animation-delay: 120ms; }
+.stagger-in:nth-child(5) { animation-delay: 160ms; }
+.stagger-in:nth-child(6) { animation-delay: 200ms; }
+.stagger-in:nth-child(n + 7) { animation-delay: 0ms; }
+
+@keyframes stagger-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* NOTHING IDLE-ANIMATES. Every rule above is triggered by arrival or by a
+   touch; none of them loop. The calm rule stands — motion-design's "always
+   include an ambient layer" is refused for the same reason it was refused for
+   the water tumbler. */
+
+@media (prefers-reduced-motion: reduce) {
+  /* A REAL BRANCH, not a shorter duration: transforms and stagger off, opacity
+     kept so arrival is still legible. This is an elderly app and motion
+     sensitivity is real. */
+  .card-press,
+  .card-press:active {
+    transition: none;
+    transform: none;
+  }
+  .stagger-in {
+    animation: none;
+    opacity: 1;
+  }
+}

@@ -5,6 +5,21 @@ import { useRouter } from 'next/navigation';
 import { useUiMode } from '@/context/ui-mode-context';
 import { createClient } from '@/lib/supabase/client';
 import FolderCarousel from '@/components/health-vault/folder-carousel';
+import { useDensity } from '@/context/density-context';
+import ZoomableImage from '@/components/health-vault/zoomable-image';
+import {
+  VAULT_ACCEPT_ATTR,
+  VAULT_ALLOWED_LABEL,
+  VAULT_CAMERA_ACCEPT,
+  VAULT_MAX_BYTES,
+  VAULT_MAX_FILES,
+  atLimit,
+  oversizeReason,
+  unsupportedTypeReason,
+  vaultFullCopy,
+  vaultUsageCopy,
+} from '@/lib/health-vault/limits';
+import { compressImage } from '@/lib/health-vault/compress-image';
 import { 
   FileText, 
   ClipboardList, 
@@ -29,7 +44,8 @@ import {
   Search,
   Trash2,
   RotateCcw,
-  Trash
+  Trash,
+  Camera
 } from 'lucide-react';
 
 interface Category {
@@ -47,11 +63,15 @@ interface HealthVaultClientViewProps {
   patientId?: string;
 }
 
-const ALLOWED_EXTENSIONS = ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.doc', '.docx', '.txt', '.zip'];
 const LIMIT = 20;
 
 // Map a file extension to a correct MIME type. The browser's File.type is often empty on mobile
 // or for some files; storing the right content-type lets the signed URL render inline (esp. PDFs).
+//
+// DELIBERATELY WIDER THAN VAULT_ALLOWED_EXTENSIONS, and must stay that way. New uploads are
+// images and PDFs only (2026-08-13), but .doc/.docx/.txt/.zip files uploaded before that are
+// still in the bucket and still have to open. This map serves READING; the allow-list serves
+// WRITING. Trimming this one to match would break documents people already stored.
 const MIME_BY_EXT: Record<string, string> = {
   pdf: 'application/pdf',
   jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif',
@@ -88,6 +108,21 @@ export default function HealthVaultClientView({
 
   const [mounted, setMounted] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+
+  /**
+   * How full the vault is, read from `vault_object_count()` — the SAME function
+   * the RLS policy enforces with. Not a count of health_records rows: those and
+   * the bucket can disagree (a trashed record keeps its object; a direct API
+   * upload creates an object and no row), and a counter that disagrees with the
+   * limit is worse than no counter at all.
+   *
+   * null = not read yet. The upload controls stay ENABLED while it is null, so a
+   * failed or slow count never locks someone out of their own vault — the server
+   * is the thing that actually refuses, and it does not need our help.
+   */
+  const [vaultUsed, setVaultUsed] = useState<number | null>(null);
+  const [vaultTrashed, setVaultTrashed] = useState(0);
+  const isFull = vaultUsed !== null && atLimit(vaultUsed);
 
   // Folder Timeline view state
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
@@ -129,6 +164,22 @@ export default function HealthVaultClientView({
   // Form Field State
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  /** True while a photo is being resized — decoding a 12 MP image is not instant. */
+  const [isPreparingFile, setIsPreparingFile] = useState(false);
+  /** Original byte size when compression actually shrank the file; null otherwise. */
+  const [compressedFrom, setCompressedFrom] = useState<number | null>(null);
+  /** True when the current file came from Take photo, so Retake can reopen the camera. */
+  const [fromCamera, setFromCamera] = useState(false);
+  /**
+   * Object URL for the CHECK-IT-FIRST preview.
+   *
+   * A phone camera in a clinic corridor produces blurred and half-framed shots
+   * routinely, and a vault that holds five files cannot afford one of them being
+   * an unreadable photo of a thumb. Nothing counts against the limit until the
+   * upload actually happens, so this is the moment to look before spending a
+   * slot — and the moment a retake is free.
+   */
+  const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
   const [recordDate, setRecordDate] = useState<string>('');
   const [recordTitle, setRecordTitle] = useState<string>('');
 
@@ -147,6 +198,56 @@ export default function HealthVaultClientView({
   // Drag and drop state
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  /**
+   * Whether to offer "Take photo" as its own door.
+   *
+   * Inside the app always — that is where a patient photographs a paper
+   * prescription, and it is the reason this feature exists. In a browser, only
+   * on a coarse pointer: `capture` is ignored on desktop, so the button would
+   * open a file browser under a label promising a camera, which is worse than
+   * not offering it.
+   *
+   * Resolved after mount because `matchMedia` does not exist on the server, and
+   * defaults to false so the first paint matches the server's.
+   */
+  const { isApp } = useDensity();
+  const [coarsePointer, setCoarsePointer] = useState(false);
+  useEffect(() => {
+    try { setCoarsePointer(window.matchMedia('(pointer: coarse)').matches); } catch { /* older webview */ }
+  }, []);
+  const showCamera = isApp || coarsePointer;
+
+  /**
+   * Re-read the two numbers behind "N of 5 used". Called after every upload,
+   * delete, restore and purge, because each one moves the count and a stale
+   * counter is exactly the thing that makes someone delete a second file for no
+   * reason.
+   *
+   * Never surfaces an error. If the count cannot be read the counter simply
+   * hides; the limit is still enforced in the database, and a red banner about a
+   * failed count would be alarming without being actionable.
+   */
+  const refreshUsage = React.useCallback(async () => {
+    // A caregiver is looking at someone else's vault. `vault_object_count()`
+    // answers only about the CALLER, so showing it here would print the
+    // caregiver's own usage under the patient's name.
+    if (userRole === 'CAREGIVER' || patientId) return;
+    try {
+      const [{ data: used }, { count: trashed }] = await Promise.all([
+        supabase.rpc('vault_object_count'),
+        supabase
+          .from('health_records')
+          .select('id', { count: 'exact', head: true })
+          .not('deleted_at', 'is', null),
+      ]);
+      if (typeof used === 'number') setVaultUsed(used);
+      setVaultTrashed(trashed ?? 0);
+    } catch {
+      /* counter hides; the database is still the limit */
+    }
+  }, [supabase, userRole, patientId]);
 
   useEffect(() => {
     setMounted(true);
@@ -157,10 +258,11 @@ export default function HealthVaultClientView({
       }
     }
     getSession();
+    refreshUsage();
 
     const today = new Date().toISOString().split('T')[0];
     setRecordDate(today);
-  }, [supabase]);
+  }, [supabase, refreshUsage]);
 
   // Fetch timeline records when viewing mode, category, page, or search query changes
   useEffect(() => {
@@ -394,6 +496,10 @@ export default function HealthVaultClientView({
 
       setRecords((prev) => prev.filter((r) => r.id !== recordId));
       setTotalRecordsCount((prev) => Math.max(0, prev - 1));
+      // Moves the file into "in trash" — it does NOT free a slot, because the
+      // object stays in the bucket so Restore can work. The counter has to say
+      // so, or someone deletes a second file wondering why nothing changed.
+      void refreshUsage();
       router.refresh();
     } catch (err) {
       console.error('Soft delete error:', err);
@@ -420,6 +526,7 @@ export default function HealthVaultClientView({
 
       setRecords((prev) => prev.filter((r) => r.id !== recordId));
       setTotalRecordsCount((prev) => Math.max(0, prev - 1));
+      void refreshUsage();
       router.refresh();
     } catch (err) {
       console.error('Restore error:', err);
@@ -470,6 +577,8 @@ export default function HealthVaultClientView({
       setTotalRecordsCount((prev) => Math.max(0, prev - 1));
       setRecordToPermanentlyDelete(null);
       setDeleteConfirmationText('');
+      // THIS is the one that frees a slot — the object leaves the bucket here.
+      void refreshUsage();
       router.refresh();
     } catch (err: any) {
       console.error('Permanent delete error:', err);
@@ -652,20 +761,60 @@ export default function HealthVaultClientView({
   };
 
   // Upload handlers
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const file = e.target.files[0];
-      const error = validateFile(file);
-      if (error) {
-        setUploadError(error);
-        setSelectedFile(null);
-      } else {
-        setUploadError(null);
-        setSelectedFile(file);
-        const nameWithoutExt = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
-        setRecordTitle(nameWithoutExt);
-      }
+  /**
+   * One path for both entry points (browse and drop): check the TYPE of what was
+   * picked, shrink it if it is a photo, then check the size of what would
+   * actually be uploaded.
+   *
+   * The order is the point. Type first, on the original — compression rewrites a
+   * photo to .jpg, so checking afterwards would let a disallowed image type
+   * launder itself into an allowed one. Size last, on the result — checking a
+   * 9 MB camera photo before shrinking it would refuse the most ordinary thing
+   * anyone does here.
+   */
+  const acceptFile = async (raw: File) => {
+    setUploadError(null);
+
+    const typeProblem = unsupportedTypeReason(raw.name);
+    if (typeProblem) {
+      setUploadError(typeProblem);
+      setSelectedFile(null);
+      return;
     }
+
+    setIsPreparingFile(true);
+    try {
+      const file = await compressImage(raw);
+      const sizeProblem = oversizeReason(file.size);
+      if (sizeProblem) {
+        setUploadError(sizeProblem);
+        setSelectedFile(null);
+        return;
+      }
+      setSelectedFile(file);
+      setFilePreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return file.type.startsWith('image/') ? URL.createObjectURL(file) : null;
+      });
+      // Shown so nobody is startled by a 9 MB photo becoming a 700 KB one —
+      // and so a document that did NOT shrink is not silently blamed later.
+      setCompressedFrom(file.size < raw.size ? raw.size : null);
+      const nameWithoutExt = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+      setRecordTitle(nameWithoutExt);
+    } finally {
+      setIsPreparingFile(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, viaCamera = false) => {
+    setFromCamera(viaCamera);
+    const file = e.target.files?.[0];
+    // Cleared BEFORE handling, so picking the same file twice still fires. A
+    // retake is the common case here — the first photo of a prescription is
+    // blurred, and on some camera apps the retake reuses the same filename, so
+    // without this the second attempt would silently do nothing.
+    e.target.value = '';
+    if (file) void acceptFile(file);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -683,29 +832,8 @@ export default function HealthVaultClientView({
     setUploadError(null);
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const file = e.dataTransfer.files[0];
-      const error = validateFile(file);
-      if (error) {
-        setUploadError(error);
-        setSelectedFile(null);
-      } else {
-        setSelectedFile(file);
-        const nameWithoutExt = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
-        setRecordTitle(nameWithoutExt);
-      }
+      void acceptFile(e.dataTransfer.files[0]);
     }
-  };
-
-  const validateFile = (file: File): string | null => {
-    const extension = '.' + file.name.split('.').pop()?.toLowerCase();
-    if (!ALLOWED_EXTENSIONS.includes(extension)) {
-      return `Unsupported file extension (${extension}). Supported: PDF, JPG, JPEG, PNG, WEBP, DOC, DOCX, TXT, ZIP.`;
-    }
-    const maxSize = 20 * 1024 * 1024; // 20 MB
-    if (file.size > maxSize) {
-      return 'File exceeds 20 MB size limit.';
-    }
-    return null;
   };
 
   // The two upload entry points call the same handler; the only difference is whether a
@@ -715,8 +843,16 @@ export default function HealthVaultClientView({
   // categories yet that was an unsaveable `default-` placeholder that only failed at the
   // final Save. It now opens with nothing selected so the choice is deliberate.
   const openUploadModal = (categoryId: string = '') => {
+    // Every call site disables its own button, but this is the door itself: a
+    // modal that cannot succeed should not open, and a call site added later
+    // should not have to remember the rule.
+    if (isFull) return;
     setSelectedCategoryId(categoryId.startsWith('default-') ? '' : categoryId);
     setSelectedFile(null);
+    setCompressedFrom(null);
+    setFromCamera(false);
+    setFilePreviewUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
+    setIsPreparingFile(false);
     setUploadError(null);
     setUploadSuccess(false);
     setIsUploading(false);
@@ -728,6 +864,30 @@ export default function HealthVaultClientView({
     setIsModalOpen(true);
   };
 
+  /**
+   * Turn a Storage API refusal into something a person can act on.
+   *
+   * Each of these corresponds to a rule enforced in
+   * migration_vault_upload_limits_2026_08_13.sql, and reaching one means the
+   * form's own check was out of date — a counter read before another device
+   * uploaded, or an APK older than the current rules. Falls through to the raw
+   * message for anything genuinely unexpected, because inventing friendly copy
+   * for an unknown failure hides the failure.
+   */
+  const storageRefusalCopy = (message: string): string => {
+    const m = message.toLowerCase();
+    if (m.includes('row-level security') || m.includes('unauthorized')) {
+      return vaultFullCopy(vaultUsed ?? VAULT_MAX_FILES, vaultTrashed);
+    }
+    if (m.includes('maximum allowed size') || m.includes('payload too large') || m.includes('entity too large')) {
+      return `Each document needs to be under ${(VAULT_MAX_BYTES / (1024 * 1024)).toFixed(0)} MB.`;
+    }
+    if (m.includes('mime') || m.includes('content type') || m.includes('invalid_mime_type')) {
+      return `The vault takes ${VAULT_ALLOWED_LABEL} files.`;
+    }
+    return message;
+  };
+
   const handleUploadSave = async () => {
     if (!userId) {
       setUploadError('Session expired. Please log in.');
@@ -735,6 +895,13 @@ export default function HealthVaultClientView({
     }
     if (!selectedFile) {
       setUploadError('Please select a file.');
+      return;
+    }
+    // Re-checked here and not only at the modal's door: the count may have moved
+    // since it opened — the same account on a second device, or a file restored
+    // from the trash. Cheap, and it saves an upload that would be refused.
+    if (isFull) {
+      setUploadError(vaultFullCopy(vaultUsed ?? VAULT_MAX_FILES, vaultTrashed));
       return;
     }
     if (!selectedCategoryId || selectedCategoryId.startsWith('default-')) {
@@ -769,7 +936,11 @@ export default function HealthVaultClientView({
         });
 
       if (storageError) {
-        throw new Error(`Storage error: ${storageError.message}`);
+        // The server is the real limit, so its refusals reach the user in the
+        // same words the form uses — otherwise someone who slipped past a stale
+        // counter gets "new row violates row-level security policy", which is
+        // true, unreadable, and sounds like their account is broken.
+        throw new Error(storageRefusalCopy(storageError.message));
       }
 
       const { error: dbError } = await supabase
@@ -802,8 +973,9 @@ export default function HealthVaultClientView({
       }]);
 
       setUploadSuccess(true);
+      void refreshUsage();
       router.refresh();
-      
+
       if (selectedCategory && selectedCategory.id === selectedCategoryId) {
         fetchRecords(selectedCategoryId, 0, false);
       }
@@ -860,7 +1032,38 @@ export default function HealthVaultClientView({
                 </p>
               )}
             </div>
+
+            {/* "N of 5 used". Hidden until the count is read, and hidden from
+                caregivers — the number describes the CALLER's own vault, so
+                printing it under a patient's name would be a different person's
+                usage. Quiet by default and warning-toned only when full: a
+                storage counter is not news until it stops you doing something. */}
+            {userRole !== 'CAREGIVER' && vaultUsed !== null && (
+              <span
+                className={`shrink-0 rounded-full px-3 py-1 font-mono font-bold tabular-nums ${
+                  isElderly ? 'text-sm' : 'text-[11px]'
+                } ${isFull
+                  ? 'bg-warning/15 text-warning-strong border border-warning/30'
+                  : 'bg-muted text-muted-foreground'}`}
+              >
+                {vaultUsageCopy(vaultUsed, vaultTrashed)}
+              </span>
+            )}
           </div>
+
+          {/* The explanation, only once there is something to explain. Sentence
+              case, no blame, and it names the way out rather than the rule. */}
+          {userRole !== 'CAREGIVER' && isFull && (
+            <div
+              className="flex items-start gap-2.5 rounded-3xl border border-warning/35 bg-warning/10 px-4 py-3 text-warning-strong"
+              role="status"
+            >
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+              <p className={`font-semibold text-balance ${isElderly ? 'text-base' : 'text-xs'}`}>
+                {vaultFullCopy(vaultUsed ?? VAULT_MAX_FILES, vaultTrashed)}
+              </p>
+            </div>
+          )}
 
           {/* Trust banner.
               Two problems here. It wore the app's PINK — the alert/brand color — for a
@@ -923,9 +1126,12 @@ export default function HealthVaultClientView({
                 {userRole !== 'CAREGIVER' && (
                   <button
                     onClick={() => openUploadModal()}
-                    className={`mt-2 inline-flex items-center justify-center min-h-11 px-4 rounded-xl font-black bg-primary-strong text-primary-strong-foreground hover:bg-primary-strong-hover transition-all cursor-pointer ${
+                    /* Reachable while full: five documents all sitting in the
+                       trash leaves this list empty and every slot taken. */
+                    disabled={isFull}
+                    className={`mt-2 inline-flex items-center justify-center min-h-11 px-4 rounded-xl font-black bg-primary-strong text-primary-strong-foreground transition-all ${
                       isElderly ? 'text-base' : 'text-xs'
-                    }`}
+                    } ${isFull ? 'opacity-40 cursor-not-allowed' : 'hover:bg-primary-strong-hover cursor-pointer'}`}
                   >
                     <Upload className="w-4 h-4 mr-1.5 shrink-0" /> Upload your first record
                   </button>
@@ -949,7 +1155,7 @@ export default function HealthVaultClientView({
                   return (
                     <li
                       key={item.id}
-                      className="rise-in flex items-center gap-3 bg-card border border-border rounded-2xl p-3 shadow-sm transition-colors hover:border-input"
+                      className="rise-in flex items-center gap-3 card-lift p-3 shadow-sm transition-colors hover:border-input"
                       style={{ ['--rise-delay' as string]: `${Math.min(idx, 6) * 60}ms` }}
                     >
                       {/* File type is metadata, not a status — a red PDF badge would read
@@ -1030,8 +1236,16 @@ export default function HealthVaultClientView({
           {userRole !== 'CAREGIVER' && (
             <button
               onClick={() => openUploadModal()}
-              aria-label="Upload a record"
-              className="floating-bottom fixed right-4 z-30 w-14 h-14 rounded-full bg-primary-strong text-primary-strong-foreground shadow-lg hover:bg-primary-strong-hover active:scale-[0.96] transition-all cursor-pointer flex items-center justify-center"
+              disabled={isFull}
+              aria-label={isFull ? `Vault full — ${vaultFullCopy(vaultUsed ?? VAULT_MAX_FILES, vaultTrashed)}` : 'Upload a record'}
+              // Disabled rather than hidden. A control that vanishes leaves you
+              // hunting for a button you remember; one that is visibly out of
+              // reach, next to a banner saying why, answers the question.
+              className={`floating-bottom fixed right-4 z-30 w-14 h-14 rounded-full bg-primary-strong text-primary-strong-foreground shadow-lg transition-all flex items-center justify-center ${
+                isFull
+                  ? 'opacity-40 cursor-not-allowed'
+                  : 'hover:bg-primary-strong-hover active:scale-[0.96] cursor-pointer'
+              }`}
             >
               <Upload className="w-6 h-6" />
             </button>
@@ -1052,7 +1266,7 @@ export default function HealthVaultClientView({
           </button>
 
           {/* Folder Details Header Panel */}
-          <div className={`flex flex-col md:flex-row md:items-center md:justify-between bg-card rounded-3xl border border-border shadow-sm transition-all duration-300 gap-4 ${
+          <div className={`flex flex-col md:flex-row md:items-center md:justify-between card-lift shadow-sm transition-all duration-300 gap-4 ${
             isElderly ? 'p-8 border-4 border-primary/30' : 'p-5'
           }`}>
             <div className="flex items-center gap-4">
@@ -1071,15 +1285,23 @@ export default function HealthVaultClientView({
               </div>
             </div>
             {userRole !== 'CAREGIVER' && !viewingTrash && (
-              <button
-                onClick={() => openUploadModal(selectedCategory.id)}
-                className={`font-black rounded bg-primary-strong text-primary-strong-foreground hover:bg-primary-strong-hover transition-all cursor-pointer shadow-sm flex items-center justify-center shrink-0 ${
-                  isElderly ? 'px-6 py-3.5 text-base' : 'px-4 py-2 text-xs'
-                }`}
-              >
-                <Upload className="w-4 h-4 mr-1.5 shrink-0" />
-                <span>Upload to {selectedCategory.name}</span>
-              </button>
+              <div className="shrink-0 space-y-1.5">
+                <button
+                  onClick={() => openUploadModal(selectedCategory.id)}
+                  disabled={isFull}
+                  className={`w-full font-black rounded bg-primary-strong text-primary-strong-foreground transition-all shadow-sm flex items-center justify-center ${
+                    isElderly ? 'px-6 py-3.5 text-base' : 'px-4 py-2 text-xs'
+                  } ${isFull ? 'opacity-40 cursor-not-allowed' : 'hover:bg-primary-strong-hover cursor-pointer'}`}
+                >
+                  <Upload className="w-4 h-4 mr-1.5 shrink-0" />
+                  <span>Upload to {selectedCategory.name}</span>
+                </button>
+                {isFull && (
+                  <p className={`font-semibold text-warning-strong text-balance ${isElderly ? 'text-sm' : 'text-[11px]'}`}>
+                    {vaultFullCopy(vaultUsed ?? VAULT_MAX_FILES, vaultTrashed)}
+                  </p>
+                )}
+              </div>
             )}
           </div>
 
@@ -1164,7 +1386,7 @@ export default function HealthVaultClientView({
             </div>
           ) : records.length === 0 ? (
             // Trashed or Active Empty State
-            <div className={`bg-card border border-border rounded-3xl text-center shadow-sm flex flex-col items-center justify-center max-w-xl mx-auto space-y-4 py-16 ${
+            <div className={`card-lift text-center shadow-sm flex flex-col items-center justify-center max-w-xl mx-auto space-y-4 py-16 ${
               isElderly ? 'p-16 border-4 border-dashed' : 'p-12 border-dashed'
             }`}>
               <div className={`rounded-full bg-muted flex items-center justify-center text-muted-foreground/60 ${
@@ -1191,9 +1413,10 @@ export default function HealthVaultClientView({
               {userRole !== 'CAREGIVER' && !viewingTrash && !searchQuery.trim() && (
                 <button
                   onClick={() => openUploadModal(selectedCategory.id)}
-                  className={`font-black rounded bg-primary-strong text-primary-strong-foreground hover:bg-primary-strong-hover transition-all cursor-pointer shadow-sm flex items-center justify-center ${
+                  disabled={isFull}
+                  className={`font-black rounded bg-primary-strong text-primary-strong-foreground transition-all shadow-sm flex items-center justify-center ${
                     isElderly ? 'px-5 py-3 text-base' : 'px-4 py-2 text-xs'
-                  }`}
+                  } ${isFull ? 'opacity-40 cursor-not-allowed' : 'hover:bg-primary-strong-hover cursor-pointer'}`}
                 >
                   <Upload className="w-4 h-4 mr-1.5 shrink-0" />
                   <span>Upload Document</span>
@@ -1236,7 +1459,7 @@ export default function HealthVaultClientView({
                           {dateGroup.items.map((item) => (
                             <div
                               key={item.id}
-                              className={`bg-card rounded-2xl border border-border flex flex-col lg:flex-row lg:items-center justify-between gap-4 transition-all duration-300 shadow-sm ${
+                              className={`card-lift flex flex-col lg:flex-row lg:items-center justify-between gap-4 transition-all duration-300 shadow-sm ${
                                 isElderly 
                                   ? 'p-6 border-2 hover:scale-[1.005] hover:shadow-md' 
                                   : 'p-4 hover:scale-[1.005] hover:shadow-md'
@@ -1577,36 +1800,155 @@ export default function HealthVaultClientView({
               {activeStep === 2 && (
                 <div className="space-y-4">
                   <label className={`block font-black text-foreground ${isElderly ? 'text-lg' : 'text-xs'}`}>
-                    Choose File
+                    Add the document
                   </label>
-                  <div
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                    onClick={() => fileInputRef.current?.click()}
-                    className={`border-2 border-dashed rounded-3xl p-6 flex flex-col items-center justify-center gap-3 cursor-pointer transition-all duration-200 ${
-                      isDragging 
-                        ? 'border-primary bg-primary/5' 
-                        : 'border-border hover:border-primary/50 bg-muted/40 hover:bg-muted/60'
-                    }`}
-                  >
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleFileChange}
-                      accept={ALLOWED_EXTENSIONS.join(',')}
-                      className="hidden"
-                    />
-                    <UploadCloud className="w-10 h-10 text-muted-foreground/60 shrink-0" />
-                    <div className="text-center space-y-1">
-                      <p className={`font-black text-foreground ${isElderly ? 'text-base' : 'text-xs'}`}>
-                        {selectedFile ? 'Selected File:' : 'Drag & Drop File Here'}
-                      </p>
+
+                  {/* TWO LABELLED DOORS, not one picker with a camera hidden inside it.
+                      Most of what belongs in this vault is a piece of paper the user is
+                      holding — a prescription, a lab report — so photographing it is the
+                      primary path, not an alternative to browsing files. It leads, and
+                      it says what it does.
+
+                      There were no doors at all before: the single input carried neither
+                      `capture` nor `image/*`, and Capacitor's onShowFileChooser needs BOTH
+                      to route to the camera, so the app offered a documents-only chooser
+                      and the vault's actual front door did not exist. */}
+                  <div className={`grid gap-3 ${showCamera ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                    {showCamera && (
+                      <button
+                        type="button"
+                        onClick={() => cameraInputRef.current?.click()}
+                        disabled={isPreparingFile}
+                        className={`flex flex-col items-center justify-center gap-2 rounded-3xl bg-primary-strong text-primary-strong-foreground font-black transition-all hover:bg-primary-strong-hover active:scale-[0.98] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                          isElderly ? 'min-h-[112px] px-4 text-lg' : 'min-h-[88px] px-3 text-sm'
+                        }`}
+                      >
+                        <Camera className={isElderly ? 'w-8 h-8' : 'w-6 h-6'} aria-hidden />
+                        <span>Take photo</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isPreparingFile}
+                      className={`flex flex-col items-center justify-center gap-2 rounded-3xl border-2 border-border bg-card text-foreground font-black transition-all hover:border-primary/50 hover:bg-muted/50 active:scale-[0.98] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                        isElderly ? 'min-h-[112px] px-4 text-lg' : 'min-h-[88px] px-3 text-sm'
+                      }`}
+                    >
+                      <FolderOpen className={isElderly ? 'w-8 h-8' : 'w-6 h-6'} aria-hidden />
+                      <span>Choose file</span>
+                    </button>
+                  </div>
+
+                  {/* Capacitor routes to the camera only when `capture` is present AND
+                      acceptTypes contains the literal `image/*` — list membership, so
+                      `image/jpeg` silently falls back to the file picker. Do not narrow
+                      this accept value. No CAMERA permission is involved: the manifest
+                      deliberately does not declare it, which is what makes
+                      isMediaCaptureSupported() true and launches the capture intent with
+                      no prompt. Declaring it would REQUIRE a runtime grant. */}
+                  <input
+                    type="file"
+                    ref={cameraInputRef}
+                    onChange={(e) => handleFileChange(e, true)}
+                    accept={VAULT_CAMERA_ACCEPT}
+                    capture="environment"
+                    className="hidden"
+                  />
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    accept={VAULT_ACCEPT_ATTR}
+                    className="hidden"
+                  />
+
+                  {isPreparingFile && (
+                    <div className="flex items-center gap-2.5 rounded-2xl bg-muted px-4 py-3">
+                      <Loader2 className="w-4 h-4 shrink-0 animate-spin text-primary" aria-hidden />
+                      <div className="min-w-0">
+                        <p className={`font-black text-foreground ${isElderly ? 'text-base' : 'text-xs'}`}>
+                          Getting the photo ready…
+                        </p>
+                        <p className="text-[11px] text-muted-foreground font-semibold">
+                          Making it smaller so it uploads quickly
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Drag and drop is a desktop affordance, so it only appears where a
+                      mouse does — on a phone it was a large dead panel above the thing
+                      you actually tap. */}
+                  {!showCamera && !isPreparingFile && (
+                    <div
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                      className={`border-2 border-dashed rounded-3xl p-5 flex flex-col items-center justify-center gap-2 transition-all duration-200 ${
+                        isDragging
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border bg-muted/30'
+                      }`}
+                    >
+                      <UploadCloud className="w-8 h-8 text-muted-foreground/60 shrink-0" aria-hidden />
                       <p className="text-[11px] text-muted-foreground font-semibold">
-                        {selectedFile ? selectedFile.name : 'or click to browse local files'}
+                        or drag a file here
                       </p>
                     </div>
-                  </div>
+                  )}
+
+                  {/* Says what is accepted BEFORE the picker opens. The rules are
+                      enforced by the server either way; this is so nobody hunts
+                      through a gallery for a file that was never going to fit. */}
+                  <p className={`text-muted-foreground font-semibold ${isElderly ? 'text-sm' : 'text-[11px]'}`}>
+                    {VAULT_ALLOWED_LABEL}, up to {(VAULT_MAX_BYTES / (1024 * 1024)).toFixed(0)} MB each.
+                    Photos are made smaller automatically.
+                  </p>
+
+                  {/* Only when it actually happened, and phrased as reassurance —
+                      a file whose size changed between picking and uploading is
+                      alarming if nobody mentions it. */}
+                  {compressedFrom !== null && selectedFile && (
+                    <p className={`font-semibold text-success-strong ${isElderly ? 'text-sm' : 'text-[11px]'}`}>
+                      Photo made smaller — {(compressedFrom / (1024 * 1024)).toFixed(1)} MB
+                      to {(selectedFile.size / (1024 * 1024)).toFixed(1)} MB. It stays readable.
+                    </p>
+                  )}
+                  {/* CHECK IT BEFORE IT COSTS A SLOT. The photo is shown at a size
+                      you can actually judge, with the retake sitting right next to
+                      it — the vault holds five files and a blurred one is a wasted
+                      fifth. Nothing has been uploaded at this point, so a retake
+                      costs nothing but the tap. */}
+                  {selectedFile && filePreviewUrl && (
+                    <div className="space-y-2.5">
+                      <div className="overflow-hidden rounded-2xl border border-border bg-muted/40">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={filePreviewUrl}
+                          alt="The photo you just took"
+                          className={`w-full object-contain ${isElderly ? 'max-h-72' : 'max-h-56'}`}
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => (fromCamera ? cameraInputRef : fileInputRef).current?.click()}
+                          className={`flex-1 inline-flex items-center justify-center gap-2 rounded-2xl border-2 border-border bg-card font-black text-foreground transition-colors hover:bg-muted cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                            isElderly ? 'min-h-14 text-base' : 'min-h-12 text-sm'
+                          }`}
+                        >
+                          {fromCamera
+                            ? <><Camera className={isElderly ? 'w-6 h-6' : 'w-4 h-4'} aria-hidden /> Retake</>
+                            : <><FolderOpen className={isElderly ? 'w-6 h-6' : 'w-4 h-4'} aria-hidden /> Choose another</>}
+                        </button>
+                      </div>
+                      <p className={`text-muted-foreground font-semibold ${isElderly ? 'text-sm' : 'text-[11px]'}`}>
+                        Can you read it? If not, take it again — nothing is saved yet.
+                      </p>
+                    </div>
+                  )}
+
                   {selectedFile && (
                     <div className="bg-muted p-3.5 rounded-2xl flex items-center justify-between text-xs font-semibold text-foreground">
                       <div className="truncate pr-4">
@@ -1619,6 +1961,11 @@ export default function HealthVaultClientView({
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedFile(null);
+                          // Or the "photo made smaller" line outlives the photo.
+                          setCompressedFrom(null);
+                          setFromCamera(false);
+                          setFilePreviewUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
+                          setUploadError(null);
                         }}
                         className="text-muted-foreground hover:text-foreground cursor-pointer"
                       >
@@ -1838,13 +2185,11 @@ export default function HealthVaultClientView({
                 const kind = previewKindOf(previewName || previewTitle || '', previewType);
 
                 if (kind === 'image') {
-                  return (
-                    <img
-                      src={previewUrl}
-                      alt={previewTitle || 'Preview'}
-                      className="max-w-full max-h-full object-contain select-none"
-                    />
-                  );
+                  // Pinch / double-tap / buttons. A photographed prescription is
+                  // usually handwriting on a paper slip, so "can I read it at all"
+                  // is the whole reason it was filed — a fixed-size preview made
+                  // the document unreadable and the file pointless.
+                  return <ZoomableImage src={previewUrl} alt={previewTitle || 'Preview'} />;
                 }
 
                 if (kind === 'pdf') {

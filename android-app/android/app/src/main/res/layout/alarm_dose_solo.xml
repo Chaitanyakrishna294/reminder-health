@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ONE dose, filling the screen — the original S30 alarm, unchanged.
+
+  Used when the handful has exactly one dose in it, and in ELDERLY at every size:
+  elderly asks one question at a time (CLAUDE.md's one-question screen), so a
+  four-dose handful is four of these in turn rather than a list of four.
+
+  Shares every id with alarm_dose_grouped.xml so AlarmActivity binds them with
+  the same code. The difference between the two densities is therefore entirely
+  in these two files, which is the only place it should ever be.
+
+  The identity block carries the weight so the action band stays PINNED LOW —
+  thumb reach is sacred (teardown §2), and this is the geometry that was verified
+  on device. AlarmActivity gives this root MATCH_PARENT height for exactly that
+  reason; see doseView().
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <!-- Takes all the slack, so the name sits optically centred. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:gravity="center">
+
+        <TextView
+            android:id="@+id/dose_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="34sp"
+            android:textStyle="bold"
+            android:textColor="@color/alarm_ink"
+            android:gravity="center"
+            android:lineSpacingMultiplier="1.1" />
+
+        <TextView
+            android:id="@+id/dose_amount"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textSize="20sp"
+            android:textColor="@color/alarm_ink_muted"
+            android:gravity="center" />
+    </LinearLayout>
+
+    <!-- Primary action: big, on top, unmistakable. -->
+    <Button
+        android:id="@+id/dose_taken"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:text="@string/alarm_taken"
+        android:textSize="19sp"
+        android:textStyle="bold"
+        android:textAllCaps="false"
+        android:textColor="@color/alarm_on_primary"
+        android:background="@drawable/bg_alarm_primary" />
+
+    <!-- Honest decline: full size, neutral, never guilt-worded. -->
+    <Button
+        android:id="@+id/dose_skip"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:layout_marginTop="12dp"
+        android:text="@string/alarm_skip"
+        android:textSize="17sp"
+        android:textStyle="bold"
+        android:textAllCaps="false"
+        android:textColor="@color/alarm_ink"
+        android:background="@drawable/bg_alarm_secondary" />
+</LinearLayout>

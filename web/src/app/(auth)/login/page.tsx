@@ -151,7 +151,7 @@ function LoginForm() {
     }
   };
 
-  const inputClass = `w-full pl-12 pr-4 rounded-2xl bg-white border border-border text-foreground shadow-sm placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all ${isElderly ? 'py-5 text-lg' : 'py-4 text-[15px]'}`;
+  const inputClass = `w-full pl-12 pr-4 rounded-[14px] surface-sunk border border-input text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all ${isElderly ? 'py-5 text-lg' : 'py-4 text-[15px]'}`;
   // Pink icons are decorative accents (mockup direction) — labels carry the meaning.
   const iconClass = 'absolute left-4 top-1/2 -translate-y-1/2 text-primary pointer-events-none';
   const labelClass = `block font-bold text-foreground mb-1.5 ${isElderly ? 'text-base' : 'text-xs'}`;
@@ -160,7 +160,7 @@ function LoginForm() {
     <div className="space-y-5">
       <header>
         {codeSent && (
-          <div className="mx-auto mb-6 w-28 h-28 rounded-[32px] bg-white shadow-xl ring-1 ring-primary/15 flex items-center justify-center">
+          <div className="mx-auto mb-6 w-28 h-28 rounded-[20px] card-lift card-lift-2 ring-1 ring-primary/15 flex items-center justify-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/mascot/login-hero.png"
@@ -217,8 +217,12 @@ function LoginForm() {
                 <Mail className={`${iconClass} w-[18px] h-[18px]`} aria-hidden />
                 <input
                   id="login-email"
+                  name="email"
                   type="email"
                   required
+                  autoComplete="email"
+                  autoCapitalize="none"
+                  autoCorrect="off"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className={inputClass}
@@ -235,8 +239,10 @@ function LoginForm() {
                 <Lock className={`${iconClass} w-[18px] h-[18px]`} aria-hidden />
                 <input
                   id="login-password"
+                  name="password"
                   type={showPassword ? 'text' : 'password'}
                   required
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className={`${inputClass} pr-14`}

@@ -30,10 +30,14 @@ jobs:
       # No test runner/script exists for web/ (see CLAUDE.md) — these are bare
       # node:assert scripts, one process per file, run the same way a
       # developer runs them locally.
+      # `find`, not a hand-listed set of directories. The glob used to name
+      # src/lib and src/lib/schedule explicitly, so a test added in any other
+      # subdirectory was written, passed locally, and then silently never ran in
+      # CI — which is worse than having no test, because it reads like coverage.
       - working-directory: web
         run: |
-          for f in src/lib/schedule/*.test.ts src/lib/*.test.ts; do
+          find src/lib -name '*.test.ts' -print0 | sort -z | while IFS= read -r -d '' f; do
             echo "::group::$f"
-            node --experimental-strip-types "$f"
+            node --experimental-strip-types "$f" || exit 1
             echo "::endgroup::"
           done

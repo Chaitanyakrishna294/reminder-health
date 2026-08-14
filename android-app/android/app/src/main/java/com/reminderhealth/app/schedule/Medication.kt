@@ -26,6 +26,28 @@ data class Medication(
     val medicationReason: String?,
 
     /**
+     * `medications.priority_level` — "normal" | "important" | "critical".
+     *
+     * Added with the retry ladder (2026-08-14). It was deliberately NOT synced
+     * before, because nothing native varied by it: the alarm rang once and the
+     * server owned every escalation decision. The ladder is the first native
+     * behaviour that differs by priority.
+     */
+    val priorityLevel: String? = null,
+
+    /**
+     * Retry-ladder override, or null to use the priority default — which is the
+     * normal state. BOTH or NEITHER; a database CHECK rejects a half-set pair,
+     * and [RetryLadder] treats either being null as "use the default".
+     *
+     * NOT to be confused with `medications.retry_count` on the server, which is
+     * the BOT's send-retry counter and is not synced here at all. That name
+     * collision cost a failed migration on 2026-08-14.
+     */
+    val retryLadderIntervalMinutes: Int? = null,
+    val retryLadderCount: Int? = null,
+
+    /**
      * Family voice alarms (see CLAUDE.md "Post-M2 features"). Absolute paths to
      * files ALREADY DOWNLOADED to local device storage — never remote URLs: the
      * alarm has to work in airplane mode, so nothing may be fetched at fire

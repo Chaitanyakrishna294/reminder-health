@@ -1,5 +1,7 @@
 'use client';
 
+import { useSearchParams } from 'next/navigation';
+
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
@@ -230,6 +232,34 @@ export default function SharedTrustCenter() {
   useEffect(() => {
     fetchTrustData();
   }, [fetchTrustData]);
+
+  /**
+   * DEEP LINK FROM A MEMBER CARD — `?connection=<id>`.
+   *
+   * The care-circle roster links straight to one relationship now that every row
+   * carries its connection_id. Before this the settings icon on every card led
+   * to the same page, and the reader had to find the person they had just tapped
+   * in a list of everyone.
+   *
+   * Waits for the data: connections load asynchronously, so on a cold open the
+   * target does not exist yet and opening on mount alone would silently do
+   * nothing. Fires once — `opened` guards against re-opening the editor if the
+   * user closes it while the param is still in the URL, which would trap them.
+   */
+  const searchParams = useSearchParams();
+  const deepLinkId = searchParams.get('connection');
+  const [openedFromLink, setOpenedFromLink] = useState(false);
+  useEffect(() => {
+    const all = [...peopleSupportingMe, ...peopleISupport];
+    if (!deepLinkId || openedFromLink || all.length === 0) return;
+    const target = all.find((c) => c.connection_id === deepLinkId);
+    if (!target) return;
+    setOpenedFromLink(true);
+    handleOpenEdit(target);
+    // handleOpenEdit is redefined every render; depending on it would re-open
+    // the editor on each one.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deepLinkId, openedFromLink, peopleSupportingMe, peopleISupport]);
 
   // Actions
   const handleOpenEdit = (conn: CareCircleConnection) => {
@@ -505,7 +535,7 @@ export default function SharedTrustCenter() {
             </div>
 
             {peopleSupportingMe.length === 0 ? (
-              <div className="bg-card border border-border rounded-3xl p-8 text-center text-muted-foreground shadow-sm">
+              <div className="card-lift p-8 text-center text-muted-foreground shadow-sm">
                 <Info className="w-8 h-8 mx-auto text-muted-foreground mb-2 opacity-50" />
                 <p className="text-xs font-bold text-foreground">No caregiver access granted yet</p>
                 <p className="text-[10px] text-muted-foreground mt-1 max-w-sm mx-auto leading-relaxed">
@@ -519,7 +549,7 @@ export default function SharedTrustCenter() {
                   const daysCaring = Math.max(1, moment().diff(moment(conn.created_at), 'days'));
                   
                   return (
-                    <div key={conn.connection_id} className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-5">
+                    <div key={conn.connection_id} className="card-lift p-6 shadow-sm space-y-5">
                       {/* Stacks below sm. Side by side at 375px this row asked an
                           identity block AND three buttons to share 287px, so the
                           "Primary Coordinator" badge wrapped to two lines inside a 73px
@@ -640,7 +670,7 @@ export default function SharedTrustCenter() {
             </div>
 
             {peopleISupport.length === 0 ? (
-              <div className="bg-card border border-border rounded-3xl p-8 text-center text-muted-foreground shadow-sm">
+              <div className="card-lift p-8 text-center text-muted-foreground shadow-sm">
                 <Info className="w-8 h-8 mx-auto text-muted-foreground mb-2 opacity-50" />
                 <p className="text-xs font-bold text-foreground">You support no active patients</p>
                 <p className="text-[10px] text-muted-foreground mt-1 max-w-sm mx-auto leading-relaxed">
@@ -652,7 +682,7 @@ export default function SharedTrustCenter() {
                 {peopleISupport.map((conn) => {
                   const preset = resolvePreset(conn);
                   return (
-                    <div key={conn.connection_id} className="bg-card border border-border rounded-2xl p-5 shadow-sm flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
+                    <div key={conn.connection_id} className="card-lift p-5 shadow-sm flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="shrink-0 w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold border border-primary/20">
                           {conn.resolved_name?.substring(0, 2).toUpperCase() || 'PT'}
@@ -702,7 +732,7 @@ export default function SharedTrustCenter() {
             <h2 className="text-xs font-black text-foreground uppercase tracking-wider">Consent History Log</h2>
           </div>
 
-          <div className="bg-card border border-border rounded-3xl p-5 shadow-sm space-y-4">
+          <div className="card-lift p-5 shadow-sm space-y-4">
             {auditLogs.length === 0 ? (
               <p className="text-[11px] text-muted-foreground text-center py-8">No consent history logged yet.</p>
             ) : (
@@ -723,7 +753,7 @@ export default function SharedTrustCenter() {
       {/* Editor Permissions Modal Overlay */}
       {editingConnection && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-card border border-border rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-6">
+          <div className="card-lift max-w-lg w-full p-6 shadow-2xl space-y-6">
             <div className="space-y-1">
               <h2 className="text-base font-black text-foreground">Edit Shared Trust: {editingConnection.resolved_name}</h2>
               <p className="text-[11px] text-muted-foreground">Adjust presets or customize individual permissions directly.</p>

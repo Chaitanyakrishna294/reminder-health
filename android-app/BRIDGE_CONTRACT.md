@@ -39,6 +39,67 @@ recognises as having no row behind it and therefore skips rescheduling.
 
 ---
 
+## 0. Retry ladder — what the three new payload fields are for (2026-08-14)
+
+Between the first ring and the caregiver being told, the device re-asks. The
+ladder is those re-asks, and it is **native**: chained exact alarms, same
+offline and reboot guarantees as the first ring, no polling.
+
+| priority | default ladder | offsets from the dose time |
+|---|---|---|
+| `normal` (Routine) | 15 x 1 | +15 |
+| `important` | 10 x 2 | +10, +20 |
+| `critical` | 5 x 5 | +5, +10, +15, +20, +25 |
+
+`retryIntervalMinutes` / `retryCount` override the default for **important and
+critical only**; NULL means "use the default", and that is the normal state.
+
+**`interval * count` MAY NEVER EXCEED 30 MINUTES.** This is a safety property.
+`scan_and_escalate_overdue_reminders` clamps its escalation anchor to
+`created_at + 30 minutes` so a dose nobody re-prompted still escalates; a ladder
+running past that would have the device politely re-asking the patient at +35
+while the caregiver was already being told the dose was missed. Enforced by a DB
+CHECK, by the edit form, and by `retryOffsets()` falling back to the priority
+default rather than clamping. Do not raise it on the native side alone.
+
+**The arithmetic is fixture-driven.** `test/retry-ladder-vectors.json` is shared
+by `web/src/lib/schedule/retry-ladder.ts` and the Kotlin `RetryLadder` port —
+same rule as `schedule-test-vectors.json`. Add cases there, never in one side's
+test, or the two drift invisibly. **Fire times still come only from the native
+core**; the fixture is offsets, not wall-clock instants.
+
+### Rules the Kotlin half must honour
+
+1. **Retries reuse the ORIGINAL `scheduledFor`.** `scheduleAt` already separates
+   `fireAt` from `scheduledFor` — that split was the snooze fix, and a retry has
+   exactly the same shape: a later ring about an earlier dose. Getting this wrong
+   makes the answer unsaveable (`INVALID_SCHEDULED_TIME`).
+2. **Retry is not snooze.** A user snooze suspends the ladder and reschedules per
+   snooze rules; auto-retries never touch `scheduledFor` and never call
+   `snooze_reminder_event`.
+3. **Resolving from ANY surface cancels the pending chain** — notification
+   action, app, or a caregiver on the web. An offline device keeps climbing until
+   it learns, which is correct: it has no reason to believe the dose was taken.
+4. **Boot reconstructs in-flight ladders.** `rescheduleAll` recomputes from
+   `reminder_times`, so a reboot mid-ladder would otherwise drop a critical
+   medication's remaining rungs silently — the exact failure this feature exists
+   to prevent. This is a must-fix within the feature, not a follow-up.
+5. **Presentation follows the standing rule**: locked or idle -> full-screen
+   `AlarmActivity`; unlocked and in use -> heads-up notification, fully
+   answerable on its own.
+6. **One ring, N doses.** Rungs landing in the same minute coalesce. The ring
+   lists **every still-unanswered dose from the same original scheduled time**,
+   each answerable on its own — the patient takes their noon pills as one
+   handful and must never be double-asked. Answered doses show their state
+   immediately and the screen persists until every dose is answered or dismissed;
+   at 8:01 the unanswered remainder must still be plainly visible. **In elderly
+   mode the same handful presents ONE DOSE AT A TIME** (answer -> next appears),
+   matching the one-question philosophy. Either way an unanswered dose never
+   vanishes: its own ladder, the sticky, and the rail all keep holding it.
+   Ladders stay independent in the scheduler; only presentation coalesces.
+7. **Copy is zero-blame** — "Still time to take Telmikind", reminding rather than
+   scolding. The sticky keeps its current honest record-keeping role.
+
 ## 1. `syncSchedule(medications: MedicationPayload[])` — web → native
 
 Called by the web app after any medication create/edit/delete, and once on app foreground to
@@ -53,6 +114,9 @@ interface MedicationPayload {
   dosageAmount: number;           // medications.dosage_amount (numeric, default 1)
   unitType: string | null;        // medications.unit_type
   reminderTimes: string[];        // medications.reminder_times (jsonb array of "HH:MM")
+  priorityLevel: string | null;   // medications.priority_level — 'normal' | 'important' | 'critical'
+  retryIntervalMinutes: number|null; // medications.retry_ladder_interval_minutes, NULL = priority default
+  retryCount: number | null;      // medications.retry_ladder_count, NULL = priority default
   doseDays: number[] | null;      // medications.dose_days (smallint[]); null = every day, 0=Sun..6=Sat
   timezone: string;               // medications.timezone (IANA tz string, e.g. "Asia/Kolkata")
   nextReminderAt: string;         // medications.next_reminder_at, ISO 8601 UTC — a server-computed
@@ -87,6 +151,155 @@ keep in sync and less that goes stale on the device.
 
 `reminder_times` is confirmed **`jsonb`** live (not `TEXT[]` — see `db/migrations/APPLIED.md`
 #64), so it deserializes to a plain JS/Kotlin string array with no special handling either side.
+
+### Call-level fields alongside `medications`
+
+```ts
+syncSchedule({ medications, userId?: string, elderly?: boolean, ringSeconds?: number })
+```
+
+- **`userId`** keys the native store to one identity (account-switch guard, 2026-08-11).
+- **`ringSeconds`** (2026-08-14) is `profiles.alarm_ring_seconds` — how long **each
+  dose** rings before the alarm screen moves on to the next dose in the same handful.
+  **Per dose, not per screen:** four medicines at two minutes each is a lit, ringing
+  phone for eight, which is why the settings copy states the total instead of leaving
+  it to be discovered at 3am. Clamped to 60-300s on arrival as well as by the DB CHECK —
+  it drives a wake-lit screen, so the device is safe against a bad sync as well as a bad
+  form. Absent leaves the stored value alone (default 60s, today's behaviour).
+  **Its query is deliberately separate on the web side**: PostgREST fails an entire
+  select on an unknown column, so folding it into the medication read would mean
+  deploying before the migration stops `syncSchedule` outright.
+- **`elderly`** (2026-08-14) mirrors CLAUDE.md's third density so the **Kotlin alarm screen**
+  can honour it. This is the same argument the planned `language` field rests on: the alarm is
+  a separate process with no webview running, so it cannot read a React context, `localStorage`,
+  or `profiles` — anything that changes how a dose is *presented* has to travel. It changes
+  exactly one thing natively: a coalesced handful is asked about **one dose at a time** instead
+  of as a list. Stored in `AlarmPrefs` (plain SharedPreferences, deliberately **not**
+  `SessionStore`, which is wiped on sign-out — wiping "this person needs the simplified screen"
+  at sign-out resets the person least able to put it back). Absent leaves the stored value
+  alone, so an APK newer than the deployed web keeps whatever it last learned.
+
+---
+
+## 1c. Alarm media — the one bridge area where NATIVE owns the data (2026-08-14)
+
+```ts
+getAlarmMedia()  -> { imageChoice, soundChoice, bundled: string[], hasCustomImage, hasCustomSound }
+setAlarmImage({ choice })   -> AlarmMediaState   // a bundled key, or 'none'
+pickAlarmImage()            -> { picked, imageChoice?, error? }
+pickAlarmSound()            -> { picked, soundChoice?, error? }
+clearAlarmSound()           -> AlarmMediaState
+renderAlarmPreview({ width? }) -> { dataUri: string | null }   // a JPEG data: URI
+previewAlarmSound()         -> { playing: boolean }
+stopAlarmSoundPreview()     -> { playing: false }
+```
+
+**`renderAlarmPreview` returns a picture of the REAL screen, not a mock-up.**
+Native inflates the same XML the alarm uses, binds it through the same
+`AlarmScreenBinder`, resolves the backdrop through the same `AlarmMedia`, and draws
+the result to a bitmap. A CSS recreation in Settings would have been a second
+implementation of the most safety-critical screen in the product, and the moment the
+two diverged the preview would be a lie about what someone sees at 3am — with no way
+for them to check until then. `AlarmScreenBinder` exists solely so the two paths are
+one; if the alarm layout changes, the miniature changes with it.
+
+- **Measured at real screen size, then scaled.** Laying out at preview size would
+  re-wrap the text and re-balance the weighted identity block, so a long medicine name
+  could look fine in the miniature and overflow on the alarm.
+- **Never rejects.** A null `dataUri` means "no preview"; a settings screen must not
+  break because a picture could not be drawn. `Throwable` is caught, not `Exception` —
+  an OOM drawing a full-screen bitmap is the realistic failure.
+- **Sound is previewed by playing it** (`USAGE_ALARM`, so it answers "what will
+  actually wake me"), non-looping and hard-stopped after 10s.
+
+**Direction matters and it is the opposite of everything else here.** `elderly` and
+`ringSeconds` are web data the device mirrors. The alarm's picture and sound are
+**device data the web displays**: the webview cannot write to Android app-private
+storage, and the alarm must show and play them in airplane mode with the app process
+dead. So the picker runs in Kotlin, the bytes are copied in Kotlin, and the web only
+ever learns *which* choice is active.
+
+- **Files live in `filesDir/alarm-media/`, never Supabase, never a URL.** The copy is
+  the feature: a gallery pick hands back a `content://` URI belonging to another app
+  that can be revoked or deleted. Copying the bytes is what lets someone tidy their
+  photos without their alarm quietly reverting to a grey screen.
+- **`ACTION_OPEN_DOCUMENT`, not the photo picker or MediaStore** — it needs no
+  permission on any API level this app supports, so the manifest's permission list is
+  unchanged. CLAUDE.md treats that list as a promise; "the user picked a wallpaper" is
+  not a reason to start reading their photo library.
+- **Three bundled backdrops** ship in the APK as authored gradients (`alarm_bg_dawn`,
+  `alarm_bg_calm`, `alarm_bg_night`), not photographs: legible by construction, about a
+  kilobyte each, nothing to license. A photograph can arrive with a bright corner
+  exactly where the medicine name sits.
+- **Contrast is structural, not per-image.** Every backdrop sits under the same 55%
+  black scrim, and the buttons keep their own opaque fills — so no image, bundled or
+  picked, can affect whether Taken/Skip/Snooze are readable.
+- **A picked image is decoded DOWNSAMPLED.** A 50-megapixel photo decoded whole is an
+  OutOfMemoryError on a cheap phone, on the one screen that must never crash, and the
+  picker puts exactly that file one tap away.
+- **`picked: false` is a cancel, not an error.** Cancelling is the commonest outcome of
+  opening a file picker; rejecting the call would show a failure to someone who simply
+  changed their mind.
+
+**GLOBAL, not per medication.** One image and one sound for every alarm, and in a
+coalesced handful they belong to the *presentation* — one backdrop, one tone, not one
+per row; swapping either as the focus moves would flicker the screen and stutter the
+sound while someone is reading a medicine name. Per-medication override is the natural
+next step and is **already half built**: `Medication.alarmAudioPath`/`alarmPhotoPath`
+exist in Room v2, `AlarmMedia.resolveImage`/`resolveSound` already prefer them, and
+`AlarmActivity` already passes them. What is missing is somewhere to *set* them — a
+server column, a migration, per-medication UI. Global costs nothing later, because the
+resolution order **is** the override's mechanism with one of its two inputs populated.
+
+---
+
+## 1b. `doseResolved({ doses })` and `getActiveLadders()` — the ladder-cancellation pair (2026-08-14)
+
+**The device runs the retry ladder, so the device has to learn about every answer.** It sees
+answers made on the alarm screen and on the notification, because both write to its local queue.
+It does **not** see an answer made in the webview — the rail, the dose gate, elderly mode all
+resolve straight to Supabase.
+
+Found live on a real device, 2026-08-14: two **critical** medications marked SKIP from the app's
+rail read as skipped everywhere on screen while `pending_retries` kept ringing about them every
+five minutes. Phase 2 had proved the notification path cancelled correctly, which is exactly what
+made the gap invisible — the choke point (`DoseActionQueue.record`) only ever saw
+native-originated answers.
+
+```ts
+doseResolved({ doses: { medicationId: number; scheduledFor: string; action: 'TAKEN' | 'SKIP' }[] })
+  -> { applied: number }
+getActiveLadders() -> { ladders: { medicationId: number; scheduledFor: string }[] }
+```
+
+Two routes, because there are two ways an answer can reach the device:
+
+1. **Immediately**, from `web/src/lib/reminder-events.ts` — the one function every web surface
+   resolves through. It lives there rather than in each surface for the same reason the native
+   cancellation lives inside `DoseActionQueue.record`: a surface added next month gets it
+   without knowing it exists. Never throws; the dose is already recorded server-side by then, and
+   a failure costs at most one extra ring.
+2. **By reconciliation**, from `ScheduleSync` — ask native which ladders are in flight, ask the
+   server whether those doses are already resolved, report back the ones that are. This is the
+   only route for an answer the device was *never* part of: a **caregiver resolving from their
+   own phone**. Ladder-first on purpose, so the usual app-open makes one bridge call, gets an
+   empty list, and issues no query at all.
+
+**`doseResolved` goes through `DoseActionQueue.record(alreadyOnServer = true)`, not straight to
+`cancelLadder`.** Cancelling the ladder is only one of the things an answer must do — it also has
+to leave the dose out of the coalesced alarm group, narrow or clear the notification, and reach a
+visible alarm screen. A second cancellation path would have covered the first and silently missed
+the rest. The row is written `synced = true`, so `ActionSync` correctly never tries to send a
+server-originated answer back to the server.
+
+**Honest bound:** reconciliation runs when the webview runs. A ladder is at most 30 minutes long
+(the escalation clamp), so a caregiver's remote answer can still leave the phone re-asking until
+the app is next opened. Closing that would mean the device polling the server, which CLAUDE.md
+forbids and which would break the offline guarantee the alarm core exists for.
+
+Both methods are **optional on the JS side** (`bridge.doseResolved?`). `server.url` means the web
+and the APK ship separately, so a device can be running either combination; absence means "this
+device cannot be told", never an error.
 
 ---
 

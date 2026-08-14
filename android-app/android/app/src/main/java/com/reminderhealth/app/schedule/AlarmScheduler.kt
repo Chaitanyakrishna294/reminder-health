@@ -41,6 +41,17 @@ object AlarmScheduler {
     const val EXTRA_PHOTO_PATH = "alarmPhotoPath"
 
     /**
+     * True when this firing is a retry RUNG rather than the dose's first ring.
+     *
+     * PRESENTATION ONLY -- it decides the wording, nothing else. Whether the
+     * ladder advances is decided from the `pending_retries` table, because
+     * extras do not survive a reboot and a rebuilt rung must behave exactly like
+     * the one it replaced. Flag for what the patient reads, table for what the
+     * device does.
+     */
+    const val EXTRA_IS_RETRY = "isRetry"
+
+    /**
      * False only on Android 12+ when the user has revoked exact-alarm access.
      * The app declares `USE_EXACT_ALARM` (auto-granted on 13+ for alarm-class
      * apps — medication reminders qualify, see CLAUDE.md), so this is expected
@@ -78,6 +89,7 @@ object AlarmScheduler {
         val db = ScheduleDatabase.getInstance(context)
         val medications = db.medicationDao().getAll()
         val snoozeDao = db.pendingSnoozeDao()
+        val retryDao = db.pendingRetryDao()
         Log.i(TAG, "rescheduleAll: ${medications.size} medication(s) in the local store")
         val now = Instant.now()
 
@@ -130,6 +142,146 @@ object AlarmScheduler {
                 snoozeDao.clear(medication.id)
             }
 
+            // A LADDER IN FLIGHT OUTRANKS THE NEXT DOSE, for the same reason a
+            // snooze does: the device promised to ask again about THIS dose, and
+            // Android dropped the registration at shutdown. Rebuilding from
+            // reminder_times alone would silently swallow a critical
+            // medication's remaining rungs -- the failure this table exists for.
+            val ladder = retryDao.get(medication.id)
+            if (ladder != null) {
+                val ladderDoseAt = runCatching { Instant.parse(ladder.doseAt) }.getOrNull()
+                if (ladderDoseAt == null) {
+                    retryDao.clear(medication.id)
+                } else if (armRung(context, medication, ladderDoseAt, ladder.offsets(), "rebuilt after boot")) {
+                    return@forEach
+                } else {
+                    // The phone slept through the whole ladder. Leave the sticky
+                    // so the dose stays visibly unanswered rather than vanishing,
+                    // then fall through and register the next dose.
+                    DoseNotifications.showMissedGroup(context, ladder.doseAt, DoseRow.of(medication))
+                }
+            }
+
+            scheduleNext(context, medication)
+        }
+    }
+
+
+    // -- RETRY LADDER --------------------------------------------------------
+    //
+    // One pending alarm per medication is the model this whole file is built on
+    // (see [requestCode] and the per-medication data URI), and a ladder fits it
+    // because a ladder is SEQUENTIAL: only the next rung is ever registered, and
+    // firing it registers the one after.
+    //
+    // That does mean a live rung temporarily REPLACES the next-dose alarm. It
+    // heals on its own -- every fire re-registers the next dose (AlarmReceiver),
+    // and the last rung's fire is what makes that stick -- but it is why a reboot
+    // mid-ladder must be handled explicitly in [rescheduleAll] rather than left
+    // to "rebuild from reminder_times", which would drop the ladder AND ring the
+    // next dose as if nothing had been pending.
+    //
+    // Rungs carry the ORIGINAL dose instant as `scheduledFor`, never their own
+    // fire time. That is the same identity rule the snooze split was fixed for:
+    // the server resolves on `(medication_id, scheduled_for)`, so a rung that
+    // announced itself as its own dose would make the patient's answer
+    // unsaveable.
+
+    /**
+     * Begin the ladder for a dose that has just rung unanswered.
+     *
+     * @return true when a rung was registered; false when this medication's
+     *   ladder is empty, in which case the caller should leave the sticky.
+     */
+    suspend fun startLadder(context: Context, medication: Medication, doseAt: Instant): Boolean {
+        return armRung(context, medication, doseAt, RetryLadder.offsetsFor(medication), "started")
+    }
+
+    /**
+     * Ring the next rung after one has just fired.
+     *
+     * @return true when another rung was registered; false when the ladder is
+     *   exhausted -- the caller posts the sticky missed notice.
+     */
+    suspend fun advanceLadder(context: Context, medication: Medication, pending: PendingRetry): Boolean {
+        val doseAt = runCatching { Instant.parse(pending.doseAt) }.getOrNull() ?: return false
+        // Drop the rung that just fired; armRung drops any the device slept through.
+        return armRung(context, medication, doseAt, pending.offsets().drop(1), "advanced")
+    }
+
+    /**
+     * Register the earliest rung still in the future and persist what is left,
+     * or clear the ladder when nothing is.
+     *
+     * Past rungs are DISCARDED rather than fired late. An alarm for a dose whose
+     * moment went by while the phone was off is startling and ambiguous, and the
+     * server still owns the dose through the escalation ladder -- the same
+     * division of labour the snooze-through-shutdown branch already follows.
+     */
+    private suspend fun armRung(
+        context: Context,
+        medication: Medication,
+        doseAt: Instant,
+        offsets: List<Int>,
+        verb: String,
+    ): Boolean {
+        val dao = ScheduleDatabase.getInstance(context).pendingRetryDao()
+        val now = Instant.now()
+        val future = offsets.filter { doseAt.plusSeconds(it * 60L).isAfter(now) }
+
+        val row = PendingRetry.of(medication.id, doseAt.toString(), future)
+        if (row == null) {
+            dao.clear(medication.id)
+            Log.i(
+                TAG,
+                "retry ladder for med " + medication.id + " (" + medication.drugName + ") is exhausted " +
+                    "(dose " + doseAt + ") -- leaving the sticky missed notice",
+            )
+            return false
+        }
+
+        dao.upsert(row)
+        val fireAt = doseAt.plusSeconds(future.first() * 60L)
+        scheduleAt(
+            context = context,
+            medicationId = medication.id,
+            drugName = medication.drugName,
+            doseLabel = doseLabelFor(medication),
+            fireAt = fireAt,
+            audioPath = medication.alarmAudioPath,
+            photoPath = medication.alarmPhotoPath,
+            // THE ORIGINAL DOSE, not the rung's own time. See the block comment.
+            scheduledFor = doseAt,
+            isRetry = true,
+        )
+        Log.i(
+            TAG,
+            "retry ladder " + verb + " for med " + medication.id + " (" + medication.drugName + "): " +
+                "next rung +" + future.first() + "min at " + fireAt + " for the dose due " + doseAt +
+                " (remaining " + future.joinToString() + ")",
+        )
+        return true
+    }
+
+    /**
+     * The dose was answered, from any surface -- cancel the chain and put the
+     * next dose back.
+     *
+     * Restoring the next-dose alarm is not optional: the live rung occupies this
+     * medication's single alarm slot, so cancelling without rescheduling would
+     * leave it with no alarm at all until the next sync.
+     */
+    suspend fun cancelLadder(context: Context, medicationId: Long) {
+        val db = ScheduleDatabase.getInstance(context)
+        val dao = db.pendingRetryDao()
+        if (dao.get(medicationId) == null) return
+
+        dao.clear(medicationId)
+        cancel(context, medicationId)
+        Log.i(TAG, "retry ladder cancelled for med " + medicationId + " -- the dose was answered")
+
+        val medication = db.medicationDao().getById(medicationId)
+        if (medication != null && medication.active) {
             scheduleNext(context, medication)
         }
     }
@@ -222,6 +374,8 @@ object AlarmScheduler {
          * INVALID_SCHEDULED_TIME, five retries, answer dropped. Found 2026-08-11.
          */
         scheduledFor: Instant = fireAt,
+        /** See [EXTRA_IS_RETRY] -- wording only. */
+        isRetry: Boolean = false,
     ) {
         val manager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: run {
             Log.e(TAG, "AlarmManager unavailable; cannot schedule med $medicationId")
@@ -263,6 +417,7 @@ object AlarmScheduler {
             putExtra(EXTRA_SCHEDULED_FOR, scheduledFor.toString())
             putExtra(EXTRA_AUDIO_PATH, audioPath)
             putExtra(EXTRA_PHOTO_PATH, photoPath)
+            putExtra(EXTRA_IS_RETRY, isRetry)
         }
 
         val pendingIntent = PendingIntent.getBroadcast(

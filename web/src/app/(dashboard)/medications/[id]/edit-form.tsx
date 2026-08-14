@@ -5,6 +5,10 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { calculateNextReminder } from '@/lib/medication-utils';
+import RetryLadderFields, { isCustomLadder } from '@/components/medications/retry-ladder-fields';
+// Only the validator is still needed here — the fields, the cap and the preview
+// all moved into the shared component so the wizard cannot drift from this form.
+import { ladderError } from '@/lib/schedule/retry-ladder';
 import { useUiMode } from '@/context/ui-mode-context';
 import { type UnitType, unitOptions, stepMeta, frequencies, priorities, weekdays, describeDoseDays, unitPhrase } from '@/components/medications/medication-form-options';
 import { validateMedicationStep, buildSharedMedicationFields, normalizeDoseDays } from '@/lib/medications/form-logic';
@@ -36,6 +40,8 @@ interface EditMedicationFormProps {
     reminder_times: string[];
     tablet_count: number;
     priority_level: string;
+    retry_ladder_interval_minutes?: number | null;
+    retry_ladder_count?: number | null;
     active: boolean;
     low_stock_alert_enabled: boolean;
     unit_type?: string;
@@ -98,6 +104,16 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
   
   // Step 5 states
   const [medicationReason, setMedicationReason] = useState<string>(medication.medication_reason || '');
+  // Retry ladder override. NULL/NULL is the normal state and means "use the
+  // priority default", so the inputs start EMPTY rather than pre-filled with the
+  // default — a filled box reads as a choice somebody made.
+  const [retryInterval, setRetryInterval] = useState<string>(
+    medication.retry_ladder_interval_minutes != null ? String(medication.retry_ladder_interval_minutes) : '',
+  );
+  const [retryCount, setRetryCount] = useState<string>(
+    medication.retry_ladder_count != null ? String(medication.retry_ladder_count) : '',
+  );
+
   const [priority, setPriority] = useState<'normal' | 'important' | 'critical'>(
     medication.priority_level as any
   );
@@ -196,10 +212,32 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
       nextReminder = calculateNextReminder(sortedTimes, medication.timezone ?? undefined, normalizeDoseDays(doseDays));
     }
 
+    // Both or neither, and under the cap. The DB CHECK enforces this too — the
+    // form check is so nobody discovers it as a save failure.
+    // Shared with the fields and the wizard: one definition of "the user chose
+    // custom", so the save path cannot disagree with what the form showed.
+    const ladderTouched = isCustomLadder(retryInterval, retryCount);
+    let retryFields: { retry_ladder_interval_minutes: number | null; retry_ladder_count: number | null } = {
+      retry_ladder_interval_minutes: null,
+      retry_ladder_count: null,
+    };
+    if (ladderTouched) {
+      const iv = Number(retryInterval);
+      const ct = Number(retryCount);
+      const problem = ladderError(iv, ct);
+      if (problem) {
+        setError(problem);
+        setLoading(false);
+        return;
+      }
+      retryFields = { retry_ladder_interval_minutes: iv, retry_ladder_count: ct };
+    }
+
     try {
       const { error: updateErr } = await supabase
         .from('medications')
         .update({
+          ...retryFields,
           ...buildSharedMedicationFields(
             { drugName, frequency, times, doseDays, dosageAmount, strength, enableInventory, currentStock, stockThreshold, medicationReason, priority, unitType, catalogLink },
             sortedTimes,
@@ -220,7 +258,7 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
   };
 
   const labelClass = `block font-semibold text-foreground ${isElderly ? 'text-xl mb-2' : 'text-sm mb-1.5'}`;
-  const inputClass = `mt-1 block w-full px-4 py-3 border border-input rounded-2xl bg-background text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 text-sm transition-all duration-200 font-[var(--font-sans)] ${
+  const inputClass = `mt-1 block w-full px-4 py-3 min-h-11 border border-input rounded-2xl bg-background text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 text-sm transition-all duration-200 font-[var(--font-sans)] ${
     isElderly ? 'py-4 text-xl rounded-2xl border-2' : ''
   }`;
 
@@ -251,7 +289,7 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
         </div>
       )}
 
-      <div className={`bg-card rounded-3xl border border-border shadow-md overflow-hidden ${isElderly ? 'border-2' : ''}`}>
+      <div className={`card-lift shadow-md overflow-hidden ${isElderly ? 'border-2' : ''}`}>
         
         {/* ── Premium Stepper ── */}
         <div className="px-6 pt-6 pb-4 md:px-8 md:pt-8">
@@ -632,6 +670,22 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
                     })}
                   </div>
                 </div>
+
+                {/* REMINDING AGAIN, BEFORE ANYONE ELSE IS TOLD.
+                    Routine is deliberately excluded: a supplement does not need
+                    its own retry schedule, and it would be one more decision on
+                    a form that already asks plenty. */}
+                <RetryLadderFields
+                  priority={priority}
+                  interval={retryInterval}
+                  count={retryCount}
+                  onIntervalChange={setRetryInterval}
+                  onCountChange={setRetryCount}
+                  isElderly={isElderly}
+                  inputClass={inputClass}
+                  labelClass={labelClass}
+                  idPrefix="edit-retry"
+                />
               </div>
             )}
 

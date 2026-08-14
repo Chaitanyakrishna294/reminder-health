@@ -18,6 +18,27 @@ export interface MedicationPayload {
   nextReminderAt: string;
   active: boolean;
   medicationReason: string | null;
+  /**
+   * `medications.priority_level` — 'normal' | 'important' | 'critical'.
+   *
+   * Sent as of the retry ladder (2026-08-14). It was deliberately NOT in this
+   * payload before, because nothing native needed it: the alarm rang once and
+   * the server owned every escalation decision. The ladder is the first native
+   * behaviour that differs by priority, so now it travels.
+   */
+  priorityLevel: string | null;
+  /**
+   * Retry override, or NULL to use the priority default. BOTH or NEITHER — a
+   * half-set pair is rejected by the DB constraint, and the native side treats
+   * either being null as "use the default".
+   *
+   * `interval * count` may never exceed 30 minutes. That is not a preference:
+   * the server clamps its escalation anchor at created_at + 30, so a longer
+   * ladder would have the device re-asking the patient while the caregiver was
+   * already being told the dose was missed. See lib/schedule/retry-ladder.ts.
+   */
+  retryIntervalMinutes: number | null;
+  retryCount: number | null;
 }
 
 /**
@@ -72,6 +93,72 @@ export interface PendingAction {
   syncError: string | null;
 }
 
+/**
+ * A dose the SERVER has already resolved, being reported back to the device.
+ *
+ * The device runs its own retry ladder — chained exact alarms that re-ask about
+ * an unanswered dose — and it cancels that ladder when it sees the answer. It
+ * sees answers made on the alarm screen and on the notification. It does NOT see
+ * an answer made in this webview, because that goes straight to Supabase.
+ *
+ * On 2026-08-14 that gap was live on a real device: two critical medications
+ * marked skipped in the app kept ringing every five minutes afterwards. This
+ * type is the report that closes it, and [notifyNativeDoseResolved] is called
+ * from the one place every web resolve passes through — see
+ * lib/reminder-events.ts.
+ */
+export interface ResolvedDose {
+  medicationId: number;
+  /** ISO-8601 UTC, the dose's own scheduled instant — the server's dose identity. */
+  scheduledFor: string;
+  action: 'TAKEN' | 'SKIP';
+}
+
+/** A retry chain still running on the device, from `getActiveLadders`. */
+export interface ActiveLadder {
+  medicationId: number;
+  scheduledFor: string;
+}
+
+/**
+ * The alarm's backdrop and sound.
+ *
+ * **Native owns the files, and this direction is the reverse of every other
+ * bridge value.** `elderly` and `ringSeconds` are web data the device mirrors;
+ * these are device data the web displays. The webview cannot write to Android
+ * app-private storage, and the alarm has to show its picture and play its sound
+ * in airplane mode with the app process dead — so the picker runs in Kotlin, the
+ * bytes are copied there, and the web only ever learns which choice is active.
+ *
+ * That copy is also what makes "delete the original from your gallery" safe: the
+ * alarm never refers to the picked file again.
+ *
+ * GLOBAL, not per medication (2026-08-14) — one picture and one sound for every
+ * alarm. A per-medication override is the natural next step and is already half
+ * built: `Medication.alarmAudioPath`/`alarmPhotoPath` exist in Room, the alarm
+ * already prefers them, and what is missing is somewhere to set them (per-med UI,
+ * a server column, a migration). Global costs nothing later — the resolution
+ * order IS the override's mechanism, with one of its two inputs populated.
+ */
+export interface AlarmMediaState {
+  /** A bundled key (see `bundled`), `custom`, or `none`. */
+  imageChoice: string;
+  /** `default` (the system alarm tone) or `custom`. */
+  soundChoice: string;
+  /** Keys of the images shipped inside the APK, in display order. */
+  bundled: string[];
+  hasCustomImage: boolean;
+  hasCustomSound: boolean;
+}
+
+/** `picked: false` means the user cancelled the file picker — not an error. */
+export interface AlarmPickResult {
+  picked: boolean;
+  imageChoice?: string;
+  soundChoice?: string;
+  error?: string;
+}
+
 /** Android hardware back button payload — see lib/native/app-bridge.ts. */
 export interface BackButtonEvent {
   /** Capacitor's own read of whether the webview has history to pop. */
@@ -105,7 +192,27 @@ declare global {
           syncSchedule: (options: {
             medications: MedicationPayload[];
             userId?: string;
+            elderly?: boolean;
+            ringSeconds?: number;
           }) => Promise<{ synced: number; canScheduleExactAlarms: boolean }>;
+          /**
+           * Optional: an APK older than 2026-08-14 has neither. Every caller must
+           * treat their absence as "this device cannot be told", not as an error
+           * — `server.url` means the web and the APK ship separately and a device
+           * can be running either combination.
+           */
+          doseResolved?: (options: { doses: ResolvedDose[] }) => Promise<{ applied: number }>;
+          getActiveLadders?: () => Promise<{ ladders: ActiveLadder[] }>;
+          /** Alarm backdrop + sound. Native owns the files — see AlarmMediaState. */
+          getAlarmMedia?: () => Promise<AlarmMediaState>;
+          setAlarmImage?: (options: { choice: string }) => Promise<AlarmMediaState>;
+          pickAlarmImage?: () => Promise<AlarmPickResult>;
+          pickAlarmSound?: () => Promise<AlarmPickResult>;
+          clearAlarmSound?: () => Promise<AlarmMediaState>;
+          /** A rendered picture of the real alarm screen — see renderAlarmPreview. */
+          renderAlarmPreview?: (options: { width?: number }) => Promise<{ dataUri: string | null }>;
+          previewAlarmSound?: () => Promise<{ playing: boolean }>;
+          stopAlarmSoundPreview?: () => Promise<{ playing: boolean }>;
           clearSchedule: () => Promise<{
             cleared: boolean;
             syncedBeforeClear: number;
@@ -162,6 +269,22 @@ export async function getPendingNativeActions(): Promise<PendingAction[]> {
 export async function syncScheduleToNative(
   medications: MedicationPayload[],
   userId?: string,
+  /**
+   * Elderly mode, mirrored so the NATIVE alarm screen can honour it. The alarm
+   * is Kotlin and cannot read this webview's UI mode, and it is the one screen
+   * that has to work offline at 3am for the least technical user — so the
+   * choice travels, exactly as BRIDGE_CONTRACT.md requires for `language`.
+   * Elderly changes one thing there: a coalesced handful is asked about one dose
+   * at a time instead of as a list.
+   */
+  elderly?: boolean,
+  /**
+   * How long EACH dose rings before the alarm screen moves on to the next one in
+   * the same handful. `profiles.alarm_ring_seconds`; undefined leaves whatever
+   * the device already has, so an APK newer than the migration keeps its 60s
+   * default rather than being reset by an absent field.
+   */
+  ringSeconds?: number,
 ): Promise<{ synced: number; canScheduleExactAlarms: boolean } | null> {
   if (!isNativeApp()) return null;
   const bridge = window.Capacitor?.Plugins?.ScheduleBridge;
@@ -169,7 +292,140 @@ export async function syncScheduleToNative(
   // userId keys the native store to one identity. Without it, signing in as a
   // guest left the previous account's medications in place and ringing for
   // doses the current user doesn't have (found on-device 2026-08-11).
-  return bridge.syncSchedule({ medications, userId });
+  return bridge.syncSchedule({ medications, userId, elderly, ringSeconds });
+}
+
+/**
+ * Tell the device about a dose THIS webview just resolved.
+ *
+ * Without it the device's retry ladder outlives the answer: the dose reads as
+ * taken everywhere on screen while the phone keeps re-asking about it every few
+ * minutes, which is the 2026-08-14 field bug. Native routes this through the
+ * same queue an alarm-screen tap uses, so the ladder is cancelled, the dose
+ * leaves the coalesced alarm group, and a visible alarm screen refreshes.
+ *
+ * Deliberately silent on every failure. A resolve has ALREADY succeeded on the
+ * server by the time this runs, so nothing here may turn a recorded dose into
+ * an error the patient sees — the worst case is a ladder that outlives the
+ * answer by one app-open, which the reconciliation in `schedule-sync` then
+ * clears.
+ */
+export async function notifyNativeDoseResolved(doses: ResolvedDose[]): Promise<void> {
+  if (!isNativeApp() || doses.length === 0) return;
+  const bridge = window.Capacitor?.Plugins?.ScheduleBridge;
+  if (!bridge?.doseResolved) return;
+  try {
+    await bridge.doseResolved({ doses });
+  } catch (err) {
+    console.error('[ScheduleBridge] doseResolved failed:', err);
+  }
+}
+
+/**
+ * The alarm's current backdrop and sound, or null when this device cannot say —
+ * a browser, or an APK older than the media picker. Null means "do not render
+ * the section", never "no image chosen": showing "None selected" to someone
+ * whose alarm has a picture would invite them to fix something that is not
+ * broken.
+ */
+export async function getAlarmMedia(): Promise<AlarmMediaState | null> {
+  if (!isNativeApp()) return null;
+  const bridge = window.Capacitor?.Plugins?.ScheduleBridge;
+  if (!bridge?.getAlarmMedia) return null;
+  try {
+    return await bridge.getAlarmMedia();
+  } catch (err) {
+    console.error('[ScheduleBridge] getAlarmMedia failed:', err);
+    return null;
+  }
+}
+
+/**
+ * A rendered picture of the REAL alarm screen, as a `data:` URI for an `<img>`.
+ *
+ * Native inflates the same layouts the alarm uses and draws them to a bitmap, so
+ * the Settings miniature cannot drift from the screen it previews. A CSS
+ * recreation would have been a second implementation of the most safety-critical
+ * screen in the product, and a preview that quietly stops matching is worse than
+ * no preview — it is a promise about a screen the user next sees at 3am.
+ *
+ * Null means "no preview available": a browser, an older APK, or a render that
+ * failed. Never an error the settings screen surfaces.
+ */
+export async function renderAlarmPreview(width = 420): Promise<string | null> {
+  const bridge = window.Capacitor?.Plugins?.ScheduleBridge;
+  if (!isNativeApp() || !bridge?.renderAlarmPreview) return null;
+  try {
+    const { dataUri } = await bridge.renderAlarmPreview({ width });
+    return dataUri ?? null;
+  } catch (err) {
+    console.error('[ScheduleBridge] renderAlarmPreview failed:', err);
+    return null;
+  }
+}
+
+/** Hear the chosen alarm sound. Non-looping and self-stopping after ~10s. */
+export async function previewAlarmSound(): Promise<boolean> {
+  const bridge = window.Capacitor?.Plugins?.ScheduleBridge;
+  if (!isNativeApp() || !bridge?.previewAlarmSound) return false;
+  try {
+    const { playing } = await bridge.previewAlarmSound();
+    return playing;
+  } catch {
+    return false;
+  }
+}
+
+export async function stopAlarmSoundPreview(): Promise<void> {
+  const bridge = window.Capacitor?.Plugins?.ScheduleBridge;
+  if (!isNativeApp() || !bridge?.stopAlarmSoundPreview) return;
+  try {
+    await bridge.stopAlarmSoundPreview();
+  } catch {
+    /* stopping is best-effort; it self-stops anyway */
+  }
+}
+
+export async function setAlarmImage(choice: string): Promise<AlarmMediaState | null> {
+  const bridge = window.Capacitor?.Plugins?.ScheduleBridge;
+  if (!isNativeApp() || !bridge?.setAlarmImage) return null;
+  return bridge.setAlarmImage({ choice });
+}
+
+/** Opens Android's document picker. Resolves with `picked: false` if cancelled. */
+export async function pickAlarmImage(): Promise<AlarmPickResult> {
+  const bridge = window.Capacitor?.Plugins?.ScheduleBridge;
+  if (!isNativeApp() || !bridge?.pickAlarmImage) return { picked: false };
+  return bridge.pickAlarmImage();
+}
+
+export async function pickAlarmSound(): Promise<AlarmPickResult> {
+  const bridge = window.Capacitor?.Plugins?.ScheduleBridge;
+  if (!isNativeApp() || !bridge?.pickAlarmSound) return { picked: false };
+  return bridge.pickAlarmSound();
+}
+
+export async function clearAlarmSound(): Promise<AlarmMediaState | null> {
+  const bridge = window.Capacitor?.Plugins?.ScheduleBridge;
+  if (!isNativeApp() || !bridge?.clearAlarmSound) return null;
+  return bridge.clearAlarmSound();
+}
+
+/**
+ * Retry chains still running on this device. Empty outside the app, and on any
+ * APK that predates the call — both mean "nothing to reconcile".
+ */
+export async function getNativeActiveLadders(): Promise<ActiveLadder[]> {
+  if (!isNativeApp()) return [];
+  const bridge = window.Capacitor?.Plugins?.ScheduleBridge;
+  if (!bridge?.getActiveLadders) return [];
+  try {
+    const { ladders } = await bridge.getActiveLadders();
+    return ladders ?? [];
+  } catch (err) {
+    console.error('[ScheduleBridge] getActiveLadders failed:', err);
+    return [];
+  }
 }
 
 /**

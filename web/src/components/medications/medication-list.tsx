@@ -10,11 +10,13 @@ import { useUiMode } from '@/context/ui-mode-context';
 import { Plus, Package, Clock, Pause, Play, SquarePen, Trash2, Pill, X, ChevronDown, Search, Calendar, ChevronLeft, ChevronRight, Info } from 'lucide-react';
 import GuideButton from '@/components/guide/guide-button';
 import GuideAutoStart from '@/components/guide/guide-auto-start';
-import { getUnitIcon } from '@/components/ui/custom-icons';
+import { getUnitIcon } from '@/lib/design/dose-forms';
 import { priorityMeta } from '@/lib/design/semantics';
 import { unitPhrase } from '@/components/medications/medication-form-options';
 import { isLowStock as lowStockOf } from '@/lib/medications/stock';
 import { EmptyState } from '@/components/ui/empty-state';
+import MedicationCard from '@/components/medications/medication-card';
+import { useDensity } from '@/context/density-context';
 import { iconButtonClasses } from '@/components/ui/button';
 import { searchMedicationCatalog, type CatalogSearchResult } from '@/lib/medications/catalog';
 import { fetchDoseHistory, dosesForDate, weekOf, type DayDose, type DoseHistory } from '@/lib/schedule/day-doses';
@@ -144,6 +146,12 @@ export default function MedicationList({
   const supabase = createClient();
   const router = useRouter();
   const { isElderly, viewMode } = useUiMode();
+  // App density gets the same calm treatment as Today: the day-view week strip
+  // duplicates the dashboard's own week strip, and two week strips in one app is
+  // two places to learn the same gesture. Elderly drops it for the stronger
+  // reason — see the readOnly note on MedicationCard.
+  const { isApp } = useDensity();
+  const showDayView = !isApp && !isElderly;
   const activeRole = viewMode === 'PATIENT_MONITOR' ? 'CAREGIVER' : 'PATIENT';
 
   useEffect(() => {
@@ -297,12 +305,23 @@ export default function MedicationList({
     ? dosesForDate(selectedDay, { medications: meds.filter(m => m.active), history: dayHistory })
     : [];
 
+  // The inventory question — "do I need to order anything?" — asked once for the
+  // whole list. The per-card chips answer it medication by medication, which is
+  // the wrong shape for a question about the cupboard as a whole, and on a list
+  // of twelve it means scrolling all twelve to find out.
+  const lowStockMeds = meds.filter((m) => m.active && lowStockOf(m).low);
+
   const activeMeds = meds.filter(m => m.active);
   const pausedMeds = meds.filter(m => !m.active);
   // With nothing paused there are no tabs, so the filter must not hide anything.
-  const tabMeds = pausedMeds.length === 0
-    ? meds
-    : filter === 'paused' ? pausedMeds : activeMeds;
+  // Elderly has no tabs, so it must not inherit a filter — and it shows ACTIVE
+  // medications only. A paused medication is one you are not taking, which is
+  // precisely the wrong thing to list on a screen answering "what am I taking?".
+  const tabMeds = isElderly
+    ? activeMeds
+    : pausedMeds.length === 0
+      ? meds
+      : filter === 'paused' ? pausedMeds : activeMeds;
 
   // Search across the fields someone would actually recall a medication by: what it is
   // called, the dose, and why they take it — a reason like "blood pressure" is often the
@@ -332,8 +351,10 @@ export default function MedicationList({
 
   return (
     <div className="space-y-5">
-      {/* Auto-start the guided tour once for first-time users (then summonable via the ? button). */}
-      <GuideAutoStart tour="medications" />
+      {/* Auto-start the guided tour once, for a genuinely new account only (always
+          summonable via the ? button). `initialMeds`, not the filtered `meds` — a
+          long-standing user who has paused everything is still a long-standing user. */}
+      <GuideAutoStart tour="medications" accountHasData={initialMeds.length > 0} />
       {/* Header */}
       <div data-tour="med-hero" className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
         <div>
@@ -346,6 +367,12 @@ export default function MedicationList({
             </p>
           )}
         </div>
+        {/* ELDERLY SEES NO CONTROLS HERE. Adding a medication and planning a
+            schedule are both regimen decisions — the same class of work as
+            correcting a past dose, which elderly already excludes on the grounds
+            that judging a regimen is the caregiver's job from their own phone.
+            The mode is switchable from Settings when that judgement is needed. */}
+        {!isElderly && (
         <div className="flex items-center gap-2 shrink-0">
           {/* Scheduler's primary entry point now that it is out of the bottom nav. A
               plain labelled link on purpose: the week strip on the planner SELECTS a day,
@@ -376,13 +403,43 @@ export default function MedicationList({
             </Link>
           )}
         </div>
+        )}
       </div>
+
+      {/* MANAGE INVENTORY'S ENTRY. It used to be a solid-pink button on Today,
+          the loudest control on a screen about taking a dose — restocking is a
+          weekly errand, not a today action. Here it is the page's own business,
+          and it only appears when there is something to say. Elderly never sees
+          it: ordering medicine is caregiver work.
+
+          Warning tone, not danger: running low is a waiting state with time to
+          act, and the word "low" carries the meaning so colour is never alone. */}
+      {!selectedDay && !isElderly && lowStockMeds.length > 0 && (
+        <div className="flex items-start gap-3 rounded-2xl border border-warning/35 bg-warning/10 px-4 py-3">
+          <Package className="w-4 h-4 shrink-0 mt-0.5 text-warning-strong" aria-hidden />
+          <div className="min-w-0">
+            <p className={`font-bold text-warning-strong ${isElderly ? 'text-base' : 'text-[13px]'}`}>
+              {lowStockMeds.length === 1
+                ? '1 medicine is running low'
+                : `${lowStockMeds.length} medicines are running low`}
+            </p>
+            <p className={`text-warning-strong/90 font-semibold text-balance ${isElderly ? 'text-sm' : 'text-[11px]'}`}>
+              {lowStockMeds.map((m) => m.drug_name).join(', ')}
+              {isOwnMeds ? ' — tap Add stock on a card below to top it up.' : ''}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* One box, two jobs: filter what you already take, and look the rest up in the
           real medicine directory. Always shown, because searching the directory is
           useful even with an empty list. */}
-      {!selectedDay && activeRole !== 'CAREGIVER' && (
-        <div className="space-y-3">
+      {!selectedDay && activeRole !== 'CAREGIVER' && !isElderly && (
+        /* STICKY. The list is the only thing that scrolls under it, and hunting
+           back up the page to change one letter of a query is the whole reason a
+           search box gets abandoned. `-mx-1 px-1` so the sticky element's own
+           background covers the cards' shadow as they pass beneath it. */
+        <div className="sticky top-0 z-20 -mx-1 px-1 py-2 bg-background/95 backdrop-blur space-y-3">
           <div className="relative">
             <Search className={`absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none shrink-0 ${isElderly ? 'w-5 h-5' : 'w-4 h-4'}`} />
             <input
@@ -394,10 +451,24 @@ export default function MedicationList({
                  stays as the accessible name below. */
               placeholder="Search medicines"
               aria-label="Search your medications or the medicine directory"
-              className={`w-full rounded-2xl bg-card border border-border pl-10 pr-4 font-semibold text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors ${
+              className={`w-full rounded-2xl bg-card border border-border pl-10 pr-12 font-semibold text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors ${
                 isElderly ? 'h-14 text-base' : 'h-11 text-[13px]'
               }`}
             />
+            {/* `type="search"` renders a native clear affordance on some engines
+                and nothing at all on Android's WebView — which is the one that
+                matters here. An explicit 44px button is the only version that
+                exists everywhere. */}
+            {query.length > 0 && (
+              <button
+                type="button"
+                onClick={() => { setQuery(''); setCatalogResults([]); }}
+                aria-label="Clear the search"
+                className="absolute right-1 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <X className="w-4 h-4" strokeWidth={2.5} aria-hidden />
+              </button>
+            )}
           </div>
 
           {q.length >= 2 && (
@@ -454,6 +525,17 @@ export default function MedicationList({
         </div>
       )}
 
+      {/* PHONE NEVER SHOWS THE DAY VIEW, browser or app.
+          The approved rule was "app drops the duplicate week strip", and the
+          reason — Today already has a week strip, and two of them is two places
+          to learn one gesture — is about the SCREEN, not the wrapper. On a 375px
+          phone this strip is ~180px of a first screen that otherwise had to fit a
+          title, three buttons, a stock notice, a search field and a tab pair
+          before a single medication appeared. It did not: the first card started
+          below the fold on a page whose entire job is the list.
+          Desktop keeps it, where it costs nothing. The full planner is one tap
+          away from the Schedule button on every size. */}
+      {showDayView && (<><div className="hidden sm:contents">
       {/* Week strip. It SELECTS a day — the same thing this control does on the
           planner — rather than navigating somewhere. A day-picker that teleports would
           mean one control with two meanings depending on the page it sits on.
@@ -465,9 +547,9 @@ export default function MedicationList({
           hydration mismatch. A reserved-height placeholder keeps the page from
           jumping when the real strip arrives. */}
       {!mounted ? (
-        <div className="bg-card rounded-[22px] border border-border p-2 sm:p-4 shadow-sm h-[136px] sm:h-[150px]" aria-hidden />
+        <div className="card-lift p-2 sm:p-4 shadow-sm h-[136px] sm:h-[150px]" aria-hidden />
       ) : (
-      <div className="bg-card rounded-[22px] border border-border p-2 sm:p-4 shadow-sm">
+      <div className="card-lift p-2 sm:p-4 shadow-sm">
         <div className="flex items-center justify-between mb-3 gap-2">
           <button
             onClick={() => setWeekAnchor(d => { const n = new Date(d); n.setDate(d.getDate() - 7); return n; })}
@@ -572,9 +654,10 @@ export default function MedicationList({
         </div>
       </div>
       )}
+      </div></>)}
 
       {/* Active / Paused tabs — only meaningful once something is paused. */}
-      {!selectedDay && pausedMeds.length > 0 && (
+      {!selectedDay && !isElderly && pausedMeds.length > 0 && (
         <div role="tablist" aria-label="Filter medications" className="flex items-center gap-2">
           {([
             ['active', 'Active', activeMeds.length],
@@ -627,7 +710,7 @@ export default function MedicationList({
               {dosesForSelectedDay.map((dose, i) => (
                 <li
                   key={`${dose.id}-${dose.time}-${i}`}
-                  className="flex items-center gap-3 bg-card border border-border rounded-2xl p-3 shadow-sm"
+                  className="flex items-center gap-3 card-lift p-3 shadow-sm"
                 >
                   <span
                     aria-hidden
@@ -672,7 +755,7 @@ export default function MedicationList({
           icon={<Pill className={isElderly ? 'w-9 h-9' : 'w-6 h-6'} />}
           title={
             q
-              ? `No match for “${query.trim()}”`
+              ? 'No medicines match'
               : meds.length === 0
                 ? 'No medications yet'
                 : filter === 'paused'
@@ -681,7 +764,7 @@ export default function MedicationList({
           }
           description={
             q
-              ? 'Nothing in your list matches that. You can add it as a new medication.'
+              ? 'Check the spelling, or add it as new.'
               : meds.length === 0
                 ? 'Add your first medication and we will remind you when each dose is due.'
                 : filter === 'paused'
@@ -706,254 +789,33 @@ export default function MedicationList({
         />
       ) : (
         <div className="grid grid-cols-1 gap-4">
-          {visibleMeds.map((med, idx) => {
-            const isLoading = loadingId === med.id;
-            const isLowStock = lowStockOf(med).low;
-            const t = cardTheme(med);
-            const stockColor = isLowStock ? 'var(--warning-strong)' : t.color;
-            // Same current_stock ?? tablet_count fallback the predicate uses, so a
-            // legacy medication (current_stock NULL, tablet_count holds the real
-            // count) doesn't render "Stock not tracked" while the dashboard strip
-            // and Low stock badge above say it's low.
-            const displayStock = med.current_stock ?? med.tablet_count ?? null;
-
-            return (
-              <div
-                key={med.id}
-                data-tour={idx === 0 ? 'med-card-first' : undefined}
-                className={`rise-in relative bg-card rounded-[22px] overflow-hidden transition-transform duration-200 ease-out hover:-translate-y-0.5 ${!med.active ? 'opacity-70' : ''}`}
-                /* Same 60ms cascade the dashboard uses (`.rise-in` in globals.css),
-                   capped at 6 so a long list still finishes inside ~360ms. */
-                style={{ boxShadow: cardShadow, ['--rise-delay' as string]: `${Math.min(idx, 6) * 60}ms` }}
-              >
-                {/* Header region */}
-                <div className="px-5 pt-5 pb-4">
-                  <div className="flex items-start gap-3.5">
-                    {/* Icon tile */}
-                    <div
-                      className={`shrink-0 rounded-2xl flex items-center justify-center ${isElderly ? 'w-14 h-14' : 'w-12 h-12'}`}
-                      style={{ background: t.tint, color: t.color }}
-                    >
-                      {getUnitIcon(med.unit_type, isElderly ? 'w-7 h-7' : 'w-6 h-6')}
-                    </div>
-
-                    {/* Name + meta */}
-                    <div className="flex-1 min-w-0">
-                      {/* The name is what you scan this list FOR, so it takes the display
-                          size. It was 18px semibold next to a 32px stock figure — the
-                          count was the loudest thing on every card, which inverts what
-                          the page is for. */}
-                      <h3
-                        className={`font-black tracking-[-0.01em] text-foreground ${isElderly ? 'text-2xl break-words' : 'text-xl truncate'}`}
-                      >
-                        {med.drug_name}
-                      </h3>
-                      {/* Amount-per-dose and strength used to run together as
-                          "5 ml(s) · 10mg", which reads as two competing numbers. Label
-                          which is which. */}
-                      <p className={`text-muted-foreground font-medium mt-0.5 ${isElderly ? 'text-base' : 'text-[13px]'}`}>
-                        {med.dosage && med.dosage !== 'N/A' ? (
-                          <>Dose: {med.dosage} in {med.dosage_amount || 1} {unitPhrase(med.unit_type, med.dosage_amount || 1)}</>
-                        ) : (
-                          <>Dose: {med.dosage_amount || 1} {unitPhrase(med.unit_type, med.dosage_amount || 1)}</>
-                        )}
-                      </p>
-                      {med.linked_brand_name && (
-                        <div className="mt-1">
-                          <button
-                            type="button"
-                            onClick={() => toggleExpanded(med.id)}
-                            className="flex items-center gap-1 text-left w-full cursor-pointer"
-                            aria-expanded={expandedIds.has(med.id)}
-                            aria-label="Toggle medication details"
-                          >
-                            <span
-                              className={`text-[11px] text-muted-foreground/80 font-medium flex-1 min-w-0 ${
-                                expandedIds.has(med.id) ? '' : 'truncate'
-                              }`}
-                            >
-                              {med.linked_brand_name}{med.linked_composition ? ` — ${med.linked_composition}` : ''}
-                              {med.linked_is_discontinued && (
-                                <span className="ml-1.5 inline-flex items-center rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-semibold text-muted-foreground align-middle">
-                                  Discontinued
-                                </span>
-                              )}
-                            </span>
-                            <ChevronDown
-                              className={`w-3.5 h-3.5 text-muted-foreground/60 shrink-0 transition-transform ${
-                                expandedIds.has(med.id) ? 'rotate-180' : ''
-                              }`}
-                              aria-hidden="true"
-                            />
-                          </button>
-                          {expandedIds.has(med.id) && med.linked_manufacturer && (
-                            <p className="text-[9px] text-muted-foreground/70 mt-0.5">
-                              Manufacturer: {med.linked_manufacturer}
-                            </p>
-                          )}
-                          <span className="block text-[9px] text-muted-foreground/70 mt-0.5">
-                            Patient-selected from catalog · as of {med.linked_snapshot_date}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Stock */}
-                    {/* Capped: an uncapped "inhalations left" label grew this column to
-                        99px and pushed "Dose: 5mg in 2.5 inhalations" onto two lines.
-                        The word "left" is dropped too — a bare count beside a unit
-                        already reads as remaining, and the Low stock line below says
-                        the state outright. */}
-                    <div data-tour={idx === 0 ? 'med-stock' : undefined} className="shrink-0 text-right max-w-[76px]">
-                      {displayStock !== null ? (
-                        <>
-                          {/* Demoted from 32px. Stock is a secondary metric on a page you
-                              came to for the medication list — at display size it beat the
-                              drug name for attention on every card, and it also stole the
-                              width that pushed the priority/frequency pills onto two rows.
-                              Still colour-coded, so a low count is found just as fast. */}
-                          <p
-                            className={`font-black tabular-nums leading-none ${isElderly ? 'text-3xl' : 'text-xl'}`}
-                            style={{ color: stockColor }}
-                          >
-                            {displayStock}
-                          </p>
-                          {/* A bare "4" told you nothing — 4 tablets or 4 ml? And the
-                              label flipped between "Low" and "left" for the same slot.
-                              Always the unit; "Low" is an extra word, not a swap, so the
-                              warning never costs you the reading. */}
-                          {/* No `tracking-wide` here: the extra letter-spacing pushed
-                              the longest unit ("inhalations") 2px past the column and
-                              clipped its last letter. */}
-                          <p className="font-semibold text-[11px] uppercase mt-1 leading-tight text-muted-foreground">
-                            {unitPhrase(med.unit_type, Number(displayStock))}
-                          </p>
-                          {isLowStock && (
-                            <p className="font-black text-[11px] uppercase tracking-wide mt-0.5 leading-tight text-warning-strong">
-                              Low stock
-                            </p>
-                          )}
-                        </>
-                      ) : (
-                        <Package className="w-5 h-5 text-muted-foreground/40 mt-1" aria-label="Stock not tracked" />
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Category + frequency pills.
-                      These live on their OWN full-width row rather than inside the name
-                      column. Nested beside the icon tile and the stock column they had
-                      ~151px to work with, so "Important" and "Once Daily" — 178px of
-                      pills — wrapped onto two rows on every single card. Out here they
-                      get the full 287px and sit on one line. */}
-                  <div className="flex items-center gap-1.5 mt-3 flex-wrap">
-                    <span
-                      className="inline-flex items-center gap-1 font-semibold rounded-full px-2.5 py-1 text-[11px]"
-                      style={{ background: t.tint, color: t.color }}
-                    >
-                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: t.color }} />
-                      {priorityMeta(med.priority_level).label}
-                    </span>
-                    <span className="inline-flex items-center font-semibold capitalize rounded-full px-2.5 py-1 text-[11px] bg-muted text-muted-foreground">
-                      {med.frequency.replace(/_/g, ' ')}
-                    </span>
-                    {!med.active && (
-                      <span className="inline-flex items-center font-semibold rounded-full px-2.5 py-1 text-[11px] bg-muted text-muted-foreground">
-                        Paused
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Divider */}
-                <div className="h-px bg-border mx-5" />
-
-                {/* Footer region.
-                    Times and the four action buttons used to share one row. Once the
-                    buttons went to 44px for touch, four of them plus the divider ate
-                    ~210px of a 375px screen and squeezed the time pills to 58px — so
-                    "7:40 PM" wrapped onto two lines inside its own pill. They get their
-                    own rows below sm; side by side from sm up where there is room. */}
-                <div className="px-5 py-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  {/* Times */}
-                  <div data-tour={idx === 0 ? 'med-times' : undefined} className="flex items-center gap-1.5 flex-wrap min-w-0">
-                    {med.reminder_times.map((time, ti) => (
-                      <span
-                        key={ti}
-                        className={`inline-flex items-center gap-1 font-semibold rounded-full whitespace-nowrap ${
-                          isElderly ? 'px-3 py-1.5 text-sm' : 'px-2.5 py-1 text-[11px]'
-                        }`}
-                        style={{ background: t.tint, color: t.color }}
-                      >
-                        <Clock className="w-3 h-3 shrink-0" strokeWidth={2.5} />
-                        {format12Hour(time)}
-                      </span>
-                    ))}
-                  </div>
-
-                  {/* Actions */}
-                  {activeRole !== 'CAREGIVER' && (
-                    /* Four identical 36px circles in a row, distinguishable only by a
-                       small glyph, put "delete this medication" one slip away from
-                       "log a dose". Now: 44px targets, real accessible names (a `title`
-                       is not announced on touch), and the destructive one pushed out of
-                       the group by a divider. */
-                    <div data-tour={idx === 0 ? 'med-actions' : undefined} className="flex items-center gap-2 shrink-0">
-                      {isOwnMeds && (
-                        <button
-                          onClick={() => openStockModal(med)}
-                          disabled={stockBusyId === med.id}
-                          title="Add stock"
-                          aria-label={`Add stock for ${med.drug_name}`}
-                          className={iconButtonClasses({ isElderly })}
-                        >
-                          {stockBusyId === med.id
-                            ? <span className="text-[10px]">…</span>
-                            : <Plus className="w-4 h-4" strokeWidth={2.5} />}
-                        </button>
-                      )}
-                      <button
-                        onClick={() => handleToggleActive(med)}
-                        disabled={isLoading}
-                        title={med.active ? 'Pause' : 'Resume'}
-                        aria-label={`${med.active ? 'Pause' : 'Resume'} reminders for ${med.drug_name}`}
-                        className={iconButtonClasses({ isElderly, className: isLoading ? 'animate-pulse' : '' })}
-                      >
-                        {med.active ? <Pause className="w-4 h-4" strokeWidth={2.5} /> : <Play className="w-4 h-4" strokeWidth={2.5} />}
-                      </button>
-                      <Link
-                        href={`/medications/${med.id}`}
-                        title="Edit"
-                        aria-label={`Edit ${med.drug_name}`}
-                        className={iconButtonClasses({ isElderly })}
-                      >
-                        <SquarePen className="w-4 h-4" strokeWidth={2.5} />
-                      </Link>
-
-                      <span className="w-px self-stretch bg-border mx-1" aria-hidden="true" />
-
-                      <button
-                        onClick={() => setDeleteModalMed(med)}
-                        disabled={isLoading}
-                        title="Delete"
-                        aria-label={`Delete ${med.drug_name}`}
-                        className={iconButtonClasses({ variant: 'danger-ghost', isElderly })}
-                      >
-                        <Trash2 className="w-4 h-4" strokeWidth={2.5} />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+          {visibleMeds.map((med, idx) => (
+            <MedicationCard
+              key={med.id}
+              med={med}
+              index={idx}
+              isElderly={isElderly}
+              isLowStock={lowStockOf(med).low}
+              /* Elderly answers "what am I taking?" and stops there; the
+                 caregiver-monitor view is read-only by definition. */
+              readOnly={isElderly || activeRole === 'CAREGIVER'}
+              canEditStock={isOwnMeds}
+              isBusy={loadingId === med.id}
+              isStockBusy={stockBusyId === med.id}
+              expanded={expandedIds.has(med.id)}
+              onToggleExpanded={() => toggleExpanded(med.id)}
+              onAddStock={() => openStockModal(med)}
+              onTogglePause={() => handleToggleActive(med)}
+              onDelete={() => setDeleteModalMed(med)}
+            />
+          ))}
         </div>
       )}
 
       {/* Add-stock modal */}
       {stockModalMed && (
         <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in" onClick={() => stockBusyId === null && setStockModalMed(null)}>
-          <div className="bg-card rounded-[22px] max-w-sm w-full p-6 space-y-5" style={{ boxShadow: '0 8px 40px rgba(16, 28, 90, 0.18)' }} onClick={(e) => e.stopPropagation()}>
+          <div className="card-lift max-w-sm w-full p-6 space-y-5" style={{ boxShadow: '0 8px 40px rgba(16, 28, 90, 0.18)' }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0" style={{ background: cardTheme(stockModalMed).tint, color: cardTheme(stockModalMed).color }}>
@@ -1018,7 +880,7 @@ export default function MedicationList({
       {/* Delete confirmation modal */}
       {deleteModalMed && (
         <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in" onClick={() => loadingId === null && setDeleteModalMed(null)}>
-          <div className="bg-card rounded-[22px] max-w-sm w-full p-6 space-y-5 text-center" style={{ boxShadow: '0 8px 40px rgba(16, 28, 90, 0.18)' }} onClick={(e) => e.stopPropagation()}>
+          <div className="card-lift max-w-sm w-full p-6 space-y-5 text-center" style={{ boxShadow: '0 8px 40px rgba(16, 28, 90, 0.18)' }} onClick={(e) => e.stopPropagation()}>
             <div className="w-14 h-14 rounded-full bg-danger/10 flex items-center justify-center mx-auto">
               <Trash2 className="w-6 h-6 text-danger-strong" strokeWidth={2.2} />
             </div>

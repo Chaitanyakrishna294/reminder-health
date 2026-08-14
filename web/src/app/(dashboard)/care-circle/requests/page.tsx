@@ -286,7 +286,7 @@ export default function CareCircleRequestsPage() {
       )}
 
       {/* SECTION 1: Incoming Requests (I am the patient) */}
-      <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4">
+      <div className="card-lift p-6 shadow-sm space-y-4">
         <div className="flex items-center gap-2">
           <Shield className="w-5 h-5 text-primary" />
           <h2 className="font-black text-foreground text-sm">Requests to Support You</h2>
@@ -385,7 +385,7 @@ export default function CareCircleRequestsPage() {
       </div>
 
       {/* SECTION 2: Sent Requests (I am the caregiver) */}
-      <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4">
+      <div className="card-lift p-6 shadow-sm space-y-4">
         <div className="flex items-center gap-2">
           <Clock className="w-5 h-5 text-muted-foreground" />
           <h2 className="font-black text-foreground text-sm">Requests You&apos;ve Sent</h2>

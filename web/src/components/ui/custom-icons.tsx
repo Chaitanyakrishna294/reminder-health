@@ -1,5 +1,4 @@
 import React from 'react';
-import { Pill, Beaker, Droplets, Wind, Sparkles, Package, CircleDot, Bandage } from 'lucide-react';
 
 export const SpoonIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
   <svg 
@@ -41,37 +40,10 @@ export const TabletIcon = ({ className = "w-5 h-5" }: { className?: string }) =>
   </svg>
 );
 
-// Maps a medication's unit_type to its representative icon.
-// Shared by the dashboard and the medication list so the icon is consistent everywhere.
-export const getUnitIcon = (unitType?: string, className: string = 'w-6 h-6') => {
-  const type = unitType?.toUpperCase() || 'TABLET';
-  switch (type) {
-    case 'TABLET':
-      return <TabletIcon className={className} />;
-    case 'CAPSULE':
-      return <Pill className={className} />;
-    case 'ML':
-    case 'LIQUID':
-      return <Beaker className={className} />;
-    case 'DROP':
-    case 'DROPS':
-      return <Droplets className={className} />;
-    case 'SPRAY':
-      return <Wind className={className} />;
-    case 'APPLICATION':
-      return <CreamBottleIcon className={className} />;
-    case 'TEASPOON':
-      return <SpoonIcon className={className} />;
-    case 'PATCH':
-      return <Bandage className={className} />;
-    case 'POWDER':
-      return <Sparkles className={className} />;
-    case 'INHALER':
-    case 'INHALATION':
-      return <Wind className={className} />;
-    case 'OTHER':
-      return <Package className={className} />;
-    default:
-      return <CircleDot className={className} />;
-  }
-};
+// NOTE: getUnitIcon USED to live here and now lives in lib/design/dose-forms.ts.
+// It cannot live in this file: dose-forms imports these three SVGs, so a
+// re-export here would close an import cycle — custom-icons -> dose-forms ->
+// custom-icons — and the cycle fails at RUNTIME, not at build time, with
+// "Cannot access 'TabletIcon' before initialization". The build is happy; the
+// page is blank. Keep this file a leaf: SVG components only, no imports from
+// anything that imports it back.

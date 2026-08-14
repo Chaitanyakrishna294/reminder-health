@@ -10,8 +10,16 @@
                                Snooze  (smallest, tinted, deferral)
 
   "Unambiguous" is the whole point: a half-asleep user must not have to read.
-  Styling is placeholder (see values/alarm_colors.xml) — the UI redesign owns
-  the final tokens.
+
+  THE COALESCED RING (2026-08-14). Doses at the SAME instant are one handful, so
+  this screen holds a LIST rather than a single dose. The list is one row per
+  dose, each answered on its own; the layout for a row lives in
+  alarm_dose_solo.xml (one dose, or elderly) and alarm_dose_grouped.xml (several).
+  Both carry the same ids, so AlarmActivity binds them with one function and the
+  two presentations cannot drift into two behaviours.
+
+  Snooze stays down here, once, because it is the one action that means the same
+  thing for the whole handful: not now, ask again in ten minutes.
 
   Touch targets are all >= 56dp, above the 44dp floor the teardown's
   accessibility notes call out, and generous for elderly users.
@@ -49,85 +57,78 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:paddingStart="24dp"
-        android:paddingEnd="24dp"
-        android:paddingTop="32dp"
-        android:paddingBottom="24dp">
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingTop="28dp"
+        android:paddingBottom="20dp">
 
-    <!-- Identity block: takes all the slack so it sits optically centred. -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:orientation="vertical"
-        android:gravity="center">
-
+        <!-- When and how many. Never a count of how often you have been asked. -->
         <TextView
             android:id="@+id/alarm_eyebrow"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:textSize="16sp"
             android:textColor="@color/alarm_ink_muted"
             android:letterSpacing="0.04"
+            android:gravity="center"
             android:text="@string/alarm_eyebrow_prefix" />
 
         <TextView
-            android:id="@+id/alarm_drug_name"
+            android:id="@+id/alarm_group_count"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:textSize="34sp"
-            android:textStyle="bold"
-            android:textColor="@color/alarm_ink"
+            android:layout_marginTop="4dp"
+            android:textSize="15sp"
+            android:textColor="@color/alarm_ink_muted"
             android:gravity="center"
-            android:lineSpacingMultiplier="1.1" />
+            android:visibility="gone" />
 
+        <!-- The doses. Scrolls because a handful can be four or more, and a dose
+             pushed off the bottom of the screen is a dose nobody answers. -->
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fillViewport="true"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:id="@+id/alarm_dose_list"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center_vertical" />
+        </ScrollView>
+
+        <!-- Shown once every dose in the handful has been answered, just long
+             enough to be seen before the screen closes itself. -->
         <TextView
-            android:id="@+id/alarm_dose"
+            android:id="@+id/alarm_all_done"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:textSize="20sp"
-            android:textColor="@color/alarm_ink_muted"
-            android:gravity="center" />
-    </LinearLayout>
+            android:layout_marginBottom="8dp"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:textColor="@color/verdict_taken"
+            android:gravity="center"
+            android:text="@string/alarm_all_done"
+            android:visibility="gone" />
 
-    <!-- Action band, pinned bottom: thumb reach is sacred (teardown §2). -->
-    <Button
-        android:id="@+id/alarm_taken"
-        android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:text="@string/alarm_taken"
-        android:textSize="19sp"
-        android:textStyle="bold"
-        android:textAllCaps="false"
-        android:textColor="@color/alarm_on_primary"
-        android:background="@drawable/bg_alarm_primary" />
-
-    <Button
-        android:id="@+id/alarm_skip"
-        android:layout_width="match_parent"
-        android:layout_height="60dp"
-        android:layout_marginTop="12dp"
-        android:text="@string/alarm_skip"
-        android:textSize="17sp"
-        android:textStyle="bold"
-        android:textAllCaps="false"
-        android:textColor="@color/alarm_ink"
-        android:background="@drawable/bg_alarm_secondary" />
-
-    <Button
-        android:id="@+id/alarm_snooze"
-        android:layout_width="wrap_content"
-        android:layout_height="56dp"
-        android:layout_gravity="center_horizontal"
-        android:layout_marginTop="14dp"
-        android:paddingStart="28dp"
-        android:paddingEnd="28dp"
-        android:text="@string/alarm_snooze"
-        android:textSize="15sp"
-        android:textAllCaps="false"
-        android:textColor="@color/alarm_ink"
-        android:background="@drawable/bg_alarm_tertiary" />
+        <!-- Deferral, smallest, tinted — and one for the whole handful: "not now"
+             is the same answer whether it covers one medicine or four. -->
+        <Button
+            android:id="@+id/alarm_snooze"
+            android:layout_width="wrap_content"
+            android:layout_height="56dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="14dp"
+            android:paddingStart="28dp"
+            android:paddingEnd="28dp"
+            android:text="@string/alarm_snooze"
+            android:textSize="15sp"
+            android:textAllCaps="false"
+            android:textColor="@color/alarm_ink"
+            android:background="@drawable/bg_alarm_tertiary" />
     </LinearLayout>
 </FrameLayout>

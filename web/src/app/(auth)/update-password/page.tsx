@@ -50,7 +50,7 @@ export default function UpdatePasswordPage() {
     }
   };
 
-  const inputClass = `w-full pl-12 rounded-2xl bg-white border border-border text-foreground shadow-sm placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all ${isElderly ? 'py-5 text-lg' : 'py-4 text-[15px]'}`;
+  const inputClass = `w-full pl-12 rounded-[14px] surface-sunk border border-input text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all ${isElderly ? 'py-5 text-lg' : 'py-4 text-[15px]'}`;
   const iconClass = 'absolute left-4 top-1/2 -translate-y-1/2 text-primary pointer-events-none w-[18px] h-[18px]';
   const labelClass = `block font-bold text-foreground mb-1.5 ${isElderly ? 'text-base' : 'text-xs'}`;
   const eyeClass =
@@ -106,8 +106,10 @@ export default function UpdatePasswordPage() {
             <Lock className={iconClass} aria-hidden />
             <input
               id="new-password"
+              name="new-password"
               type={showPassword ? 'text' : 'password'}
               required
+              autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className={`${inputClass} pr-14`}
@@ -130,8 +132,10 @@ export default function UpdatePasswordPage() {
             <Lock className={iconClass} aria-hidden />
             <input
               id="confirm-password"
+              name="confirm-password"
               type={showConfirmPassword ? 'text' : 'password'}
               required
+              autoComplete="new-password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               className={`${inputClass} pr-14`}

@@ -663,7 +663,7 @@ export default function SchedulePlannerPage() {
       </div>
 
       {/* Week navigator */}
-      <div className="rise-in bg-card rounded-[22px] p-4" style={{ boxShadow: CARD_SHADOW, ['--rise-delay' as string]: '60ms' }}>
+      <div className="rise-in card-lift p-4" style={{ boxShadow: CARD_SHADOW, ['--rise-delay' as string]: '60ms' }}>
         <div className="flex items-center justify-between mb-3">
           <button
             onClick={() => shiftWeek(-1)}
@@ -820,7 +820,7 @@ export default function SchedulePlannerPage() {
 
       {/* Main: timeline + summary */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        <div className="rise-in lg:col-span-8 bg-card rounded-[22px] overflow-hidden" style={{ boxShadow: CARD_SHADOW, ['--rise-delay' as string]: '120ms' }}>
+        <div className="rise-in lg:col-span-8 card-lift overflow-hidden" style={{ boxShadow: CARD_SHADOW, ['--rise-delay' as string]: '120ms' }}>
           <div className="flex items-center justify-between px-6 py-4">
             <div>
               <h3 className="text-sm font-bold tracking-tight text-foreground">{selectedDateLong}</h3>
@@ -975,7 +975,7 @@ export default function SchedulePlannerPage() {
         {/* Summary rail */}
         <div className="rise-in lg:col-span-4 space-y-5" style={{ ['--rise-delay' as string]: '180ms' }}>
           <div className="grid grid-cols-2 gap-3">
-            <div className="bg-card rounded-[22px] p-4" style={{ boxShadow: CARD_SHADOW }}>
+            <div className="card-lift p-4" style={{ boxShadow: CARD_SHADOW }}>
               <p className="text-2xl font-bold text-foreground leading-none">{activeDoses.length}</p>
               {/* Was a flat "DOSES TODAY" — plural for a count of 1, and still "today"
                   while you were looking at next Thursday. */}
@@ -983,7 +983,7 @@ export default function SchedulePlannerPage() {
                 {activeDoses.length === 1 ? 'Dose' : 'Doses'} {isToday ? 'today' : 'that day'}
               </p>
             </div>
-            <div className="bg-card rounded-[22px] p-4" style={{ boxShadow: CARD_SHADOW }}>
+            <div className="card-lift p-4" style={{ boxShadow: CARD_SHADOW }}>
               <p className="text-2xl font-bold leading-none" style={{ color: criticalCount > 0 ? 'var(--danger-strong)' : 'var(--foreground)' }}>{criticalCount}</p>
               <p className="text-[11px] font-semibold text-muted-foreground mt-1 uppercase tracking-wide">Critical</p>
             </div>
@@ -992,7 +992,7 @@ export default function SchedulePlannerPage() {
           {/* Labels and colors both come from the shared map now. This legend used to
               hardcode its own hexes AND call the lowest level "Routine" while the wizard
               you set it in called it "Normal" — so the key did not explain the app. */}
-          <div className="bg-card rounded-[22px] p-5 space-y-3" style={{ boxShadow: CARD_SHADOW }}>
+          <div className="card-lift p-5 space-y-3" style={{ boxShadow: CARD_SHADOW }}>
             <h4 className="text-xs font-bold tracking-tight text-foreground">Priority key</h4>
             {(['critical', 'important', 'normal'] as const).map((level) => {
               const meta = PRIORITY[level];
@@ -1009,7 +1009,7 @@ export default function SchedulePlannerPage() {
 
           {/* Time-of-day legend. The rail's bands only carried tiny in-chart labels, so
               the shading read as decoration. */}
-          <div className="bg-card rounded-[22px] p-5 space-y-3" style={{ boxShadow: CARD_SHADOW }}>
+          <div className="card-lift p-5 space-y-3" style={{ boxShadow: CARD_SHADOW }}>
             <h4 className="text-xs font-bold tracking-tight text-foreground">Time of day</h4>
             <div className="grid grid-cols-2 gap-2">
               {DAY_BANDS.filter((b) => b.showLabel).map((band) => {
@@ -1058,7 +1058,7 @@ export default function SchedulePlannerPage() {
           role="presentation"
         >
           <div
-            className="bg-card rounded-[22px] max-w-md w-full p-6 space-y-4 border border-border"
+            className="card-lift max-w-md w-full p-6 space-y-4 border border-border"
             style={{ boxShadow: CARD_SHADOW }}
             role="dialog"
             aria-modal="true"
@@ -1134,7 +1134,7 @@ export default function SchedulePlannerPage() {
 
       {showOverrideModal && selectedMedForOverride && (
         <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="bg-card rounded-[22px] max-w-md w-full p-6 space-y-5" style={{ boxShadow: '0 8px 40px rgba(16, 28, 90, 0.18)' }}>
+          <div className="card-lift max-w-md w-full p-6 space-y-5" style={{ boxShadow: '0 8px 40px rgba(16, 28, 90, 0.18)' }}>
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-[11px] uppercase tracking-widest font-semibold text-muted-foreground">Adjust dose</p>

@@ -9,11 +9,15 @@
  * Account with nothing highlighted. A row that goes nowhere is worse than no row: it
  * teaches people the app is broken.
  *
- * This is what genuinely exists today: browser/PWA push permission. Sound, vibration
- * and escalation timing are NOT here, because they are not settings yet — the alarm
- * sound is the native AlarmActivity's, and escalation timing is server-side in the
- * ladder. Inventing switches for them would mean shipping controls that change
- * nothing, which is the same lie in a nicer shape.
+ * What exists here is what genuinely does something: browser/PWA push permission,
+ * how long each dose alarm rings, and the picture and sound the full-screen alarm
+ * uses. The rule has not changed — a control that changes nothing is a lie in a
+ * nicer shape — the second and third simply stopped being nothing when the alarm
+ * screen learned to read them (2026-08-14).
+ *
+ * ESCALATION TIMING IS STILL NOT HERE, and should not be: it is server-side in the
+ * ladder, it is what protects a dose nobody answers, and it is not the patient's
+ * to loosen from their own phone.
  *
  * THE HONEST FRAMING: push is the WEB channel. It is not what makes a dose alarm
  * fire on Android — that is a native AlarmManager registration, independent of the
@@ -26,10 +30,20 @@ import Link from 'next/link';
 import { Bell, BellOff, ShieldCheck, ArrowRight } from 'lucide-react';
 import { useUiMode } from '@/context/ui-mode-context';
 import { registerPush } from '@/lib/push/register-push';
+import AlarmRingDuration from '@/components/settings/alarm-ring-duration';
 
 type Permission = 'unsupported' | 'default' | 'granted' | 'denied';
 
-export default function NotificationsClientView({ telegramChatId }: { telegramChatId: string }) {
+export default function NotificationsClientView({
+  telegramChatId,
+  ringSeconds,
+  largestHandful,
+}: {
+  telegramChatId: string;
+  ringSeconds: number;
+  /** Doses at the user's busiest reminder time — the ring-duration hint's input. */
+  largestHandful: number;
+}) {
   const { isElderly } = useUiMode();
   const [permission, setPermission] = useState<Permission>('unsupported');
   const [busy, setBusy] = useState(false);
@@ -74,7 +88,7 @@ export default function NotificationsClientView({ telegramChatId }: { telegramCh
         </h1>
       </header>
 
-      <section className="bg-card border border-border rounded-3xl p-5 space-y-3">
+      <section className="card-lift p-5 space-y-3">
         <div className="flex items-start gap-3">
           <span aria-hidden className={`shrink-0 rounded-2xl flex items-center justify-center ${
             isElderly ? 'w-14 h-14' : 'w-10 h-10'
@@ -115,6 +129,15 @@ export default function NotificationsClientView({ telegramChatId }: { telegramCh
         {note && <p className={`font-bold text-muted-foreground ${body}`} role="status">{note}</p>}
       </section>
 
+      {/* Configures the NATIVE alarm, which is why it sits under the reassurance
+          below rather than above it: push is the web channel, and this is the
+          thing that actually rings. The alarm's picture and sound moved to their
+          own room (Settings -> Notification style) once the preview arrived —
+          a full-height render of the alarm plus its controls is a page, and
+          squeezed under the push card it was a scroll target rather than
+          something anyone looked at. */}
+      <AlarmRingDuration initialSeconds={ringSeconds} largestHandful={largestHandful} />
+
       {/* The line that matters most on this page. */}
       <section className="rounded-3xl border border-info/30 bg-info/5 p-5">
         <p className={`flex items-start gap-2 font-bold text-info-strong ${body}`}>
@@ -128,7 +151,7 @@ export default function NotificationsClientView({ telegramChatId }: { telegramCh
 
       <Link
         href="/settings/setup-guide"
-        className={`w-full bg-card border border-border rounded-3xl px-5 flex items-center gap-3 hover:bg-muted/60 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset ${
+        className={`w-full card-lift px-5 flex items-center gap-3 hover:bg-muted/60 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset ${
           isElderly ? 'min-h-[72px]' : 'min-h-[56px]'
         }`}
       >

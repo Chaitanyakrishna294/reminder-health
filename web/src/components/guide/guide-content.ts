@@ -1,4 +1,5 @@
 import type { MascotMood } from '@/components/dashboard/brain-mascot';
+import type { Density } from '@/lib/design/density';
 
 export interface GuideStep {
   /** Matches a `data-tour="<target>"` attribute on the element to spotlight. */
@@ -9,6 +10,15 @@ export interface GuideStep {
   /** For multi-step forms: which wizard step this field lives on, so the page can
    *  jump there before the field is spotlighted. Used by the Add Medication wizard. */
   wizardStep?: number;
+  /**
+   * Which densities render this step's target. Omit when every density does.
+   *
+   * The tour degrades gracefully when a target is missing — it centres the card
+   * and skips the spotlight — but "gracefully" is not the same as "honestly": a
+   * step describing a ring that is not on this screen is a tour lying to the
+   * person following it. Filtered in guide-tour.tsx.
+   */
+  densities?: Density[];
 }
 
 // Single source of truth for all guided tours. Add a tour or edit copy here only;
@@ -27,6 +37,10 @@ export const TOURS: Record<string, GuideStep[]> = {
     },
     {
       target: 'dash-compliance',
+      // The ring lives in the side column, which only the browser density
+      // renders. Without this the app tour would spend a step on a card that is
+      // not there.
+      densities: ['browser'],
       title: 'How today is going',
       // Was "Keeping this high is the goal!" — pressure, and an exclamation mark, on
       // the one number a struggling patient sees most. The screen reports; it does
@@ -151,22 +165,27 @@ export const TOURS: Record<string, GuideStep[]> = {
     {
       target: 'med-card-first',
       title: 'One card per medication',
+      // Described a left stripe that does not exist. The card leads with the
+      // dose-form icon, and the chip row underneath carries every status.
       message:
-        'The coloured left stripe shows priority: red is critical, orange is important, pink is routine. A PAUSED chip means reminders are currently off.',
+        'The icon shows what form it comes in — tablet, syrup, drops. The marks underneath show how important it is, how much is left, and whether reminders are paused.',
       mood: 'encouraging',
     },
     {
       target: 'med-times',
-      title: 'Reminder times',
+      title: 'When you take it',
       message:
-        'These are the exact times your Telegram reminders fire each day. Tap Edit on the card to change them.',
+        'One line for the whole schedule — the times, then which days. Tap Edit on the card to change either.',
       mood: 'reminder',
     },
     {
       target: 'med-stock',
-      title: 'Inventory tracking',
+      title: 'How much is left',
+      // Was "pulses red" — the card never pulsed, and red is the danger tone.
+      // Low stock is a waiting state, not a failure: amber, and worded as a
+      // heads-up rather than an alarm.
       message:
-        'Stock counts down with each dose. When it reaches your threshold it pulses red: that\'s your cue to restock.',
+        'Stock counts down with each dose. It turns amber at the number you set, so you can order more before you run out.',
       mood: 'curious',
     },
     {

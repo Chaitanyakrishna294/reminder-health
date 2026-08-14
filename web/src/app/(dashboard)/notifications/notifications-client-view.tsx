@@ -25,12 +25,12 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Bell, Check, SkipForward, XCircle, AlertTriangle, Heart, PackagePlus,
-  Trash2, CheckSquare, Square, X,
+  Trash2, CheckSquare, Square, X, MailOpen, SlidersHorizontal,
 } from 'lucide-react';
 import { useRealtimeNotifications, type Notification } from '@/hooks/use-realtime-notifications';
 import { useUiMode } from '@/context/ui-mode-context';
 import { dayKeyForDose, timeOfDayForDose } from '@/lib/design/slots';
-import { notificationMeta, notificationHref, type NotificationMeta } from '@/lib/design/notification-kinds';
+import { notificationMeta, notificationTarget, type NotificationMeta } from '@/lib/design/notification-kinds';
 import BrainMascot from '@/components/dashboard/brain-mascot';
 
 /** The page holds real history, not a badge's worth. */
@@ -114,6 +114,8 @@ export default function NotificationsClientView({
   }, [mounted, notifications, unreadOnOpen]);
 
   const wasUnread = (id: string) => unreadOnOpen?.has(id) ?? false;
+  /** Live unread — i.e. arrived since this page opened. See the button's note. */
+  const hasUnread = notifications.some((n) => !n.is_read);
 
   // ── Grouping ──────────────────────────────────────────────────────────────
   // Same day-key rule as the rail (lib/design/slots.ts), so a notification about a
@@ -121,7 +123,9 @@ export default function NotificationsClientView({
   const groups = useMemo(() => {
     const byDay = new Map<string, Notification[]>();
     for (const n of notifications) {
-      const key = dayKeyForDose(n.created_at, referenceTimeZone) ?? '';
+      // Group by when the dose was DUE where we know it; the row's own
+      // created_at is only a stand-in for older rows.
+      const key = dayKeyForDose(n.scheduled_for || n.created_at, referenceTimeZone) ?? '';
       if (!key) continue;
       const bucket = byDay.get(key);
       if (bucket) bucket.push(n);
@@ -183,18 +187,15 @@ export default function NotificationsClientView({
   };
   useEffect(() => cancelPress, []);
 
+  /**
+   * Every notification now has somewhere to go — see notificationTarget. A dose
+   * row written since migration_notification_targets_2026_08_14 carries its own
+   * medication and instant, so the link names the day AND the dose and the
+   * dashboard rings that card; older rows keep the created_at approximation and
+   * simply open the day.
+   */
   const openNotification = (n: Notification) => {
-    const href = notificationHref(n.type);
-    if (href) {
-      router.push(href);
-      return;
-    }
-    // A dose notification. The table stores no medication_id and no scheduled_for,
-    // so the day it happened is inferred from `created_at` — accurate except when a
-    // dose is answered across midnight or escalates hours later. Stated in the
-    // commit rather than hidden: the alternative is no deep link at all.
-    const key = dayKeyForDose(n.created_at, referenceTimeZone);
-    router.push(key ? `/dashboard?day=${key}` : '/dashboard');
+    router.push(notificationTarget(n, (iso) => dayKeyForDose(iso, referenceTimeZone)));
   };
 
   const confirmDeleteSelected = () => {
@@ -231,6 +232,18 @@ export default function NotificationsClientView({
               ? `${selected.size} selected`
               : 'Messages about your doses and your care circle.'}
           </p>
+          {/* The question this page provokes is "can I get fewer of these?", and
+              until now it had no answer on screen — you had to know the setting
+              existed and go looking for it in another section. */}
+          {!selecting && (
+            <Link
+              href="/settings/notifications"
+              className={`mt-2 inline-flex items-center gap-1.5 font-bold text-primary-strong hover:underline min-h-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-lg ${isElderly ? 'text-lg' : 'text-xs'}`}
+            >
+              <SlidersHorizontal className={isElderly ? 'w-5 h-5' : 'w-3.5 h-3.5'} aria-hidden />
+              Choose what you get notified about
+            </Link>
+          )}
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -257,6 +270,17 @@ export default function NotificationsClientView({
                 <button type="button" onClick={() => setSelecting(true)} className={`${btn} border border-border text-foreground hover:bg-muted`}>
                   <CheckSquare className={isElderly ? 'w-5 h-5' : 'w-4 h-4'} aria-hidden /> Select
                 </button>
+                {/* ONLY when something is genuinely unread — which, on this page,
+                    means a message that ARRIVED while it was open. Opening the page
+                    already marks everything read (that is what clears the bell), so
+                    a permanent button here would be a control with nothing to do
+                    999 times out of 1000, and a disabled one would be worse: it
+                    would look like a feature that is broken. */}
+                {hasUnread && (
+                  <button type="button" onClick={markAllAsRead} className={`${btn} border border-border text-foreground hover:bg-muted`}>
+                    <MailOpen className={isElderly ? 'w-5 h-5' : 'w-4 h-4'} aria-hidden /> Mark all as read
+                  </button>
+                )}
                 <button type="button" onClick={confirmClearAll} className={`${btn} text-danger-strong hover:bg-danger/10`}>
                   Clear all
                 </button>
@@ -341,7 +365,7 @@ export default function NotificationsClientView({
                               className={`shrink-0 font-mono tabular-nums text-muted-foreground ${isElderly ? 'text-sm' : 'text-[11px]'}`}
                               suppressHydrationWarning
                             >
-                              {timeOfDayForDose(n.created_at, referenceTimeZone)}
+                              {timeOfDayForDose(n.scheduled_for || n.created_at, referenceTimeZone)}
                             </span>
                           </span>
                           <span className={`block text-muted-foreground leading-relaxed break-words ${isElderly ? 'text-base mt-1' : 'text-xs mt-0.5'}`}>

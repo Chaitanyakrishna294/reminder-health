@@ -177,6 +177,8 @@ through RPCs, never raw table writes. `lib/rate-limit.ts` and `lib/medications/c
 | `lib/push/register-push.ts` (client) · `send-push.ts` (server) | Web-push both directions |
 | `lib/plan.ts` · `billing/use-plan-status.ts` · `billing/luxe.ts` | Plan gate, client mirror, Care+ inline-style tokens (deliberately outside Tailwind) |
 | `lib/design/semantics.ts` | **Colour→meaning + canonical labels.** `PRIORITY` (Routine/Important/Critical), `CARE_LABELS` (patient-side first), `DOSE_TONE`/`doseLabel`, `TONE_VAR`. Import these instead of typing a status word or a hex — see `docs/DESIGN_SYSTEM.md` |
+| `lib/health-vault/limits.ts` · `compress-image.ts` | **The 5-file / 5 MB / images-and-PDF vault quota, client side** (2026-08-13). Numbers + all the refusal copy in one module, in lockstep with `migration_vault_upload_limits_2026_08_13.sql`; `compressImage()` resizes photos to 2000px JPEG before upload so the ceiling does not fight an ordinary camera. **Politeness layer only** — the browser uploads straight to Storage, so the real refusal is the bucket ceiling + the `storage.objects` policy. Has a test (`limits.test.ts`) |
+| `lib/design/density.ts` | **The three densities as one system** (2026-08-13): `Density` = `browser \| app \| elderly`, `resolveDensity()`, and `DENSITY_LAYOUT` — the table saying what each one renders. Presentation only; never gate a derivation or a write path on it. `?preview=app\|browser` forces one for the session |
 | `lib/severity-theme.ts` | tone→Tailwind classes (`getToneTheme`, `getSeverityTheme`). `.text` is the readable-on-tint colour; never `text-*-foreground` on a tint |
 | `lib/medications/stock.ts` | **Web mirror of the bot's low-stock predicate** (`isLowStock`: threshold first, `daysOfStockLeft <= 3` backup). Lockstep with `src/reminders.js` is enforced by `test/fixtures/low-stock-cases.json`, which both tests read — same mirror discipline as the moment-timezone pair |
 | `lib/medications/add-stock.ts` | The single web path that writes `current_stock`. Raising it clears `low_stock_notified_at` via the `rearm_low_stock_notice()` trigger |
@@ -185,7 +187,10 @@ through RPCs, never raw table writes. `lib/rate-limit.ts` and `lib/medications/c
 | `lib/admin.ts` | `getAdminUser()` — `ADMIN_EMAILS` allowlist, fail closed |
 
 Context: `theme-context` (light/dark, **defaults to light** when nothing is saved), `ui-mode-context`
-(`normal|elderly` + `PATIENT_SELF|PATIENT_MONITOR`, persisted to `view-mode` cookie).
+(`normal|elderly` + `PATIENT_SELF|PATIENT_MONITOR`, persisted to `view-mode` cookie; also owns the
+elderly view lock on `profiles.ui_mode_locked`), `density-context` (`useDensity()` → the browser/app/
+elderly split; mounted INSIDE `UiModeProvider` because elderly outranks the rest, and paired with a
+pre-paint `data-density` script in `app/layout.tsx` + the `.browser-only` rule in globals.css).
 Hook: `use-realtime-notifications` (realtime `notifications` channel → bell).
 
 Components live in `components/{layout,dashboard,medications,guide,billing,settings,medical,shared,care-circle,ui}/`.
@@ -194,8 +199,11 @@ all sizes ≥44px), `badge.tsx` (`Badge`/`CountBadge`), `empty-state.tsx`, `eyeb
 `custom-icons.tsx` and `premium-toast.tsx`. `components/care-circle/connection-actions.tsx` owns
 accept/disconnect/monitor for care relationships (incl. the legacy `caregiver_info` branches) —
 **`/care-circle` is canonical for these; `/settings` keeps identity codes only and links out.**
-Big ones: `dashboard-client-view.tsx` (88 KB), `settings-client-view.tsx` (42 KB),
-`medication-list.tsx` (26 KB). Also `missed-dose-strip.tsx` (top-pinned missed-dose alert, spec
+Big ones: `dashboard-client-view.tsx` (82 KB), `medication-list.tsx` (53 KB).
+`settings-client-view.tsx` is **gone** (2026-08-13) — Settings is now a grouped-row hub
+(`app/(dashboard)/settings/settings-hub.tsx` + `components/settings/settings-row.tsx`) pushing one
+sub-page per concern (`account`, `connections`, `notifications`, `display`, `language`, `help`,
+`legal`, `setup-guide`). Stale references to the old file remain in comments only. Also `missed-dose-strip.tsx` (top-pinned missed-dose alert, spec
 2026-07-27; actionable in caregiver-monitor view; permanently-unresolvable doses render info-only)
 and `med-due-gate.tsx` (full-screen "Did you take it?" gate: due-first queue, pinned asked dose,
 one-by-one/all-at-once toggle; exports `permanentResolveError`/`UNSAVEABLE_DOSE_COPY`).
@@ -205,7 +213,11 @@ out the refill-reminder feature. `dashboard/dose-strip.tsx` (added 2026-08-09) i
 row of blister pockets — it replaced the four Morning/Afternoon/Evening/Night tiles, and tapping a
 pocket drives the compliance ring's centre (which was hover-only, i.e. dead on a phone). It takes
 `now` as a prop rather than reading `Date.now()` in render (`react-hooks/purity`). Guided tours: `components/guide/*` (`TOURS` map in `guide-content.ts`,
-`data-tour` attributes, `GuideAutoStart`).
+`data-tour` attributes, `GuideAutoStart`). A step may carry `densities?: Density[]` when its target
+only exists at some densities — `guide-tour.tsx` filters on it so step counts stay honest; note
+`medications/new/page.tsx` indexes `TOURS.newMedication` by raw index, so that one tour must stay
+unfiltered unless both sides change together. `components/dev/density-preview-badge.tsx` renders only
+while `?preview=` is forcing a density.
 
 **Recipes**
 - *New dashboard page:* `app/(dashboard)/<route>/page.tsx` server component calling `resolveUserData()` with `export const revalidate = 0`. Nav: `getNavItems()` in `components/layout/dashboard-main-layout.tsx` — **exactly 5 icons, hard rule**; secondary pages go in the navbar profile dropdown. Optionally add to `shouldPrefetch()` allowlist and to `isProtectedRoute` in `lib/supabase/middleware.ts` (list synced 07-26 — keep it that way). Optional tour entry in `guide-content.ts`.
@@ -222,6 +234,41 @@ pocket drives the compliance ring's centre (which was hover-only, i.e. dead on a
 
 27 tables + 1 view + 2 private buckets (`health-vault`, `avatars`). Full column detail:
 agent-audited 2026-07-25; `docs/DATABASE_SCHEMA.md` is badly stale (§9).
+
+**Storage quotas (applied 2026-08-13, `migration_vault_upload_limits_2026_08_13.sql` = APPLIED.md #73).**
+`health-vault` carries `file_size_limit` 5 MB + `allowed_mime_types` images/PDF, and its INSERT policy
+calls `vault_can_accept_upload()` for the 5-file-per-user cap and blocks guests. **This is the only
+layer that counts**: the client uploads to Storage directly with the anon key, so the upload form's
+checks are advice. The cap counts storage OBJECTS, so a trashed record holds its slot until
+`cleanup_expired_trash` purges it at 30 days. Prove it end to end with
+`node db/scripts/verify-vault-limits.mjs` (raw Storage REST API, no UI — use a test account).
+See CLAUDE.md's two hard rules: form-checks-are-not-limits, and policy-called-functions-need-EXECUTE
+(the latter cost a live upload outage the same day; hotfix
+`migration_vault_can_accept_grant_2026_08_13.sql`).
+
+**Orphaned storage objects are a RECURRING CHORE, and `db/scripts/purge-orphan-storage.mjs` is the
+companion to `delete_my_account`.** `storage.objects.owner` is FK to `auth.users` `ON DELETE SET
+NULL`, so **every account deletion leaves more** objects that no policy can match — unlistable,
+undeletable through the app, counted toward nobody's quota, billed forever. 114 existed in
+`health-vault` as of 2026-08-13. `delete_my_account` cannot fix it: Supabase blocks `DELETE FROM
+storage.objects` (that 42501 once broke all in-app account deletion — APPLIED.md #61), so bytes can
+only go through the Storage API, which means service_role. Run it after a batch of deletions:
+
+```
+node db/scripts/purge-orphan-storage.mjs                    # dry run, both buckets, prints the list
+node db/scripts/purge-orphan-storage.mjs --delete --confirm DELETE
+```
+
+Dry run is the default; `--max` (500) caps the blast radius; `--json` for a manifest. **It does NOT
+test `owner IS NULL`** — `avatars` policies key on the path's first segment, not on `owner`, so that
+test would delete live users' photos. It asks whether the account named by the first path segment
+still exists, and SKIPS anything it cannot classify (non-UUID first segment; a `health-vault` object a
+`health_records` row still points at).
+
+Unbounded-growth audit: `db/audits/audit_unbounded_growth_2026_08_13.sql`. **Two open findings** —
+(1) `audit_logs` is `FOR ALL TO authenticated` with no cleanup job, and the vault client appends to it
+on every action; (2) the `avatars` policy checks only the first path segment, so one user can hold
+unlimited objects under `{uid}/…`.
 
 **Core:** `profiles` (1:1 auth.users; `telegram_chat_id` unique, synthetic `WEB-<uuid>` for web-only;
 `connect_code` RM+6) · `medications` (**no CREATE TABLE in repo** — pre-repo bot table, only ALTERed;

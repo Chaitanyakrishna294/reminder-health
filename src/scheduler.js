@@ -776,6 +776,12 @@ const initScheduler = () => {
               title: status.stock === 0 ? `Out of ${med.drug_name}` : `${med.drug_name} is running low`,
               message: `${status.stock} ${unit}${status.stock === 1 ? '' : 's'} left. ${reasonLine}`,
               type: 'LOW_STOCK',
+              // So tapping the bell row opens THIS medication rather than the
+              // whole list (migration_notification_targets_2026_08_14). No
+              // scheduled_for: a stock warning is about a medication, not about
+              // one dose of it, and inventing a dose instant would send the tap
+              // to a dose the notification was never about.
+              medication_id: med.id,
             }]);
             if (notifErr) {
               console.error(`Low stock bell row failed for med ${med.id}:`, notifErr.message);

@@ -23,7 +23,7 @@ import {
   CircleAlert,
   ClipboardList,
 } from 'lucide-react';
-import { SpoonIcon, CreamBottleIcon, TabletIcon } from '@/components/ui/custom-icons';
+import { getUnitIcon } from '@/lib/design/dose-forms';
 import { PRIORITY } from '@/lib/design/semantics';
 
 export type UnitType =
@@ -44,18 +44,32 @@ export interface UnitOption {
   icon: React.ReactNode;
 }
 
-export const unitOptions: UnitOption[] = [
-  { id: 'TABLET', label: 'Tablet', icon: <TabletIcon className="w-5 h-5" /> },
-  { id: 'CAPSULE', label: 'Capsule', icon: <Pill className="w-5 h-5" /> },
-  { id: 'ML', label: 'Milliliter (ml)', icon: <Beaker className="w-5 h-5" /> },
-  { id: 'DROP', label: 'Drop', icon: <Droplets className="w-5 h-5" /> },
-  { id: 'APPLICATION', label: 'Application', icon: <CreamBottleIcon className="w-5 h-5" /> },
-  { id: 'TEASPOON', label: 'Teaspoon', icon: <SpoonIcon className="w-5 h-5" /> },
-  { id: 'UNIT', label: 'Unit', icon: <Syringe className="w-5 h-5" /> },
-  { id: 'PATCH', label: 'Patch', icon: <Bandage className="w-5 h-5" /> },
-  { id: 'INHALATION', label: 'Inhalation', icon: <Wind className="w-5 h-5" /> },
-  { id: 'OTHER', label: 'Other', icon: <Package className="w-5 h-5" /> },
-];
+/**
+ * TEN measurement options, EIGHT dose forms — and the icon comes from the forms.
+ *
+ * The labels differ on purpose: this list asks "what do you count it in?", so
+ * Milliliter and Teaspoon are separate answers even though both are syrup. The
+ * ICON asks a different question — "what is it?" — and that one has exactly one
+ * source, `lib/design/dose-forms.ts`.
+ *
+ * They used to disagree. This list carried its own inline icons, so a medication
+ * measured in millilitres showed a BEAKER on the screen where you set it and a
+ * SPOON on the card where you read it — the same drift as the priority colours
+ * that made a routine medication pink in one place and green in another. One
+ * registry, or it happens again.
+ */
+export const unitOptions: UnitOption[] = ([
+  { id: 'TABLET', label: 'Tablet' },
+  { id: 'CAPSULE', label: 'Capsule' },
+  { id: 'ML', label: 'Milliliter (ml)' },
+  { id: 'DROP', label: 'Drop' },
+  { id: 'APPLICATION', label: 'Application' },
+  { id: 'TEASPOON', label: 'Teaspoon' },
+  { id: 'UNIT', label: 'Unit' },
+  { id: 'PATCH', label: 'Patch' },
+  { id: 'INHALATION', label: 'Inhalation' },
+  { id: 'OTHER', label: 'Other' },
+] as Array<Omit<UnitOption, 'icon'>>).map((o) => ({ ...o, icon: getUnitIcon(o.id, 'w-5 h-5') }));
 
 /** Quick-pick strengths, scoped to the form chosen in step 1. The picker used to offer
  *  `500mg / 650mg / 5mg / 10mg / 20mg / 100mcg` to everyone — so someone entering a
@@ -125,6 +139,50 @@ export function describeDoseDays(days: number[] | null | undefined): string {
   if (sorted.length === 5 && sorted.every((d) => d >= 1 && d <= 5)) return 'Weekdays';
   if (sorted.length === 2 && sorted[0] === 0 && sorted[1] === 6) return 'Weekends';
   return sorted.map((d) => weekdays[d].full.slice(0, 3)).join(', ');
+}
+
+/** `"14:05"` → `"2:05 PM"`. Pure, so the card and the review screen agree. */
+export function format12Hour(timeStr: string): string {
+  const [hourStr, minStr] = (timeStr || '').split(':');
+  const hour = parseInt(hourStr, 10);
+  if (Number.isNaN(hour)) return timeStr;
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const displayHour = hour % 12 === 0 ? 12 : hour % 12;
+  return `${displayHour}:${minStr} ${ampm}`;
+}
+
+/**
+ * One line answering "when do I take this?" — `"8:00 AM · daily"`.
+ *
+ * Replaces a row of time pills plus a separate `once_daily` frequency chip. Those
+ * said the same thing twice in two vocabularies: the pills gave the times, the
+ * chip gave a count of them, and NEITHER mentioned which days — so a
+ * Monday/Thursday medication read as "Twice Daily" on the card and surprised
+ * someone on a Tuesday.
+ *
+ * Times lead, because the time is what gets checked against the clock in your
+ * hand. The day pattern follows, because it only matters when it is not "daily".
+ */
+export function scheduleSummary(
+  reminderTimes: string[] | null | undefined,
+  doseDays: number[] | null | undefined,
+): string {
+  const times = (reminderTimes ?? []).filter(Boolean);
+  // An empty reminder_times is a real state — the bot pre-filters these and the
+  // forms now refuse to save one — so say so rather than printing "· daily"
+  // beside nothing and implying a schedule that does not exist.
+  if (times.length === 0) return 'No times set';
+
+  const days = describeDoseDays(doseDays);
+  // "Every day" becomes "daily" so the line reads as a phrase. A specific list
+  // keeps its capitals — "Mon, Wed" is a set of names, not a word.
+  const dayPhrase =
+    days === 'Every day' ? 'daily'
+      : days === 'Weekdays' ? 'weekdays'
+        : days === 'Weekends' ? 'weekends'
+          : days;
+
+  return `${times.map(format12Hour).join(', ')} · ${dayPhrase}`;
 }
 
 export const frequencies = [

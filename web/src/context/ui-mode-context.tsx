@@ -26,6 +26,22 @@ interface UiModeContextType {
   uiModeLocked: boolean;
   /** Settings only. Persists to the profile so it survives a reinstall. */
   setUiModeLocked: (locked: boolean) => Promise<void>;
+  /**
+   * Names under the nav icons.
+   *
+   * OFF by default: five labelled tabs is five words competing with the dose you
+   * opened the app to answer, and the icons plus their aria-labels already carry
+   * the meaning for anyone who has used the app twice.
+   *
+   * ELDERLY FORCES IT ON, the same way elderly forces light mode — "is that a
+   * folder or a heart?" is not a question to leave someone squinting at, and it
+   * is the density with the room to answer it. `showNavLabels` is the value to
+   * render from; `navLabelsPreference` is only for the Settings switch, which
+   * must show what the user chose rather than what elderly is overriding.
+   */
+  showNavLabels: boolean;
+  navLabelsPreference: boolean;
+  setNavLabels: (show: boolean) => void;
 }
 
 const UiModeContext = createContext<UiModeContextType | undefined>(undefined);
@@ -38,6 +54,7 @@ export function UiModeProvider({ children }: { children: React.ReactNode }) {
   // when the closure was created.
   const lockedRef = useRef(false);
   const [viewMode, setViewModeState] = useState<ViewMode>('PATIENT_SELF');
+  const [navLabels, setNavLabelsState] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -87,6 +104,10 @@ export function UiModeProvider({ children }: { children: React.ReactNode }) {
       } catch { /* signed out, offline — the cached value stands */ }
     })();
 
+    try {
+      setNavLabelsState(localStorage.getItem('nav-labels') === '1');
+    } catch { /* private mode */ }
+
     setMounted(true);
   }, []);
 
@@ -133,6 +154,11 @@ export function UiModeProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const setNavLabels = (show: boolean) => {
+    setNavLabelsState(show);
+    try { localStorage.setItem('nav-labels', show ? '1' : '0'); } catch { /* private mode */ }
+  };
+
   const setViewMode = (newMode: ViewMode) => {
     setViewModeState(newMode);
     document.cookie = `view-mode=${newMode}; path=/; max-age=31536000; SameSite=Lax`;
@@ -175,6 +201,11 @@ export function UiModeProvider({ children }: { children: React.ReactNode }) {
       setViewMode,
       uiModeLocked: mounted && locked,
       setUiModeLocked,
+      // Elderly wins, exactly as it does for the theme. Gated on `mounted` so the
+      // first paint matches the server's.
+      showNavLabels: mounted && (isElderly || navLabels),
+      navLabelsPreference: mounted && navLabels,
+      setNavLabels,
     }}>
       {children}
     </UiModeContext.Provider>

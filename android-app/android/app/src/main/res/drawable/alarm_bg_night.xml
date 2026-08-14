@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Bundled alarm backdrop 3 of 3 — "Night". See alarm_bg_dawn.xml for why these
+     are authored gradients rather than photographs. Built on the slot_night and
+     slot_evening tokens.
+
+     Dark, but NOT a dark THEME. CLAUDE.md's light-mode rule is about the app
+     following the OS; this is a picture someone chose, and it looks the same at
+     3am and 3pm like every other alarm backdrop. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="270"
+                android:startColor="#3D4A8F"
+                android:centerColor="#232A57"
+                android:endColor="#12162E" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="radial"
+                android:gradientRadius="60%p"
+                android:centerX="0.72"
+                android:centerY="0.18"
+                android:startColor="#4DBFC6F0"
+                android:endColor="#00BFC6F0" />
+        </shape>
+    </item>
+</layer-list>
