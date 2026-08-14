@@ -31,7 +31,6 @@ import { Bell, BellOff, ShieldCheck, ArrowRight } from 'lucide-react';
 import { useUiMode } from '@/context/ui-mode-context';
 import { registerPush } from '@/lib/push/register-push';
 import AlarmRingDuration from '@/components/settings/alarm-ring-duration';
-import AlarmAppearance from '@/components/settings/alarm-appearance';
 
 type Permission = 'unsupported' | 'default' | 'granted' | 'denied';
 
@@ -130,12 +129,14 @@ export default function NotificationsClientView({
         {note && <p className={`font-bold text-muted-foreground ${body}`} role="status">{note}</p>}
       </section>
 
-      {/* Both of these configure the NATIVE alarm, which is why they sit under
-          the reassurance below rather than above it: push is the web channel,
-          and these two are the thing that actually rings. */}
+      {/* Configures the NATIVE alarm, which is why it sits under the reassurance
+          below rather than above it: push is the web channel, and this is the
+          thing that actually rings. The alarm's picture and sound moved to their
+          own room (Settings -> Notification style) once the preview arrived —
+          a full-height render of the alarm plus its controls is a page, and
+          squeezed under the push card it was a scroll target rather than
+          something anyone looked at. */}
       <AlarmRingDuration initialSeconds={ringSeconds} largestHandful={largestHandful} />
-
-      <AlarmAppearance />
 
       {/* The line that matters most on this page. */}
       <section className="rounded-3xl border border-info/30 bg-info/5 p-5">

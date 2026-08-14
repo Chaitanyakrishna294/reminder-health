@@ -20,7 +20,7 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  UserCircle, Bell, Monitor, Users, LifeBuoy, Globe, ShieldCheck, LogOut, ClipboardCheck, Link2,
+  UserCircle, Bell, Monitor, Users, LifeBuoy, Globe, ShieldCheck, LogOut, ClipboardCheck, Link2, Palette,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useUiMode } from '@/context/ui-mode-context';
@@ -68,6 +68,9 @@ export default function SettingsHub() {
           {/* Was /settings/account#notifications — an anchor that did not exist,
               because the preferences did not either. It now has a real page. */}
           <SettingsRow icon={Bell} label="Notifications" href="/settings/notifications" />
+          {/* Its own row rather than a card inside Notifications: a full-height
+              render of the alarm plus the controls that change it is a page. */}
+          <SettingsRow icon={Palette} label="Notification style" href="/settings/notification-style" />
           <SettingsRow icon={Monitor} label="Display" href="/settings/display" />
         </SettingsGroup>
       )}
