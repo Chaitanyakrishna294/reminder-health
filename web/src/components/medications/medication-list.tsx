@@ -547,9 +547,9 @@ export default function MedicationList({
           hydration mismatch. A reserved-height placeholder keeps the page from
           jumping when the real strip arrives. */}
       {!mounted ? (
-        <div className="bg-card rounded-[22px] border border-border p-2 sm:p-4 shadow-sm h-[136px] sm:h-[150px]" aria-hidden />
+        <div className="card-lift p-2 sm:p-4 shadow-sm h-[136px] sm:h-[150px]" aria-hidden />
       ) : (
-      <div className="bg-card rounded-[22px] border border-border p-2 sm:p-4 shadow-sm">
+      <div className="card-lift p-2 sm:p-4 shadow-sm">
         <div className="flex items-center justify-between mb-3 gap-2">
           <button
             onClick={() => setWeekAnchor(d => { const n = new Date(d); n.setDate(d.getDate() - 7); return n; })}
@@ -710,7 +710,7 @@ export default function MedicationList({
               {dosesForSelectedDay.map((dose, i) => (
                 <li
                   key={`${dose.id}-${dose.time}-${i}`}
-                  className="flex items-center gap-3 bg-card border border-border rounded-2xl p-3 shadow-sm"
+                  className="flex items-center gap-3 card-lift p-3 shadow-sm"
                 >
                   <span
                     aria-hidden
@@ -815,7 +815,7 @@ export default function MedicationList({
       {/* Add-stock modal */}
       {stockModalMed && (
         <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in" onClick={() => stockBusyId === null && setStockModalMed(null)}>
-          <div className="bg-card rounded-[22px] max-w-sm w-full p-6 space-y-5" style={{ boxShadow: '0 8px 40px rgba(16, 28, 90, 0.18)' }} onClick={(e) => e.stopPropagation()}>
+          <div className="card-lift max-w-sm w-full p-6 space-y-5" style={{ boxShadow: '0 8px 40px rgba(16, 28, 90, 0.18)' }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0" style={{ background: cardTheme(stockModalMed).tint, color: cardTheme(stockModalMed).color }}>
@@ -880,7 +880,7 @@ export default function MedicationList({
       {/* Delete confirmation modal */}
       {deleteModalMed && (
         <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in" onClick={() => loadingId === null && setDeleteModalMed(null)}>
-          <div className="bg-card rounded-[22px] max-w-sm w-full p-6 space-y-5 text-center" style={{ boxShadow: '0 8px 40px rgba(16, 28, 90, 0.18)' }} onClick={(e) => e.stopPropagation()}>
+          <div className="card-lift max-w-sm w-full p-6 space-y-5 text-center" style={{ boxShadow: '0 8px 40px rgba(16, 28, 90, 0.18)' }} onClick={(e) => e.stopPropagation()}>
             <div className="w-14 h-14 rounded-full bg-danger/10 flex items-center justify-center mx-auto">
               <Trash2 className="w-6 h-6 text-danger-strong" strokeWidth={2.2} />
             </div>

@@ -1305,7 +1305,7 @@ export default function DashboardClientView({
         <div className="browser-only rise-in lg:col-span-4 space-y-8" style={{ ['--rise-delay' as string]: '240ms' }}>
 
           <div className="grid grid-cols-[1.1fr_1fr] lg:grid-cols-1 gap-3 sm:gap-6 items-stretch">
-          <div data-tour="dash-compliance" className="bg-card border border-border rounded-3xl p-4 sm:p-6 shadow-sm flex flex-col justify-between text-center relative min-h-0 sm:min-h-[300px]">
+          <div data-tour="dash-compliance" className="card-lift p-4 sm:p-6 shadow-sm flex flex-col justify-between text-center relative min-h-0 sm:min-h-[300px]">
             {/* Half-width now, so the title has to fit one line: "Daily Compliance" wrapped
                 to two and the "Daily dose cycle progress" subtitle took two more, spending
                 four lines of a small card restating its own heading. */}
@@ -1497,7 +1497,7 @@ export default function DashboardClientView({
                 : patients.slice(0, 3).map(p => toMember(p, true));
 
             return (
-              <div className="bg-card border border-border rounded-3xl p-4 sm:p-6 shadow-sm flex flex-col min-h-0">
+              <div className="card-lift p-4 sm:p-6 shadow-sm flex flex-col min-h-0">
                 {/* "See all" sat beside the title and squeezed it to "Care …". It moves to
                     the foot of the card, where it also fills the space a short list leaves. */}
                 <h3 className="font-black text-foreground text-xs sm:text-sm flex items-center gap-1.5 min-w-0">
@@ -1564,7 +1564,7 @@ export default function DashboardClientView({
               app/(dashboard)/dashboard/page.tsx. */}
 
           {/* Layer 4: Medication Inventory */}
-          <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4">
+          <div className="card-lift p-6 shadow-sm space-y-4">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="font-black text-foreground text-sm">Medication Inventory</h3>

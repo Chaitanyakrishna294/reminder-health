@@ -43,7 +43,7 @@ export default function WaterCard({ enabled, goalCups, cupMl }: WaterCardProps) 
   return (
     <section
       aria-labelledby="water-heading"
-      className={`bg-card border border-border rounded-3xl ${isElderly ? 'p-6' : 'p-5'}`}
+      className={`card-lift ${isElderly ? 'p-6' : 'p-5'}`}
     >
       <div className="flex items-center justify-between gap-3 mb-3">
         <h2

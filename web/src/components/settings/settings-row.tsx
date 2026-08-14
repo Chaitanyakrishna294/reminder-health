@@ -100,9 +100,14 @@ export function SettingsGroup({
           {title}
         </h2>
       )}
-      {/* One rounded card with hairline dividers, rather than a gap between every
-          row: the group is the object, the rows are its contents. */}
-      <div className="rounded-3xl border border-border overflow-hidden divide-y divide-border">
+      {/* One card with hairline dividers, rather than a gap between every row:
+          the group is the object, the rows are its contents.
+
+          VISUAL REFRESH: the outline is gone and the group now FLOATS on the
+          board. The dividers stay, because those are boundaries between rows
+          rather than the edge of the object — the distinction the refresh draws
+          in §1. */}
+      <div className="card-lift overflow-hidden divide-y divide-border">
         {children}
       </div>
     </section>

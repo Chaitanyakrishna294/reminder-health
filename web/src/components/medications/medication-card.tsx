@@ -104,7 +104,7 @@ export default function MedicationCard({
   return (
     <div
       data-tour={index === 0 ? 'med-card-first' : undefined}
-      className={`rise-in relative bg-card rounded-[22px] overflow-hidden transition-transform duration-200 ease-out hover:-translate-y-0.5 ${
+      className={`rise-in relative card-lift card-press overflow-hidden transition-transform duration-200 ease-out hover:-translate-y-0.5 ${
         med.active ? '' : 'opacity-70'
       }`}
       /* The dashboard's 60ms cascade, capped at 6 so a long list still finishes

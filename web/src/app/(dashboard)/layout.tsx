@@ -47,7 +47,15 @@ export default async function DashboardLayout({
           Renders nothing until the dialog is open, and nothing at all in a
           browser. See lib/navigation/stack.ts for the model. */}
       <AndroidBack />
-      <div className="min-h-screen flex flex-col bg-background">
+      {/* THE BOARD. Applied once here, so every surface in the group sits on one
+          tray rather than each screen painting its own ground. The paper is
+          deepened ~4%; cards then float on it with two-layer shadows instead of
+          being outlined. See docs/design/visual-refresh-2026-08-14.md §1.
+
+          Safe for elderly, which is otherwise excluded from the refresh: this
+          changes the ground's lightness and nothing about size, spacing or
+          contrast. */}
+      <div className="min-h-screen flex flex-col board">
         {/* Navbar passing user profile details */}
         <Navbar
           user={{
