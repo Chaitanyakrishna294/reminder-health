@@ -159,7 +159,7 @@ export default function ConnectionsClientView({
       </header>
 
       {/* ── YOUR CODE ─────────────────────────────────────────────────────── */}
-      <section className="bg-card border border-border rounded-3xl p-5 space-y-3">
+      <section className="card-lift p-5 space-y-3">
         <h2 className={`font-extrabold text-foreground ${label}`}>Your code</h2>
         <p className={`text-muted-foreground font-semibold ${body}`}>
           Give this to someone you want in your care circle.
@@ -187,7 +187,7 @@ export default function ConnectionsClientView({
       </section>
 
       {/* ── ENTER A CODE ──────────────────────────────────────────────────── */}
-      <section className="bg-card border border-border rounded-3xl p-5 space-y-3">
+      <section className="card-lift p-5 space-y-3">
         <h2 className={`font-extrabold text-foreground ${label}`}>Enter a code</h2>
         <p className={`text-muted-foreground font-semibold ${body}`}>
           Ask them for their code, then type it here. They will get a request to accept.
@@ -268,7 +268,7 @@ export default function ConnectionsClientView({
       {/* Managing the relationships themselves is /care-circle's job, not this page's. */}
       <Link
         href="/care-circle"
-        className={`w-full bg-card border border-border rounded-3xl px-5 flex items-center gap-3 hover:bg-muted/60 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset ${
+        className={`w-full card-lift px-5 flex items-center gap-3 hover:bg-muted/60 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset ${
           isElderly ? 'min-h-[72px]' : 'min-h-[56px]'
         }`}
       >

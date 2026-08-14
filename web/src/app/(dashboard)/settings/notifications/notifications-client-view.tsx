@@ -88,7 +88,7 @@ export default function NotificationsClientView({
         </h1>
       </header>
 
-      <section className="bg-card border border-border rounded-3xl p-5 space-y-3">
+      <section className="card-lift p-5 space-y-3">
         <div className="flex items-start gap-3">
           <span aria-hidden className={`shrink-0 rounded-2xl flex items-center justify-center ${
             isElderly ? 'w-14 h-14' : 'w-10 h-10'
@@ -151,7 +151,7 @@ export default function NotificationsClientView({
 
       <Link
         href="/settings/setup-guide"
-        className={`w-full bg-card border border-border rounded-3xl px-5 flex items-center gap-3 hover:bg-muted/60 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset ${
+        className={`w-full card-lift px-5 flex items-center gap-3 hover:bg-muted/60 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset ${
           isElderly ? 'min-h-[72px]' : 'min-h-[56px]'
         }`}
       >

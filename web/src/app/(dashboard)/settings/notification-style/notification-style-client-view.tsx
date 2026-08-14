@@ -110,7 +110,7 @@ export default function NotificationStyleClientView() {
     return (
       <div className="max-w-2xl mx-auto space-y-6">
         <Header isElderly={isElderly} />
-        <section className="bg-card border border-border rounded-3xl p-5">
+        <section className="card-lift p-5">
           <p className={`text-muted-foreground font-semibold text-balance ${body}`}>
             {isNativeApp()
               ? 'This version of the app cannot change the alarm style yet. Updating the app will add it.'
@@ -125,7 +125,7 @@ export default function NotificationStyleClientView() {
     return (
       <div className="max-w-2xl mx-auto space-y-6">
         <Header isElderly={isElderly} />
-        <section className="bg-card border border-border rounded-3xl p-5">
+        <section className="card-lift p-5">
           <p className={`text-muted-foreground font-semibold text-balance ${body}`}>
             Your alarm picture and sound are already set. Someone in your care circle can
             change them from their own phone.
@@ -202,7 +202,7 @@ export default function NotificationStyleClientView() {
     <div className="max-w-2xl mx-auto space-y-6">
       <Header isElderly={isElderly} />
 
-      <section className="bg-card border border-border rounded-3xl p-5 space-y-5">
+      <section className="card-lift p-5 space-y-5">
         {/* EFFECTS — one line, controls above the thing they change.
             min-w on each swatch keeps the 44px tap floor, and the row scrolls
             rather than shrinking below it on a very narrow phone: "fits on one

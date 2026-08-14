@@ -244,7 +244,7 @@ export default function CallSchedule({ telegramId, isElderly }: { telegramId: st
   }
 
   return (
-    <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-5">
+    <div className="card-lift p-6 shadow-sm space-y-5">
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1">
           <h3 className={`font-black text-foreground flex items-center gap-1.5 ${heading}`}>

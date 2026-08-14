@@ -126,7 +126,7 @@ export default function WaterSettingsClientView({ initial }: { initial: WaterSet
         </p>
       </section>
 
-      <section className="bg-card border border-border rounded-3xl p-5 space-y-4">
+      <section className="card-lift p-5 space-y-4">
         <label className="flex items-start gap-3 cursor-pointer">
           <input
             type="checkbox"
@@ -148,7 +148,7 @@ export default function WaterSettingsClientView({ initial }: { initial: WaterSet
 
       {s.enabled && (
         <>
-          <section className="bg-card border border-border rounded-3xl p-5 space-y-4">
+          <section className="card-lift p-5 space-y-4">
             <p className={`font-extrabold text-foreground ${label}`}>Your goal</p>
 
             <div className="grid grid-cols-2 gap-3">
@@ -243,7 +243,7 @@ export default function WaterSettingsClientView({ initial }: { initial: WaterSet
             </div>
           </section>
 
-          <section className="bg-card border border-border rounded-3xl p-5 space-y-4">
+          <section className="card-lift p-5 space-y-4">
             <p className={`font-extrabold text-foreground ${label}`}>When to remind you</p>
             <div className="grid grid-cols-2 gap-3">
               <div>

@@ -75,7 +75,7 @@ export default function AlarmRingDuration({
   };
 
   return (
-    <section className="bg-card border border-border rounded-3xl p-5 space-y-3">
+    <section className="card-lift p-5 space-y-3">
       <div className="flex items-start gap-3">
         <span
           aria-hidden
