@@ -158,15 +158,7 @@ object AlarmScheduler {
                     // The phone slept through the whole ladder. Leave the sticky
                     // so the dose stays visibly unanswered rather than vanishing,
                     // then fall through and register the next dose.
-                    DoseNotifications.showMissedDose(
-                        context = context,
-                        medicationId = medication.id,
-                        drugName = medication.drugName,
-                        doseLabel = doseLabelFor(medication),
-                        scheduledForIso = ladder.doseAt,
-                        audioPath = medication.alarmAudioPath,
-                        photoPath = medication.alarmPhotoPath,
-                    )
+                    DoseNotifications.showMissedGroup(context, ladder.doseAt, DoseRow.of(medication))
                 }
             }
 

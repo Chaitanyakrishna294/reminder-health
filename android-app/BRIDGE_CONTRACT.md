@@ -152,6 +152,73 @@ keep in sync and less that goes stale on the device.
 `reminder_times` is confirmed **`jsonb`** live (not `TEXT[]` — see `db/migrations/APPLIED.md`
 #64), so it deserializes to a plain JS/Kotlin string array with no special handling either side.
 
+### Call-level fields alongside `medications`
+
+```ts
+syncSchedule({ medications, userId?: string, elderly?: boolean })
+```
+
+- **`userId`** keys the native store to one identity (account-switch guard, 2026-08-11).
+- **`elderly`** (2026-08-14) mirrors CLAUDE.md's third density so the **Kotlin alarm screen**
+  can honour it. This is the same argument the planned `language` field rests on: the alarm is
+  a separate process with no webview running, so it cannot read a React context, `localStorage`,
+  or `profiles` — anything that changes how a dose is *presented* has to travel. It changes
+  exactly one thing natively: a coalesced handful is asked about **one dose at a time** instead
+  of as a list. Stored in `AlarmPrefs` (plain SharedPreferences, deliberately **not**
+  `SessionStore`, which is wiped on sign-out — wiping "this person needs the simplified screen"
+  at sign-out resets the person least able to put it back). Absent leaves the stored value
+  alone, so an APK newer than the deployed web keeps whatever it last learned.
+
+---
+
+## 1b. `doseResolved({ doses })` and `getActiveLadders()` — the ladder-cancellation pair (2026-08-14)
+
+**The device runs the retry ladder, so the device has to learn about every answer.** It sees
+answers made on the alarm screen and on the notification, because both write to its local queue.
+It does **not** see an answer made in the webview — the rail, the dose gate, elderly mode all
+resolve straight to Supabase.
+
+Found live on a real device, 2026-08-14: two **critical** medications marked SKIP from the app's
+rail read as skipped everywhere on screen while `pending_retries` kept ringing about them every
+five minutes. Phase 2 had proved the notification path cancelled correctly, which is exactly what
+made the gap invisible — the choke point (`DoseActionQueue.record`) only ever saw
+native-originated answers.
+
+```ts
+doseResolved({ doses: { medicationId: number; scheduledFor: string; action: 'TAKEN' | 'SKIP' }[] })
+  -> { applied: number }
+getActiveLadders() -> { ladders: { medicationId: number; scheduledFor: string }[] }
+```
+
+Two routes, because there are two ways an answer can reach the device:
+
+1. **Immediately**, from `web/src/lib/reminder-events.ts` — the one function every web surface
+   resolves through. It lives there rather than in each surface for the same reason the native
+   cancellation lives inside `DoseActionQueue.record`: a surface added next month gets it
+   without knowing it exists. Never throws; the dose is already recorded server-side by then, and
+   a failure costs at most one extra ring.
+2. **By reconciliation**, from `ScheduleSync` — ask native which ladders are in flight, ask the
+   server whether those doses are already resolved, report back the ones that are. This is the
+   only route for an answer the device was *never* part of: a **caregiver resolving from their
+   own phone**. Ladder-first on purpose, so the usual app-open makes one bridge call, gets an
+   empty list, and issues no query at all.
+
+**`doseResolved` goes through `DoseActionQueue.record(alreadyOnServer = true)`, not straight to
+`cancelLadder`.** Cancelling the ladder is only one of the things an answer must do — it also has
+to leave the dose out of the coalesced alarm group, narrow or clear the notification, and reach a
+visible alarm screen. A second cancellation path would have covered the first and silently missed
+the rest. The row is written `synced = true`, so `ActionSync` correctly never tries to send a
+server-originated answer back to the server.
+
+**Honest bound:** reconciliation runs when the webview runs. A ladder is at most 30 minutes long
+(the escalation clamp), so a caregiver's remote answer can still leave the phone re-asking until
+the app is next opened. Closing that would mean the device polling the server, which CLAUDE.md
+forbids and which would break the offline guarantee the alarm core exists for.
+
+Both methods are **optional on the JS side** (`bridge.doseResolved?`). `server.url` means the web
+and the APK ship separately, so a device can be running either combination; absence means "this
+device cannot be told", never an error.
+
 ---
 
 ## 2. `setSession(session: BridgeSession)` — web → native

@@ -8,7 +8,9 @@ APK and the deployed web ship separately:
 
 - `migration_retry_ladder_2026_08_14.sql` applied ✅ (you did this)
 - web deployed ✅ (`d0zwujw95`)
-- fresh APK installed ← the only outstanding one
+- fresh APK installed ← rebuild for the coalesced ring + the 2b fix
+- **web re-deployed** ← required for 2b/2c, and for elderly to reach the alarm
+  screen at all; `server.url` means the two halves ship separately
 
 Then open the app once so `syncSchedule` pushes `priorityLevel` and the ladder
 columns into the native store. **Nothing below works until that sync has run** —
@@ -65,15 +67,34 @@ Run twice. **The two surfaces take different code paths and both must work.**
 on the notification itself (do not open the app).
 
 **2b — from the app:** repeat, but at the +1 rung open the app and answer on the
-rail or the gate.
+rail or the gate. **This FAILED on 2026-08-14 and is fixed in this build — re-run
+it first.** Two critical medications marked SKIP from the rail showed as skipped
+in the UI while their rungs kept firing every five minutes: a web resolve goes
+straight to Supabase, so the device never heard and `pending_retries` was never
+cancelled. `resolveReminderEvent` now reports every web answer over the bridge
+(`doseResolved`), through the same choke point a notification tap uses.
 
-**Pass, both times:**
+**2c — a caregiver answers remotely.** Let B ring, then resolve that dose from a
+DIFFERENT device or browser. Nothing on the phone was involved, so nothing told
+it. Then bring the app to the foreground.
+
+**Pass, all three:**
 - No further rungs. Nothing at +2 or +3.
 - logcat: `retry ladder cancelled for med N -- the dose was answered`, followed by
   an `EXACT alarm registered` for the **next dose**. That second line matters:
   a live rung occupies the medication's only alarm slot, so cancelling without
   rescheduling would leave it silent until the next sync.
 - No sticky appears.
+
+**2b also expects** `doseResolved: mirrored 1 of 1 server-side answer(s)` in
+logcat. If `retry ladder cancelled` appears without it, the ladder died for some
+other reason and the fix is not proven.
+
+**2c also expects** `[ScheduleSync] cancelled 1 retry ladder(s) for dose(s)
+already answered elsewhere` in the **webview console** (`chrome://inspect`),
+followed by the same `retry ladder cancelled` line in logcat. Honest bound: this
+only runs when the app is opened — until then the phone keeps re-asking, for at
+most the ladder's ≤30 minutes. That is the accepted cost of never polling.
 
 ## 3 · Airplane-mode rungs — **med B**
 
@@ -120,27 +141,72 @@ Let B ring, tap **Snooze 10 min** on the first ring.
 - logcat shows the snooze re-fire carrying **the original dose instant**.
 - After the re-prompt, if still unanswered, a **fresh** ladder starts.
 
-## 7 · The coalesced multi-dose ring — ⚠ NOT IN THIS BUILD
+## 7 · The coalesced multi-dose ring — **the acceptance test**
 
-**Skip this one.** Meds A and D at the same time will currently ring as **two
-separate notifications**, each with its own ladder, which is correct underneath
-but is not the single grouped ring specified. See the note below.
+Meds **A** and **D** already share a reminder time. Add two more at that same
+time so **four doses land on one instant** — the scenario the rewrite exists for,
+and the one that failed on 2026-08-14 with two doses fighting for the full screen
+while the other two sat as notifications nobody opened.
+
+**7a — the ring itself.** Let the shared time pass with the phone **locked**.
+
+**Pass:**
+- **ONE** notification, not four. Title reads **"Time for 4 medicines"**;
+  expanding it lists all four by name.
+- **ONE** full-screen alarm screen, listing four cards each with its own
+  Taken / Skip. Header reads `Dose due · <time>` with `4 medicines` beneath.
+- logcat: one `notification <id> posted for 4 dose(s) due <T>` and one
+  `coalesced 4 doses due <T> into one notification`. **The same notification id
+  for all four** — a second id means the grouping did not take.
+
+**7b — per-dose answering.** Tap **Taken** on the first card, **Skip** on the
+second.
+
+**Pass:**
+- Each answered card turns into `✓ Taken` / `✓ Skipped` **and stays on screen**.
+  The screen does NOT close.
+- The notification narrows to the two still outstanding.
+- The remaining two keep ringing.
+- Answering the last one shows **All done**, then the screen closes itself.
+
+**7c — dismissal marks only the remainder.** Repeat 7a, answer two, then press
+the power button (or just wait out the 60s of silence).
+
+**Pass:**
+- A missed notice for **2 medicines**, not four. The two you answered are absent.
+- Only those two keep laddering (`retry ladder started` / `advanced` for their
+  ids alone).
+- The 60s timer **re-arms on every answer** — it counts silence, not the age of
+  the screen, so answering four doses in turn cannot race it.
+
+**7d — a rung joins the group.** Let the group ring and answer nothing. When one
+medication's rung fires, it must land on the **same notification id**, and the
+screen must still list every unanswered dose at that instant.
+
+**Pass:** no second notification appears; the rung updates the existing one. This
+is the edge the whole derivation was built for — the group comes from the
+schedule, so a rung computes the same handful the first ring did.
+
+**7e — elderly asks one at a time.** Turn on elderly mode, **re-open the app once**
+so `syncSchedule` carries the flag (look for `elderly=true` on the
+`AlarmActivity shown` line), then repeat 7a.
+
+**Pass:**
+- **ONE** dose fills the screen at the original large size, with `1 of 4` under
+  the time.
+- Answering shows the confirmation, then the next dose appears.
+- All four are still outstanding underneath — only the presentation is
+  one-at-a-time.
+
+**7f — the single-dose alarm has NOT regressed.** Let med **C** ring on its own.
+
+**Pass:** identical to what you signed off on 2026-08-11 — big centred name,
+full-width `Taken`, `Skip` beneath it, `Snooze` smallest, and the buttons **low on
+the screen**. This is the regression risk of the whole rewrite: the single dose
+now renders through the same list the group does. If the buttons have drifted
+upward or the name has shrunk, report it before anything else.
 
 ---
-
-## What is NOT in this APK
-
-**The coalesced multi-dose ring.** Ladders are already independent in the
-scheduler — the part your spec says must stay that way — but the *presentation*
-still shows one notification per medication rather than one ring listing every
-unanswered dose from that scheduled time, with per-dose answers and elderly
-one-at-a-time.
-
-I stopped short of it deliberately. It is a substantial rewrite of
-`AlarmActivity` (472 lines) plus the notification builder, on the most
-safety-critical screen in the product, and doing it at the tail of a long
-session is how the alarm screen gets broken. Everything above is complete and
-provable tonight; the ring is its own pass with its own verification.
 
 ## If something fails
 

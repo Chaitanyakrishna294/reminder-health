@@ -240,6 +240,45 @@ are stale. Keep it updated when you add or move anything.
   - `buildGateQueue` (`lib/schedule/dose-attention.ts`) and `DayRail` are the two
     implementations. **If either ordering or grouping changes, change both**, or the app will
     ask about one dose while highlighting another.
+  - **THE NATIVE ALARM IS THE THIRD SURFACE, and it obeys the same rule (2026-08-14).** One
+    notification id per dose *instant*, one `singleInstance` `AlarmActivity` reading
+    `DosesAtInstant.rowsAt`, per-dose answering, the screen persisting until every dose is
+    answered or the screen is closed. `AlarmPrefs.elderly` (bridged from the web) is what makes
+    elderly ask one at a time there too.
+    - **The group is derived from the SCHEDULE, never from alarm state.** That is what makes a
+      retry rung, a rung rebuilt after a reboot, and the original ring all compute the same
+      group without knowing about each other. Asking "which alarms are pending" would be wrong
+      exactly when it matters — a rung races the original, and after a reboot nothing is pending
+      until `rescheduleAll` has run.
+    - **Closing the screen with doses unanswered marks ONLY those doses unattended.** Their
+      ladders keep running and their missed notice posts; the answered ones stay answered.
+    - **The alarm that rang is never swallowed.** The schedule decides the group, but a
+      medication edited out of that instant between registration and firing still gets asked —
+      `DosesAtInstant.mergeWithFallback`. A stale question can be answered Skip; a question
+      never asked has no move at all.
+- **A RETRY LADDER MUST DIE ON ANY RESOLVE THE DEVICE LEARNS ABOUT — from any surface, including
+  ones it was not part of.** The ladder is native (chained exact alarms), so cancellation is
+  native, and the choke point is `DoseActionQueue.record` — every answer routes through it and it
+  is what calls `cancelLadder`.
+  - Paid for 2026-08-14: that choke point only ever saw **native-originated** answers. A dose
+    marked SKIP from the app's own rail resolved on the server and the device never heard, so two
+    **critical** medications read as skipped everywhere on screen while the phone re-asked every
+    five minutes. Being chased for a dose you already dealt with is how people learn to ignore the
+    alarm — the exact opposite of what a retry ladder is for. The notification path had always
+    worked, which is what made the gap invisible.
+  - Fixed with `ScheduleBridge.doseResolved` (immediate, called from
+    `web/src/lib/reminder-events.ts` — the one function every web surface resolves through) plus
+    `getActiveLadders` reconciliation in `ScheduleSync` for answers the device was never part of,
+    i.e. **a caregiver resolving from their own phone**. See BRIDGE_CONTRACT.md §1b.
+  - **Report resolves through `record(alreadyOnServer = true)`, never straight to
+    `cancelLadder`.** An answer also has to leave the dose out of the coalesced alarm group,
+    narrow or clear the notification, and reach a visible alarm screen. A second cancellation
+    path covers the first of those and silently misses the rest — which is the same shape as the
+    bug it would be fixing.
+  - **Honest bound, do not overstate it:** reconciliation runs when the webview runs, so a
+    caregiver's remote answer can leave the phone re-asking until the app is next opened
+    (at most one ladder, ≤30 min). Closing that gap means the device polling the server, which is
+    forbidden and would break the offline guarantee the alarm core exists for.
 - Web deploys from **repo root**: `npx vercel deploy --prod --yes --scope chaitanya-krishnas-projects-397d3a53`. **The `--scope` is required** — without it the CLI returns `Not authorized` even though `vercel whoami` succeeds, because `.vercel/repo.json` pins an `orgId` that no longer resolves for the logged-in user. Root `.vercel/repo.json` maps the repo to project `reminder-health` with `directory: web`, so deploy from the ROOT, never from `web/`. Vercel ships the **working tree, not the commit** — check `git status` first, or uncommitted work goes to production too.
 - For nontrivial Next.js work, heed `web/AGENTS.md`: this Next 16 differs from training data; check `node_modules/next/dist/docs/`.
 - Exclude `.claude/worktrees/` from repo-wide greps (stale full checkout).
@@ -494,30 +533,14 @@ service). The design consequence is that **the notification must be fully answer
   `setAutoCancel(false)`) and stay until the dose is actually resolved. The missed fallback carries
   the same three buttons — it has to, since a persistent notification with no way to answer it is
   just a stuck notification.
-- **Android 14+ caveat:** a user can still *deliberately* dismiss an ongoing notification; the
-  platform stopped treating `setOngoing` as absolute. Accepted, not fought — the missed-dose
-  fallback and above all the **server-side escalation ladder** are the real backstop. A
-  notification the OS lets someone dismiss was never the last line of defence.
-
-**Alarm presentation: two shapes, both correct (confirmed on device 2026-08-11 — do not "fix").**
-Android decides how to present the dose alarm's full-screen intent:
-- phone **locked or idle** → the full-screen `AlarmActivity` takes over the screen;
-- phone **unlocked and in active use** → a **heads-up notification** instead (tapping it opens the
-  full alarm screen).
-
-That second case is Android deliberately not hijacking the screen of someone who is demonstrably
-already using their phone. It is correct and desirable. **Never attempt to override it** — the ways
-to do so are exactly the ones CLAUDE.md already forbids (`SYSTEM_ALERT_WINDOW`, a foreground
-service). The design consequence is that **the notification must be fully answerable on its own**:
-- **Taken / Skip / Snooze 10 min are action buttons on the notification itself**, handled by
-  `DoseActionReceiver` (a BroadcastReceiver — no UI opens) and routed through the *same*
-  `DoseActionQueue` as the full-screen buttons. Snooze does both halves: local re-registration
-  **and** `snooze_reminder_event`. Nobody should have to open a takeover screen to answer a dose
-  they are awake for.
-- Both the live alarm and the "Missed: take X" fallback are **persistent** (`setOngoing(true)` +
-  `setAutoCancel(false)`) and stay until the dose is actually resolved. The missed fallback carries
-  the same three buttons — it has to, since a persistent notification with no way to answer it is
-  just a stuck notification.
+- **A HANDFUL GETS ONE NOTIFICATION, not one per medicine (2026-08-14).** The id is derived from
+  the dose *instant*, so four medications at 12:00 update a single notification with a single
+  full-screen intent instead of racing to launch four alarm screens. A notification has three
+  action slots and a handful can have four doses, so the grouped one carries **Taken all · Open ·
+  Snooze**: "Taken all" is the one answer that is honest for a whole handful, "Open" is how you
+  answer them individually, and **Skip-all is deliberately not a one-tap on a lock screen** —
+  declining every medicine at once deserves the screen that shows you which ones. The single-dose
+  notification keeps Taken / Skip / Snooze exactly as before.
 - **Android 14+ caveat:** a user can still *deliberately* dismiss an ongoing notification; the
   platform stopped treating `setOngoing` as absolute. Accepted, not fought — the missed-dose
   fallback and above all the **server-side escalation ladder** are the real backstop. A

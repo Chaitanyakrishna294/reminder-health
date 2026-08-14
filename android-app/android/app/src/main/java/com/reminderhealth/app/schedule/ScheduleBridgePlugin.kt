@@ -84,6 +84,12 @@ class ScheduleBridgePlugin : Plugin() {
 
         val incomingUserId = call.getString("userId")
 
+        // The alarm screen is Kotlin and cannot read the web's UI mode, so the
+        // web sends it. Absent (an older deployed build) leaves the stored value
+        // alone rather than resetting someone to the standard screen — see
+        // [AlarmPrefs].
+        call.getBoolean("elderly")?.let { AlarmPrefs.setElderly(context, it) }
+
         scope.launch {
             val dao = ScheduleDatabase.getInstance(context).medicationDao()
 
@@ -301,6 +307,118 @@ class ScheduleBridgePlugin : Plugin() {
             }
             val result = JSObject()
             result.put("actions", arr)
+            call.resolve(result)
+        }
+    }
+
+    /**
+     * `doseResolved({ doses: [{ medicationId, scheduledFor, action }] })` — the
+     * webview telling the device about an answer the SERVER already has.
+     *
+     * **This is what kills a retry ladder for an in-app answer.** The rail, the
+     * dose gate and elderly mode all resolve straight to Supabase; before this
+     * existed, the device never heard, so `pending_retries` kept ringing every
+     * five minutes at a patient who had answered in the app minutes earlier —
+     * found on-device 2026-08-14 with two critical medications showing as
+     * skipped and still alarming. The notification path had always worked,
+     * which is exactly what made it look like the ladder was fine.
+     *
+     * Deliberately routed through [DoseActionQueue.record] with
+     * `alreadyOnServer = true` rather than calling `cancelLadder` directly.
+     * Cancelling the ladder is only one of the things an answer has to do — it
+     * also has to leave the dose out of the coalesced alarm group, clear or
+     * narrow the notification, and reach a visible alarm screen. A second
+     * cancellation path would have covered the first and quietly missed the
+     * rest.
+     *
+     * Idempotent: re-reporting a dose writes another already-synced row, which
+     * every reader treats the same as the first.
+     */
+    @PluginMethod
+    fun doseResolved(call: PluginCall) {
+        val doses = call.getArray("doses")
+        if (doses == null) {
+            call.reject("doseResolved requires a 'doses' array")
+            return
+        }
+
+        val parsed = try {
+            (0 until doses.length()).map { i ->
+                val d = doses.getJSONObject(i)
+                Triple(
+                    d.getLong("medicationId"),
+                    d.getString("scheduledFor"),
+                    d.stringOrNull("action") ?: DoseAction.ACTION_TAKEN,
+                )
+            }
+        } catch (e: Exception) {
+            call.reject("doseResolved payload parse error: ${e.message}")
+            return
+        }
+
+        scope.launch {
+            var applied = 0
+            parsed.forEach { (medicationId, scheduledFor, action) ->
+                // SNOOZE is not a resolve — it defers the question, so a ladder
+                // must not be cancelled by one arriving down this path.
+                val normalised = if (action == DoseAction.ACTION_SKIP) DoseAction.ACTION_SKIP else DoseAction.ACTION_TAKEN
+                val name = runCatching {
+                    ScheduleDatabase.getInstance(context).medicationDao().getById(medicationId)?.drugName
+                }.getOrNull() ?: "your medication"
+
+                val ok = runCatching {
+                    DoseActionQueue.record(
+                        context = context,
+                        medicationId = medicationId,
+                        drugName = name,
+                        scheduledFor = scheduledFor,
+                        action = normalised,
+                        alreadyOnServer = true,
+                    )
+                }.getOrDefault(false)
+                if (ok) applied++
+            }
+            Log.i(
+                AlarmScheduler.TAG,
+                "doseResolved: mirrored $applied of ${parsed.size} server-side answer(s); " +
+                    "any retry ladder for them is now cancelled",
+            )
+            val result = JSObject()
+            result.put("applied", applied)
+            call.resolve(result)
+        }
+    }
+
+    /**
+     * `getActiveLadders()` — every retry chain still in flight on this device.
+     *
+     * The webview uses it to reconcile: if a ladder is running for a dose the
+     * server already shows as resolved, the answer was made somewhere this
+     * device never saw — most often a CAREGIVER answering from their own phone —
+     * and it reports it back through [doseResolved].
+     *
+     * Asking the device first is what keeps that cheap. Ladders are rare (a dose
+     * has to have gone unanswered), so the reconciling query on the web runs
+     * almost never, and the common app-open does one bridge call and stops.
+     */
+    @PluginMethod
+    fun getActiveLadders(call: PluginCall) {
+        scope.launch {
+            val ladders = runCatching {
+                ScheduleDatabase.getInstance(context).pendingRetryDao().getAll()
+            }.getOrDefault(emptyList())
+
+            val arr = JSArray()
+            ladders.forEach { ladder ->
+                arr.put(
+                    JSObject().apply {
+                        put("medicationId", ladder.medicationId)
+                        put("scheduledFor", ladder.doseAt)
+                    },
+                )
+            }
+            val result = JSObject()
+            result.put("ladders", arr)
             call.resolve(result)
         }
     }

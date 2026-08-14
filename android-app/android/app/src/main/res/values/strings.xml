@@ -7,10 +7,40 @@
 
     <!-- Full-screen dose alarm (M2 step 4). Copy follows the Pillo teardown's
          zero-blame framing: the decline action is honest ("Skip"), never
-         guilt-worded. -->
+         guilt-worded, and no wording anywhere counts how many times someone has
+         been asked. -->
     <string name="alarm_taken">Taken</string>
     <string name="alarm_skip">Skip</string>
     <string name="alarm_snooze">Snooze 10 min</string>
     <string name="alarm_eyebrow_prefix">Dose due</string>
     <string name="alarm_photo_description">Photo from your care circle</string>
+
+    <!-- Coalesced ring (2026-08-14). Doses at the same instant are one handful,
+         presented together and answered one at a time. -->
+    <string name="alarm_title">Time to take %1$s</string>
+    <string name="alarm_title_retry">Still time to take %1$s</string>
+    <string name="alarm_group_title">Time for %1$d medicines</string>
+    <string name="alarm_missed_title">Missed: take %1$s</string>
+    <string name="alarm_missed_group_title">Missed: %1$d medicines</string>
+    <string name="alarm_tap_to_open">Tap to open Re-MIND-eЯ</string>
+    <string name="alarm_tap_to_record">Tap to record this dose</string>
+
+    <!-- Shown under the time when several doses share one instant. Plain count,
+         no urgency: it answers "how many am I looking at", nothing more. -->
+    <string name="alarm_group_count">%1$d medicines</string>
+    <!-- Elderly density: one question at a time, so the count becomes progress. -->
+    <string name="alarm_group_progress">%1$d of %2$d</string>
+
+    <!-- Answering a handful. "Taken all" is spelled out rather than reusing
+         "Taken", because on a group it is a claim about four medicines and the
+         person tapping it should be able to see that. -->
+    <string name="alarm_taken_all">Taken all</string>
+    <string name="alarm_open">Open</string>
+
+    <!-- Per-dose confirmation, left on screen so the handful can be checked off
+         and seen. The mark means "recorded" in all three cases. -->
+    <string name="alarm_recorded_taken">✓ Taken</string>
+    <string name="alarm_recorded_skipped">✓ Skipped</string>
+    <string name="alarm_recorded">✓ Recorded</string>
+    <string name="alarm_all_done">All done</string>
 </resources>

@@ -93,6 +93,33 @@ export interface PendingAction {
   syncError: string | null;
 }
 
+/**
+ * A dose the SERVER has already resolved, being reported back to the device.
+ *
+ * The device runs its own retry ladder — chained exact alarms that re-ask about
+ * an unanswered dose — and it cancels that ladder when it sees the answer. It
+ * sees answers made on the alarm screen and on the notification. It does NOT see
+ * an answer made in this webview, because that goes straight to Supabase.
+ *
+ * On 2026-08-14 that gap was live on a real device: two critical medications
+ * marked skipped in the app kept ringing every five minutes afterwards. This
+ * type is the report that closes it, and [notifyNativeDoseResolved] is called
+ * from the one place every web resolve passes through — see
+ * lib/reminder-events.ts.
+ */
+export interface ResolvedDose {
+  medicationId: number;
+  /** ISO-8601 UTC, the dose's own scheduled instant — the server's dose identity. */
+  scheduledFor: string;
+  action: 'TAKEN' | 'SKIP';
+}
+
+/** A retry chain still running on the device, from `getActiveLadders`. */
+export interface ActiveLadder {
+  medicationId: number;
+  scheduledFor: string;
+}
+
 /** Android hardware back button payload — see lib/native/app-bridge.ts. */
 export interface BackButtonEvent {
   /** Capacitor's own read of whether the webview has history to pop. */
@@ -126,7 +153,16 @@ declare global {
           syncSchedule: (options: {
             medications: MedicationPayload[];
             userId?: string;
+            elderly?: boolean;
           }) => Promise<{ synced: number; canScheduleExactAlarms: boolean }>;
+          /**
+           * Optional: an APK older than 2026-08-14 has neither. Every caller must
+           * treat their absence as "this device cannot be told", not as an error
+           * — `server.url` means the web and the APK ship separately and a device
+           * can be running either combination.
+           */
+          doseResolved?: (options: { doses: ResolvedDose[] }) => Promise<{ applied: number }>;
+          getActiveLadders?: () => Promise<{ ladders: ActiveLadder[] }>;
           clearSchedule: () => Promise<{
             cleared: boolean;
             syncedBeforeClear: number;
@@ -183,6 +219,15 @@ export async function getPendingNativeActions(): Promise<PendingAction[]> {
 export async function syncScheduleToNative(
   medications: MedicationPayload[],
   userId?: string,
+  /**
+   * Elderly mode, mirrored so the NATIVE alarm screen can honour it. The alarm
+   * is Kotlin and cannot read this webview's UI mode, and it is the one screen
+   * that has to work offline at 3am for the least technical user — so the
+   * choice travels, exactly as BRIDGE_CONTRACT.md requires for `language`.
+   * Elderly changes one thing there: a coalesced handful is asked about one dose
+   * at a time instead of as a list.
+   */
+  elderly?: boolean,
 ): Promise<{ synced: number; canScheduleExactAlarms: boolean } | null> {
   if (!isNativeApp()) return null;
   const bridge = window.Capacitor?.Plugins?.ScheduleBridge;
@@ -190,7 +235,50 @@ export async function syncScheduleToNative(
   // userId keys the native store to one identity. Without it, signing in as a
   // guest left the previous account's medications in place and ringing for
   // doses the current user doesn't have (found on-device 2026-08-11).
-  return bridge.syncSchedule({ medications, userId });
+  return bridge.syncSchedule({ medications, userId, elderly });
+}
+
+/**
+ * Tell the device about a dose THIS webview just resolved.
+ *
+ * Without it the device's retry ladder outlives the answer: the dose reads as
+ * taken everywhere on screen while the phone keeps re-asking about it every few
+ * minutes, which is the 2026-08-14 field bug. Native routes this through the
+ * same queue an alarm-screen tap uses, so the ladder is cancelled, the dose
+ * leaves the coalesced alarm group, and a visible alarm screen refreshes.
+ *
+ * Deliberately silent on every failure. A resolve has ALREADY succeeded on the
+ * server by the time this runs, so nothing here may turn a recorded dose into
+ * an error the patient sees — the worst case is a ladder that outlives the
+ * answer by one app-open, which the reconciliation in `schedule-sync` then
+ * clears.
+ */
+export async function notifyNativeDoseResolved(doses: ResolvedDose[]): Promise<void> {
+  if (!isNativeApp() || doses.length === 0) return;
+  const bridge = window.Capacitor?.Plugins?.ScheduleBridge;
+  if (!bridge?.doseResolved) return;
+  try {
+    await bridge.doseResolved({ doses });
+  } catch (err) {
+    console.error('[ScheduleBridge] doseResolved failed:', err);
+  }
+}
+
+/**
+ * Retry chains still running on this device. Empty outside the app, and on any
+ * APK that predates the call — both mean "nothing to reconcile".
+ */
+export async function getNativeActiveLadders(): Promise<ActiveLadder[]> {
+  if (!isNativeApp()) return [];
+  const bridge = window.Capacitor?.Plugins?.ScheduleBridge;
+  if (!bridge?.getActiveLadders) return [];
+  try {
+    const { ladders } = await bridge.getActiveLadders();
+    return ladders ?? [];
+  } catch (err) {
+    console.error('[ScheduleBridge] getActiveLadders failed:', err);
+    return [];
+  }
 }
 
 /**

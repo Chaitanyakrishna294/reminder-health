@@ -136,4 +136,54 @@ class DosesAtInstantTest {
         assertTrue(DosesAtInstant.hasDoseAt(twice, noonIst))
         assertFalse(DosesAtInstant.hasDoseAt(twice, Instant.parse("2026-08-14T05:30:00Z"))) // 11:00 IST
     }
+
+    // -- THE ALARM THAT RANG IS NEVER SWALLOWED ------------------------------
+    //
+    // The schedule decides the GROUP; the alarm that actually fired decides
+    // whether its own dose still gets asked. These two rules disagree exactly
+    // when a medication's reminder_times changed between the alarm being
+    // registered and it ringing — and the safe answer there is to ask a question
+    // that may be stale, never to show a silent screen.
+
+    private fun row(id: Long) = DoseRow(id, "Med$id", "1 tablet", null, null)
+
+    @Test
+    fun aFiredAlarmIsAddedBackWhenTheScheduleNoLongerKnowsAboutIt() {
+        // The schedule says nobody is due; the alarm says med 7 is. Ask.
+        val merged = DosesAtInstant.mergeWithFallback(emptyList(), emptySet(), row(7))
+        assertEquals(listOf(7L), merged.map { it.medicationId })
+    }
+
+    @Test
+    fun aFiredAlarmJoinsTheHandfulRatherThanReplacingIt() {
+        val merged = DosesAtInstant.mergeWithFallback(listOf(row(1), row(3)), emptySet(), row(2))
+        assertEquals(listOf(1L, 2L, 3L), merged.map { it.medicationId })
+    }
+
+    @Test
+    fun anAnsweredDoseIsNotResurrectedByItsOwnAlarm() {
+        // The patient answered on the notification; the ring that follows must
+        // not put the question back.
+        val merged = DosesAtInstant.mergeWithFallback(listOf(row(1)), setOf(7L), row(7))
+        assertEquals(listOf(1L), merged.map { it.medicationId })
+    }
+
+    @Test
+    fun aDoseAlreadyInTheGroupIsNotDuplicated() {
+        val merged = DosesAtInstant.mergeWithFallback(listOf(row(1), row(2)), emptySet(), row(2))
+        assertEquals(listOf(1L, 2L), merged.map { it.medicationId })
+    }
+
+    /** Test alarms have no row behind them by design, so they bypass the answered check. */
+    @Test
+    fun testAlarmsAlwaysRender() {
+        val test = DoseRow(-1L, "Test alarm", null, null, null)
+        assertEquals(listOf(-1L), DosesAtInstant.mergeWithFallback(emptyList(), setOf(-1L), test).map { it.medicationId })
+    }
+
+    @Test
+    fun noFallbackChangesNothing() {
+        val scheduled = listOf(row(4), row(9))
+        assertEquals(scheduled, DosesAtInstant.mergeWithFallback(scheduled, emptySet(), null))
+    }
 }

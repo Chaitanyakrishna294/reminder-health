@@ -32,15 +32,29 @@ class AlarmReceiver : BroadcastReceiver() {
             "ALARM FIRED for med $medicationId ($drugName) — scheduled for $scheduledFor, now ${Instant.now()}",
         )
 
+        val isRetry = intent.getBooleanExtra(AlarmScheduler.EXTRA_IS_RETRY, false)
+        val row = DoseRow(
+            medicationId = medicationId,
+            drugName = drugName,
+            doseLabel = doseLabel,
+            audioPath = intent.getStringExtra(AlarmScheduler.EXTRA_AUDIO_PATH),
+            photoPath = intent.getStringExtra(AlarmScheduler.EXTRA_PHOTO_PATH),
+        )
+
+        // SYNCHRONOUSLY, with the one dose this alarm carried. The store read
+        // that finds the rest of the handful happens below, off the main thread —
+        // and the alarm must never wait on a database to start ringing. Both
+        // writes land on the same notification id, so what the patient sees is
+        // one notification filling in, never two arriving.
         DoseNotifications.showDoseReminder(
             context = context,
             medicationId = medicationId,
             drugName = drugName,
             doseLabel = doseLabel,
             scheduledForIso = scheduledFor,
-            audioPath = intent.getStringExtra(AlarmScheduler.EXTRA_AUDIO_PATH),
-            photoPath = intent.getStringExtra(AlarmScheduler.EXTRA_PHOTO_PATH),
-            isRetry = intent.getBooleanExtra(AlarmScheduler.EXTRA_IS_RETRY, false),
+            audioPath = row.audioPath,
+            photoPath = row.photoPath,
+            isRetry = isRetry,
         )
 
         if (medicationId <= 0L) {
@@ -56,6 +70,24 @@ class AlarmReceiver : BroadcastReceiver() {
         val pending = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
+                /*
+                 * WIDEN THE RING TO THE WHOLE HANDFUL.
+                 *
+                 * Four medications at 12:00 fire as four separate alarms
+                 * milliseconds apart. Each one arrives here knowing only its own
+                 * dose, and each asks the SCHEDULE who else is due at that
+                 * instant — so the first alarm to land already names all four,
+                 * without waiting for the other three to fire. That is why the
+                 * group is derived from reminder_times rather than from which
+                 * alarms happen to be pending: a retry rung, a rung rebuilt after
+                 * a reboot, and the original ring all compute the same group.
+                 *
+                 * Deliberately after the synchronous notify() above, so a slow or
+                 * failed store read can delay the coalescing but never the alarm.
+                 */
+                runCatching { DoseNotifications.widenToGroup(context, scheduledFor, row, isRetry) }
+                    .onFailure { Log.w(AlarmScheduler.TAG, "could not coalesce the doses due $scheduledFor", it) }
+
                 // Any pending snooze for this dose has now been delivered — this
                 // IS the re-prompt. Clearing it before rescheduling matters: a
                 // stale row would make rescheduleAll try to re-register a snooze
@@ -108,17 +140,12 @@ class AlarmReceiver : BroadcastReceiver() {
                         }
 
                         // Ladder exhausted (or none configured). Leave the
-                        // honest record and put the next dose back.
+                        // honest record and put the next dose back. The notice
+                        // covers whatever is still unanswered at this instant —
+                        // it reads the group itself, so four exhausted ladders
+                        // leave one notice rather than four.
                         if (doseAt != null) {
-                            DoseNotifications.showMissedDose(
-                                context = context,
-                                medicationId = medicationId,
-                                drugName = drugName,
-                                doseLabel = doseLabel,
-                                scheduledForIso = scheduledFor,
-                                audioPath = intent.getStringExtra(AlarmScheduler.EXTRA_AUDIO_PATH),
-                                photoPath = intent.getStringExtra(AlarmScheduler.EXTRA_PHOTO_PATH),
-                            )
+                            DoseNotifications.showMissedGroup(context, scheduledFor, row)
                         }
                         // From "now", so the dose that just fired is behind us
                         // and this lands on the following one.

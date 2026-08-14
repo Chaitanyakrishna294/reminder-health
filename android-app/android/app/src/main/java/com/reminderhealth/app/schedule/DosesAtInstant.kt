@@ -1,7 +1,32 @@
 package com.reminderhealth.app.schedule
 
+import android.util.Log
 import java.time.Instant
 import java.time.ZoneId
+
+/**
+ * One dose as the alarm surfaces need it: enough to name it, say what to take,
+ * and personalise the ring. Deliberately NOT [Medication] — a test alarm and an
+ * alarm whose medication has since been edited both have to render, and neither
+ * has a row to hand.
+ */
+data class DoseRow(
+    val medicationId: Long,
+    val drugName: String,
+    val doseLabel: String?,
+    val audioPath: String?,
+    val photoPath: String?,
+) {
+    companion object {
+        fun of(medication: Medication): DoseRow = DoseRow(
+            medicationId = medication.id,
+            drugName = medication.drugName,
+            doseLabel = AlarmScheduler.doseLabelFor(medication),
+            audioPath = medication.alarmAudioPath,
+            photoPath = medication.alarmPhotoPath,
+        )
+    }
+}
 
 /**
  * WHICH MEDICATIONS ARE DUE AT ONE INSTANT — the coalescing question.
@@ -89,5 +114,69 @@ object DosesAtInstant {
             .getOrDefault(emptyList())
             .toSet()
         return unanswered(db.medicationDao().getAll(), instant, answered)
+    }
+
+    /**
+     * THE ALARM THAT RANG IS NEVER SWALLOWED — the safety rule on top of the
+     * derivation.
+     *
+     * [unanswered] asks the schedule, which is right for coalescing and wrong as
+     * the last word: a medication whose `reminder_times` were edited between the
+     * alarm being registered and it firing no longer "has a dose" at this
+     * instant, so a screen built purely from the schedule would show nothing and
+     * the ring would vanish. The registered alarm is evidence in its own right,
+     * so the dose it carries is added back unless it has actually been answered.
+     *
+     * Errs toward asking a question that may be stale rather than silently
+     * dropping one. A patient who is asked about a dose they no longer take can
+     * say Skip; a patient who is never asked has no move at all.
+     *
+     * Test alarms (`medicationId <= 0`, see `scheduleTestAlarm`) have no row
+     * behind them by design and are always kept.
+     */
+    fun mergeWithFallback(
+        scheduled: List<DoseRow>,
+        answeredIds: Set<Long>,
+        fallback: DoseRow?,
+    ): List<DoseRow> {
+        if (fallback == null) return scheduled
+        if (fallback.medicationId > 0L) {
+            if (fallback.medicationId in answeredIds) return scheduled
+            if (scheduled.any { it.medicationId == fallback.medicationId }) return scheduled
+        }
+        return (scheduled + fallback).sortedBy { it.medicationId }
+    }
+
+    /**
+     * Every dose still waiting at [instantIso], ready to render.
+     *
+     * The single entry point for both alarm surfaces — the full-screen screen and
+     * the notification — so neither can grow its own idea of who is being asked.
+     *
+     * @param fallback the dose the firing alarm itself carried; see
+     *   [mergeWithFallback]. A store read that fails outright degrades to this
+     *   rather than to nothing.
+     */
+    suspend fun rowsAt(
+        context: android.content.Context,
+        instantIso: String?,
+        fallback: DoseRow? = null,
+    ): List<DoseRow> {
+        val instant = instantIso?.let { runCatching { Instant.parse(it) }.getOrNull() }
+        if (instant == null) return listOfNotNull(fallback)
+
+        val read = runCatching {
+            val db = ScheduleDatabase.getInstance(context)
+            val answered = db.doseActionDao().answeredMedicationIdsAt(instantIso).toSet()
+            val scheduled = unanswered(db.medicationDao().getAll(), instant, answered).map { DoseRow.of(it) }
+            scheduled to answered
+        }.getOrElse {
+            // The store is how this device knows anything. If it cannot be read
+            // the alarm still has to ring for the dose in hand.
+            Log.e(AlarmScheduler.TAG, "could not read the dose group at $instantIso; using the alarm's own dose", it)
+            return listOfNotNull(fallback)
+        }
+
+        return mergeWithFallback(read.first, read.second, fallback)
     }
 }

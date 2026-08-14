@@ -3,12 +3,90 @@
 import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { useUiMode } from '@/context/ui-mode-context';
 import {
+  getNativeActiveLadders,
   isNativeApp,
+  notifyNativeDoseResolved,
   setNativeSession,
   syncScheduleToNative,
   type MedicationPayload,
+  type ResolvedDose,
 } from '@/lib/native/schedule-bridge';
+import type { SupabaseClient } from '@supabase/supabase-js';
+
+/**
+ * RECONCILE RETRY LADDERS AGAINST THE SERVER.
+ *
+ * The device cancels a retry ladder when it sees the dose answered, and it sees
+ * answers made on this device — the alarm screen, the notification, and (since
+ * 2026-08-14) this webview, which reports them through `doseResolved`. What it
+ * cannot see is an answer made somewhere else entirely: a CAREGIVER resolving
+ * the dose from their own phone, or the patient answering on the web while this
+ * phone was asleep. Nothing on this device was involved, so nothing told it.
+ *
+ * This is the catch-all. It asks native which ladders are still running, asks
+ * the server whether those doses are in fact resolved, and reports back the ones
+ * that are.
+ *
+ * **Ladder-first, deliberately.** A ladder only exists for a dose that went
+ * unanswered past its time, which is rare, so the usual app-open makes one cheap
+ * bridge call, gets an empty list, and stops — no query at all. Querying the
+ * server first would have cost a round trip on every navigation to find nothing.
+ *
+ * The bound worth being honest about: this runs when the webview runs. A ladder
+ * is at most 30 minutes long (the escalation clamp), so a caregiver's remote
+ * answer can still leave the phone re-asking until the app is next opened. The
+ * alternative is the device polling the server, which CLAUDE.md forbids and
+ * which would break the offline guarantee the alarm core is built on.
+ */
+async function reconcileLadders(supabase: SupabaseClient): Promise<number> {
+  const ladders = await getNativeActiveLadders();
+  if (ladders.length === 0) return 0;
+
+  const instants = ladders.map((l) => Date.parse(l.scheduledFor)).filter((n) => !Number.isNaN(n));
+  if (instants.length === 0) return 0;
+
+  const { data, error } = await supabase
+    .from('reminder_events')
+    .select('medication_id, scheduled_for, reminder_status')
+    .in('medication_id', ladders.map((l) => l.medicationId))
+    .gte('scheduled_for', new Date(Math.min(...instants)).toISOString())
+    .lte('scheduled_for', new Date(Math.max(...instants)).toISOString());
+
+  if (error || !data) {
+    if (error) console.error('[ScheduleSync] ladder reconciliation query failed:', error);
+    return 0;
+  }
+
+  const resolved: ResolvedDose[] = [];
+  for (const ladder of ladders) {
+    const at = Date.parse(ladder.scheduledFor);
+    // Matched on the INSTANT, not on the string. Native sends its own ISO-8601
+    // ("...T06:30:00Z") and PostgREST renders timestamptz differently
+    // ("...T06:30:00+00:00"); the same moment, two spellings.
+    const event = data.find(
+      (e) => e.medication_id === ladder.medicationId && Date.parse(e.scheduled_for) === at,
+    );
+    if (event?.reminder_status === 'TAKEN' || event?.reminder_status === 'SKIPPED') {
+      resolved.push({
+        medicationId: ladder.medicationId,
+        // The string NATIVE gave us — that is the key its own store and its
+        // pending_retries row are written under.
+        scheduledFor: ladder.scheduledFor,
+        action: event.reminder_status === 'TAKEN' ? 'TAKEN' : 'SKIP',
+      });
+    }
+  }
+
+  if (resolved.length > 0) {
+    await notifyNativeDoseResolved(resolved);
+    console.log(
+      `[ScheduleSync] cancelled ${resolved.length} retry ladder(s) for dose(s) already answered elsewhere`,
+    );
+  }
+  return resolved.length;
+}
 
 /**
  * ORDERING CONSTRAINT — APPLY THE MIGRATION BEFORE DEPLOYING THIS.
@@ -50,6 +128,10 @@ const MEDICATION_COLUMNS =
 export default function ScheduleSync() {
   const pathname = usePathname();
   const router = useRouter();
+  // Mirrored to native so the KOTLIN alarm screen asks one dose at a time in
+  // elderly mode. It cannot read this context — it is a different process with
+  // no webview running — so the value has to travel over the bridge.
+  const { isElderly } = useUiMode();
 
   useEffect(() => {
     if (!isNativeApp()) return;
@@ -106,6 +188,17 @@ export default function ScheduleSync() {
 
       if (cancelled) return;
 
+      // Before anything else: a ladder still ringing for a dose somebody has
+      // already answered is the loudest wrong thing this device can do.
+      try {
+        const cancelledLadders = await reconcileLadders(supabase);
+        if (cancelledLadders > 0 && !cancelled) router.refresh();
+      } catch (err) {
+        console.error('[ScheduleSync] ladder reconciliation failed:', err);
+      }
+
+      if (cancelled) return;
+
       const { data, error } = await supabase.from('medications').select(MEDICATION_COLUMNS);
 
       if (cancelled) return;
@@ -137,11 +230,11 @@ export default function ScheduleSync() {
       }));
 
       try {
-        const result = await syncScheduleToNative(medications, session?.user.id);
+        const result = await syncScheduleToNative(medications, session?.user.id, isElderly);
         if (cancelled) return;
         console.log(
           `[ScheduleSync] synced ${medications.length} medication(s) to the native store` +
-            ` (exact alarms allowed: ${result?.canScheduleExactAlarms})`,
+            ` (exact alarms allowed: ${result?.canScheduleExactAlarms}, elderly: ${isElderly})`,
         );
       } catch (err) {
         console.error('[ScheduleSync] syncSchedule failed:', err);
@@ -163,8 +256,13 @@ export default function ScheduleSync() {
     // stable, and listing it invites a future lint autofix to add something that
     // is not — which would re-subscribe the visibility listener and re-run the
     // whole sync on every render.
+    //
+    // `isElderly` IS one: switching to elderly mode has to reach the native
+    // alarm screen straight away, not at the next navigation. Someone who turns
+    // it on is telling us the current presentation is too much for them, and the
+    // alarm is the screen where that matters most.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname]);
+  }, [pathname, isElderly]);
 
   return null;
 }
