@@ -98,6 +98,12 @@
             android:excludeFromRecents="true"
             android:taskAffinity=""
             android:theme="@style/AlarmTheme" />
+
+        <!-- Water nudges. NOT exported: the "+1 cup" action is an in-app signal,
+             and an exported receiver would let any app inflate someone's count. -->
+        <receiver
+            android:name=".schedule.WaterActionReceiver"
+            android:exported="false" />
     </application>
 
     <!-- Permissions -->

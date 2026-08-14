@@ -10,10 +10,13 @@ import {
   notifyNativeDoseResolved,
   setNativeSession,
   syncScheduleToNative,
+  syncWaterToNative,
+  getNativeWaterCount,
   type MedicationPayload,
   type ResolvedDose,
 } from '@/lib/native/schedule-bridge';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { localDayKey, minutesOfDay, waterSchedule } from '@/lib/water/hydration';
 
 /**
  * RECONCILE RETRY LADDERS AGAINST THE SERVER.
@@ -256,6 +259,57 @@ export default function ScheduleSync() {
         active: row.active,
         medicationReason: row.medication_reason,
       }));
+
+      /*
+       * WATER — its own try, and last, because it is the quiet tier: a hydration
+       * problem must never stop the medication schedule reaching the alarm core.
+       *
+       * The WEB computes the nudge times, including dropping the ones that clash
+       * with a dose, so the settings preview and the phone cannot disagree about
+       * when reminders arrive. Native only picks the next one.
+       */
+      if (session?.user.id) {
+        try {
+          const { data: w } = await supabase
+            .from('water_settings')
+            .select('enabled, goal_cups, window_start, window_end')
+            .eq('user_id', session.user.id)
+            .maybeSingle();
+
+          if (w?.enabled) {
+            const doseTimes = (data ?? []).flatMap((m) => m.reminder_times ?? []);
+            const times = waterSchedule({
+              startHhmm: String(w.window_start ?? '08:00').slice(0, 5),
+              endHhmm: String(w.window_end ?? '21:00').slice(0, 5),
+              goalCups: w.goal_cups ?? 8,
+              doseTimes,
+            });
+            // The device counts cups too (the notification's Taken), so take the
+            // larger of the two only HERE, on the way in: this is a merge of two
+            // independent tallies, not a conflict between two edits of one.
+            // Undo still wins everywhere it matters, because it writes the row.
+            const deviceCups = (await getNativeWaterCount()) ?? 0;
+            const { data: log } = await supabase
+              .from('water_logs')
+              .select('cups')
+              .eq('user_id', session.user.id)
+              .eq('day', localDayKey())
+              .maybeSingle();
+            const cupsToday = Math.max(deviceCups, log?.cups ?? 0);
+
+            await syncWaterToNative({
+              enabled: true,
+              goalCups: w.goal_cups ?? 8,
+              cupsToday,
+              nudgeMinutes: times.map((t) => minutesOfDay(t) ?? 0).filter((n) => n > 0),
+            });
+          } else {
+            await syncWaterToNative({ enabled: false, goalCups: 0, cupsToday: 0, nudgeMinutes: [] });
+          }
+        } catch {
+          // Not applied yet, or offline. Water simply does not nudge.
+        }
+      }
 
       try {
         const result = await syncScheduleToNative(medications, session?.user.id, isElderly, ringSeconds);
