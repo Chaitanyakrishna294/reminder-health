@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/client';
 import { useUiMode } from '@/context/ui-mode-context';
+import { useLanguage } from '@/context/language-context';
 import { HeartPulse, Save, Upload, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'UNKNOWN'] as const;
@@ -73,6 +74,16 @@ function computeBmi(h: number | null, w: number | null): string | null {
 export default function MedicalProfileClientView({ userId, fullName, email, initial, initialAvatarUrl }: Props) {
   const supabase = createClient();
   const { isElderly } = useUiMode();
+  const { t } = useLanguage();
+  // LABEL translated, stored VALUE untouched. `blood_group` is a zod enum over the
+  // English spellings and gender is persisted exactly as listed, so translating the
+  // option's value would fail validation and corrupt existing profiles. Same rule as
+  // `units` — see lib/i18n/format.ts.
+  const genderLabel = (g: string) =>
+    g === 'Male' ? t.profile.genderMale
+    : g === 'Female' ? t.profile.genderFemale
+    : g === 'Other' ? t.profile.genderOther
+    : t.profile.genderPreferNotToSay;
 
   const [dob, setDob] = useState(initial?.date_of_birth ?? '');
   const [gender, setGender] = useState(initial?.gender ?? '');
@@ -106,11 +117,11 @@ export default function MedicalProfileClientView({ userId, fullName, email, init
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      setError('Please choose an image file for your photo.');
+      setError(t.profile.errImageFile);
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      setError('Photo must be under 5 MB.');
+      setError(t.profile.errPhotoSize);
       return;
     }
     setUploading(true);
@@ -144,7 +155,7 @@ export default function MedicalProfileClientView({ userId, fullName, email, init
       emergency_contact_phone: ecPhone || null,
     });
     if (!parsed.success) {
-      setError('Please check the values entered (height/weight must be positive numbers).');
+      setError(t.profile.errValues);
       return;
     }
 
@@ -195,8 +206,8 @@ export default function MedicalProfileClientView({ userId, fullName, email, init
           <HeartPulse className="w-6 h-6" />
         </div>
         <div>
-          <h1 className={`font-black text-foreground ${isElderly ? 'text-3xl' : 'text-xl'}`}>Medical Profile</h1>
-          <p className="text-xs text-muted-foreground">Your medical identity card, used for reminders and emergencies.</p>
+          <h1 className={`font-black text-foreground ${isElderly ? 'text-3xl' : 'text-xl'}`}>{t.profile.title}</h1>
+          <p className="text-xs text-muted-foreground">{t.profile.subtitle}</p>
         </div>
       </div>
 
@@ -207,18 +218,18 @@ export default function MedicalProfileClientView({ userId, fullName, email, init
       )}
       {success && (
         <div className="bg-success/10 text-success text-sm p-3 rounded-2xl border border-success/20 flex items-start gap-2">
-          <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" /> <span>Medical profile saved.</span>
+          <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" /> <span>{t.profile.saved}</span>
         </div>
       )}
 
       {/* Personal Information */}
       <div className={card}>
-        <h3 className={sectionTitle}>Personal Information</h3>
+        <h3 className={sectionTitle}>{t.profile.sectionPersonal}</h3>
         <div className="flex items-center gap-4">
           <div className="w-20 h-20 rounded-full bg-primary/10 border border-primary/20 overflow-hidden flex items-center justify-center shrink-0">
             {avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={avatarUrl} alt="Profile photo" className="w-full h-full object-cover" />
+              <img src={avatarUrl} alt={t.profile.photoAlt} className="w-full h-full object-cover" />
             ) : (
               <span className="text-primary font-black text-xl">{fullName.substring(0, 2).toUpperCase()}</span>
             )}
@@ -242,15 +253,15 @@ export default function MedicalProfileClientView({ userId, fullName, email, init
         </label>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <label className="block">
-            <span className={label}>Full Name</span>
+            <span className={label}>{t.profile.fullName}</span>
             <input className={`${input} opacity-70`} value={fullName} disabled readOnly />
           </label>
           <label className="block">
-            <span className={label}>Email</span>
+            <span className={label}>{t.profile.email}</span>
             <input className={`${input} opacity-70`} value={email} disabled readOnly />
           </label>
           <label className="block">
-            <span className={label}>Date of Birth</span>
+            <span className={label}>{t.profile.dob}</span>
             <input type="date" className={input} value={dob} onChange={(e) => setDob(e.target.value)} />
           </label>
           <label className="block">
@@ -258,10 +269,10 @@ export default function MedicalProfileClientView({ userId, fullName, email, init
             <input className={`${input} opacity-70`} value={age !== null ? `${age} years` : '—'} disabled readOnly />
           </label>
           <label className="block">
-            <span className={label}>Gender</span>
+            <span className={label}>{t.profile.gender}</span>
             <select className={input} value={gender} onChange={(e) => setGender(e.target.value)}>
-              <option value="">Select…</option>
-              {GENDERS.map((g) => <option key={g} value={g}>{g}</option>)}
+              <option value="">{t.profile.selectPlaceholder}</option>
+              {GENDERS.map((g) => <option key={g} value={g}>{genderLabel(g)}</option>)}
             </select>
           </label>
         </div>
@@ -269,25 +280,25 @@ export default function MedicalProfileClientView({ userId, fullName, email, init
 
       {/* Medical Identity */}
       <div className={card}>
-        <h3 className={sectionTitle}>Medical Identity</h3>
+        <h3 className={sectionTitle}>{t.profile.sectionIdentity}</h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <label className="block">
-            <span className={label}>Blood Group</span>
+            <span className={label}>{t.profile.bloodGroup}</span>
             <select className={input} value={bloodGroup} onChange={(e) => setBloodGroup(e.target.value)}>
               <option value="">—</option>
-              {BLOOD_GROUPS.map((b) => <option key={b} value={b}>{b}</option>)}
+              {BLOOD_GROUPS.map((b) => <option key={b} value={b}>{b === 'UNKNOWN' ? t.profile.bloodUnknown : b}</option>)}
             </select>
           </label>
           <label className="block">
-            <span className={label}>Height (cm)</span>
+            <span className={label}>{t.profile.heightCm}</span>
             <input type="number" className={input} value={height} onChange={(e) => setHeight(e.target.value)} />
           </label>
           <label className="block">
-            <span className={label}>Weight (kg)</span>
+            <span className={label}>{t.profile.weightKg}</span>
             <input type="number" className={input} value={weight} onChange={(e) => setWeight(e.target.value)} />
           </label>
           <label className="block">
-            <span className={label}>BMI (auto)</span>
+            <span className={label}>{t.profile.bmiAuto}</span>
             <input className={`${input} opacity-70`} value={bmi ?? '—'} disabled readOnly />
           </label>
         </div>
@@ -295,62 +306,62 @@ export default function MedicalProfileClientView({ userId, fullName, email, init
 
       {/* Health Information */}
       <div className={card}>
-        <h3 className={sectionTitle}>Health Information</h3>
-        <p className="text-xs text-muted-foreground -mt-2">Separate multiple entries with commas.</p>
+        <h3 className={sectionTitle}>{t.profile.sectionHealth}</h3>
+        <p className="text-xs text-muted-foreground -mt-2">{t.profile.separateWithCommas}</p>
         <div className="grid grid-cols-1 gap-4">
           <label className="block">
-            <span className={label}>Drug Allergies</span>
-            <input className={input} value={drugAllergies} onChange={(e) => setDrugAllergies(e.target.value)} placeholder="Penicillin, Aspirin" />
+            <span className={label}>{t.profile.drugAllergies}</span>
+            <input className={input} value={drugAllergies} onChange={(e) => setDrugAllergies(e.target.value)} placeholder={t.profile.drugAllergiesPlaceholder} />
           </label>
           <label className="block">
-            <span className={label}>Food Allergies</span>
-            <input className={input} value={foodAllergies} onChange={(e) => setFoodAllergies(e.target.value)} placeholder="Peanuts, Shellfish" />
+            <span className={label}>{t.profile.foodAllergies}</span>
+            <input className={input} value={foodAllergies} onChange={(e) => setFoodAllergies(e.target.value)} placeholder={t.profile.foodAllergiesPlaceholder} />
           </label>
           <label className="block">
-            <span className={label}>Other Allergies</span>
-            <input className={input} value={otherAllergies} onChange={(e) => setOtherAllergies(e.target.value)} placeholder="Latex, Pollen" />
+            <span className={label}>{t.profile.otherAllergies}</span>
+            <input className={input} value={otherAllergies} onChange={(e) => setOtherAllergies(e.target.value)} placeholder={t.profile.otherAllergiesPlaceholder} />
           </label>
           <label className="block">
-            <span className={label}>Chronic Conditions</span>
-            <input className={input} value={conditions} onChange={(e) => setConditions(e.target.value)} placeholder="Diabetes, Hypertension, Asthma" />
+            <span className={label}>{t.profile.chronicConditions}</span>
+            <input className={input} value={conditions} onChange={(e) => setConditions(e.target.value)} placeholder={t.profile.chronicConditionsPlaceholder} />
           </label>
         </div>
       </div>
 
       {/* Emergency Information */}
       <div className={card}>
-        <h3 className={sectionTitle}>Emergency Information</h3>
+        <h3 className={sectionTitle}>{t.profile.sectionEmergency}</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <label className="block">
-            <span className={label}>Emergency Contact</span>
-            <input className={input} value={ecName} onChange={(e) => setEcName(e.target.value)} placeholder="Name" />
+            <span className={label}>{t.profile.emergencyContact}</span>
+            <input className={input} value={ecName} onChange={(e) => setEcName(e.target.value)} placeholder={t.profile.emergencyContactPlaceholder} />
           </label>
           <label className="block">
-            <span className={label}>Emergency Phone</span>
+            <span className={label}>{t.profile.emergencyPhone}</span>
             <input className={input} value={ecPhone} onChange={(e) => setEcPhone(e.target.value)} placeholder="+91…" />
           </label>
           <label className="block">
-            <span className={label}>Relationship</span>
-            <input className={input} value={ecRel} onChange={(e) => setEcRel(e.target.value)} placeholder="Spouse, Son…" />
+            <span className={label}>{t.profile.relationship}</span>
+            <input className={input} value={ecRel} onChange={(e) => setEcRel(e.target.value)} placeholder={t.profile.relationshipPlaceholder} />
           </label>
         </div>
       </div>
 
       {/* Medical Preferences */}
       <div className={card}>
-        <h3 className={sectionTitle}>Medical Preferences</h3>
+        <h3 className={sectionTitle}>{t.profile.sectionPreferences}</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <label className="block">
-            <span className={label}>Primary Language</span>
-            <input className={input} value={primaryLang} onChange={(e) => setPrimaryLang(e.target.value)} placeholder="English" />
+            <span className={label}>{t.profile.primaryLanguage}</span>
+            <input className={input} value={primaryLang} onChange={(e) => setPrimaryLang(e.target.value)} placeholder={t.profile.languagePlaceholder} />
           </label>
           <label className="block">
-            <span className={label}>Preferred Reminder Language</span>
-            <input className={input} value={reminderLang} onChange={(e) => setReminderLang(e.target.value)} placeholder="English" />
+            <span className={label}>{t.profile.reminderLanguage}</span>
+            <input className={input} value={reminderLang} onChange={(e) => setReminderLang(e.target.value)} placeholder={t.profile.languagePlaceholder} />
           </label>
           <label className="block">
-            <span className={label}>Time Zone</span>
-            <input className={input} value={timezone} onChange={(e) => setTimezone(e.target.value)} placeholder="Asia/Kolkata" />
+            <span className={label}>{t.profile.timeZone}</span>
+            <input className={input} value={timezone} onChange={(e) => setTimezone(e.target.value)} placeholder={t.profile.timeZonePlaceholder} />
           </label>
         </div>
       </div>

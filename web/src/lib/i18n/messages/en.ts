@@ -176,6 +176,78 @@ export interface Messages {
     errChooseFileFirst: string;
     errTitleForRecord: string;
   };
+  /**
+   * MEDICAL PROFILE. The placeholders here are hints WE wrote, so they translate —
+   * with two deliberate exceptions, because "example" and "safe to translate" are
+   * not the same question:
+   *
+   * · `drugAllergiesPlaceholder` keeps its drug names in Latin ("Penicillin,
+   *   Aspirin"). Transliterating them would look helpful and teach the user to
+   *   type a spelling that matches nothing on the box, nothing in the medication
+   *   catalog, and nothing a pharmacist reads. Same rule as medicine names
+   *   everywhere else in this app — see lib/i18n/format.ts.
+   * · `timeZonePlaceholder` is an IANA identifier. A machine token, not a word.
+   *
+   * Foods and conditions DO translate: they are free text nobody matches against
+   * a catalog, and "peanuts" is genuinely more useful to a Hindi reader as
+   * मूंगफली.
+   */
+  profile: {
+    title: string;
+    subtitle: string;
+    saved: string;
+    sectionPersonal: string;
+    sectionIdentity: string;
+    sectionHealth: string;
+    sectionEmergency: string;
+    sectionPreferences: string;
+    photoAlt: string;
+    fullName: string;
+    email: string;
+    dob: string;
+    gender: string;
+    selectPlaceholder: string;
+    bloodGroup: string;
+    heightCm: string;
+    weightKg: string;
+    bmiAuto: string;
+    separateWithCommas: string;
+    drugAllergies: string;
+    /** Latin drug names on purpose — see the note above. */
+    drugAllergiesPlaceholder: string;
+    foodAllergies: string;
+    foodAllergiesPlaceholder: string;
+    otherAllergies: string;
+    otherAllergiesPlaceholder: string;
+    chronicConditions: string;
+    chronicConditionsPlaceholder: string;
+    emergencyContact: string;
+    emergencyContactPlaceholder: string;
+    emergencyPhone: string;
+    relationship: string;
+    relationshipPlaceholder: string;
+    primaryLanguage: string;
+    reminderLanguage: string;
+    languagePlaceholder: string;
+    timeZone: string;
+    /** IANA identifier. Not translated. */
+    timeZonePlaceholder: string;
+    errImageFile: string;
+    errPhotoSize: string;
+    errValues: string;
+    /**
+     * Gender and blood-group options render as `<option value={x}>{x}</option>` —
+     * the STORED VALUE and the visible label are the same string today, and
+     * `blood_group` is a zod enum validated against the English spellings. So the
+     * label translates and the value must not, exactly like `units`. A+/O- are
+     * international medical codes and never translate; only UNKNOWN is a word.
+     */
+    genderMale: string;
+    genderFemale: string;
+    genderOther: string;
+    genderPreferNotToSay: string;
+    bloodUnknown: string;
+  };
   greeting: {
     morning: string;
     afternoon: string;
@@ -348,6 +420,53 @@ const en: Messages = {
     errDatabase: 'Could not save. {detail}',
     errChooseFileFirst: 'Please choose a file before continuing.',
     errTitleForRecord: 'Please add a title for this record.',
+  },
+  profile: {
+    title: 'Medical profile',
+    subtitle: 'Your medical identity card, used for reminders and emergencies.',
+    saved: 'Medical profile saved.',
+    sectionPersonal: 'Personal information',
+    sectionIdentity: 'Medical identity',
+    sectionHealth: 'Health information',
+    sectionEmergency: 'Emergency information',
+    sectionPreferences: 'Medical preferences',
+    photoAlt: 'Profile photo',
+    fullName: 'Full name',
+    email: 'Email',
+    dob: 'Date of birth',
+    gender: 'Gender',
+    selectPlaceholder: 'Select…',
+    bloodGroup: 'Blood group',
+    heightCm: 'Height (cm)',
+    weightKg: 'Weight (kg)',
+    bmiAuto: 'BMI (automatic)',
+    separateWithCommas: 'Separate multiple entries with commas.',
+    drugAllergies: 'Drug allergies',
+    drugAllergiesPlaceholder: 'Penicillin, Aspirin',
+    foodAllergies: 'Food allergies',
+    foodAllergiesPlaceholder: 'Peanuts, shellfish',
+    otherAllergies: 'Other allergies',
+    otherAllergiesPlaceholder: 'Latex, pollen',
+    chronicConditions: 'Long-term conditions',
+    chronicConditionsPlaceholder: 'Diabetes, high blood pressure, asthma',
+    emergencyContact: 'Emergency contact',
+    emergencyContactPlaceholder: 'Name',
+    emergencyPhone: 'Emergency phone',
+    relationship: 'Relationship',
+    relationshipPlaceholder: 'Spouse, son…',
+    primaryLanguage: 'Main language',
+    reminderLanguage: 'Preferred reminder language',
+    languagePlaceholder: 'English',
+    timeZone: 'Time zone',
+    timeZonePlaceholder: 'Asia/Kolkata',
+    errImageFile: 'Please choose an image file for your photo.',
+    errPhotoSize: 'The photo must be under 5 MB.',
+    errValues: 'Please check the values entered. Height and weight must be positive numbers.',
+    genderMale: 'Male',
+    genderFemale: 'Female',
+    genderOther: 'Other',
+    genderPreferNotToSay: 'Prefer not to say',
+    bloodUnknown: 'Unknown',
   },
   greeting: {
     morning: 'Good morning',
