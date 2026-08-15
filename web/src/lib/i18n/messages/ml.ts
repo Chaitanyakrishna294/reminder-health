@@ -2,6 +2,39 @@ import type { Messages } from './en';
 
 /** മലയാളം — Malayalam. */
 const ml: Messages = {
+  units: {
+    TABLET: { one: 'ഗുളിക', other: 'ഗുളികകൾ' },
+    CAPSULE: { one: 'ക്യാപ്സ്യൂൾ', other: 'ക്യാപ്സ്യൂളുകൾ' },
+    ML: { one: 'മില്ലിലിറ്റർ', other: 'മില്ലിലിറ്റർ' },
+    DROP: { one: 'തുള്ളി', other: 'തുള്ളികൾ' },
+    APPLICATION: { one: 'പുരട്ടൽ', other: 'പുരട്ടലുകൾ' },
+    TEASPOON: { one: 'ടീസ്പൂൺ', other: 'ടീസ്പൂണുകൾ' },
+    UNIT: { one: 'യൂണിറ്റ്', other: 'യൂണിറ്റുകൾ' },
+    PATCH: { one: 'പാച്ച്', other: 'പാച്ചുകൾ' },
+    INHALATION: { one: 'ശ്വസനം', other: 'ശ്വസനങ്ങൾ' },
+    OTHER: { one: 'അളവ്', other: 'അളവുകൾ' },
+  },
+  dose: {
+    amount: '{amount} {unit}',
+  },
+  elderly: {
+    today: 'ഇന്ന്',
+    progress: '{total}ൽ {taken} കഴിച്ചു',
+    viewingOnly: 'നിങ്ങൾക്ക് കാണാൻ മാത്രമേ കഴിയൂ.',
+    saving: 'സേവ് ചെയ്യുന്നു…',
+    taken: 'കഴിച്ചു',
+    skip: 'ഒഴിവാക്കുക',
+    allDone: 'ഇന്നത്തേക്ക് എല്ലാം കഴിഞ്ഞു',
+    nothingLeft: 'ഇനി കഴിക്കാൻ ഒന്നുമില്ല.',
+    nothingRightNow: 'ഇപ്പോൾ ഒന്നുമില്ല',
+    next: 'അടുത്തത്: {name}, {time}ന്',
+    noneToday: 'ഇന്ന് മരുന്നൊന്നും നിശ്ചയിച്ചിട്ടില്ല.',
+    laterToday: 'ഇന്ന് പിന്നീട്',
+    notTaken: '{name} കഴിച്ചിട്ടില്ല',
+    open: 'തുറക്കുക',
+    notSavedTitle: 'സേവ് ചെയ്തില്ല',
+    notSavedBody: 'ദയവായി വീണ്ടും ശ്രമിക്കുക.',
+  },
   greeting: {
     morning: 'സുപ്രഭാതം',
     afternoon: 'ശുഭ ഉച്ച',

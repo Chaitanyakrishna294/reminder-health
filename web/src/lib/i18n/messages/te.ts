@@ -2,6 +2,39 @@ import type { Messages } from './en';
 
 /** తెలుగు — Telugu. */
 const te: Messages = {
+  units: {
+    TABLET: { one: 'మాత్ర', other: 'మాత్రలు' },
+    CAPSULE: { one: 'క్యాప్సూల్', other: 'క్యాప్సూల్స్' },
+    ML: { one: 'మిల్లీలీటర్', other: 'మిల్లీలీటర్లు' },
+    DROP: { one: 'చుక్క', other: 'చుక్కలు' },
+    APPLICATION: { one: 'పూత', other: 'పూతలు' },
+    TEASPOON: { one: 'చెంచా', other: 'చెంచాలు' },
+    UNIT: { one: 'యూనిట్', other: 'యూనిట్లు' },
+    PATCH: { one: 'ప్యాచ్', other: 'ప్యాచ్‌లు' },
+    INHALATION: { one: 'పీల్పు', other: 'పీల్పులు' },
+    OTHER: { one: 'మోతాదు', other: 'మోతాదులు' },
+  },
+  dose: {
+    amount: '{amount} {unit}',
+  },
+  elderly: {
+    today: 'ఈ రోజు',
+    progress: '{total}లో {taken} తీసుకున్నారు',
+    viewingOnly: 'మీరు చూస్తున్నారు మాత్రమే.',
+    saving: 'సేవ్ అవుతోంది…',
+    taken: 'తీసుకున్నాను',
+    skip: 'వదిలేయి',
+    allDone: 'ఈ రోజుకి అంతా పూర్తయింది',
+    nothingLeft: 'ఇంకా తీసుకోవలసినది ఏమీ లేదు.',
+    nothingRightNow: 'ఇప్పుడు ఏమీ లేదు',
+    next: 'తదుపరి: {name}, {time}కి',
+    noneToday: 'ఈ రోజు మందులేవీ షెడ్యూల్ కాలేదు.',
+    laterToday: 'ఈ రోజు తర్వాత',
+    notTaken: '{name} తీసుకోలేదు',
+    open: 'తెరవండి',
+    notSavedTitle: 'సేవ్ కాలేదు',
+    notSavedBody: 'దయచేసి మళ్లీ ప్రయత్నించండి.',
+  },
   greeting: {
     morning: 'శుభోదయం',
     afternoon: 'శుభ మధ్యాహ్నం',

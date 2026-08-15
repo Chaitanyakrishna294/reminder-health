@@ -2,6 +2,39 @@ import type { Messages } from './en';
 
 /** मराठी — Marathi. Devanagari, same script as Hindi but a different language. */
 const mr: Messages = {
+  units: {
+    TABLET: { one: 'गोळी', other: 'गोळ्या' },
+    CAPSULE: { one: 'कॅप्सूल', other: 'कॅप्सूल' },
+    ML: { one: 'मिलिलिटर', other: 'मिलिलिटर' },
+    DROP: { one: 'थेंब', other: 'थेंब' },
+    APPLICATION: { one: 'लेप', other: 'लेप' },
+    TEASPOON: { one: 'चमचा', other: 'चमचे' },
+    UNIT: { one: 'युनिट', other: 'युनिट्स' },
+    PATCH: { one: 'पॅच', other: 'पॅचेस' },
+    INHALATION: { one: 'श्वास', other: 'श्वास' },
+    OTHER: { one: 'मात्रा', other: 'मात्रा' },
+  },
+  dose: {
+    amount: '{amount} {unit}',
+  },
+  elderly: {
+    today: 'आज',
+    progress: '{total} पैकी {taken} घेतल्या',
+    viewingOnly: 'तुम्ही फक्त पाहत आहात.',
+    saving: 'सेव्ह होत आहे…',
+    taken: 'घेतली',
+    skip: 'वगळा',
+    allDone: 'आजचे सर्व झाले',
+    nothingLeft: 'आता घ्यायचे काही उरले नाही.',
+    nothingRightNow: 'आत्ता काही नाही',
+    next: 'पुढील: {name}, {time} वाजता',
+    noneToday: 'आज कोणतेही औषध नियोजित नाही.',
+    laterToday: 'आज नंतर',
+    notTaken: '{name} घेतली नाही',
+    open: 'उघडा',
+    notSavedTitle: 'सेव्ह झाले नाही',
+    notSavedBody: 'कृपया पुन्हा प्रयत्न करा.',
+  },
   greeting: {
     morning: 'सुप्रभात',
     afternoon: 'शुभ दुपार',

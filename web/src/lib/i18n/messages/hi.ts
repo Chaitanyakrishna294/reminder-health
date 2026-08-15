@@ -2,6 +2,39 @@ import type { Messages } from './en';
 
 /** हिन्दी — Hindi. Devanagari. */
 const hi: Messages = {
+  units: {
+    TABLET: { one: 'गोली', other: 'गोलियाँ' },
+    CAPSULE: { one: 'कैप्सूल', other: 'कैप्सूल' },
+    ML: { one: 'मिलीलीटर', other: 'मिलीलीटर' },
+    DROP: { one: 'बूँद', other: 'बूँदें' },
+    APPLICATION: { one: 'लेप', other: 'लेप' },
+    TEASPOON: { one: 'चम्मच', other: 'चम्मच' },
+    UNIT: { one: 'यूनिट', other: 'यूनिट' },
+    PATCH: { one: 'पैच', other: 'पैच' },
+    INHALATION: { one: 'साँस', other: 'साँसें' },
+    OTHER: { one: 'खुराक', other: 'खुराकें' },
+  },
+  dose: {
+    amount: '{amount} {unit}',
+  },
+  elderly: {
+    today: 'आज',
+    progress: '{total} में से {taken} ली गईं',
+    viewingOnly: 'आप केवल देख रहे हैं।',
+    saving: 'सहेजा जा रहा है…',
+    taken: 'ले ली',
+    skip: 'छोड़ें',
+    allDone: 'आज के लिए सब हो गया',
+    nothingLeft: 'अब कुछ लेना बाकी नहीं।',
+    nothingRightNow: 'अभी कुछ नहीं',
+    next: 'अगली: {name}, {time} बजे',
+    noneToday: 'आज कोई दवा तय नहीं है।',
+    laterToday: 'आज बाद में',
+    notTaken: '{name} नहीं ली गई',
+    open: 'खोलें',
+    notSavedTitle: 'सहेजा नहीं गया',
+    notSavedBody: 'कृपया फिर कोशिश करें।',
+  },
   greeting: {
     morning: 'सुप्रभात',
     afternoon: 'शुभ दोपहर',

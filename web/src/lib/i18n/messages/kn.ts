@@ -2,6 +2,39 @@ import type { Messages } from './en';
 
 /** ಕನ್ನಡ — Kannada. */
 const kn: Messages = {
+  units: {
+    TABLET: { one: 'ಮಾತ್ರೆ', other: 'ಮಾತ್ರೆಗಳು' },
+    CAPSULE: { one: 'ಕ್ಯಾಪ್ಸೂಲ್', other: 'ಕ್ಯಾಪ್ಸೂಲ್‌ಗಳು' },
+    ML: { one: 'ಮಿಲಿಲೀಟರ್', other: 'ಮಿಲಿಲೀಟರ್' },
+    DROP: { one: 'ಹನಿ', other: 'ಹನಿಗಳು' },
+    APPLICATION: { one: 'ಲೇಪನ', other: 'ಲೇಪನಗಳು' },
+    TEASPOON: { one: 'ಚಮಚ', other: 'ಚಮಚಗಳು' },
+    UNIT: { one: 'ಘಟಕ', other: 'ಘಟಕಗಳು' },
+    PATCH: { one: 'ಪ್ಯಾಚ್', other: 'ಪ್ಯಾಚ್‌ಗಳು' },
+    INHALATION: { one: 'ಉಸಿರೆಳೆತ', other: 'ಉಸಿರೆಳೆತಗಳು' },
+    OTHER: { one: 'ಪ್ರಮಾಣ', other: 'ಪ್ರಮಾಣಗಳು' },
+  },
+  dose: {
+    amount: '{amount} {unit}',
+  },
+  elderly: {
+    today: 'ಇಂದು',
+    progress: '{total}ರಲ್ಲಿ {taken} ತೆಗೆದುಕೊಂಡಿದ್ದೀರಿ',
+    viewingOnly: 'ನೀವು ನೋಡುತ್ತಿದ್ದೀರಿ ಮಾತ್ರ.',
+    saving: 'ಉಳಿಸಲಾಗುತ್ತಿದೆ…',
+    taken: 'ತೆಗೆದುಕೊಂಡೆ',
+    skip: 'ಬಿಟ್ಟುಬಿಡಿ',
+    allDone: 'ಇಂದಿಗೆ ಎಲ್ಲಾ ಮುಗಿಯಿತು',
+    nothingLeft: 'ಇನ್ನು ತೆಗೆದುಕೊಳ್ಳಲು ಏನೂ ಇಲ್ಲ.',
+    nothingRightNow: 'ಈಗ ಏನೂ ಇಲ್ಲ',
+    next: 'ಮುಂದಿನದು: {name}, {time}ಕ್ಕೆ',
+    noneToday: 'ಇಂದು ಯಾವುದೇ ಔಷಧಿ ನಿಗದಿಯಾಗಿಲ್ಲ.',
+    laterToday: 'ಇಂದು ನಂತರ',
+    notTaken: '{name} ತೆಗೆದುಕೊಂಡಿಲ್ಲ',
+    open: 'ತೆರೆಯಿರಿ',
+    notSavedTitle: 'ಉಳಿಸಲಾಗಿಲ್ಲ',
+    notSavedBody: 'ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.',
+  },
   greeting: {
     morning: 'ಶುಭೋದಯ',
     afternoon: 'ಶುಭ ಮಧ್ಯಾಹ್ನ',

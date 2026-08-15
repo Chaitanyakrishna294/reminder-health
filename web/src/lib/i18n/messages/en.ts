@@ -15,7 +15,65 @@
  * emoji, zero blame, and nothing that implies the app checks medical correctness.
  */
 
+/**
+ * A dose unit, in the two forms every one of these languages needs.
+ *
+ * `unitPhrase()` in medication-form-options.tsx pluralises by appending "s"/"es",
+ * which is English morphology and produces nonsense everywhere else — "మాత్రs".
+ * Two explicit forms per unit is the smallest thing that is actually correct.
+ * Where a language does not inflect the noun here, both forms are the same word;
+ * that is the right answer, not a placeholder.
+ */
+export interface UnitForms {
+  one: string;
+  other: string;
+}
+
 export interface Messages {
+  /** Keyed by `medications.unit_type`. OTHER is the fallback for an unknown id. */
+  units: {
+    TABLET: UnitForms;
+    CAPSULE: UnitForms;
+    ML: UnitForms;
+    DROP: UnitForms;
+    APPLICATION: UnitForms;
+    TEASPOON: UnitForms;
+    UNIT: UnitForms;
+    PATCH: UnitForms;
+    INHALATION: UnitForms;
+    OTHER: UnitForms;
+  };
+  dose: {
+    /** "{amount} {unit}" — the amount is a number, the unit comes from `units`. */
+    amount: string;
+  };
+  /**
+   * ELDERLY MODE. The plainest register in the product, in every language: short
+   * sentences, no idiom, nothing that needs a second reading. This is the copy
+   * that matters most — the person reading it may be doing so without glasses,
+   * at speed, deciding whether to swallow something.
+   */
+  elderly: {
+    today: string;
+    /** "{taken} of {total} taken" — both Western numerals. */
+    progress: string;
+    viewingOnly: string;
+    saving: string;
+    taken: string;
+    skip: string;
+    allDone: string;
+    nothingLeft: string;
+    nothingRightNow: string;
+    /** "Next: {name} at {time}" — {name} is the medicine, VERBATIM. */
+    next: string;
+    noneToday: string;
+    laterToday: string;
+    /** "{name} not taken" — {name} VERBATIM. */
+    notTaken: string;
+    open: string;
+    notSavedTitle: string;
+    notSavedBody: string;
+  };
   greeting: {
     morning: string;
     afternoon: string;
@@ -77,6 +135,39 @@ export interface Messages {
 }
 
 const en: Messages = {
+  units: {
+    TABLET: { one: 'tablet', other: 'tablets' },
+    CAPSULE: { one: 'capsule', other: 'capsules' },
+    ML: { one: 'milliliter', other: 'milliliters' },
+    DROP: { one: 'drop', other: 'drops' },
+    APPLICATION: { one: 'application', other: 'applications' },
+    TEASPOON: { one: 'teaspoon', other: 'teaspoons' },
+    UNIT: { one: 'unit', other: 'units' },
+    PATCH: { one: 'patch', other: 'patches' },
+    INHALATION: { one: 'inhalation', other: 'inhalations' },
+    OTHER: { one: 'dose', other: 'doses' },
+  },
+  dose: {
+    amount: '{amount} {unit}',
+  },
+  elderly: {
+    today: 'Today',
+    progress: '{taken} of {total} taken',
+    viewingOnly: 'You are viewing only.',
+    saving: 'Saving…',
+    taken: 'Taken',
+    skip: 'Skip',
+    allDone: 'All done for today',
+    nothingLeft: 'Nothing left to take.',
+    nothingRightNow: 'Nothing right now',
+    next: 'Next: {name} at {time}',
+    noneToday: 'No medicines scheduled today.',
+    laterToday: 'Later today',
+    notTaken: '{name} not taken',
+    open: 'Open',
+    notSavedTitle: 'Not saved',
+    notSavedBody: 'Please try again.',
+  },
   greeting: {
     morning: 'Good morning',
     afternoon: 'Good afternoon',

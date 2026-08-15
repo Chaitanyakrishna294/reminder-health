@@ -37,7 +37,8 @@ import { Check } from 'lucide-react';
 import { resolveReminderEvent } from '@/lib/reminder-events';
 import { isAttentionStatus } from '@/lib/schedule/dose-attention';
 import { getUnitIcon } from '@/components/dashboard/dashboard-helpers';
-import { unitPhrase } from '@/components/medications/medication-form-options';
+import { useLanguage } from '@/context/language-context';
+import { format, formatTime, unitFor } from '@/lib/i18n/format';
 import BrainMascot from '@/components/dashboard/brain-mascot';
 import { PremiumToast } from '@/components/ui/premium-toast';
 import type { ReminderEvent } from '@/components/dashboard/todays-schedule';
@@ -57,12 +58,6 @@ interface ElderlyTodayProps {
   todayTotal: number;
 }
 
-/** Time in the viewer's locale, hour and minute only. Rendered client-side only. */
-function timeOf(iso: string, mounted: boolean) {
-  if (!mounted) return '--:--';
-  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
-
 export default function ElderlyToday({
   events,
   nextPendingEvent,
@@ -75,6 +70,9 @@ export default function ElderlyToday({
 }: ElderlyTodayProps) {
   const supabase = createClient();
   const router = useRouter();
+  const { locale, t } = useLanguage();
+  /** Local conventions, Western digits. Marathi defaults to Devanagari without this. */
+  const timeOf = (iso: string, isMounted: boolean) => formatTime(iso, locale, isMounted);
   const [busy, setBusy] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [nowMs, setNowMs] = useState(0);
@@ -115,7 +113,7 @@ export default function ElderlyToday({
       router.refresh();
     } catch {
       // One sentence, no blame, no error code. The recovery is to try again.
-      showToast('Not saved', 'Please try again.', 'error');
+      showToast(t.elderly.notSavedTitle, t.elderly.notSavedBody, 'error');
     } finally {
       setBusy(false);
     }
@@ -138,10 +136,18 @@ export default function ElderlyToday({
   // the same dose is never both the question and the footnote.
   const missed = attentionEvents.filter((e) => e.id !== asking?.id);
 
+  // "1 tablet · 8:00 AM" — a TRANSLATED frame ({amount} {unit}) around numbers that
+  // stay Western. The medicine NAME is not in this line; it is the h1 above, rendered
+  // verbatim. The " · " separator is punctuation, not language, so it stays in code.
   const doseLine = (event: ReminderEvent) => {
     const amount = event.medications.dosage_amount;
     return [
-      amount != null && amount !== 0 ? `${amount} ${unitPhrase(event.medications.unit_type, amount)}` : '',
+      amount != null && amount !== 0
+        ? format(t.dose.amount, {
+            amount,
+            unit: unitFor(t.units, event.medications.unit_type, amount),
+          })
+        : '',
       timeOf(event.scheduled_for, mounted),
     ].filter(Boolean).join(' · ');
   };
@@ -164,11 +170,14 @@ export default function ElderlyToday({
           where you are, and how the day is going — a sentence, not a chart. */}
       <header className="mb-5 px-1">
         <h2 className="font-mono uppercase tracking-[0.14em] text-sm text-muted-foreground">
-          Today
+          {t.elderly.today}
         </h2>
         {todayTotal > 0 && (
+          /* One translated sentence rather than "N of M" assembled in JSX — the word
+             order differs per language ("{total}లో {taken}"), and a hardcoded layout
+             would force every translation into English syntax. */
           <p className="mt-1 text-2xl font-bold text-foreground tabular-nums" suppressHydrationWarning>
-            {todayTaken} of {todayTotal} taken
+            {format(t.elderly.progress, { taken: todayTaken, total: todayTotal })}
           </p>
         )}
       </header>
@@ -193,7 +202,7 @@ export default function ElderlyToday({
           </p>
 
           {readOnly ? (
-            <p className="mt-7 text-xl font-bold text-muted-foreground">You are viewing only.</p>
+            <p className="mt-7 text-xl font-bold text-muted-foreground">{t.elderly.viewingOnly}</p>
           ) : (
             <>
               {/* 72px+ and full width. One tap, one meaning. */}
@@ -203,7 +212,7 @@ export default function ElderlyToday({
                 disabled={busy}
                 className="mt-7 w-full min-h-[88px] rounded-3xl bg-primary-strong text-primary-strong-foreground text-3xl font-black active:scale-[0.98] transition-transform cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
-                {busy ? 'Saving…' : 'Taken'}
+                {busy ? t.elderly.saving : t.elderly.taken}
               </button>
               {/* Skip is deliberately quiet and below. It is a legitimate answer, not
                   a failure — but it is not the one being asked for. */}
@@ -213,7 +222,7 @@ export default function ElderlyToday({
                 disabled={busy}
                 className="mt-3 w-full min-h-[56px] rounded-2xl text-xl font-bold text-muted-foreground hover:bg-muted active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
-                Skip
+                {t.elderly.skip}
               </button>
             </>
           )}
@@ -227,8 +236,8 @@ export default function ElderlyToday({
           >
             <Check className="w-14 h-14" strokeWidth={3} />
           </span>
-          <h1 className="text-4xl font-black text-foreground text-balance">All done for today</h1>
-          <p className="mt-2 text-xl font-bold text-muted-foreground">Nothing left to take.</p>
+          <h1 className="text-4xl font-black text-foreground text-balance">{t.elderly.allDone}</h1>
+          <p className="mt-2 text-xl font-bold text-muted-foreground">{t.elderly.nothingLeft}</p>
           <div className="mt-4 flex justify-center">
             <BrainMascot size={144} mood="proud" />
           </div>
@@ -236,16 +245,23 @@ export default function ElderlyToday({
       ) : (
         /* ── STATES 3 & 4: nothing due right now ───────────────────────────── */
         <section className="bg-card border-2 border-border rounded-[32px] p-7 text-center shadow-sm">
-          <h1 className="text-4xl font-black text-foreground text-balance">Nothing right now</h1>
+          <h1 className="text-4xl font-black text-foreground text-balance">{t.elderly.nothingRightNow}</h1>
           {nextPendingEvent ? (
+            /* THE MIXED LINE. The frame is translated and may reorder — Telugu puts
+               the time before the postposition — while {name} is the medicine
+               exactly as the user typed it. This used to be JSX with "Next:" and
+               "at" hardcoded around the name, which pinned every language to
+               English word order. The medicine name loses its mono/tabular
+               styling in the process; that styling belonged to the TIME, and the
+               time is still Western-digit via formatTime. */
             <p className="mt-3 text-2xl font-bold text-muted-foreground text-balance" suppressHydrationWarning>
-              Next: {nextPendingEvent.medications.drug_name} at{' '}
-              <span className="font-mono tabular-nums text-foreground">
-                {timeOf(nextPendingEvent.scheduled_for, mounted)}
-              </span>
+              {format(t.elderly.next, {
+                name: nextPendingEvent.medications.drug_name,
+                time: timeOf(nextPendingEvent.scheduled_for, mounted),
+              })}
             </p>
           ) : (
-            <p className="mt-3 text-2xl font-bold text-muted-foreground">No medicines scheduled today.</p>
+            <p className="mt-3 text-2xl font-bold text-muted-foreground">{t.elderly.noneToday}</p>
           )}
           <div className="mt-4 flex justify-center">
             {/* peaceful, not happy: this is a quiet moment, not an achievement. */}
@@ -262,7 +278,7 @@ export default function ElderlyToday({
       {later.length > 0 && (
         <section className="mt-6">
           <h2 className="font-mono uppercase tracking-[0.14em] text-sm text-muted-foreground px-1 mb-2">
-            Later today
+            {t.elderly.laterToday}
           </h2>
           <ul className="space-y-2">
             {later.map((event) => (
@@ -299,9 +315,9 @@ export default function ElderlyToday({
                 className="w-full min-h-[64px] px-5 py-3 rounded-2xl bg-muted/60 border border-border text-left flex items-center justify-between gap-4 hover:bg-muted active:scale-[0.99] transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
                 <span className="text-xl font-bold text-foreground text-balance">
-                  {event.medications.drug_name} not taken
+                  {format(t.elderly.notTaken, { name: event.medications.drug_name })}
                 </span>
-                <span className="text-lg font-bold text-primary-strong shrink-0">Open</span>
+                <span className="text-lg font-bold text-primary-strong shrink-0">{t.elderly.open}</span>
               </button>
             </li>
           ))}

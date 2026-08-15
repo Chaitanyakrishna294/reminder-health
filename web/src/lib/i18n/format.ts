@@ -41,6 +41,8 @@
  * WORDS around them are translated; the digits are not.
  */
 
+import type { Messages } from './messages/en';
+
 /**
  * Substitute `{key}` placeholders in a translated pattern.
  *
@@ -79,3 +81,48 @@ export function format(
  * rather than a message SLOT, stop — that is the bug this file exists to prevent.
  */
 export const userContent = (value: string): string => value;
+
+/**
+ * A dose unit in the right form for the amount.
+ *
+ * Replaces `unitPhrase()` from medication-form-options.tsx, which appended "s" or
+ * "es" — English morphology that yields "మాత్రs" in Telugu and "गोलीs" in Hindi.
+ * The plural rule these seven languages share is "one vs. not-one", which is what
+ * the `{ one, other }` pair encodes. An unknown unit id falls back to OTHER
+ * ("dose") rather than throwing: a dose line with a vague unit is recoverable,
+ * a crashed elderly screen is not.
+ */
+export function unitFor(
+  units: Messages['units'],
+  unitType: string | undefined,
+  amount: number
+): string {
+  const key = (unitType || 'TABLET').toUpperCase() as keyof Messages['units'];
+  const forms = units[key] ?? units.OTHER;
+  return amount === 1 ? forms.one : forms.other;
+}
+
+/**
+ * A clock time: LOCAL CONVENTIONS, WESTERN DIGITS.
+ *
+ * This is the "times format per locale, numerals stay familiar" rule made real.
+ * `-u-nu-latn` is a Unicode locale extension that pins the numbering system to
+ * Latin while leaving everything else — 12- vs 24-hour, the separator, the
+ * am/pm marker — to the locale. So Telugu gets Telugu time conventions with
+ * `8:00`, never `౮:౦౦`.
+ *
+ * Why that matters more here than it looks: the digits on this screen have to
+ * match the digits on the strip, the prescription and the pharmacist's label. A
+ * time or a dose the patient must mentally convert is one they can convert wrong.
+ *
+ * Returns a placeholder before mount — the server has no viewer timezone, so
+ * rendering a real time during SSR produces a hydration mismatch and, worse, a
+ * visibly wrong time for the first frame.
+ */
+export function formatTime(iso: string, locale: string, mounted: boolean): string {
+  if (!mounted) return '--:--';
+  return new Date(iso).toLocaleTimeString(`${locale}-u-nu-latn`, {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
