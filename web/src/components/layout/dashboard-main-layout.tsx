@@ -543,7 +543,11 @@ export default function DashboardMainLayout({
             <PageBack />
           </div>
         )}
-        <div className="w-full">
+        {/* SHARED-AXIS PAGE ENTER. Keyed on the pathname so React remounts the
+            wrapper on every navigation — without the key the animation runs once
+            on first load and never again, which is the usual way this ends up
+            defined and invisible. Reduced motion drops it to a plain appearance. */}
+        <div key={pathname} className="w-full page-enter">
           {children}
         </div>
       </main>

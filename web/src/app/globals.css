@@ -931,7 +931,10 @@ h1, h2 {
    flourish is earned, because it is the confirmation of the single action this
    whole product exists for. Stroke animation on an SVG path: one property, GPU
    friendly, and it stops. */
-.check-draw {
+/* Applied to a lucide icon, whose stroke lives on an inner <path> — setting the
+   dash on the wrapper would do nothing at all, which is how an animation ends up
+   "defined and wired" and still invisible. */
+.check-draw path {
   stroke-dasharray: 32;
   stroke-dashoffset: 32;
   animation: check-draw 340ms var(--ease-out) 60ms forwards;
@@ -951,6 +954,6 @@ h1, h2 {
      sensitivity is real. */
   .press-sink, .press-sink:active { transition: none; transform: none; }
   .page-enter, .tab-enter, .numeral-tick { animation: none; opacity: 1; transform: none; }
-  .check-draw { animation: none; stroke-dashoffset: 0; }
+  .check-draw path { animation: none; stroke-dashoffset: 0; }
 }
 }

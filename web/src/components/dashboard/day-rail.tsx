@@ -401,7 +401,7 @@ function DoseCard({
   // rail carrying full-width actions.
   if (isDueNow && canResolve) {
     return (
-      <article {...anchor} {...tourAttr} className={`rounded-2xl bg-card border border-primary/35 p-4 shadow-[0_2px_4px_rgba(15,28,90,0.06)] ${selectedRing}`}>
+      <article {...anchor} {...tourAttr} className={`rounded-[20px] ground-hero card-raised press-sink p-5 ${selectedRing}`}>
         <div className="flex items-center gap-3">
           <span className={`rounded-2xl flex items-center justify-center shrink-0 ${isElderly ? 'w-16 h-16' : 'w-12 h-12'} ${slotChip}`}>
             {/* 28px in elderly — the written floor, not a judgement call. */}
@@ -447,7 +447,7 @@ function DoseCard({
   }
 
   return (
-    <article {...anchor} {...tourAttr} className={`rounded-2xl bg-card border border-transparent px-3.5 py-3 flex items-center gap-3 shadow-sm ${selectedRing}`}>
+    <article {...anchor} {...tourAttr} className={`rounded-[20px] card-lift press-sink stagger-in px-4 py-3 flex items-center gap-3 ${selectedRing}`}>
       <span className={`rounded-xl flex items-center justify-center shrink-0 ${isElderly ? 'w-14 h-14' : 'w-9 h-9'} ${slotChip}`}>
         {/* Was 24px in elderly, under the 28px floor. The tile grew with it —
             a 28px glyph in a 36px tile has no room to breathe. */}
@@ -467,7 +467,20 @@ function DoseCard({
       </div>
       <div className="shrink-0 flex flex-col items-end gap-0.5">
         <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-mono font-semibold ${isElderly ? 'text-xs' : 'text-[10px]'} ${meta.cls}`}>
-          <meta.Icon className={isElderly ? 'w-5 h-5' : 'w-3 h-3'} aria-hidden />
+          {/* THE DOSE-RESOLVE MOMENT. The tick draws itself in — the one flourish
+              that is earned, because it confirms the single action this product
+              exists for.
+
+              HONEST SCOPE: this runs on MOUNT, so it plays when a dose is
+              resolved (the row re-renders) and also when the day first paints
+              with doses already taken. Firing it only on a fresh resolve would
+              mean threading a just-resolved id down three component layers, and
+              an entrance that matches the card stagger is not worth that. It
+              does not loop either way. */}
+          <meta.Icon
+            className={`${isElderly ? 'w-5 h-5' : 'w-3 h-3'} ${verdict === 'taken' ? 'check-draw' : ''}`}
+            aria-hidden
+          />
           {meta.label}
         </span>
         {showCorrect && (

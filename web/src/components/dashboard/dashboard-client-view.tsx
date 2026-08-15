@@ -1396,7 +1396,15 @@ export default function DashboardClientView({
                         </div>
                       ) : (
                         <div className="leading-tight">
-                          <p className="text-[18px] font-black text-foreground">
+                          {/* The one real hero numeral on Today: the figure the
+                              ring exists to state. It was 18px inside a 300px
+                              ring, which made the ring the subject and the
+                              number a caption — the wrong way round.
+
+                              `numeral-tick` runs on mount, so it rises into
+                              place on load and again whenever the count changes
+                              and this re-renders. */}
+                          <p className="numeral-lg numeral-tick text-foreground">
                             {todayTotal > 0 ? Math.round((todayTaken / todayTotal) * 100) : 100}%
                           </p>
                           <p className="text-[11px] font-black text-muted-foreground uppercase tracking-wider mt-0.5">
