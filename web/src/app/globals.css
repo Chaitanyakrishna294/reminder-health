@@ -388,9 +388,34 @@ body:has(nav[data-tour="dash-nav"]) .floating-bottom {
   pointer-events: none;
 }
 
+/* THE INDIC TAIL — one list, appended to every font stack in this file.
+   Defined as its own variable because it has to appear in four places (the two
+   theme tokens below, plus the `body`, headings and `.font-mono` rules further
+   down, which reference the raw next/font variables rather than the Tailwind
+   tokens). A tail that is only on some of them is worse than none: it renders
+   Telugu correctly in a heading and as tofu in the nav label beneath it.
+
+   Font fallback is resolved PER GLYPH, not per run of text, so this changes
+   nothing about how Latin renders — Inter still wins every character it has.
+   Inter contains zero Devanagari, Telugu, Tamil, Kannada or Malayalam
+   codepoints; without this tail those land on whatever the OS calls
+   `sans-serif`, which is tofu wherever that guess is wrong.
+
+   Order among the five is irrelevant: their unicode ranges do not overlap. */
+:root {
+  --font-indic-tail:
+    var(--font-indic-devanagari), var(--font-indic-telugu), var(--font-indic-tamil),
+    var(--font-indic-kannada), var(--font-indic-malayalam);
+}
+
 @theme inline {
-  --font-sans: var(--font-sans), sans-serif;
-  --font-mono: var(--font-mono), monospace;
+  /* The MONO chain carries the tail too. `.navigation-label` and the other value
+     labels are mono, and JetBrains Mono has no Indic coverage either, so a Telugu
+     nav label would otherwise fall through to `monospace`. Per-glyph fallback
+     means Latin values stay mono and only the Indic glyphs come from Noto — the
+     right outcome, since monospaced Indic essentially does not exist. */
+  --font-sans: var(--font-sans), var(--font-indic-tail), sans-serif;
+  --font-mono: var(--font-mono), var(--font-indic-tail), monospace;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -600,7 +625,7 @@ body {
   color: var(--foreground);
   min-height: 100vh;
   margin: 0;
-  font-family: var(--font-sans), sans-serif;
+  font-family: var(--font-sans), var(--font-indic-tail), sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
@@ -615,7 +640,7 @@ body {
    What is left here is the honest list: badges, metrics, times, nav labels. Each
    is a VALUE or a label, never a sentence. */
 .font-mono, .badge, .metric, .time-tag, .navigation-label {
-  font-family: var(--font-mono), monospace !important;
+  font-family: var(--font-mono), var(--font-indic-tail), monospace !important;
   letter-spacing: -0.01em;
 }
 
@@ -623,7 +648,7 @@ body {
    Tracking tightens as type grows, which is what makes a large title read as
    composed rather than merely big. */
 h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-sans), sans-serif;
+  font-family: var(--font-sans), var(--font-indic-tail), sans-serif;
   letter-spacing: -0.018em;
   text-wrap: balance;
 }

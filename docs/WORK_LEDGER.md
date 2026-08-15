@@ -190,8 +190,20 @@ Context: `theme-context` (light/dark, **defaults to light** when nothing is save
 (`normal|elderly` + `PATIENT_SELF|PATIENT_MONITOR`, persisted to `view-mode` cookie; also owns the
 elderly view lock on `profiles.ui_mode_locked`), `density-context` (`useDensity()` → the browser/app/
 elderly split; mounted INSIDE `UiModeProvider` because elderly outranks the rest, and paired with a
-pre-paint `data-density` script in `app/layout.tsx` + the `.browser-only` rule in globals.css).
+pre-paint `data-density` script in `app/layout.tsx` + the `.browser-only` rule in globals.css),
+`language-context` (`useLanguage()` → `{ locale, setLocale, t }`; 7 locales in `localStorage.language`,
+outermost provider, paired with a pre-paint `<html lang>` script — see below).
 Hook: `use-realtime-notifications` (realtime `notifications` channel → bell).
+
+**i18n (added 2026-08-15) — `lib/i18n/`.** Seven languages (en · hi · te · ta · kn · ml · mr) covering
+the nav labels, the Settings hub, the language picker and the three legal documents; **nothing else**,
+and the native alarm screen is still English. `messages/en.ts` exports the `Messages` type that the
+other six are checked against, so a new key breaks the build until all seven have it. The legal
+documents are DATA (`lib/i18n/legal/*.ts`) rendered by one component (`components/legal/legal-document.tsx`),
+and every non-English rendering states that the English version governs. Five `Noto_Sans_*` families are
+appended to both font stacks as `--font-indic-tail` (Inter has no Indic glyphs); they are `preload: false`
+and unicode-range-subset, so English users fetch none of them. **Full scope, decisions and open items:
+[`docs/I18N.md`](I18N.md)** — read it before adding a language or assuming a surface is translated.
 
 Components live in `components/{layout,dashboard,medications,guide,billing,settings,medical,shared,care-circle,ui}/`.
 `components/ui/` holds the shared primitives — `button.tsx` (`Button`/`buttonClasses()`/`IconButton`,
@@ -428,7 +440,7 @@ non-idempotent migrations guarded; superseded vault migrations marked.
 
 | Trust | Docs |
 |---|---|
-| **Live / authoritative** | This ledger · root `README.md` (rewritten 2026-08-06, three-surface era) · `KNOWN_ISSUES.md` (07-11, freshest state) · `ARCHITECTURE_DECISIONS.md` (ADR-001..006; stops before heartbeat/catalog) · `PROJECT.md` (terse reference, mostly current) · `PROJECT_WALKTHROUGH.md` + `FAQ.md` (07-20, narrated tour + glossary; tracked in git since 07-26) · `web/AGENTS.md` |
+| **Live / authoritative** | This ledger · root `README.md` (rewritten 2026-08-06, three-surface era) · `KNOWN_ISSUES.md` (07-11, freshest state) · `ARCHITECTURE_DECISIONS.md` (ADR-001..006; stops before heartbeat/catalog) · `PROJECT.md` (terse reference, mostly current) · `PROJECT_WALKTHROUGH.md` + `FAQ.md` (07-20, narrated tour + glossary; tracked in git since 07-26) · `web/AGENTS.md` · **`I18N.md` (08-15, the 7-language scope + what is deliberately NOT translated)** |
 | **Reference, partial** | `PERMISSION_MATRIX.md` (two claims wrong re `are_profiles_connected`) · `DEPLOYMENT_GUIDE.md` (no CRON_SECRET/voice vars) · `DESIGN_BRIEF.md` · `LEGAL_COMPLIANCE.md` |
 | **Stale — do not trust for state** | `AI_SESSION_START.md` (now redirects here) · `CURRENT_SYSTEM_STATE.md` · `SPRINT_STATUS.md` · `FEATURE_INVENTORY.md` · `PROJECT_JOURNAL.md` · `ENGINEERING_STATE.md` (lists shipped work as "Not Started") · `DATABASE_SCHEMA.md` (20 of 27 tables missing, wrong status enum) · `UI_UX_DESIGNER_HANDOVER.md` (says Next 15) |
 | **Voice line (shelved)** | `VOICE_CALLS_DESIGN.md` · `VOICE_LAUNCH_CHECKLIST.md` · `EXOTEL_SUPPORT_BRIEF.md` — mutually contradictory on build status; checklist is the accurate runbook |

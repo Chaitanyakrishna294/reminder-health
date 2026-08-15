@@ -834,6 +834,23 @@ tone. This is the feature the product is differentiated on, not a nice-to-have.
   does not need rebuilding.**
 
 ### 2. Multi-language — phased, deliberately
+
+**PART OF PHASE 2 SHIPPED 2026-08-15 — read [docs/I18N.md](docs/I18N.md) before touching
+this area or assuming a surface is translated.** Seven languages (English · हिन्दी · ಕನ್ನಡ ·
+മലയാളം · मराठी · தமிழ் · తెలుగు) now cover the nav labels, the Settings hub, the language
+picker and **all three legal documents**. Two corrections to the plan below, both deliberate:
+- **It does NOT use next-intl.** Its routing mode wants a `[locale]` segment across all 39
+  routes; its no-routing mode is a provider around a flat dictionary, which is what
+  `theme-context` / `density-context` / `ui-mode-context` already are here. `lib/i18n/messages/`
+  is laid out the way next-intl expects, so adopting it later is a config change, not a rewrite.
+- **The scope was wider than "Hindi + Telugu plus 1-2"** (six Indian languages) and
+  **narrower in depth** — chrome and legal text only. Medication names are user data and are
+  never translated.
+
+**The alarm screen is still English, and that remains the important gap** — see the CRITICAL
+note below, which is unchanged and unaddressed. The language picker says so on screen rather
+than letting someone discover it at 3am.
+
 - **Phase 1 is the voice feature itself.** A recorded message in the patient's own language from
   their own family solves the alarm-language problem *without any translation work*. This is why
   voice comes first.
@@ -845,10 +862,18 @@ tone. This is the feature the product is differentiated on, not a nice-to-have.
   `android-app/android/app/src/main/res/values/strings.xml`, so its translation is a `values-hi/`
   `values-te/` drop, independent of the web's next-intl work.
 
-**Placement (decided 2026-08-11 — settled):**
+**Placement (decided 2026-08-11 — settled; the picker half BUILT 2026-08-15):**
 - **Language picker lives in Settings** as a "Language" row, with **every language shown in its
   own script**: English / తెలుగు / हिन्दी. A language list written only in English is unusable by
-  exactly the person who needs to change it.
+  exactly the person who needs to change it. ✅ Built — `settings/language/language-picker.tsx`,
+  a `radiogroup` with the native name as the label and the English name muted beneath it (for
+  the caregiver setting up somebody else's phone). The Settings row's own value shows the
+  current language in its own script for the same reason.
+  - **Inter has no Indic glyphs, so this needed fonts, not just strings.** Five `Noto_Sans_*`
+    families are appended to **both** the sans and mono stacks via `--font-indic-tail`
+    (mono too — nav labels and badges are mono and JetBrains Mono has no Indic coverage
+    either). `preload: false` + per-script unicode-range subsets mean an English page fetches
+    none of them; verified in-browser that only the active script's file loads.
 - **Also asked ONCE at first-launch onboarding, before any other screen**, so the permission and
   setup screens themselves render in the chosen language — those are the screens where a
   misunderstanding costs the user their alarms.

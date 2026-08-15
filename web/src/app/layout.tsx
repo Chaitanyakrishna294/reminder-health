@@ -1,11 +1,20 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import {
+  Inter,
+  JetBrains_Mono,
+  Noto_Sans_Devanagari,
+  Noto_Sans_Telugu,
+  Noto_Sans_Tamil,
+  Noto_Sans_Kannada,
+  Noto_Sans_Malayalam,
+} from "next/font/google";
 import "./globals.css";
 import { UiModeProvider } from "@/context/ui-mode-context";
 import { DensityProvider } from "@/context/density-context";
 import DensityPreviewBadge from "@/components/dev/density-preview-badge";
 import { ThemeProvider } from "@/context/theme-context";
+import { LanguageProvider } from "@/context/language-context";
 import CookieConsent from "@/components/cookie-consent";
 import InstallPrompt from "@/components/install-prompt";
 import RegisterSW from "@/components/register-sw";
@@ -21,6 +30,67 @@ const jetbrainsMono = JetBrains_Mono({
   variable: "--font-mono",
   subsets: ["latin"],
 });
+
+/**
+ * INDIC GLYPH COVERAGE. Inter has none — not one Devanagari, Telugu, Tamil, Kannada
+ * or Malayalam codepoint. Without these five families the six Indian languages fall
+ * through to whatever `sans-serif` resolves to, which is usually fine on Android and
+ * Windows and is tofu boxes wherever it is not. "Usually fine" is not a floor for the
+ * screen an elderly user reads their language list on.
+ *
+ * COSTS NOTHING TO ENGLISH USERS. Each family is emitted with only its own script
+ * subset, so the CSS carries a `unicode-range` the browser matches before it fetches
+ * anything: an English page never requests a single one of these files.
+ * `preload: false` is the other half of that — a preload link would fetch them
+ * eagerly and undo it. `display: 'swap'` so text is readable while a face loads,
+ * rather than invisible.
+ *
+ * Five families cover six languages: Hindi and Marathi share Devanagari.
+ */
+const notoDevanagari = Noto_Sans_Devanagari({
+  variable: "--font-indic-devanagari",
+  subsets: ["devanagari"],
+  display: "swap",
+  preload: false,
+});
+
+const notoTelugu = Noto_Sans_Telugu({
+  variable: "--font-indic-telugu",
+  subsets: ["telugu"],
+  display: "swap",
+  preload: false,
+});
+
+const notoTamil = Noto_Sans_Tamil({
+  variable: "--font-indic-tamil",
+  subsets: ["tamil"],
+  display: "swap",
+  preload: false,
+});
+
+const notoKannada = Noto_Sans_Kannada({
+  variable: "--font-indic-kannada",
+  subsets: ["kannada"],
+  display: "swap",
+  preload: false,
+});
+
+const notoMalayalam = Noto_Sans_Malayalam({
+  variable: "--font-indic-malayalam",
+  subsets: ["malayalam"],
+  display: "swap",
+  preload: false,
+});
+
+const FONT_VARIABLES = [
+  inter.variable,
+  jetbrainsMono.variable,
+  notoDevanagari.variable,
+  notoTelugu.variable,
+  notoTamil.variable,
+  notoKannada.variable,
+  notoMalayalam.variable,
+].join(" ");
 
 export const metadata: Metadata = {
   title: "Re-MIND-eЯ | Healthcare Companion",
@@ -54,7 +124,7 @@ export default async function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
+      className={`${FONT_VARIABLES} h-full antialiased`}
     >
       <head>
         {/* Apply saved theme before paint to avoid a flash of the wrong theme.
@@ -71,6 +141,20 @@ export default async function RootLayout({
           suppressHydrationWarning
           dangerouslySetInnerHTML={{
             __html: `(function(){try{if(localStorage.getItem('theme')==='dark'){document.documentElement.classList.add('dark');document.documentElement.style.colorScheme='dark';}else{document.documentElement.style.colorScheme='light';}}catch(e){}})();`,
+          }}
+        />
+        {/* Stamp the saved language onto <html lang> before paint, same reason as the
+            theme script above. `lang` is what picks the right Indic font off the
+            fallback chain and what a screen reader announces in, so getting it one
+            frame late means a flash of the wrong script and a wrong-language
+            announcement. Falls back to 'en' on anything unexpected, which is what
+            LanguageProvider also lands on. Keep the key ('language') and the tag list
+            in lockstep with lib/i18n/locales.ts. */}
+        <script
+          nonce={nonce}
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var l=localStorage.getItem('language');if(l&&['en','hi','te','ta','kn','ml','mr'].indexOf(l)>-1)document.documentElement.lang=l;}catch(e){}})();`,
           }}
         />
         {/* PWA launch handoff, before paint for the same reason as the theme script:
@@ -111,19 +195,22 @@ export default async function RootLayout({
       </head>
       <body className="min-h-full flex flex-col">
         <LaunchHandoff />
-        <ThemeProvider>
-          <UiModeProvider>
-            {/* Inside UiModeProvider: elderly outranks every other density. */}
-            <DensityProvider>
-              {children}
-              <RegisterSW />
-              <InstallPrompt />
-              <CookieConsent />
-              {/* Renders only while ?preview= is forcing a density. */}
-              <DensityPreviewBadge />
-            </DensityProvider>
-          </UiModeProvider>
-        </ThemeProvider>
+        {/* Outermost, because every other provider's subtree may need a label. */}
+        <LanguageProvider>
+          <ThemeProvider>
+            <UiModeProvider>
+              {/* Inside UiModeProvider: elderly outranks every other density. */}
+              <DensityProvider>
+                {children}
+                <RegisterSW />
+                <InstallPrompt />
+                <CookieConsent />
+                {/* Renders only while ?preview= is forcing a density. */}
+                <DensityPreviewBadge />
+              </DensityProvider>
+            </UiModeProvider>
+          </ThemeProvider>
+        </LanguageProvider>
       </body>
     </html>
   );

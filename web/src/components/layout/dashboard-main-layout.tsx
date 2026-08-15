@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useLinkStatus } from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useUiMode } from '@/context/ui-mode-context';
+import { useLanguage } from '@/context/language-context';
 import { createClient } from '@/lib/supabase/client';
 import { ESCALATION_STATUSES } from '@/lib/schedule/dose-attention';
 import { isRootPath } from '@/lib/navigation/stack';
@@ -105,6 +106,7 @@ export default function DashboardMainLayout({
   patientChatId?: string | null;
 }) {
   const { isElderly, viewMode, setViewMode, showNavLabels } = useUiMode();
+  const { t } = useLanguage();
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
@@ -219,12 +221,15 @@ export default function DashboardMainLayout({
     // overrides it where the elderly nav's four tabs leave room for the plainer
     // word — "Meds" is idiomatic rather than plain, and elderly mode is the one
     // density that can afford "Medicines".
+    //
+    // Translated, so the five tabs read in the chosen language. The COUNT is
+    // untouched — "exactly 5 icons" is a hard rule and no locale changes it.
     const baseItems = [
-      { href: '/dashboard', label: 'Dashboard', short: 'Today', icon: LayoutDashboard },
-      { href: '/care-circle', label: 'Care Circle', short: 'Care', icon: Users },
-      { href: '/medications', label: 'Medications', short: 'Meds', shortElderly: 'Medicines', icon: Pill },
-      { href: '/health-vault', label: 'Health Vault', short: 'Vault', icon: FolderHeart },
-      { href: '/settings', label: 'Settings', short: 'Settings', icon: Settings },
+      { href: '/dashboard', label: t.nav.dashboard, short: t.nav.dashboardShort, icon: LayoutDashboard },
+      { href: '/care-circle', label: t.nav.careCircle, short: t.nav.careCircleShort, icon: Users },
+      { href: '/medications', label: t.nav.medications, short: t.nav.medicationsShort, shortElderly: t.nav.medicationsElderly, icon: Pill },
+      { href: '/health-vault', label: t.nav.healthVault, short: t.nav.healthVaultShort, icon: FolderHeart },
+      { href: '/settings', label: t.nav.settings, short: t.nav.settingsShort, icon: Settings },
     ];
 
     // ELDERLY = the third density, and its nav collapses with everything else.
