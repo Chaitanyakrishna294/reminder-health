@@ -74,6 +74,108 @@ export interface Messages {
     notSavedTitle: string;
     notSavedBody: string;
   };
+  /**
+   * HEALTH VAULT. Two things in here are deliberately NOT translated, and both
+   * would be bugs if they were:
+   *
+   * · `confirmToken` is 'DELETE', compared literally by handlePermanentDelete
+   *   (`.toUpperCase() !== 'DELETE'`). Translating the instruction while the code
+   *   still demands the English word would make permanent delete impossible in six
+   *   languages — the user types the word the screen asked for and nothing happens.
+   *   So the token stays Latin and the sentence around it carries it as a slot,
+   *   which keeps the screen and the check in agreement everywhere.
+   *
+   * · `formats` (PDF, JPG…) and the "20 MB" in `maxSize` are machine tokens and a
+   *   unit symbol. They are slots, not words.
+   */
+  vault: {
+    folders: string;
+    recentDocuments: string;
+    loading: string;
+    privateNotice: string;
+    backToFolders: string;
+    sharedReadOnly: string;
+    trashFolder: string;
+    searchPlaceholder: string;
+    uploadDocument: string;
+    needsAccount: string;
+    // Row actions
+    preview: string;
+    download: string;
+    edit: string;
+    delete: string;
+    restore: string;
+    purgeForever: string;
+    open: string;
+    openPdf: string;
+    tapToViewPdf: string;
+    previewUnavailable: string;
+    closePreview: string;
+    loadMore: string;
+    loadingMore: string;
+    // Edit dialog
+    editTitle: string;
+    editSubtitle: string;
+    fieldTitle: string;
+    fieldDate: string;
+    fieldCategory: string;
+    saveChanges: string;
+    // Permanent delete dialog
+    irreversible: string;
+    /** "Please type {token} below to confirm:" — {token} is the literal word. */
+    typeToConfirm: string;
+    /** "Type {token} here..." */
+    confirmPlaceholder: string;
+    confirmDeleteTitle: string;
+    canYouReadIt: string;
+    confirmToken: string;
+    deleteForever: string;
+    // Upload wizard
+    step1: string;
+    step2: string;
+    step3: string;
+    step4: string;
+    takePhoto: string;
+    chooseFile: string;
+    photoAlt: string;
+    retake: string;
+    chooseAnother: string;
+    /** "Supported formats: {formats}." */
+    formats: string;
+    /** "Maximum file size: {size}." */
+    maxSize: string;
+    titlePlaceholder: string;
+    summaryTitle: string;
+    labelCategory: string;
+    labelTitle: string;
+    labelDate: string;
+    labelFileName: string;
+    labelFileSize: string;
+    back: string;
+    next: string;
+    saving: string;
+    uploadAndSave: string;
+    // Errors + confirmations. Plain, no blame, no error codes on screen.
+    errTimeline: string;
+    errDownloadLink: string;
+    errPreview: string;
+    confirmTrash: string;
+    errDelete: string;
+    errRestore: string;
+    errTypeDelete: string;
+    errPermanentDelete: string;
+    errTitleRequired: string;
+    errDateRequired: string;
+    errCategoryRequired: string;
+    errSaveChanges: string;
+    errSessionExpired: string;
+    errSelectFile: string;
+    errValidFolder: string;
+    /** "Could not save. {detail}" — {detail} is a raw provider message, English. */
+    errDatabase: string;
+    errChooseFileFirst: string;
+    errTitleForRecord: string;
+  };
   greeting: {
     morning: string;
     afternoon: string;
@@ -167,6 +269,85 @@ const en: Messages = {
     open: 'Open',
     notSavedTitle: 'Not saved',
     notSavedBody: 'Please try again.',
+  },
+  vault: {
+    folders: 'Folders',
+    recentDocuments: 'Recent documents',
+    loading: 'Loading your documents…',
+    privateNotice: 'Your records are private',
+    backToFolders: 'Back to folders',
+    sharedReadOnly: 'Shared through Care Circle. You currently have read-only access.',
+    trashFolder: 'Trash',
+    searchPlaceholder: 'Search by title or file name…',
+    uploadDocument: 'Upload document',
+    needsAccount: 'Health Vault needs a saved account',
+    preview: 'Preview',
+    download: 'Download',
+    edit: 'Edit',
+    delete: 'Delete',
+    restore: 'Restore',
+    purgeForever: 'Delete forever',
+    open: 'Open',
+    openPdf: 'Open PDF',
+    tapToViewPdf: 'Tap to view this PDF',
+    previewUnavailable: 'Preview not available in the app',
+    closePreview: 'Close preview',
+    loadMore: 'Load more records',
+    loadingMore: 'Loading more…',
+    editTitle: 'Edit record details',
+    editSubtitle: 'Change the folder or the date on this record.',
+    fieldTitle: 'Title',
+    fieldDate: 'Record date',
+    fieldCategory: 'Folder',
+    saveChanges: 'Save changes',
+    irreversible:
+      'This cannot be undone. The record and the stored file are deleted forever.',
+    typeToConfirm: 'Please type {token} below to confirm:',
+    confirmPlaceholder: 'Type {token} here…',
+    confirmDeleteTitle: 'Delete this record forever?',
+    canYouReadIt: 'Can you read it? If not, take it again — nothing is saved yet.',
+    confirmToken: 'DELETE',
+    deleteForever: 'Delete forever',
+    step1: 'Step 1: Folder',
+    step2: 'Step 2: File',
+    step3: 'Step 3: Details',
+    step4: 'Step 4: Save',
+    takePhoto: 'Take photo',
+    chooseFile: 'Choose file',
+    photoAlt: 'The photo you just took',
+    retake: 'Retake',
+    chooseAnother: 'Choose another',
+    formats: 'Supported formats: {formats}.',
+    maxSize: 'Maximum file size: {size}.',
+    titlePlaceholder: 'e.g. Blood test report',
+    summaryTitle: 'Check before saving',
+    labelCategory: 'Folder',
+    labelTitle: 'Title',
+    labelDate: 'Date',
+    labelFileName: 'File name',
+    labelFileSize: 'File size',
+    back: 'Back',
+    next: 'Next',
+    saving: 'Saving…',
+    uploadAndSave: 'Upload and save',
+    errTimeline: 'Could not load your records. Please try again.',
+    errDownloadLink: 'Could not prepare the download. Please try again.',
+    errPreview: 'Could not load the preview. Please try again.',
+    confirmTrash: 'Move this record to the Trash?',
+    errDelete: 'Could not delete the record. Please try again.',
+    errRestore: 'Could not restore the record. Please try again.',
+    errTypeDelete: 'Please type {token} to confirm.',
+    errPermanentDelete: 'Could not delete the record. Please try again.',
+    errTitleRequired: 'Please add a title.',
+    errDateRequired: 'Please choose a date.',
+    errCategoryRequired: 'Please choose a folder.',
+    errSaveChanges: 'Could not save the changes. Please try again.',
+    errSessionExpired: 'Your session ended. Please sign in again.',
+    errSelectFile: 'Please choose a file.',
+    errValidFolder: 'Please choose a folder.',
+    errDatabase: 'Could not save. {detail}',
+    errChooseFileFirst: 'Please choose a file before continuing.',
+    errTitleForRecord: 'Please add a title for this record.',
   },
   greeting: {
     morning: 'Good morning',
