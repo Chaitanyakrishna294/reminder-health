@@ -54,6 +54,49 @@ export const LOCALE_META: Record<Locale, LocaleMeta> = {
 /** Ordered for the picker: English first, then the Indic languages alphabetically by English name. */
 export const LOCALE_ORDER: Locale[] = ['en', 'hi', 'kn', 'ml', 'mr', 'ta', 'te'];
 
+/**
+ * THE COMPLETENESS GATE — a language appears in the picker only when it is DONE.
+ *
+ * "Better fewer complete languages than many partial ones." A half-translated
+ * language is worse than no translation: an English-only app is at least
+ * consistently readable by someone who got that far, whereas a "Telugu" app with
+ * an English Save button strands them mid-task with no way to guess what the
+ * button does. The partial state also teaches them the setting is broken, so they
+ * never try it again.
+ *
+ * HOW A LANGUAGE GETS ADDED HERE — both must hold, and both are checkable:
+ *   1. `node scripts/i18n-audit.mjs` reports 0 for every surface in scope, so no
+ *      hardcoded English is left to leak through.
+ *   2. `completeness.test.ts` passes for the locale — every key present (the
+ *      TYPE already forces that) and none still carrying a TODO_TRANSLATE marker.
+ *
+ * Do not add a locale here to "make it visible for testing". Use `?preview=` for
+ * that, the way the density split does — a shipped picker entry is a promise.
+ *
+ * CURRENT STATE (2026-08-15): all seven are complete **for the surfaces
+ * translated so far** — nav, Settings hub, language picker, legal documents.
+ * The full-app extraction is in progress (625 strings measured, see docs/I18N.md);
+ * as each wave lands, the locales stay listed only while they keep passing both
+ * checks above. If a wave translates English but not the other six, THIS LIST
+ * shrinks to ['en'] until they catch up. That is the mechanism working, not a
+ * regression to route around.
+ */
+export const COMPLETE_LOCALES: Locale[] = ['en', 'hi', 'kn', 'ml', 'mr', 'ta', 'te'];
+
+/**
+ * Sentinel for a string that has been extracted but not yet translated.
+ *
+ * Prefixing a value with this keeps the file type-correct (so the build stays
+ * green and work can proceed in parallel) while `completeness.test.ts` refuses to
+ * let that locale ship. Never ship a locale whose file contains one.
+ */
+export const TODO_TRANSLATE = 'TODO_TRANSLATE:';
+
+/** The picker's list. Never `LOCALE_ORDER` directly — that would show unfinished work. */
+export function pickableLocales(): Locale[] {
+  return LOCALE_ORDER.filter((l) => COMPLETE_LOCALES.includes(l));
+}
+
 export function isLocale(value: unknown): value is Locale {
   return typeof value === 'string' && (LOCALES as readonly string[]).includes(value);
 }

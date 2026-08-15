@@ -4,7 +4,7 @@ import React from 'react';
 import { Check } from 'lucide-react';
 import { useLanguage } from '@/context/language-context';
 import { useUiMode } from '@/context/ui-mode-context';
-import { LOCALE_META, LOCALE_ORDER } from '@/lib/i18n/locales';
+import { LOCALE_META, pickableLocales } from '@/lib/i18n/locales';
 
 /**
  * Settings → Language. The picker that the placeholder here used to promise.
@@ -49,7 +49,9 @@ export default function LanguagePicker() {
         aria-label={t.language.title}
         className="card-lift overflow-hidden divide-y divide-border"
       >
-        {LOCALE_ORDER.map((code) => {
+        {/* pickableLocales(), never LOCALE_ORDER — a language appears here only
+            once it is complete. See the gate in lib/i18n/locales.ts. */}
+        {pickableLocales().map((code) => {
           const meta = LOCALE_META[code];
           const active = code === locale;
           return (
