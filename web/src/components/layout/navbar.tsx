@@ -45,31 +45,56 @@ export default function Navbar({ user }: NavbarProps) {
   return (
     <nav className="bg-white/80 dark:bg-card/70 backdrop-blur-xl border-b border-border/70 shadow-sm sticky top-0 z-40 transition-all duration-300 supports-[backdrop-filter]:bg-white/65">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className={`flex justify-between items-center transition-all duration-300 ${isElderly ? 'h-20' : 'h-16'
+        {/* 56px in normal density, down from 64. The bar is chrome: it should
+            frame the screen, not take a bite out of it. Elderly keeps its 80px
+            — that density is excluded from this round and its targets are sized
+            for a different pair of hands. */}
+        <div className={`flex justify-between items-center transition-all duration-300 ${isElderly ? 'h-20' : 'h-14'
           }`}>
           {/* Logo and Brand */}
           <div className="flex items-center">
             <Link href="/dashboard" className="flex items-center gap-1 min-h-11 shrink-0">
               
-              <span className={`font-black text-foreground tracking-tight transition-all duration-300 font-mono flex items-center gap-0.5 ${isElderly ? 'text-2xl' : 'text-lg'
-                }`}>
-                <span>Re</span>
-                <img
-                  src="/logo2.png"
-                  alt="MIND"
-                  className="inline-block rounded-md object-contain shrink-0 bg-white"
-                  style={{
-                    width: isElderly ? '48px' : '40px',
-                    height: isElderly ? '48px' : '40px'
-                  }}
-                />
-                <span>eЯ</span>
-              </span>
+              {/* A TYPE WORDMARK, not a raster mark.
+                  The bar used to carry a 40px PNG between "Re" and "eЯ", which
+                  set the header's height on its own and shipped an image request
+                  on every page. Set in the brand's mono face — a wordmark is a
+                  VALUE, not a sentence, so this is the one place mono is exactly
+                  right — with MIND in the accent so the name still reads as a
+                  mark rather than as three syllables.
+
+                  Elderly keeps the image: that density is excluded, and its
+                  users are the ones most helped by a familiar shape. */}
+              {isElderly ? (
+                <span className="font-black text-foreground tracking-tight transition-all duration-300 font-mono flex items-center gap-0.5 text-2xl">
+                  <span>Re</span>
+                  <img
+                    src="/logo2.png"
+                    alt="MIND"
+                    className="inline-block rounded-md object-contain shrink-0 bg-white"
+                    style={{ width: '48px', height: '48px' }}
+                  />
+                  <span>eЯ</span>
+                </span>
+              ) : (
+                <span className="font-mono font-black text-foreground text-[19px] leading-none tracking-[-0.03em] flex items-baseline">
+                  <span>Re</span>
+                  <span className="text-primary-strong">MIND</span>
+                  <span>eЯ</span>
+                </span>
+              )}
             </Link>
           </div>
 
           {/* Action Center (Role Switcher, Realtime Bell, Mode Toggle, Profile Dropdown) */}
-          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+          <div className={`flex items-center min-w-0 ${isElderly ? 'gap-2 sm:gap-4' : 'gap-1.5'}`}>
+
+            {/* CONSOLIDATED. The bar carried three separate round buttons of equal
+                weight — bell, glasses, avatar — which read as a row of widgets
+                rather than as chrome. In normal density they now sit in one
+                recessed group, so the header has ONE object on the right instead
+                of three competing ones. Each target keeps its own 44px. */}
+            <div className={isElderly ? 'contents' : 'flex items-center gap-0.5 rounded-[14px] surface-sunk px-1'}>
 
             {/* Realtime Bell */}
             <NotificationCenter userId={user.id} />
@@ -97,7 +122,7 @@ export default function Navbar({ user }: NavbarProps) {
               title={isElderly ? 'Switch to Normal view' : 'Switch to Elderly view'}
               className={`flex items-center justify-center rounded-full transition-all duration-200 border cursor-pointer hover:scale-[1.05] active:scale-[0.95] ${isElderly
                 ? 'bg-warning/20 hover:bg-warning/35 border-warning/50 text-warning-strong w-12 h-12 shadow-sm'
-                : 'bg-muted hover:bg-muted/80 border-border text-foreground/80 hover:text-foreground w-11 h-11'
+                : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/60 w-11 h-11'
                 }`}
             >
               <Glasses className={isElderly ? 'w-6 h-6' : 'w-[18px] h-[18px]'} />
@@ -108,6 +133,8 @@ export default function Navbar({ user }: NavbarProps) {
             <div className="relative">
               <button
                 onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                aria-label={`Account menu for ${user.fullName}`}
+                aria-expanded={userDropdownOpen}
                 className="flex items-center space-x-2 focus:outline-none cursor-pointer font-mono"
               >
                 <div className={`rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold border border-primary/20 transition-all overflow-hidden ${isElderly ? 'w-12 h-12 text-base' : 'w-11 h-11 text-sm'
@@ -119,11 +146,19 @@ export default function Navbar({ user }: NavbarProps) {
                     user.fullName.substring(0, 2).toUpperCase()
                   )}
                 </div>
-                <span className={`hidden sm:inline font-semibold text-foreground ${isElderly ? 'text-base' : 'text-sm'
-                  }`}>
-                  {user.fullName}
-                </span>
-                <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                {/* The name and chevron survive in ELDERLY only. In normal
+                    density the avatar is the affordance and the name is the
+                    first line of the menu it opens, so both were restating
+                    something one tap away — and the aria-label above carries the
+                    name for anyone not looking at the picture. */}
+                {isElderly && (
+                  <>
+                    <span className="hidden sm:inline font-semibold text-foreground text-base">
+                      {user.fullName}
+                    </span>
+                    <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  </>
+                )}
               </button>
 
               {userDropdownOpen && (
@@ -182,6 +217,7 @@ export default function Navbar({ user }: NavbarProps) {
                   </button>
                 </div>
               )}
+            </div>
             </div>
           </div>
         </div>
