@@ -248,6 +248,103 @@ export interface Messages {
     genderPreferNotToSay: string;
     bloodUnknown: string;
   };
+  /**
+   * THE DASHBOARD — banners, the first-run guide, the caregiver monitor header,
+   * and the inventory column.
+   *
+   * `iosInstruction` names two iOS system labels ("Share", "Add to Home Screen").
+   * Those appear in whatever language THE PHONE is set to, which we cannot know
+   * from here, so naming them in the app's language can be wrong either way. The
+   * sentence therefore leans on the icon description — a box with an arrow
+   * pointing up — which is the same on every iPhone regardless of language, and
+   * translates the rest normally.
+   */
+  dashboard: {
+    enableNotifications: string;
+    dismissBanner: string;
+    iosTitle: string;
+    iosInstruction: string;
+    welcomeTitle: string;
+    dismissGuide: string;
+    guideMedsTitle: string;
+    guideMedsBody: string;
+    guideInviteTitle: string;
+    guideInviteBody: string;
+    guideCaregiverTitle: string;
+    guideCaregiverBody: string;
+    guideSkipTitle: string;
+    guideSkipBody: string;
+    photoAlt: string;
+    statusIntervention: string;
+    statusMissed: string;
+    statusOnTrack: string;
+    patientName: string;
+    complianceRate: string;
+    lastTakenDose: string;
+    nextDose: string;
+    alertStatus: string;
+    compliance: string;
+    dailyCycle: string;
+    noSchedule: string;
+    careCircle: string;
+    inventoryTitle: string;
+    inventorySubtitle: string;
+    refillFor: string;
+    unitsToAdd: string;
+    inventoryBalanced: string;
+    inventoryBalancedBody: string;
+  };
+  /**
+   * CARE CIRCLE — the sharing controls and the consent log.
+   *
+   * The relationship options here are SAFE to translate, unlike gender in
+   * `profile`: they already render as `<option value="SON">Son</option>`, so the
+   * stored code and the visible label are separate fields. Worth noting the
+   * contrast — the same-looking list was a trap in one file and is not in this one,
+   * and the difference is one attribute.
+   *
+   * The consent-log lines carry a PERSON'S NAME. Same rule as medicine names: the
+   * frame translates, `{name}` is substituted verbatim.
+   */
+  care: {
+    trustGranted: string;
+    trustGrantedBody: string;
+    coordinatorUpdated: string;
+    coordinatorUpdatedBody: string;
+    accessRevoked: string;
+    accessRevokedBody: string;
+    trustUpdated: string;
+    backToCareCircle: string;
+    trustCenter: string;
+    inControl1: string;
+    inControl2: string;
+    peopleSupportingMe: string;
+    noCaregivers: string;
+    promoteCoordinator: string;
+    revokeAccess: string;
+    accessLevel: string;
+    permMedSchedule: string;
+    permMissedAlerts: string;
+    permComplianceReports: string;
+    permVaultDocs: string;
+    permModifySchedules: string;
+    peopleISupport: string;
+    noPatients: string;
+    consentHistory: string;
+    noConsentHistory: string;
+    adjustPresets: string;
+    relationshipType: string;
+    relSon: string;
+    relDaughter: string;
+    relSpouse: string;
+    relParent: string;
+    relSibling: string;
+    relFriend: string;
+    relDoctor: string;
+    relOther: string;
+    accessPresets: string;
+    granularToggles: string;
+  };
   greeting: {
     morning: string;
     afternoon: string;
@@ -467,6 +564,81 @@ const en: Messages = {
     genderOther: 'Other',
     genderPreferNotToSay: 'Prefer not to say',
     bloodUnknown: 'Unknown',
+  },
+  dashboard: {
+    enableNotifications: 'Turn on browser notifications',
+    dismissBanner: 'Dismiss',
+    iosTitle: 'Add to Home Screen (iPhone)',
+    iosInstruction:
+      'Tap the share button — the box with an arrow pointing up — then choose “Add to Home Screen”.',
+    welcomeTitle: 'Welcome to Re-MIND-eЯ',
+    dismissGuide: 'Close this guide',
+    guideMedsTitle: 'Manage my medicines',
+    guideMedsBody: 'Add your medicines, set the times, and record what you take.',
+    guideInviteTitle: 'Invite someone to help me',
+    guideInviteBody: 'Share your code so family can see how you are doing.',
+    guideCaregiverTitle: 'Help care for someone else',
+    guideCaregiverBody: 'Enter their code to see the doses they have agreed to share.',
+    guideSkipTitle: 'Skip for now',
+    guideSkipBody: 'Close this guide and look around on your own.',
+    photoAlt: 'Profile photo',
+    statusIntervention: 'A caregiver needs to step in.',
+    statusMissed: 'Some doses were missed.',
+    statusOnTrack: 'Today is on track.',
+    patientName: 'Name',
+    complianceRate: 'Doses taken',
+    lastTakenDose: 'Last dose taken',
+    nextDose: 'Next dose',
+    alertStatus: 'Status',
+    compliance: 'Doses taken',
+    dailyCycle: "Today's progress",
+    noSchedule: 'Nothing scheduled today',
+    careCircle: 'Care circle',
+    inventoryTitle: 'Medicine stock',
+    inventorySubtitle: 'What you have left, and what is running low',
+    refillFor: 'Running low:',
+    unitsToAdd: 'How many to add',
+    inventoryBalanced: 'Stock looks fine',
+    inventoryBalancedBody: 'Nothing is running low right now.',
+  },
+  care: {
+    trustGranted: 'Access granted',
+    trustGrantedBody: 'You approved the request and shared your care circle with {name}.',
+    coordinatorUpdated: 'Main contact changed',
+    coordinatorUpdatedBody: '{name} is now your main contact.',
+    accessRevoked: 'Access removed',
+    accessRevokedBody: 'Access removed for {name}.',
+    trustUpdated: 'Access updated',
+    backToCareCircle: 'Back to care circle',
+    trustCenter: 'Who can help me',
+    inControl1: 'You decide who can support you.',
+    inControl2: 'You can change or remove access at any time.',
+    peopleSupportingMe: 'People supporting me',
+    noCaregivers: 'Nobody has access yet',
+    promoteCoordinator: 'Make main contact',
+    revokeAccess: 'Remove access',
+    accessLevel: 'Can see:',
+    permMedSchedule: 'My medicine times',
+    permMissedAlerts: 'Missed dose alerts',
+    permComplianceReports: 'How I am doing',
+    permVaultDocs: 'Health vault documents',
+    permModifySchedules: 'Change my times',
+    peopleISupport: 'People I support',
+    noPatients: 'You are not supporting anyone yet',
+    consentHistory: 'History of changes',
+    noConsentHistory: 'Nothing has changed yet.',
+    adjustPresets: 'Choose a preset, or set each permission yourself.',
+    relationshipType: 'Relationship',
+    relSon: 'Son',
+    relDaughter: 'Daughter',
+    relSpouse: 'Spouse',
+    relParent: 'Parent',
+    relSibling: 'Brother or sister',
+    relFriend: 'Friend',
+    relDoctor: 'Doctor',
+    relOther: 'Other',
+    accessPresets: 'Presets',
+    granularToggles: 'Each permission',
   },
   greeting: {
     morning: 'Good morning',

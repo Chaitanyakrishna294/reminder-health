@@ -5,6 +5,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useUiMode } from '@/context/ui-mode-context';
+import { useLanguage } from '@/context/language-context';
 import { useDensity } from '@/context/density-context';
 import TodaysSchedule, { ReminderEvent } from '@/components/dashboard/todays-schedule';
 import WaterCard, { type WaterCardProps } from '@/components/water/water-card';
@@ -114,6 +115,7 @@ export default function DashboardClientView({
   avatarUrl = null,
 }: DashboardClientViewProps) {
   const { isElderly, toggleMode, viewMode } = useUiMode();
+  const { t } = useLanguage();
   /**
    * THE DENSITY SPLIT. `layout` is the table in lib/design/density.ts — read it
    * rather than comparing densities by hand here, so the whole difference
@@ -888,7 +890,7 @@ export default function DashboardClientView({
               <Send className="w-5 h-5 animate-bounce" />
             </div>
             <div>
-              <h4 className="text-sm font-black text-foreground">Enable Browser Notifications</h4>
+              <h4 className="text-sm font-black text-foreground">{t.dashboard.enableNotifications}</h4>
               <p className="text-xs text-muted-foreground font-semibold mt-0.5">
                 Get real-time alerts for your scheduled medications directly on your device.
               </p>
@@ -903,7 +905,7 @@ export default function DashboardClientView({
             </button>
             <button
               onClick={handleDismissBanner}
-              aria-label="Dismiss banner"
+              aria-label={t.dashboard.dismissBanner}
               className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-full transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
@@ -920,9 +922,9 @@ export default function DashboardClientView({
               <Plus className="w-5 h-5" />
             </div>
             <div>
-              <h4 className="text-sm font-black text-foreground">Add to Home Screen (iOS)</h4>
+              <h4 className="text-sm font-black text-foreground">{t.dashboard.iosTitle}</h4>
               <p className="text-xs text-muted-foreground font-semibold mt-0.5">
-                To receive push reminders on iOS, install Re-MIND-eЯ: tap the <span className="font-bold text-primary">Share</span> button (box with an up arrow) and select <span className="font-bold text-primary">"Add to Home Screen"</span>.
+                {t.dashboard.iosInstruction}
               </p>
             </div>
           </div>
@@ -933,7 +935,7 @@ export default function DashboardClientView({
                 setShowIosPwaBanner(false);
               }}
               className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-full transition-colors cursor-pointer"
-              aria-label="Dismiss banner"
+              aria-label={t.dashboard.dismissBanner}
             >
               <X className="w-4 h-4" />
             </button>
@@ -954,7 +956,7 @@ export default function DashboardClientView({
                 <Sparkles className="w-6 h-6 animate-pulse" />
               </div>
               <div>
-                <h2 className="text-base font-black text-foreground">Welcome to Re-MIND-eЯ</h2>
+                <h2 className="text-base font-black text-foreground">{t.dashboard.welcomeTitle}</h2>
                 <p className="text-xs text-muted-foreground font-semibold mt-1">
                   What would you like to do?
                 </p>
@@ -965,7 +967,7 @@ export default function DashboardClientView({
                 localStorage.setItem('dismissedSetupWizard', 'true');
                 setShowSetupWizard(false);
               }}
-              aria-label="Dismiss setup guide"
+              aria-label={t.dashboard.dismissGuide}
               className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted/45 rounded-full transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
@@ -978,8 +980,8 @@ export default function DashboardClientView({
               className="flex flex-col items-center text-center p-5 border border-border hover:border-primary/40 bg-card hover:bg-primary/[0.02] rounded-2xl cursor-pointer transition-all hover:scale-[1.02] group"
             >
               <Pill className="w-7 h-7 mb-2 text-primary group-hover:scale-110 transition-transform" />
-              <span className="text-xs font-black text-foreground">Manage my medications</span>
-              <span className="text-[10px] text-muted-foreground mt-1 font-semibold leading-relaxed">Add drug inventory, schedule recurring reminder times, and log intake.</span>
+              <span className="text-xs font-black text-foreground">{t.dashboard.guideMedsTitle}</span>
+              <span className="text-[10px] text-muted-foreground mt-1 font-semibold leading-relaxed">{t.dashboard.guideMedsBody}</span>
             </Link>
 
             <Link
@@ -987,8 +989,8 @@ export default function DashboardClientView({
               className="flex flex-col items-center text-center p-5 border border-border hover:border-primary/40 bg-card hover:bg-primary/[0.02] rounded-2xl cursor-pointer transition-all hover:scale-[1.02] group"
             >
               <Users className="w-7 h-7 mb-2 text-primary group-hover:scale-110 transition-transform" />
-              <span className="text-xs font-black text-foreground">Invite someone to support me</span>
-              <span className="text-[10px] text-muted-foreground mt-1 font-semibold leading-relaxed">Share your profile access code so family members can monitor adherence.</span>
+              <span className="text-xs font-black text-foreground">{t.dashboard.guideInviteTitle}</span>
+              <span className="text-[10px] text-muted-foreground mt-1 font-semibold leading-relaxed">{t.dashboard.guideInviteBody}</span>
             </Link>
 
             <Link
@@ -996,8 +998,8 @@ export default function DashboardClientView({
               className="flex flex-col items-center text-center p-5 border border-border hover:border-primary/40 bg-card hover:bg-primary/[0.02] rounded-2xl cursor-pointer transition-all hover:scale-[1.02] group"
             >
               <Stethoscope className="w-7 h-7 mb-2 text-primary group-hover:scale-110 transition-transform" />
-              <span className="text-xs font-black text-foreground">Help care for someone else</span>
-              <span className="text-[10px] text-muted-foreground mt-1 font-semibold leading-relaxed">Register your caregiver ID and link connected patient profiles.</span>
+              <span className="text-xs font-black text-foreground">{t.dashboard.guideCaregiverTitle}</span>
+              <span className="text-[10px] text-muted-foreground mt-1 font-semibold leading-relaxed">{t.dashboard.guideCaregiverBody}</span>
             </Link>
 
             <button
@@ -1008,8 +1010,8 @@ export default function DashboardClientView({
               className="flex flex-col items-center text-center p-5 border border-border hover:border-primary/40 bg-card hover:bg-primary/[0.02] rounded-2xl cursor-pointer transition-all hover:scale-[1.02] group"
             >
               <SkipForward className="w-7 h-7 mb-2 text-muted-foreground group-hover:scale-110 transition-transform" />
-              <span className="text-xs font-black text-foreground">Skip for now</span>
-              <span className="text-[10px] text-muted-foreground mt-1 font-semibold leading-relaxed">Close this guide and explore the workspace dashboard at your own pace.</span>
+              <span className="text-xs font-black text-foreground">{t.dashboard.guideSkipTitle}</span>
+              <span className="text-[10px] text-muted-foreground mt-1 font-semibold leading-relaxed">{t.dashboard.guideSkipBody}</span>
             </button>
           </div>
         </div>
@@ -1025,7 +1027,7 @@ export default function DashboardClientView({
           <div className="w-10 h-10 rounded-full bg-primary/10 text-foreground border border-primary/20 flex items-center justify-center font-mono font-black text-sm shadow-inner shrink-0 overflow-hidden">
             {avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={avatarUrl} alt="Profile photo" className="w-full h-full object-cover" />
+              <img src={avatarUrl} alt={t.dashboard.photoAlt} className="w-full h-full object-cover" />
             ) : (
               userName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'U'
             )}
@@ -1045,17 +1047,17 @@ export default function DashboardClientView({
               {activeEscalations > 0 ? (
                 <>
                   <AlertTriangle className="w-3.5 h-3.5 text-danger shrink-0 animate-bounce" />
-                  <span>Caregiver intervention is required.</span>
+                  <span>{t.dashboard.statusIntervention}</span>
                 </>
               ) : todayMissed > 0 ? (
                 <>
                   <AlertCircle className="w-3.5 h-3.5 text-warning shrink-0" />
-                  <span>Attention: You have missed doses.</span>
+                  <span>{t.dashboard.statusMissed}</span>
                 </>
               ) : (
                 <>
                   <CheckCircle className="w-3.5 h-3.5 text-success shrink-0" />
-                  <span>Your health schedule is on track today.</span>
+                  <span>{t.dashboard.statusOnTrack}</span>
                 </>
               )}
             </p>
@@ -1068,17 +1070,17 @@ export default function DashboardClientView({
       {viewMode === 'PATIENT_MONITOR' && (
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 bg-primary/5 border border-primary/20 rounded-3xl p-6 shadow-sm animate-fade-in">
           <div className="md:col-span-1 border-b md:border-b-0 md:border-r border-primary/10 pb-3 md:pb-0 md:pr-4 flex flex-col justify-center">
-            <Eyebrow as="span" className="text-primary">Patient Name</Eyebrow>
+            <Eyebrow as="span" className="text-primary">{t.dashboard.patientName}</Eyebrow>
             <h3 className="text-sm font-black text-foreground mt-0.5">{patientName}</h3>
           </div>
           
           <div className="md:col-span-1 border-b md:border-b-0 md:border-r border-primary/10 pb-3 md:pb-0 md:pr-4 flex flex-col justify-center">
-            <Eyebrow as="span" className="text-primary">Compliance Rate</Eyebrow>
+            <Eyebrow as="span" className="text-primary">{t.dashboard.complianceRate}</Eyebrow>
             <h3 className="text-sm font-black text-foreground mt-0.5">{monthlyAdherence}% Adherence</h3>
           </div>
 
           <div className="md:col-span-1 border-b md:border-b-0 md:border-r border-primary/10 pb-3 md:pb-0 md:pr-4 flex flex-col justify-center">
-            <Eyebrow as="span" className="text-primary">Last Taken Dose</Eyebrow>
+            <Eyebrow as="span" className="text-primary">{t.dashboard.lastTakenDose}</Eyebrow>
             {(() => {
               const formattedLastTakenTime = mounted && lastTaken
                 ? new Date(lastTaken.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -1092,7 +1094,7 @@ export default function DashboardClientView({
           </div>
 
           <div className="md:col-span-1 border-b md:border-b-0 md:border-r border-primary/10 pb-3 md:pb-0 md:pr-4 flex flex-col justify-center">
-            <Eyebrow as="span" className="text-primary">Next Dose</Eyebrow>
+            <Eyebrow as="span" className="text-primary">{t.dashboard.nextDose}</Eyebrow>
             <h3 className="text-xs font-black text-foreground mt-0.5 truncate" title={nextPendingEvent ? `${nextPendingEvent.medications.drug_name} at ${mounted ? new Date(nextPendingEvent.scheduled_for).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}` : 'All caught up!'}>
               {nextPendingEvent 
                 ? `${nextPendingEvent.medications.drug_name} (${mounted ? new Date(nextPendingEvent.scheduled_for).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'})`
@@ -1101,7 +1103,7 @@ export default function DashboardClientView({
           </div>
 
           <div className="md:col-span-1 flex flex-col justify-center">
-            <Eyebrow as="span" className="text-primary">Alert Status</Eyebrow>
+            <Eyebrow as="span" className="text-primary">{t.dashboard.alertStatus}</Eyebrow>
             <div className="mt-0.5">
               {activeEscalations > 0 ? (
                 <span className="inline-flex items-center gap-1.5 text-[10px] font-black text-danger bg-danger/10 border border-danger/25 px-2.5 py-0.5 rounded-full animate-pulse uppercase tracking-wider">
@@ -1317,9 +1319,9 @@ export default function DashboardClientView({
             <div className="w-full text-left mb-2">
               <h3 className="font-black text-foreground text-xs sm:text-sm flex items-center gap-1.5 min-w-0">
                 <Activity className="w-4 h-4 text-primary shrink-0" />
-                <span className="truncate">Compliance</span>
+                <span className="truncate">{t.dashboard.compliance}</span>
               </h3>
-              <p className="hidden sm:block text-[11px] text-muted-foreground">Daily dose cycle progress</p>
+              <p className="hidden sm:block text-[11px] text-muted-foreground">{t.dashboard.dailyCycle}</p>
             </div>
 
             {/* The ring is the whole card. It gets every pixel the half-width card can spare
@@ -1331,7 +1333,7 @@ export default function DashboardClientView({
               {events.length === 0 ? (
                 <div className="text-center space-y-2">
                   <CheckCircle className="w-8 h-8 text-success mx-auto" />
-                  <p className="text-xs text-muted-foreground font-bold">No active schedule today</p>
+                  <p className="text-xs text-muted-foreground font-bold">{t.dashboard.noSchedule}</p>
                 </div>
               ) : (
                 <svg viewBox="0 0 300 300" className="w-full h-full overflow-visible">
@@ -1515,7 +1517,7 @@ export default function DashboardClientView({
                     the foot of the card, where it also fills the space a short list leaves. */}
                 <h3 className="font-black text-foreground text-xs sm:text-sm flex items-center gap-1.5 min-w-0">
                   <Users className="w-4 h-4 text-primary shrink-0" />
-                  <span className="truncate">Care circle</span>
+                  <span className="truncate">{t.dashboard.careCircle}</span>
                 </h3>
 
                 {members.length > 0 ? (
@@ -1580,8 +1582,8 @@ export default function DashboardClientView({
           <div className="card-lift p-6 space-y-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 className="font-black text-foreground text-sm">Medication Inventory</h3>
-                <p className="text-[11px] text-muted-foreground">Current tablet counts and alerts</p>
+                <h3 className="font-black text-foreground text-sm">{t.dashboard.inventoryTitle}</h3>
+                <p className="text-[11px] text-muted-foreground">{t.dashboard.inventorySubtitle}</p>
               </div>
               {lowStockCount > 0 && (
                 <span className="shrink-0 inline-flex items-center gap-1 bg-warning/10 border border-warning/30 text-warning-strong text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full">
@@ -1596,7 +1598,7 @@ export default function DashboardClientView({
                     `-strong` is the readable-on-tint variant. */}
                 <div className="bg-warning/10 border border-warning/35 p-3 rounded-xl flex items-center gap-2 text-warning-strong text-xs font-semibold">
                   <AlertCircle className="w-4 h-4 shrink-0 text-warning-strong" />
-                  <span>Refill recommended for:</span>
+                  <span>{t.dashboard.refillFor}</span>
                 </div>
                 {lowStockMedicines.map((m, idx) => {
                   const canRefill = viewMode !== 'PATIENT_MONITOR';
@@ -1633,7 +1635,7 @@ export default function DashboardClientView({
                             value={refillAmount}
                             onChange={(e) => setRefillAmount(e.target.value)}
                             onKeyDown={(e) => { if (e.key === 'Enter') submitRefill(m.id, m.stock); }}
-                            placeholder="Units to add"
+                            placeholder={t.dashboard.unitsToAdd}
                             className="flex-1 min-w-0 bg-card border border-input rounded-lg px-3 py-1.5 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                           />
                           <button
@@ -1652,8 +1654,8 @@ export default function DashboardClientView({
             ) : (
               <div className="bg-success/5 border border-success/20 p-4 rounded-2xl text-center text-xs space-y-1">
                 <Package className="w-8 h-8 text-success mx-auto mb-2" />
-                <p className="font-black text-success-strong mt-1">Inventory Balanced</p>
-                <p className="text-[11px] text-muted-foreground font-semibold">All medication stock levels are sufficient.</p>
+                <p className="font-black text-success-strong mt-1">{t.dashboard.inventoryBalanced}</p>
+                <p className="text-[11px] text-muted-foreground font-semibold">{t.dashboard.inventoryBalancedBody}</p>
               </div>
             )}
 

@@ -67,7 +67,11 @@ function isCopy(s) {
 
 const findings = [];
 
-for (const file of walk(SCAN_ROOT)) {
+// `--path` takes a directory or a single file — scoping to one file is the common
+// case while working through a surface.
+const targets = statSync(SCAN_ROOT).isDirectory() ? walk(SCAN_ROOT) : [SCAN_ROOT];
+
+for (const file of targets) {
   const rel = relative(ROOT, file).replace(/\\/g, '/');
   const lines = readFileSync(file, 'utf8').split('\n');
 
