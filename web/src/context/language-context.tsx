@@ -42,22 +42,63 @@ function applyLocale(locale: Locale) {
   document.documentElement.lang = LOCALE_META[locale].htmlLang;
 }
 
-export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(DEFAULT_LOCALE);
-  const [mounted, setMounted] = useState(false);
+/**
+ * Mirror the choice into a cookie so the SERVER can read it.
+ *
+ * Same key and value as the localStorage entry, written together and never
+ * separately — server-rendered copy and client-rendered copy disagreeing about
+ * the language is worse than either being wrong on its own, because it looks like
+ * the app is half-translated. One year, `Lax` so it survives normal navigation
+ * without riding along on cross-site requests. Not httpOnly: the picker writes it.
+ * Mirrors the `view-mode` cookie in ui-mode-context.tsx.
+ */
+function writeLocaleCookie(locale: Locale) {
+  document.cookie = `${LOCALE_STORAGE_KEY}=${locale}; path=/; max-age=31536000; SameSite=Lax`;
+}
+
+function readLocaleCookie(): string | null {
+  const hit = document.cookie
+    .split('; ')
+    .find((row) => row.startsWith(`${LOCALE_STORAGE_KEY}=`));
+  return hit ? hit.split('=')[1] : null;
+}
+
+export function LanguageProvider({
+  children,
+  /**
+   * Read from the cookie on the server (lib/i18n/server.ts) and handed down by the
+   * root layout. THIS IS WHAT REMOVES THE FLASH: the first painted frame is already
+   * in the right language, rather than English being replaced a moment later. It is
+   * also what keeps hydration honest — the client starts from the same value the
+   * server rendered, instead of correcting it after the fact.
+   */
+  initialLocale = DEFAULT_LOCALE,
+}: {
+  children: React.ReactNode;
+  initialLocale?: Locale;
+}) {
+  const [locale, setLocaleState] = useState<Locale>(initialLocale);
 
   useEffect(() => {
+    // MIGRATION, and the reason this effect still exists. Anyone who chose a
+    // language before the cookie existed has localStorage and no cookie, so the
+    // server rendered them English. Adopt their stored choice and write the cookie
+    // so every later request is server-rendered correctly.
     let saved: string | null = null;
     try {
       saved = localStorage.getItem(LOCALE_STORAGE_KEY);
     } catch {
-      // Private mode / storage disabled. English is the fallback, which is the
-      // same answer the pre-paint script lands on.
+      // Private mode / storage disabled. The cookie alone is enough.
     }
-    const next = resolveLocale(saved);
-    setLocaleState(next);
+    const cookie = readLocaleCookie();
+    const next = resolveLocale(cookie ?? saved);
+
+    if (!cookie) writeLocaleCookie(next);
+    if (next !== locale) setLocaleState(next);
     applyLocale(next);
-    setMounted(true);
+    // `locale` is intentionally not a dependency: this runs once, to reconcile the
+    // server's guess with what the browser remembers.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const setLocale = useCallback((next: Locale) => {
@@ -65,17 +106,14 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     try {
       localStorage.setItem(LOCALE_STORAGE_KEY, next);
     } catch {
-      // The choice still applies for this session; it just will not survive a reload.
+      // The choice still applies for this session; the cookie below carries it.
     }
+    writeLocaleCookie(next);
     applyLocale(next);
   }, []);
 
-  // Before mount, render English — it is what the server streamed, so this is what
-  // keeps hydration honest rather than patching over a mismatch.
-  const active = mounted ? locale : DEFAULT_LOCALE;
-
   return (
-    <LanguageContext.Provider value={{ locale: active, setLocale, t: getMessages(active) }}>
+    <LanguageContext.Provider value={{ locale, setLocale, t: getMessages(locale) }}>
       {children}
     </LanguageContext.Provider>
   );

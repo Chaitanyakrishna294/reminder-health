@@ -15,6 +15,8 @@ import { DensityProvider } from "@/context/density-context";
 import DensityPreviewBadge from "@/components/dev/density-preview-badge";
 import { ThemeProvider } from "@/context/theme-context";
 import { LanguageProvider } from "@/context/language-context";
+import { getServerLocale } from "@/lib/i18n/server";
+import { LOCALE_META } from "@/lib/i18n/locales";
 import CookieConsent from "@/components/cookie-consent";
 import InstallPrompt from "@/components/install-prompt";
 import RegisterSW from "@/components/register-sw";
@@ -120,9 +122,13 @@ export default async function RootLayout({
   // Per-request nonce set by proxy.ts. Reading headers() here also opts the whole app into
   // dynamic rendering — required for nonce-based CSP (the nonce must be fresh per request).
   const nonce = (await headers()).get("x-nonce") ?? undefined;
+  // From the `language` cookie. Free to read — this layout already awaits headers()
+  // for the nonce, so every route is dynamic regardless. Rendering the right `lang`
+  // and the right copy server-side is what removes the flash of English.
+  const locale = await getServerLocale();
   return (
     <html
-      lang="en"
+      lang={LOCALE_META[locale].htmlLang}
       suppressHydrationWarning
       className={`${FONT_VARIABLES} h-full antialiased`}
     >
@@ -143,18 +149,20 @@ export default async function RootLayout({
             __html: `(function(){try{if(localStorage.getItem('theme')==='dark'){document.documentElement.classList.add('dark');document.documentElement.style.colorScheme='dark';}else{document.documentElement.style.colorScheme='light';}}catch(e){}})();`,
           }}
         />
-        {/* Stamp the saved language onto <html lang> before paint, same reason as the
-            theme script above. `lang` is what picks the right Indic font off the
-            fallback chain and what a screen reader announces in, so getting it one
-            frame late means a flash of the wrong script and a wrong-language
-            announcement. Falls back to 'en' on anything unexpected, which is what
-            LanguageProvider also lands on. Keep the key ('language') and the tag list
-            in lockstep with lib/i18n/locales.ts. */}
+        {/* THE LANGUAGE MIGRATION SCRIPT — and it is only that.
+            `lang` is now rendered server-side from the cookie, so the ordinary path
+            needs no script at all. This covers one case: somebody who chose a
+            language before the cookie existed has localStorage and no cookie, so the
+            server rendered them English. Stamping `lang` before paint keeps the Indic
+            font and the screen-reader voice right for that one render; the provider
+            then writes the cookie and every later request is server-correct.
+            Delete this once enough time has passed that no live user is cookie-less.
+            Keep the key and the tag list in lockstep with lib/i18n/locales.ts. */}
         <script
           nonce={nonce}
           suppressHydrationWarning
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var l=localStorage.getItem('language');if(l&&['en','hi','te','ta','kn','ml','mr'].indexOf(l)>-1)document.documentElement.lang=l;}catch(e){}})();`,
+            __html: `(function(){try{if(/(^|; )language=/.test(document.cookie))return;var l=localStorage.getItem('language');if(l&&['en','hi','te','ta','kn','ml','mr'].indexOf(l)>-1)document.documentElement.lang=l;}catch(e){}})();`,
           }}
         />
         {/* PWA launch handoff, before paint for the same reason as the theme script:
@@ -196,7 +204,7 @@ export default async function RootLayout({
       <body className="min-h-full flex flex-col">
         <LaunchHandoff />
         {/* Outermost, because every other provider's subtree may need a label. */}
-        <LanguageProvider>
+        <LanguageProvider initialLocale={locale}>
           <ThemeProvider>
             <UiModeProvider>
               {/* Inside UiModeProvider: elderly outranks every other density. */}
