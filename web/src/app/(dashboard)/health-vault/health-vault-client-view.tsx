@@ -1155,7 +1155,7 @@ export default function HealthVaultClientView({
                   return (
                     <li
                       key={item.id}
-                      className="rise-in flex items-center gap-3 card-lift p-3 shadow-sm transition-colors hover:border-input"
+                      className="rise-in flex items-center gap-3 card-lift p-3 transition-colors hover:border-input"
                       style={{ ['--rise-delay' as string]: `${Math.min(idx, 6) * 60}ms` }}
                     >
                       {/* File type is metadata, not a status — a red PDF badge would read
@@ -1266,7 +1266,7 @@ export default function HealthVaultClientView({
           </button>
 
           {/* Folder Details Header Panel */}
-          <div className={`flex flex-col md:flex-row md:items-center md:justify-between card-lift shadow-sm transition-all duration-300 gap-4 ${
+          <div className={`flex flex-col md:flex-row md:items-center md:justify-between card-lift transition-all duration-300 gap-4 ${
             isElderly ? 'p-8 border-4 border-primary/30' : 'p-5'
           }`}>
             <div className="flex items-center gap-4">
@@ -1386,7 +1386,7 @@ export default function HealthVaultClientView({
             </div>
           ) : records.length === 0 ? (
             // Trashed or Active Empty State
-            <div className={`card-lift text-center shadow-sm flex flex-col items-center justify-center max-w-xl mx-auto space-y-4 py-16 ${
+            <div className={`card-lift text-center flex flex-col items-center justify-center max-w-xl mx-auto space-y-4 py-16 ${
               isElderly ? 'p-16 border-4 border-dashed' : 'p-12 border-dashed'
             }`}>
               <div className={`rounded-full bg-muted flex items-center justify-center text-muted-foreground/60 ${
@@ -1459,7 +1459,7 @@ export default function HealthVaultClientView({
                           {dateGroup.items.map((item) => (
                             <div
                               key={item.id}
-                              className={`card-lift flex flex-col lg:flex-row lg:items-center justify-between gap-4 transition-all duration-300 shadow-sm ${
+                              className={`card-lift flex flex-col lg:flex-row lg:items-center justify-between gap-4 transition-all duration-300 ${
                                 isElderly 
                                   ? 'p-6 border-2 hover:scale-[1.005] hover:shadow-md' 
                                   : 'p-4 hover:scale-[1.005] hover:shadow-md'

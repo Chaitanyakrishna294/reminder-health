@@ -717,6 +717,31 @@ h1, h2 {
 
 
 
+
+/* ────────────────────────────────────────────────────────────────────────────
+   WHY THE BLOCKS BELOW ARE IN @layer components
+   (found 2026-08-15, auditing the grey nav pill)
+
+   Everything this file writes outside a @layer is UNLAYERED, and unlayered CSS
+   BEATS layered CSS at equal specificity. Tailwind v4 puts its utilities in
+   `@layer utilities`. So an unlayered `.card-lift { background: var(--surface) }`
+   silently outranked every `bg-*` utility on the same element — the utility was
+   in the markup, looked correct in review, and did nothing.
+
+   The audit found 37 elements whose `shadow-*` was being ignored this way, 2
+   whose `rounded-*` was, and 1 hover background. Most of those were harmless
+   because the system shadow was the intent — but harmless BY ACCIDENT is the
+   defect: the next person to put `bg-primary-strong` on a card would have had it
+   vanish for no visible reason.
+
+   Inside `@layer components` the normal Tailwind contract is restored: a utility
+   in the markup wins over a component class, which is what everyone already
+   assumes. The utilities that were being silently ignored have been removed from
+   the markup in the same commit, so this changes the cascade without changing
+   the rendering.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+@layer components {
 /* ════════════════════════════════════════════════════════════════════════════
    VISUAL REFRESH — "cards on a board"  (docs/design/visual-refresh-2026-08-14.md)
 
@@ -802,8 +827,9 @@ h1, h2 {
     opacity: 1;
   }
 }
+}
 
-
+@layer components {
 /* ════════════════════════════════════════════════════════════════════════════
    LOOKS MAXX — round two. Round one built the system; this makes it VISIBLE.
 
@@ -926,4 +952,5 @@ h1, h2 {
   .press-sink, .press-sink:active { transition: none; transform: none; }
   .page-enter, .tab-enter, .numeral-tick { animation: none; opacity: 1; transform: none; }
   .check-draw { animation: none; stroke-dashoffset: 0; }
+}
 }

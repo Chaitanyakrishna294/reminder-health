@@ -570,7 +570,7 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
               return (
                 <div
                   key={q.id}
-                  className="flex flex-wrap items-center justify-between gap-3 card-lift card-lift-2 px-4 py-3 shadow-sm"
+                  className="flex flex-wrap items-center justify-between gap-3 card-lift card-lift-2 px-4 py-3"
                 >
                   <div className="min-w-0">
                     <p className={`font-black text-foreground truncate ${isElderly ? 'text-xl' : 'text-sm'}`}>

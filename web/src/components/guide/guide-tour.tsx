@@ -153,7 +153,7 @@ export default function GuideTour() {
 
       {/* Step bubble — the guider mascot lives inside it. */}
       <div
-        className="absolute card-lift card-lift-2 shadow-2xl p-5 transition-all duration-300 animate-fade-in pointer-events-auto"
+        className="absolute card-lift card-lift-2 p-5 transition-all duration-300 animate-fade-in pointer-events-auto"
         style={{ top: cardTop, left: cardLeft, width: cardW }}
       >
         <div className="flex items-start gap-3">

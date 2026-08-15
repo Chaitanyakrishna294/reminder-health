@@ -547,9 +547,9 @@ export default function MedicationList({
           hydration mismatch. A reserved-height placeholder keeps the page from
           jumping when the real strip arrives. */}
       {!mounted ? (
-        <div className="card-lift p-2 sm:p-4 shadow-sm h-[136px] sm:h-[150px]" aria-hidden />
+        <div className="card-lift p-2 sm:p-4 h-[136px] sm:h-[150px]" aria-hidden />
       ) : (
-      <div className="card-lift p-2 sm:p-4 shadow-sm">
+      <div className="card-lift p-2 sm:p-4">
         <div className="flex items-center justify-between mb-3 gap-2">
           <button
             onClick={() => setWeekAnchor(d => { const n = new Date(d); n.setDate(d.getDate() - 7); return n; })}
@@ -710,7 +710,7 @@ export default function MedicationList({
               {dosesForSelectedDay.map((dose, i) => (
                 <li
                   key={`${dose.id}-${dose.time}-${i}`}
-                  className="flex items-center gap-3 card-lift p-3 shadow-sm"
+                  className="flex items-center gap-3 card-lift p-3"
                 >
                   <span
                     aria-hidden

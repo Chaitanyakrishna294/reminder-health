@@ -185,7 +185,7 @@ export default function MedicalProfileClientView({ userId, fullName, email, init
   // 44px touch floor the rest of the app now holds to. Height is set explicitly rather
   // than via padding so the selects match the inputs exactly.
   const input = `w-full px-3 rounded-xl bg-background border border-border text-foreground focus:outline-none focus:border-primary transition-all ${isElderly ? 'h-14 text-lg' : 'h-11 text-sm'}`;
-  const card = 'card-lift p-6 shadow-sm space-y-4';
+  const card = 'card-lift p-6 space-y-4';
   const sectionTitle = `font-black text-foreground ${isElderly ? 'text-xl' : 'text-sm'}`;
 
   return (

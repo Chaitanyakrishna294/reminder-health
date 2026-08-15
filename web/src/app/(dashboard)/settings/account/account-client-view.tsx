@@ -175,7 +175,7 @@ export default function AccountClientView({ fullName, email, role, isGuest }: Ac
             aria-modal="true"
             aria-labelledby="delete-title"
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-sm card-lift shadow-xl p-6 space-y-4"
+            className="w-full max-w-sm card-lift p-6 space-y-4"
           >
             <h2 id="delete-title" className="text-lg font-black text-foreground">Delete this account?</h2>
             <p className="text-xs text-muted-foreground font-semibold text-balance">
