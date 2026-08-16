@@ -1058,7 +1058,7 @@ export default function HealthVaultClientView({
               case, no blame, and it names the way out rather than the rule. */}
           {userRole !== 'CAREGIVER' && isFull && (
             <div
-              className="flex items-start gap-2.5 rounded-3xl border border-warning/35 bg-warning/10 px-4 py-3 text-warning-strong"
+              className="flex items-start gap-2.5 rounded-[var(--r-card)] border border-warning/35 bg-warning/10 px-4 py-3 text-warning-strong"
               role="status"
             >
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
@@ -1122,7 +1122,7 @@ export default function HealthVaultClientView({
                 <span className="sr-only">{t.vault.loading}</span>
               </div>
             ) : recentRecords.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-border bg-card/60 p-5 text-center">
+              <div className="rounded-[var(--r-card)] border border-dashed border-border bg-card/60 p-5 text-center">
                 <p className={`font-semibold text-muted-foreground ${isElderly ? 'text-base' : 'text-xs'}`}>
                   No documents yet.
                 </p>
@@ -1209,7 +1209,7 @@ export default function HealthVaultClientView({
               plain-language copy, but it was sitting between the header and the folders —
               a reassurance you had to scroll past every visit to reach your own files.
               Reassurance belongs where the question occurs, not ahead of the content. */}
-          <div className={`bg-info-surface text-info-strong border border-info/25 rounded-3xl transition-all duration-300 ${
+          <div className={`bg-info-surface text-info-strong border border-info/25 rounded-[var(--r-card)] transition-all duration-300 ${
             isElderly ? 'p-6 border-2 text-lg' : 'p-4 text-xs'
           }`}>
             <div className="flex items-start gap-3">
@@ -1273,7 +1273,7 @@ export default function HealthVaultClientView({
             isElderly ? 'p-8 border-4 border-primary/30' : 'p-5'
           }`}>
             <div className="flex items-center gap-4">
-              <div className={`p-3.5 bg-primary/10 rounded-2xl text-primary flex items-center justify-center`}>
+              <div className={`p-3.5 bg-primary/10 rounded-[var(--r-control)] text-primary flex items-center justify-center`}>
                 <FolderOpen className={isElderly ? "w-10 h-10" : "w-7 h-7"} />
               </div>
               <div>
@@ -1309,7 +1309,7 @@ export default function HealthVaultClientView({
           </div>
 
           {userRole === 'CAREGIVER' && (
-            <div className="flex items-start gap-3.5 bg-primary/5 text-primary border border-primary/20 rounded-3xl p-5 text-xs">
+            <div className="flex items-start gap-3.5 bg-primary/5 text-primary border border-primary/20 rounded-[var(--r-card)] p-5 text-xs">
               <ShieldCheck className="w-5 h-5 shrink-0 text-primary mt-0.5" />
               <div className="space-y-1">
                 <h4 className="font-extrabold text-sm text-foreground">Documents Shared by {patientName}</h4>
@@ -1322,7 +1322,7 @@ export default function HealthVaultClientView({
           )}
 
           {/* Active / Trash Toggles & Simple Search Bar */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card border border-border/60 rounded-3xl p-4 shadow-sm">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card border border-border/60 rounded-[var(--r-card)] p-4 shadow-sm">
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setViewingTrash(false)}
@@ -1357,7 +1357,7 @@ export default function HealthVaultClientView({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={t.vault.searchPlaceholder}
-                className={`w-full bg-muted border border-border/80 rounded-2xl pl-9 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary/20 text-foreground font-semibold placeholder:text-muted-foreground/50 ${
+                className={`w-full bg-muted border border-border/80 rounded-[var(--r-control)] pl-9 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary/20 text-foreground font-semibold placeholder:text-muted-foreground/50 ${
                   isElderly ? 'text-sm' : 'text-xs'
                 }`}
               />
@@ -1374,7 +1374,7 @@ export default function HealthVaultClientView({
 
           {/* Records Error Alert */}
           {recordsError && (
-            <div className="flex items-start gap-2.5 bg-danger/10 text-danger border border-danger/25 p-4 rounded-3xl text-sm font-semibold">
+            <div className="flex items-start gap-2.5 bg-danger/10 text-danger border border-danger/25 p-4 rounded-[var(--r-card)] text-sm font-semibold">
               <AlertCircle className="w-5 h-5 shrink-0" />
               <span>{recordsError}</span>
             </div>
@@ -1600,7 +1600,7 @@ export default function HealthVaultClientView({
       {/* Edit Metadata Modal */}
       {recordToEdit && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/60 backdrop-blur-sm animate-fade-in">
-          <div className={`bg-card border border-border shadow-2xl rounded-3xl w-full max-w-md relative p-6 ${isElderly ? 'p-8 border-2' : 'p-6'}`}>
+          <div className={`bg-card w-full max-w-md relative ${isElderly ? 'border-2 border-border shadow-2xl rounded-3xl p-8' : 'card-overlay rounded-[var(--r-card)] p-6'}`}>
             <div className="flex items-center justify-between border-b border-border/50 pb-4 mb-4">
               <div>
                 <h3 className={`font-black text-foreground ${isElderly ? 'text-2xl' : 'text-lg'}`}>{t.vault.editTitle}</h3>
@@ -1678,8 +1678,10 @@ export default function HealthVaultClientView({
       {/* Permanent Delete Confirmation Modal */}
       {recordToPermanentlyDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/70 backdrop-blur-sm animate-fade-in">
-          <div className={`bg-card border border-border shadow-2xl rounded-3xl w-full max-w-md relative p-6 text-center space-y-4 ${
-            isElderly ? 'p-8 border-2' : 'p-6'
+          <div className={`bg-card w-full max-w-md relative text-center space-y-4 ${
+            isElderly
+              ? 'border-2 border-border shadow-2xl rounded-3xl p-8'
+              : 'card-overlay rounded-[var(--r-card)] p-6'
           }`}>
             <div className="p-3 bg-danger/10 text-danger rounded-full w-14 h-14 flex items-center justify-center mx-auto shrink-0">
               <Trash className="w-8 h-8" />
@@ -1735,8 +1737,10 @@ export default function HealthVaultClientView({
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/60 backdrop-blur-sm animate-fade-in">
           <div 
-            className={`bg-card border border-border shadow-2xl rounded-3xl w-full max-w-lg relative flex flex-col ${
-              isElderly ? 'p-8 border-2' : 'p-6'
+            className={`bg-card w-full max-w-lg relative flex flex-col ${
+              isElderly
+                ? 'border-2 border-border shadow-2xl rounded-3xl p-8'
+                : 'card-overlay rounded-[var(--r-card)] p-6'
             }`}
           >
             {/* Modal Header */}
@@ -1768,7 +1772,7 @@ export default function HealthVaultClientView({
 
             {/* Error Message Panel */}
             {uploadError && (
-              <div className="flex items-start gap-2.5 bg-danger/10 text-danger border border-danger/25 p-3.5 rounded-2xl mb-4 text-xs font-semibold animate-shake">
+              <div className="flex items-start gap-2.5 bg-danger/10 text-danger border border-danger/25 p-3.5 rounded-[var(--r-control)] mb-4 text-xs font-semibold animate-shake">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                 <span>{uploadError}</span>
               </div>
@@ -1822,7 +1826,7 @@ export default function HealthVaultClientView({
                         type="button"
                         onClick={() => cameraInputRef.current?.click()}
                         disabled={isPreparingFile}
-                        className={`flex flex-col items-center justify-center gap-2 rounded-3xl bg-primary-strong text-primary-strong-foreground font-black transition-all hover:bg-primary-strong-hover active:scale-[0.98] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                        className={`flex flex-col items-center justify-center gap-2 rounded-[var(--r-control)] bg-primary-strong text-primary-strong-foreground font-black transition-all hover:bg-primary-strong-hover active:scale-[0.98] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                           isElderly ? 'min-h-[112px] px-4 text-lg' : 'min-h-[88px] px-3 text-sm'
                         }`}
                       >
@@ -1834,7 +1838,7 @@ export default function HealthVaultClientView({
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       disabled={isPreparingFile}
-                      className={`flex flex-col items-center justify-center gap-2 rounded-3xl border-2 border-border bg-card text-foreground font-black transition-all hover:border-primary/50 hover:bg-muted/50 active:scale-[0.98] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                      className={`flex flex-col items-center justify-center gap-2 rounded-[var(--r-control)] border-2 border-border bg-card text-foreground font-black transition-all hover:border-primary/50 hover:bg-muted/50 active:scale-[0.98] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                         isElderly ? 'min-h-[112px] px-4 text-lg' : 'min-h-[88px] px-3 text-sm'
                       }`}
                     >
@@ -1867,7 +1871,7 @@ export default function HealthVaultClientView({
                   />
 
                   {isPreparingFile && (
-                    <div className="flex items-center gap-2.5 rounded-2xl bg-muted px-4 py-3">
+                    <div className="flex items-center gap-2.5 rounded-[var(--r-control)] bg-muted px-4 py-3">
                       <Loader2 className="w-4 h-4 shrink-0 animate-spin text-primary" aria-hidden />
                       <div className="min-w-0">
                         <p className={`font-black text-foreground ${isElderly ? 'text-base' : 'text-xs'}`}>
@@ -1888,7 +1892,7 @@ export default function HealthVaultClientView({
                       onDragOver={handleDragOver}
                       onDragLeave={handleDragLeave}
                       onDrop={handleDrop}
-                      className={`border-2 border-dashed rounded-3xl p-5 flex flex-col items-center justify-center gap-2 transition-all duration-200 ${
+                      className={`border-2 border-dashed rounded-[var(--r-card)] p-5 flex flex-col items-center justify-center gap-2 transition-all duration-200 ${
                         isDragging
                           ? 'border-primary bg-primary/5'
                           : 'border-border bg-muted/30'
@@ -1925,7 +1929,7 @@ export default function HealthVaultClientView({
                       costs nothing but the tap. */}
                   {selectedFile && filePreviewUrl && (
                     <div className="space-y-2.5">
-                      <div className="overflow-hidden rounded-2xl border border-border bg-muted/40">
+                      <div className="overflow-hidden rounded-[var(--r-card)] border border-border bg-muted/40">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={filePreviewUrl}
@@ -1937,7 +1941,7 @@ export default function HealthVaultClientView({
                         <button
                           type="button"
                           onClick={() => (fromCamera ? cameraInputRef : fileInputRef).current?.click()}
-                          className={`flex-1 inline-flex items-center justify-center gap-2 rounded-2xl border-2 border-border bg-card font-black text-foreground transition-colors hover:bg-muted cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                          className={`flex-1 inline-flex items-center justify-center gap-2 rounded-[var(--r-control)] border-2 border-border bg-card font-black text-foreground transition-colors hover:bg-muted cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                             isElderly ? 'min-h-14 text-base' : 'min-h-12 text-sm'
                           }`}
                         >
@@ -1953,7 +1957,7 @@ export default function HealthVaultClientView({
                   )}
 
                   {selectedFile && (
-                    <div className="bg-muted p-3.5 rounded-2xl flex items-center justify-between text-xs font-semibold text-foreground">
+                    <div className="bg-muted p-3.5 rounded-[var(--r-control)] flex items-center justify-between text-xs font-semibold text-foreground">
                       <div className="truncate pr-4">
                         <span>{selectedFile.name}</span>
                         <span className="text-[10px] text-muted-foreground block font-mono">
@@ -2031,7 +2035,7 @@ export default function HealthVaultClientView({
                       </div>
                     </div>
                   ) : (
-                    <div className="bg-muted p-5 rounded-3xl text-left space-y-3 text-xs font-semibold text-foreground">
+                    <div className="bg-muted p-5 rounded-[var(--r-card)] text-left space-y-3 text-xs font-semibold text-foreground">
                       <h4 className="font-black border-b border-border/40 pb-2 text-foreground">{t.vault.summaryTitle}</h4>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">{t.vault.labelCategory}</span>
@@ -2144,9 +2148,11 @@ export default function HealthVaultClientView({
               collapsing on scroll doesn't push the footer under the toolbar. */}
           <div
             onClick={(e) => e.stopPropagation()}
-            className={`bg-card border border-border shadow-2xl rounded-2xl sm:rounded-3xl w-full max-w-4xl h-[88dvh] sm:h-[80vh] flex flex-col relative ${
+            className={`bg-card w-full max-w-4xl h-[88dvh] sm:h-[80vh] flex flex-col relative ${
               previewClosing ? 'animate-modal-out' : 'animate-modal-in'
-            } ${isElderly ? 'p-4 sm:p-8 border-2' : 'p-3 sm:p-6'}`}
+            } ${isElderly
+              ? 'border-2 border-border shadow-2xl rounded-2xl sm:rounded-3xl p-4 sm:p-8'
+              : 'card-overlay rounded-[var(--r-card)] p-3 sm:p-6'}`}
           >
             {/* Preview Header */}
             <div className="flex items-center justify-between border-b border-border/50 pb-4 mb-4">
@@ -2183,7 +2189,7 @@ export default function HealthVaultClientView({
             </div>
 
             {/* Preview Display Zone */}
-            <div className="flex-1 bg-muted/20 rounded-2xl overflow-hidden flex items-center justify-center relative min-h-[320px]">
+            <div className="flex-1 bg-muted/20 rounded-[var(--r-card)] overflow-hidden flex items-center justify-center relative min-h-[320px]">
               {(() => {
                 const kind = previewKindOf(previewName || previewTitle || '', previewType);
 
@@ -2203,7 +2209,7 @@ export default function HealthVaultClientView({
                     <object
                       data={previewUrl || undefined}
                       type="application/pdf"
-                      className="w-full h-full rounded-2xl bg-white"
+                      className="w-full h-full rounded-[var(--r-control)] bg-white"
                     >
                       <div className="w-full h-full flex flex-col items-center justify-center text-center gap-4 p-8">
                         <FileText className="w-12 h-12 text-primary mx-auto shrink-0" />
@@ -2246,7 +2252,7 @@ export default function HealthVaultClientView({
                     <iframe
                       src={previewUrl || undefined}
                       title={previewTitle || 'Document Preview'}
-                      className="w-full h-full border-none rounded-2xl bg-white"
+                      className="w-full h-full border-none rounded-[var(--r-control)] bg-white"
                     />
                   );
                 }
