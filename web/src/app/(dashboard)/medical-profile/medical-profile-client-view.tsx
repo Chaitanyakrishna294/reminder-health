@@ -202,7 +202,7 @@ export default function MedicalProfileClientView({ userId, fullName, email, init
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
-        <div className="w-11 h-11 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
+        <div className="w-11 h-11 rounded-[var(--r-control)] bg-primary/10 text-primary-strong flex items-center justify-center">
           <HeartPulse className="w-6 h-6" />
         </div>
         <div>
@@ -212,12 +212,12 @@ export default function MedicalProfileClientView({ userId, fullName, email, init
       </div>
 
       {error && (
-        <div className="bg-danger/10 text-danger text-sm p-3 rounded-2xl border border-danger/20 flex items-start gap-2">
+        <div className="bg-danger/10 text-danger text-sm p-3 rounded-[var(--r-card)] border border-danger/20 flex items-start gap-2">
           <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /> <span>{error}</span>
         </div>
       )}
       {success && (
-        <div className="bg-success/10 text-success text-sm p-3 rounded-2xl border border-success/20 flex items-start gap-2">
+        <div className="bg-success/10 text-success text-sm p-3 rounded-[var(--r-card)] border border-success/20 flex items-start gap-2">
           <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" /> <span>{t.profile.saved}</span>
         </div>
       )}
@@ -231,7 +231,7 @@ export default function MedicalProfileClientView({ userId, fullName, email, init
               // eslint-disable-next-line @next/next/no-img-element
               <img src={avatarUrl} alt={t.profile.photoAlt} className="w-full h-full object-cover" />
             ) : (
-              <span className="text-primary font-black text-xl">{fullName.substring(0, 2).toUpperCase()}</span>
+              <span className="text-primary-strong font-black text-xl">{fullName.substring(0, 2).toUpperCase()}</span>
             )}
           </div>
           <label className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-muted hover:bg-muted/80 border border-border text-sm font-semibold cursor-pointer transition-all">
@@ -370,7 +370,7 @@ export default function MedicalProfileClientView({ userId, fullName, email, init
       <button
         onClick={handleSave}
         disabled={saving || uploading}
-        className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-primary-strong text-primary-strong-foreground font-black hover:bg-primary-strong-hover transition-all disabled:opacity-50 cursor-pointer"
+        className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-[var(--r-control)] bg-primary-strong text-primary-strong-foreground font-black hover:bg-primary-strong-hover transition-all disabled:opacity-50 cursor-pointer"
       >
         <Save className="w-5 h-5" />
         <span>{saving ? 'Saving…' : 'Save Medical Profile'}</span>

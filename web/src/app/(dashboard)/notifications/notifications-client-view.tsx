@@ -295,7 +295,7 @@ export default function NotificationsClientView({
         /* Remi's empty-state slot. `peaceful` — an empty inbox is a good outcome,
            not an error, and the calm rule says the mascot never escalates a
            non-event. No call to action: there is nothing here to do. */
-        <div className="px-6 py-10 flex flex-col items-center text-center gap-5 bg-card/60 rounded-3xl border border-dashed border-border/80">
+        <div className="px-6 py-10 flex flex-col items-center text-center gap-5 bg-card/60 rounded-[var(--r-card)] border border-dashed border-border/80">
           <BrainMascot {...mascotSlot('emptyState', isElderly)} />
           <p className={`text-muted-foreground font-semibold text-balance ${isElderly ? 'text-lg' : 'text-base'}`}>
             No notifications — all caught up.
@@ -332,7 +332,7 @@ export default function NotificationsClientView({
                         // menu over our own selection mode.
                         onContextMenu={(e) => { if (selecting || pressedId.current) e.preventDefault(); }}
                         aria-pressed={selecting ? isSelected : undefined}
-                        className={`w-full text-left rounded-2xl border p-3.5 flex items-start gap-3 select-none transition-colors cursor-pointer stagger-in
+                        className={`w-full text-left rounded-[var(--r-card)] border p-3.5 flex items-start gap-3 select-none transition-colors cursor-pointer stagger-in
                                     /* NO press-sink here, deliberately: these rows
                                        carry state TINTS rather than elevation, and
                                        press-sink resolves to lift-1 on :active — on
@@ -357,7 +357,7 @@ export default function NotificationsClientView({
                           </span>
                         ) : (
                           <span
-                            className={`shrink-0 rounded-2xl flex items-center justify-center ${TONE_CLASS[meta.tone] ?? TONE_CLASS.neutral} ${isElderly ? 'w-12 h-12' : 'w-10 h-10'}`}
+                            className={`shrink-0 rounded-[var(--r-control)] flex items-center justify-center ${TONE_CLASS[meta.tone] ?? TONE_CLASS.neutral} ${isElderly ? 'w-12 h-12' : 'w-10 h-10'}`}
                             aria-hidden
                           >
                             <Icon className={isElderly ? 'w-7 h-7' : 'w-5 h-5'} />
