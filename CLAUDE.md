@@ -885,6 +885,32 @@ than letting someone discover it at 3am.
   resource qualifiers (`values-hi/`) pick up the *device* locale, which is NOT necessarily the
   language chosen in-app; the bridged value is what makes the two agree.
 
+## `position: fixed` IS NOT VIEWPORT-RELATIVE IF ANY ANCESTOR HAS A TRANSFORM
+
+**Full-screen overlays go through `createPortal` into `document.body`. Always.**
+Both gates (`med-due-gate.tsx`, `refill-gate.tsx`) do; anything new that covers
+the screen must too.
+
+A transform, filter, backdrop-filter, perspective or `contain` on ANY ancestor
+makes that ancestor the containing block for `fixed` descendants. The dashboard's
+`page-enter` wrapper animates a transform, so `fixed inset-0` inside it measured
+**3000px tall on a 764px viewport** — sized to the scrollable page, not the
+screen.
+
+- **It does not look like a positioning bug.** It looks like a spacing bug. The
+  gate rendered under the header with the nav painted over it, and
+  `justify-center` centred the question inside a 3000px box, so the screen was
+  mostly blank space and read as "too long".
+- **It silently defeats measurement code.** A fit search comparing
+  `scrollHeight` to `clientHeight` found no overflow — correctly, against a
+  3000px box. **Two consecutive spacing fixes were invisible by construction**,
+  and both looked like wrong numbers rather than a wrong frame of reference.
+- **z-index will not save you either**: inside a lower stacking context, the
+  gate's `z-[120]` cannot beat the nav's `z-40`.
+- Suspect this whenever a `fixed` element is the wrong size, is scrollable when
+  it should not be, or sits under something with a lower z-index. Confirm by
+  measuring `getBoundingClientRect().height` against `window.innerHeight`.
+
 ## A `'use client'` FILE EXPORTS NO VALUE A SERVER COMPONENT MAY CALL — AND NOTHING CATCHES IT
 
 Paid for 2026-08-16 with a **production outage**: every route under `(auth)` —
