@@ -6,6 +6,11 @@
 
 **Preview:** https://reminder-health-refresh.vercel.app
 
+**The language itself lives in
+[`visual-refresh-2026-08-14.md` §10](visual-refresh-2026-08-14.md)** — that is the
+authoritative record of what shipped here (values, refusals, the exceptions).
+This file is the narrative; §10 is the constitution.
+
 Presentation only. No behaviour, schema, RPC or bridge changes.
 
 ---

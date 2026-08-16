@@ -1,4 +1,4 @@
-import type { MascotMood } from '@/components/dashboard/brain-mascot';
+import type { MascotMood } from '@/components/dashboard/mascot-slots';
 import type { Density } from '@/lib/design/density';
 
 export interface GuideStep {

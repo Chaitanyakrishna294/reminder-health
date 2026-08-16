@@ -21,7 +21,8 @@
 
 import React, { useEffect, useRef } from 'react';
 import { useUiMode } from '@/context/ui-mode-context';
-import BrainMascot, { MASCOT_SLOTS } from '@/components/dashboard/brain-mascot';
+import BrainMascot from '@/components/dashboard/brain-mascot';
+import { MASCOT_SLOTS } from '@/components/dashboard/mascot-slots';
 
 interface ExitDialogProps {
   open: boolean;

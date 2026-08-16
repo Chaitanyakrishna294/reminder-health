@@ -1,19 +1,22 @@
 'use client';
 
 import React, { useState } from 'react';
+import type { MascotMood } from '@/components/dashboard/mascot-slots';
 
-// The full mood set (matches the illustrated brain sheet). Add/rename art by
-// editing ONLY this map — every usage across the app updates automatically.
-export type MascotMood =
-  | 'reminder'
-  | 'concerned'
-  | 'happy'
-  | 'proud'
-  | 'curious'
-  | 'encouraging'
-  | 'sorry'
-  | 'peaceful';
+/**
+ * The registry moved to `./mascot-slots` — it is data, and this file is
+ * `'use client'`, which made every export client-only and 500'd the server-
+ * rendered `(auth)` layout that calls `mascotSlot()`. See that file's header.
+ *
+ * Re-exported for the call sites that only need the type. **A SERVER component
+ * must import `mascotSlot` / `MASCOT_SLOTS` from `./mascot-slots` directly** —
+ * re-exporting a value through this module would put it back behind the client
+ * boundary and bring the bug back.
+ */
+export type { MascotMood };
 
+// Art map. Add/rename art by editing ONLY this map — every usage across the app
+// updates automatically.
 const MASCOT: Record<MascotMood, string> = {
   reminder: '/mascot/reminder.png',
   concerned: '/mascot/concerned.png',
@@ -28,44 +31,6 @@ const MASCOT: Record<MascotMood, string> = {
 // Positive moods use the smiley fallback face; the rest use the curious/asking face,
 // until the real PNGs are dropped into /public/mascot.
 const POSITIVE = new Set<MascotMood>(['happy', 'proud', 'peaceful', 'encouraging']);
-
-/**
- * MASCOT PLACEMENT SLOTS — where Remi is allowed to appear, and at what size.
- *
- * A registry rather than a convention, because the governing constraint is CALM: the
- * mascot earns its place on screens with nothing competing for attention, and the way
- * a character stops being charming is by turning up everywhere. A new slot is a
- * design decision, so it gets added here on purpose rather than by someone importing
- * the component into one more card.
- *
- * ELDERLY MODE narrows this further — Remi appears only at welcome, celebration and
- * offline reassurance, and says less everywhere (see the ux-copy skill).
- */
-export const MASCOT_SLOTS = {
-  /** An empty day on the rail, or an empty notifications list. Remi is the content. */
-  emptyState: { size: 144, elderlySize: 176, mood: 'peaceful' as MascotMood },
-  /** Confirm dialogs — the exit confirmation, and any future one of the same weight. */
-  dialog: { size: 56, elderlySize: 64, mood: 'happy' as MascotMood },
-  /** The guided tour's bubble. */
-  guide: { size: 64, elderlySize: 80, mood: 'curious' as MascotMood },
-  /** First launch — the auth shell. The one place Remi greets a stranger. */
-  welcome: { size: 42, elderlySize: 56, mood: 'happy' as MascotMood },
-  /** Every dose answered. The one celebration in the product. */
-  celebration: { size: 120, elderlySize: 148, mood: 'proud' as MascotMood },
-} as const;
-
-export type MascotSlot = keyof typeof MASCOT_SLOTS;
-
-/**
- * Slot props for a call site. Use this rather than typing a size and a mood:
- * the registry exists so mascot placement is a DECISION MADE IN ONE PLACE
- * (CLAUDE.md), and every inline `size={144} mood="peaceful"` is that decision
- * quietly re-made somewhere nobody will look again.
- */
-export function mascotSlot(slot: MascotSlot, isElderly = false) {
-  const s = MASCOT_SLOTS[slot];
-  return { size: isElderly ? s.elderlySize : s.size, mood: s.mood };
-}
 
 interface BrainMascotProps {
   size?: number;

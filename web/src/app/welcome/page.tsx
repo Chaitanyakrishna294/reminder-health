@@ -213,11 +213,16 @@ export default function WelcomePage() {
           showCaptcha ? 'flex-1' : ''
         }`}
       >
-        <h1 className="font-mono font-black text-4xl leading-tight tracking-tight">
+        {/* Inter, not mono. Spec §4/§10.5: mono is for VALUES ONLY — times,
+            counts, codes, structural labels, the wordmark — never a sentence.
+            This screen sits outside the (dashboard) group and is styled by
+            class rather than tag, which is exactly where §10.5 predicted the
+            next violation would be hiding. */}
+        <h1 className="font-black text-4xl leading-tight tracking-tight">
           Never miss a dose{' '}
           <Heart className="inline-block w-8 h-8 text-white align-[-0.12em]" strokeWidth={2.5} aria-hidden />
         </h1>
-        <p className="mt-3 font-mono text-[15px] leading-relaxed text-[#0F1C5A]/80">
+        <p className="mt-3 text-[15px] leading-relaxed text-[#0F1C5A]/80">
           Your friendly reminder to take medicines on time, every time.
         </p>
 
@@ -244,7 +249,7 @@ export default function WelcomePage() {
           </div>
           <button
             type="submit"
-            className="w-full h-14 inline-flex items-center justify-center gap-2 rounded-2xl bg-[#CC3D64] text-white font-mono font-bold text-lg shadow-md hover:brightness-95 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 transition-all cursor-pointer"
+            className="w-full h-14 inline-flex items-center justify-center gap-2 rounded-2xl bg-[#CC3D64] text-white font-bold text-lg shadow-md hover:brightness-95 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 transition-all cursor-pointer"
           >
             <Lock className="w-5 h-5" aria-hidden />
             Sign in
@@ -253,13 +258,13 @@ export default function WelcomePage() {
 
         <div className={`relative flex items-center my-4 ${showCaptcha ? 'hidden' : ''}`} aria-hidden>
           <div className="flex-grow border-t border-[#0F1C5A]/25"></div>
-          <span className="flex-shrink mx-4 font-mono font-bold text-sm text-[#0F1C5A]/70">or</span>
+          <span className="flex-shrink mx-4 font-bold text-sm text-[#0F1C5A]/70">or</span>
           <div className="flex-grow border-t border-[#0F1C5A]/25"></div>
         </div>
 
         <Link
           href="/register"
-          className={`w-full h-12 inline-flex items-center justify-center gap-2 rounded-2xl font-mono font-bold text-lg text-[#0F1C5A] hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 transition-colors ${
+          className={`w-full h-12 inline-flex items-center justify-center gap-2 rounded-2xl font-bold text-lg text-[#0F1C5A] hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 transition-colors ${
             showCaptcha ? 'hidden' : ''
           }`}
         >
@@ -275,7 +280,7 @@ export default function WelcomePage() {
           type="button"
           onClick={handleGuestTap}
           disabled={guestLoading}
-          className="mt-1 w-full h-12 inline-flex items-center justify-center gap-2 rounded-2xl font-mono font-bold text-base text-[#0F1C5A]/85 underline underline-offset-4 decoration-[#0F1C5A]/30 hover:bg-white/25 hover:decoration-[#0F1C5A]/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-60 disabled:cursor-wait transition-colors cursor-pointer"
+          className="mt-1 w-full h-12 inline-flex items-center justify-center gap-2 rounded-2xl font-bold text-base text-[#0F1C5A]/85 underline underline-offset-4 decoration-[#0F1C5A]/30 hover:bg-white/25 hover:decoration-[#0F1C5A]/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-60 disabled:cursor-wait transition-colors cursor-pointer"
         >
           {guestLoading ? (
             <>
@@ -299,7 +304,7 @@ export default function WelcomePage() {
             {/* Hint ABOVE the widget: the widget is then the last element on the
                 page, so scrolling to the end lands it flush against the bottom
                 edge instead of leaving its tail clipped. */}
-            <p className="mb-2 text-center font-mono text-[11px] text-[#0F1C5A]/75">
+            <p className="mb-2 text-center text-[11px] text-[#0F1C5A]/75">
               Quick check that you&apos;re not a robot — then you&apos;re in.
             </p>
             <Turnstile key={captchaNonce} onVerify={handleCaptchaVerify} />
@@ -309,7 +314,7 @@ export default function WelcomePage() {
             <button
               type="button"
               onClick={() => { setShowCaptcha(false); setGuestError(null); }}
-              className="mt-3 w-full h-10 rounded-2xl font-mono text-[13px] font-bold text-[#0F1C5A]/70 hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 transition-colors cursor-pointer"
+              className="mt-3 w-full h-10 rounded-2xl text-[13px] font-bold text-[#0F1C5A]/70 hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 transition-colors cursor-pointer"
             >
               Back
             </button>
@@ -317,12 +322,12 @@ export default function WelcomePage() {
         )}
 
         {guestError && (
-          <p role="alert" className="mt-2 text-center font-mono text-[12px] font-bold text-[#7A1029]">
+          <p role="alert" className="mt-2 text-center text-[12px] font-bold text-[#7A1029]">
             {guestError}
           </p>
         )}
 
-        <p className="mt-3 flex items-center justify-center gap-1.5 font-mono text-[11px] text-[#0F1C5A]/80">
+        <p className="mt-3 flex items-center justify-center gap-1.5 text-[11px] text-[#0F1C5A]/80">
           <ShieldCheck className="w-4 h-4 shrink-0" aria-hidden />
           Your health data is secure and private with us.
         </p>

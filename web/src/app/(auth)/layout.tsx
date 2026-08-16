@@ -1,7 +1,11 @@
 import React from 'react';
 import Link from 'next/link';
 import { ShieldCheck } from 'lucide-react';
-import BrainMascot, { mascotSlot } from '@/components/dashboard/brain-mascot';
+import BrainMascot from '@/components/dashboard/brain-mascot';
+// From `mascot-slots`, NOT from `brain-mascot`: this layout is a server
+// component, and brain-mascot is `'use client'`. Importing the helper from
+// there is what 500'd every `(auth)` route, login included.
+import { mascotSlot } from '@/components/dashboard/mascot-slots';
 
 /**
  * Auth shell, redesigned 2026-08-09 from the generated mockups: brand row kept
