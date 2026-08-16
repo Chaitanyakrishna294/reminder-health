@@ -37,7 +37,7 @@ export default function LanguagePicker() {
       <header className="px-1">
         <h1
           className={`font-black text-foreground tracking-tight ${
-            isElderly ? 'text-4xl' : 'text-2xl'
+            isElderly ? 'text-4xl' : 'title-page'
           }`}
         >
           {t.language.title}

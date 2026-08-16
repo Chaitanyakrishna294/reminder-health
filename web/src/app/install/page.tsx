@@ -95,7 +95,7 @@ export default function InstallPage() {
         />
 
         <div>
-          <h1 className="text-2xl font-black text-foreground tracking-tight">Install Re-MIND-eЯ</h1>
+          <h1 className="title-page text-foreground">Install Re-MIND-eЯ</h1>
           <p className="text-sm text-muted-foreground font-semibold mt-1">
             Add it to your home screen for faster access and reminders.
           </p>

@@ -60,7 +60,7 @@ export default function SettingsHub() {
   return (
     <div className={`max-w-2xl mx-auto ${isElderly ? 'space-y-7' : 'space-y-6'}`}>
       <header className="px-1">
-        <h1 className={`font-black text-foreground tracking-tight ${isElderly ? 'text-4xl' : 'text-2xl'}`}>
+        <h1 className={`font-black text-foreground tracking-tight ${isElderly ? 'text-4xl' : 'title-page'}`}>
           {t.settings.title}
         </h1>
       </header>

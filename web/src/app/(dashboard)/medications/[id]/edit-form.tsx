@@ -275,7 +275,7 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
       
       {/* Page Header */}
       <div>
-        <h1 className={`font-black tracking-tight text-foreground ${isElderly ? 'text-4xl' : 'text-2xl'}`}>
+        <h1 className={`font-black tracking-tight text-foreground ${isElderly ? 'text-4xl' : 'title-page'}`}>
           Edit Medication
         </h1>
         <p className={`text-muted-foreground mt-1 ${isElderly ? 'text-lg' : 'text-sm'}`}>

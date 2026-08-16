@@ -263,7 +263,7 @@ export default function CareCircleRequestsPage() {
             <Heart className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-black text-foreground tracking-tight">Care Circle Requests</h1>
+            <h1 className="title-page text-foreground">Care Circle Requests</h1>
             <p className="text-xs text-muted-foreground font-medium">
               Manage who can support your medication routine.
             </p>

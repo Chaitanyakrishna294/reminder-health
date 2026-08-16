@@ -23,7 +23,7 @@ export default function LegalLinks() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <header className="px-1">
-        <h1 className="text-2xl font-black text-foreground tracking-tight">{t.legal.title}</h1>
+        <h1 className="title-page text-foreground">{t.legal.title}</h1>
       </header>
 
       <div className="rounded-3xl border border-border overflow-hidden divide-y divide-border">

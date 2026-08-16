@@ -239,7 +239,7 @@ export default async function PatientConsolePage({ params }: PageProps) {
             )}
           </div>
           <div>
-            <h1 className="text-2xl font-black text-foreground tracking-tight">{patientName}</h1>
+            <h1 className="title-page text-foreground">{patientName}</h1>
             <div className="flex flex-wrap items-center gap-2 mt-1.5 text-xs text-muted-foreground font-semibold">
               <span>{patientRoleLabel(connection.relationship_type)}</span>
               <span>•</span>

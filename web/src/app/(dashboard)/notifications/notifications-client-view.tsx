@@ -224,7 +224,7 @@ export default function NotificationsClientView({
         {/* No PageBack here: DashboardMainLayout renders one above every sub-page,
             so a local copy would show two arrows stacked. */}
         <div className="min-w-0">
-          <h1 className={`font-black text-foreground tracking-tight ${isElderly ? 'text-4xl' : 'text-2xl'}`}>
+          <h1 className={`font-black text-foreground tracking-tight ${isElderly ? 'text-4xl' : 'title-page'}`}>
             Notifications
           </h1>
           <p className={`text-muted-foreground font-semibold ${isElderly ? 'text-xl mt-2' : 'text-xs mt-1'}`}>

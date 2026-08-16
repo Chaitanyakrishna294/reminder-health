@@ -25,7 +25,7 @@ export default async function HelpSettingsPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <header className="px-1">
-        <h1 className="text-2xl font-black text-foreground tracking-tight">Help &amp; support</h1>
+        <h1 className="title-page text-foreground">Help &amp; support</h1>
         <p className="text-xs text-muted-foreground font-semibold mt-1">
           Tell us what is not working and we will help.
         </p>
