@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useUiMode } from '@/context/ui-mode-context';
+import { useLanguage } from '@/context/language-context';
 import {
   getNativeActiveLadders,
   isNativeApp,
@@ -135,6 +136,9 @@ export default function ScheduleSync() {
   // elderly mode. It cannot read this context — it is a different process with
   // no webview running — so the value has to travel over the bridge.
   const { isElderly } = useUiMode();
+  // Mirrored to native so the alarm screen speaks the app's language rather than
+  // the phone's. See the `language` note on syncScheduleToNative.
+  const { locale } = useLanguage();
 
   useEffect(() => {
     if (!isNativeApp()) return;
@@ -312,12 +316,12 @@ export default function ScheduleSync() {
       }
 
       try {
-        const result = await syncScheduleToNative(medications, session?.user.id, isElderly, ringSeconds);
+        const result = await syncScheduleToNative(medications, session?.user.id, isElderly, ringSeconds, locale);
         if (cancelled) return;
         console.log(
           `[ScheduleSync] synced ${medications.length} medication(s) to the native store` +
             ` (exact alarms allowed: ${result?.canScheduleExactAlarms}, elderly: ${isElderly},` +
-            ` ring: ${ringSeconds ?? 'default'}s)`,
+            ` ring: ${ringSeconds ?? 'default'}s, language: ${locale})`,
         );
       } catch (err) {
         console.error('[ScheduleSync] syncSchedule failed:', err);
@@ -345,7 +349,12 @@ export default function ScheduleSync() {
     // it on is telling us the current presentation is too much for them, and the
     // alarm is the screen where that matters most.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, isElderly]);
+    // `locale` belongs here for the same reason `isElderly` does: both are mirrored
+    // to the device, and a value that only syncs on navigation is a value the alarm
+    // learns about late. Without it, switching to Telugu in Settings would leave the
+    // alarm screen in English until the next route change — and Settings → Language
+    // is a leaf, so the user's very next action is usually going back, not forward.
+  }, [pathname, isElderly, locale]);
 
   return null;
 }

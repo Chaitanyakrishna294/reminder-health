@@ -1,0 +1,52 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!--
+    मराठी (Marathi) — the alarm, its notifications, and the water nudge.
+
+    THESE ARE NOT SELECTED BY THE DEVICE LOCALE. Android would normally pick this
+    directory only when the PHONE is set to mr, which is not the same as the
+    language the user chose in this app. AlarmPrefs.localized() forces the
+    configuration from the bridged `language` field so the alarm speaks the app's
+    language on an English phone. See AlarmPrefs.kt and BRIDGE_CONTRACT.md.
+
+    Only the FRAME is here. Medication names arrive as %1$s format arguments
+    straight from the Room store, exactly as the user typed them — never
+    translated, never transliterated.
+
+    Counts stay Western numerals, matching the web (see lib/i18n/format.ts).
+    app_name and the URL-scheme strings are deliberately absent: a brand and two
+    machine tokens are not words.
+-->
+<resources>
+    <string name="alarm_taken">घेतली</string>
+    <string name="alarm_skip">वगळा</string>
+    <string name="alarm_snooze">10 मिनिटांनी</string>
+    <string name="alarm_eyebrow_prefix">मात्रेची वेळ</string>
+    <string name="alarm_photo_description">तुमच्या काळजी मंडळाचा फोटो</string>
+    <string name="alarm_title">%1$s घेण्याची वेळ</string>
+    <string name="alarm_title_retry">%1$s अजून घ्यायची आहे</string>
+    <string name="alarm_group_title">%1$d औषधांची वेळ</string>
+    <string name="alarm_missed_title">चुकली: %1$s घ्या</string>
+    <string name="alarm_missed_group_title">चुकल्या: %1$d औषधे</string>
+    <string name="alarm_tap_to_open">Re-MIND-eЯ उघडण्यासाठी दाबा</string>
+    <string name="alarm_tap_to_record">ही मात्रा नोंदवण्यासाठी दाबा</string>
+    <string name="alarm_group_count">%1$d औषधे</string>
+    <string name="alarm_group_progress">%2$d पैकी %1$d</string>
+    <string name="alarm_taken_all">सर्व घेतल्या</string>
+    <string name="alarm_open">उघडा</string>
+    <string name="alarm_recorded_taken">✓ घेतली</string>
+    <string name="alarm_recorded_skipped">✓ वगळली</string>
+    <string name="alarm_recorded">✓ नोंदवली</string>
+    <string name="alarm_all_done">सर्व झाले</string>
+    <string name="alarm_waiting">प्रतीक्षेत</string>
+    <string name="alarm_not_answered">उत्तर दिले नाही</string>
+    <string name="alarm_tap_to_answer">याला आत्ता उत्तर द्या</string>
+    <string name="water_title">पाणी पिण्याची वेळ</string>
+    <string name="water_progress">आज %2$d पैकी %1$d</string>
+    <string name="water_untracked">मोजण्यासाठी घेतली दाबा</string>
+    <string name="water_taken">घेतली</string>
+    <string name="channel_dose_name">औषधांची स्मरणपत्रे</string>
+    <string name="channel_dose_description">औषध घेण्याची वेळ झाल्यावर सूचना</string>
+    <string name="channel_missed_name">चुकलेल्या मात्रा</string>
+    <string name="channel_water_name">पाण्याची स्मरणपत्रे</string>
+    <string name="channel_water_description">पाणी पिण्याची सौम्य आठवण. कधीही पूर्ण स्क्रीन नाही.</string>
+</resources>

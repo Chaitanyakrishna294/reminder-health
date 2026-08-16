@@ -51,4 +51,34 @@
     <string name="alarm_not_answered">Not answered</string>
     <!-- Read out for the tappable rows; the visual affordance is the card. -->
     <string name="alarm_tap_to_answer">Tap to answer this one now</string>
+
+    <!-- ================================================================
+         WATER NUDGE (2026-08-15). Moved out of WaterNudge.kt so it can be
+         translated at all.
+
+         The tone is load-bearing and must survive translation: this is the
+         QUIET TIER. No urgency, no streak, no guilt, and "Taken" is the only
+         action because skipping water is not an event worth recording.
+         ================================================================ -->
+    <string name="water_title">Time for a glass of water</string>
+    <!-- "%1$d of %2$d today" — Western numerals, like every count in this app. -->
+    <string name="water_progress">%1$d of %2$d today</string>
+    <string name="water_untracked">Tap Taken to count it</string>
+    <string name="water_taken">Taken</string>
+
+    <!-- ================================================================
+         NOTIFICATION CHANNELS.
+
+         These appear in ANDROID'S OWN settings, not in our UI, and Android
+         caches the name from when the channel was created — so a language
+         change does not rename an existing channel until it is recreated.
+         Translated anyway: a fresh install in Telugu should not list its
+         channels in English, and the stale-name case is cosmetic and
+         self-corrects on reinstall.
+         ================================================================ -->
+    <string name="channel_dose_name">Medication reminders</string>
+    <string name="channel_dose_description">Alerts when it is time to take a medication</string>
+    <string name="channel_missed_name">Missed doses</string>
+    <string name="channel_water_name">Water reminders</string>
+    <string name="channel_water_description">Gentle reminders to drink water. Never full-screen.</string>
 </resources>

@@ -1,6 +1,8 @@
 package com.reminderhealth.app.schedule
 
 import android.content.Context
+import android.content.res.Configuration
+import java.util.Locale
 
 /**
  * The handful of webview settings the ALARM needs to know, mirrored natively.
@@ -20,6 +22,22 @@ object AlarmPrefs {
     private const val FILE = "alarm_prefs"
     private const val KEY_ELDERLY = "elderly"
     private const val KEY_RING_SECONDS = "ringSeconds"
+    private const val KEY_LANGUAGE = "language"
+
+    /**
+     * The languages the app ships complete. Anything else falls back to English.
+     *
+     * An ALLOWLIST, not a passthrough of whatever the payload said. The bridge is
+     * a channel from a webview we control today, but a value read straight into a
+     * `Locale` decides what a patient reads at 3am — and an unknown tag would
+     * silently resolve to the default resources, which is the right outcome but
+     * for the wrong reason. Listing them makes "which languages does the alarm
+     * speak" answerable from this file rather than from a `values-*` directory
+     * listing. Keep in lockstep with `LOCALES` in web/src/lib/i18n/locales.ts.
+     */
+    val SUPPORTED_LANGUAGES = setOf("en", "hi", "te", "ta", "kn", "ml", "mr")
+
+    const val LANGUAGE_DEFAULT = "en"
 
     /**
      * Ring-window bounds, mirroring the CHECK on `profiles.alarm_ring_seconds`.
@@ -72,6 +90,56 @@ object AlarmPrefs {
     }
 
     fun clampRingSeconds(seconds: Int): Int = seconds.coerceIn(RING_SECONDS_MIN, RING_SECONDS_MAX)
+
+    // -- LANGUAGE ------------------------------------------------------------
+
+    /**
+     * The IN-APP language, mirrored from the web.
+     *
+     * **This exists because Android resource qualifiers follow the DEVICE locale,
+     * and the device locale is not the choice the user made in this app.** A
+     * patient whose phone is in English but who set the app to Telugu would get
+     * `values/` — an English alarm — on the one screen that must work offline, at
+     * speed, for the least technical person we have. `values-te/` alone does not
+     * fix that; nothing consults it unless the *configuration* says Telugu, which
+     * is what [localized] forces.
+     *
+     * Defaults to English, and an unrecognised tag falls back to English rather
+     * than being stored: an alarm in a language nobody chose is worse than an
+     * alarm in the language everything else already defaults to.
+     */
+    fun language(context: Context): String {
+        val stored = prefs(context).getString(KEY_LANGUAGE, LANGUAGE_DEFAULT) ?: LANGUAGE_DEFAULT
+        return if (stored in SUPPORTED_LANGUAGES) stored else LANGUAGE_DEFAULT
+    }
+
+    fun setLanguage(context: Context, language: String?) {
+        // A null/blank field means "the web did not say", which must leave the last
+        // known choice alone — same contract as ringSeconds. Only an explicit,
+        // supported tag overwrites.
+        val tag = language?.trim()?.lowercase()?.substringBefore('-') ?: return
+        if (tag.isEmpty() || tag !in SUPPORTED_LANGUAGES) return
+        prefs(context).edit().putString(KEY_LANGUAGE, tag).apply()
+    }
+
+    /**
+     * A Context whose resources resolve in the app's chosen language.
+     *
+     * EVERY user-facing native string must be pulled through this — the alarm
+     * screen, the notification actions, the retry rungs, the missed notice and the
+     * water nudge. `context.getString(...)` on a raw Context reads the DEVICE
+     * locale and will quietly disagree with the rest of the app.
+     *
+     * Note this is the frame only. Medication names come from the Room store as
+     * the user typed them and are never passed through resources — the same
+     * "translate the frame, never the content" rule the web side keeps.
+     */
+    fun localized(context: Context): Context {
+        val locale = Locale.forLanguageTag(language(context))
+        val config = Configuration(context.resources.configuration)
+        config.setLocale(locale)
+        return context.createConfigurationContext(config)
+    }
 
     // -- ALARM MEDIA (see [AlarmMedia]) --------------------------------------
     //
