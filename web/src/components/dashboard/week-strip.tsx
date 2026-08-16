@@ -131,7 +131,7 @@ export default function WeekStrip({
                         ? ` — ${d.total} ${d.total === 1 ? 'dose' : 'doses'}, ${d.open} to answer`
                         : ` — ${d.total} ${d.total === 1 ? 'dose' : 'doses'}, all answered`)
                 }
-                className={`w-full min-h-11 py-1.5 rounded-2xl flex flex-col items-center justify-center gap-1
+                className={`w-full min-h-11 py-1.5 rounded-[14px] flex flex-col items-center justify-center gap-1
                             transition-colors duration-150 cursor-pointer
                             focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background
                             ${isSelected ? 'bg-primary-soft' : 'hover:bg-muted'}`}
