@@ -22,7 +22,7 @@ export default async function SetupGuideSettingsPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <header className="px-1">
-        <h1 className="text-2xl font-black text-foreground tracking-tight">Setup guide</h1>
+        <h1 className="title-page text-foreground">Setup guide</h1>
         <p className="text-xs text-muted-foreground font-semibold mt-1 text-balance">
           Steps to make sure your phone lets reminders through.
         </p>

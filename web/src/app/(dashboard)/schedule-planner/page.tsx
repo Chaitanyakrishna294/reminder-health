@@ -1,5 +1,6 @@
 'use client';
 
+import { useLanguage } from '@/context/language-context';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Clock,
@@ -97,6 +98,10 @@ function DoseCard({
   openOverride, handleRemoveOverride,
   startDrag, onDragMove, endDrag, setDragging, narrow, openDetail,
 }: DoseCardProps) {
+  // Its own hook rather than a `t` prop threaded down from the page. DoseCard is a
+  // real component, so it can just ask; passing the dictionary through props would
+  // make every future caller responsible for remembering to.
+  const { t } = useLanguage();
   const isDraggingThis = dragging?.medId === med.id;
   const accent = med.isSkipped ? 'var(--muted-foreground)' : priorityColor(med.priority_level);
   // These were hardcoded light hexes (#FFFFFF / #F2F2F7 / #FFF3E0 / #FFEDF2). Because
@@ -149,16 +154,20 @@ function DoseCard({
                 : 'bg-danger/15 text-danger-strong')
           }
         >
-          {med.outcome === 'TAKEN' ? 'Taken' : med.outcome === 'SKIP' ? 'Skipped' : 'Missed'}
+          {med.outcome === 'TAKEN'
+            ? t.planner.outcomeTaken
+            : med.outcome === 'SKIP'
+              ? t.planner.skipped
+              : t.planner.outcomeMissed}
         </span>
       )}
       {/* "skip"/"adj" at 8px were closer to noise than labels. Spelled out, at a size
           that survives a phone at arm's length. */}
       {med.isSkipped && (
-        <span className="shrink-0 text-[11px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 bg-danger/10 text-danger-strong">Skipped</span>
+        <span className="shrink-0 text-[11px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 bg-danger/10 text-danger-strong">{t.planner.skipped}</span>
       )}
       {med.isOverridden && !med.isSkipped && (
-        <span className="shrink-0 text-[11px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 bg-warning/10 text-warning-strong">Moved</span>
+        <span className="shrink-0 text-[11px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 bg-warning/10 text-warning-strong">{t.planner.moved}</span>
       )}
       <span className={'shrink-0 inline-flex items-center gap-0.5 whitespace-nowrap text-[11px] font-bold font-mono px-2 py-0.5 rounded-full ' + (isDraggingThis ? 'text-primary bg-primary/15' : 'text-primary bg-primary/10')}>
         <Clock className="w-2.5 h-2.5" strokeWidth={2.5} />{displayTime}
@@ -202,7 +211,7 @@ function DoseCard({
         <button
           onClick={() => handleRemoveOverride(med.id)}
           className="inline-flex items-center justify-center w-11 h-11 rounded-full cursor-pointer transition-all bg-danger/10 text-danger-strong hover:bg-danger/15"
-          title="Restore to the usual time"
+          title={t.planner.restoreToUsual}
           aria-label={`Restore ${med.drug_name} to its usual time`}
         >
           <RotateCcw className="w-4 h-4" strokeWidth={2.5} />
@@ -211,7 +220,7 @@ function DoseCard({
         <button
           onClick={() => openOverride(med)}
           className="inline-flex items-center justify-center w-11 h-11 rounded-full text-foreground/70 bg-muted hover:bg-accent-surface cursor-pointer transition-all"
-          title="Adjust or skip this dose"
+          title={t.planner.adjustOrSkip}
           aria-label={`Adjust or skip today's ${med.drug_name} dose`}
         >
           <Edit2 className="w-4 h-4" strokeWidth={2.5} />
@@ -255,6 +264,7 @@ function DoseCard({
 }
 
 export default function SchedulePlannerPage() {
+  const { t } = useLanguage();
   const { isElderly, viewMode: activeViewMode } = useUiMode();
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -621,7 +631,7 @@ export default function SchedulePlannerPage() {
       <div className="rise-in flex items-end justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-[26px] font-bold tracking-tight text-foreground flex items-center gap-2">
-            <span className="whitespace-nowrap">Schedule</span>
+            <span className="whitespace-nowrap">{t.planner.schedule}</span>
             {isReadOnly && (
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-muted text-muted-foreground uppercase tracking-wide shrink-0">
                 Read Only
@@ -668,7 +678,7 @@ export default function SchedulePlannerPage() {
           <button
             onClick={() => shiftWeek(-1)}
             className="w-11 h-11 shrink-0 rounded-full flex items-center justify-center bg-muted hover:bg-input text-foreground transition-all cursor-pointer"
-            aria-label="Previous week"
+            aria-label={t.planner.prevWeek}
           >
             <ChevronLeft className="w-4 h-4" strokeWidth={2.5} />
           </button>
@@ -693,7 +703,7 @@ export default function SchedulePlannerPage() {
           <button
             onClick={() => shiftWeek(1)}
             className="w-11 h-11 shrink-0 rounded-full flex items-center justify-center bg-muted hover:bg-input text-foreground transition-all cursor-pointer"
-            aria-label="Next week"
+            aria-label={t.planner.nextWeek}
           >
             <ChevronRight className="w-4 h-4" strokeWidth={2.5} />
           </button>
@@ -834,7 +844,7 @@ export default function SchedulePlannerPage() {
                 <button
                   onClick={() => setZoom(z => Math.max(0.5, +(z - 0.25).toFixed(2)))}
                   className="w-11 h-11 rounded-full flex items-center justify-center hover:bg-card text-muted-foreground hover:text-foreground transition-all cursor-pointer"
-                  aria-label="Zoom out"
+                  aria-label={t.planner.zoomOut}
                 >
                   <Minus className="w-3 h-3" strokeWidth={2.5} />
                 </button>
@@ -842,7 +852,7 @@ export default function SchedulePlannerPage() {
                 <button
                   onClick={() => setZoom(z => Math.min(3, +(z + 0.25).toFixed(2)))}
                   className="w-11 h-11 rounded-full flex items-center justify-center hover:bg-card text-muted-foreground hover:text-foreground transition-all cursor-pointer"
-                  aria-label="Zoom in"
+                  aria-label={t.planner.zoomIn}
                 >
                   <Plus className="w-3 h-3" strokeWidth={2.5} />
                 </button>
@@ -854,7 +864,7 @@ export default function SchedulePlannerPage() {
                     saveOverrides(overrides.filter(o => o.dateStr !== dateStr));
                   }}
                   className="inline-flex items-center gap-1 h-11 px-3.5 rounded-full text-[11px] font-semibold transition-all cursor-pointer bg-danger/10 text-danger-strong hover:bg-danger/15"
-                  title="Reset all adjustments for this day"
+                  title={t.planner.resetDay}
                 >
                   <RotateCcw className="w-3 h-3" strokeWidth={2.5} /> Reset
                 </button>
@@ -868,7 +878,7 @@ export default function SchedulePlannerPage() {
               <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-3">
                 <Sun className="w-8 h-8 text-muted-foreground/50" strokeWidth={2} />
               </div>
-              <p className="text-sm font-bold text-foreground">A clear day</p>
+              <p className="text-sm font-bold text-foreground">{t.planner.clearDay}</p>
               <p className="text-xs font-medium text-muted-foreground mt-1">No medications scheduled for {selectedDateLong}.</p>
             </div>
           ) : (
@@ -920,7 +930,7 @@ export default function SchedulePlannerPage() {
                     <div className="relative flex items-center">
                       <span className="absolute -left-1 w-2.5 h-2.5 rounded-full bg-danger ring-2 ring-white" />
                       <div className="w-full border-t-2 border-danger/70 border-dashed" />
-                      <span className="absolute -left-12 top-1/2 -translate-y-1/2 w-11 text-center text-[10px] font-black text-danger-strong bg-card border border-danger py-0.5 rounded-full">NOW</span>
+                      <span className="absolute -left-12 top-1/2 -translate-y-1/2 w-11 text-center text-[10px] font-black text-danger-strong bg-card border border-danger py-0.5 rounded-full">{t.planner.now}</span>
                     </div>
                   </div>
                 )}
@@ -985,7 +995,7 @@ export default function SchedulePlannerPage() {
             </div>
             <div className="card-lift p-4" style={{ boxShadow: CARD_SHADOW }}>
               <p className="text-2xl font-bold leading-none" style={{ color: criticalCount > 0 ? 'var(--danger-strong)' : 'var(--foreground)' }}>{criticalCount}</p>
-              <p className="text-[11px] font-semibold text-muted-foreground mt-1 uppercase tracking-wide">Critical</p>
+              <p className="text-[11px] font-semibold text-muted-foreground mt-1 uppercase tracking-wide">{t.planner.critical}</p>
             </div>
           </div>
 
@@ -993,7 +1003,7 @@ export default function SchedulePlannerPage() {
               hardcode its own hexes AND call the lowest level "Routine" while the wizard
               you set it in called it "Normal" — so the key did not explain the app. */}
           <div className="card-lift p-5 space-y-3" style={{ boxShadow: CARD_SHADOW }}>
-            <h4 className="text-xs font-bold tracking-tight text-foreground">Priority key</h4>
+            <h4 className="text-xs font-bold tracking-tight text-foreground">{t.planner.priorityKey}</h4>
             {(['critical', 'important', 'normal'] as const).map((level) => {
               const meta = PRIORITY[level];
               return (
@@ -1010,7 +1020,7 @@ export default function SchedulePlannerPage() {
           {/* Time-of-day legend. The rail's bands only carried tiny in-chart labels, so
               the shading read as decoration. */}
           <div className="card-lift p-5 space-y-3" style={{ boxShadow: CARD_SHADOW }}>
-            <h4 className="text-xs font-bold tracking-tight text-foreground">Time of day</h4>
+            <h4 className="text-xs font-bold tracking-tight text-foreground">{t.planner.timeOfDay}</h4>
             <div className="grid grid-cols-2 gap-2">
               {DAY_BANDS.filter((b) => b.showLabel).map((band) => {
                 const BandIcon = band.icon;
@@ -1067,13 +1077,13 @@ export default function SchedulePlannerPage() {
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[11px] uppercase tracking-widest font-semibold text-muted-foreground">Dose record</p>
+                <p className="text-[11px] uppercase tracking-widest font-semibold text-muted-foreground">{t.planner.doseRecord}</p>
                 <h3 className="text-base font-bold tracking-tight text-foreground mt-0.5 break-words">{detailMed.drug_name}</h3>
                 <p className="text-[11px] font-semibold text-primary-strong mt-0.5">{selectedDateLong}</p>
               </div>
               <button
                 onClick={() => setDetailMed(null)}
-                aria-label="Close details"
+                aria-label={t.planner.closeDetails}
                 className="shrink-0 w-11 h-11 rounded-full flex items-center justify-center bg-muted hover:bg-accent-surface text-foreground transition-all cursor-pointer"
               >
                 <X className="w-4 h-4" strokeWidth={2.5} />
@@ -1082,18 +1092,18 @@ export default function SchedulePlannerPage() {
 
             <dl className="space-y-2.5">
               <div className="flex items-start justify-between gap-4">
-                <dt className="text-[11px] font-semibold text-muted-foreground shrink-0">Outcome</dt>
+                <dt className="text-[11px] font-semibold text-muted-foreground shrink-0">{t.planner.outcome}</dt>
                 <dd className="text-[12px] font-bold text-foreground text-right">
                   {detailMed.outcome === 'TAKEN' ? 'Taken' : detailMed.outcome === 'SKIP' ? 'Skipped' : 'Missed'}
                 </dd>
               </div>
               <div className="flex items-start justify-between gap-4">
-                <dt className="text-[11px] font-semibold text-muted-foreground shrink-0">Scheduled for</dt>
+                <dt className="text-[11px] font-semibold text-muted-foreground shrink-0">{t.planner.scheduledFor}</dt>
                 <dd className="text-[12px] font-bold text-foreground text-right">{formatTimeLabel(detailMed.time)}</dd>
               </div>
               {detailMed.respondedAt && (
                 <div className="flex items-start justify-between gap-4">
-                  <dt className="text-[11px] font-semibold text-muted-foreground shrink-0">Answered at</dt>
+                  <dt className="text-[11px] font-semibold text-muted-foreground shrink-0">{t.planner.answeredAt}</dt>
                   <dd className="text-[12px] font-bold text-foreground text-right">
                     {new Date(detailMed.respondedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </dd>
@@ -1101,19 +1111,19 @@ export default function SchedulePlannerPage() {
               )}
               {detailMed.dosage && detailMed.dosage !== 'N/A' && (
                 <div className="flex items-start justify-between gap-4">
-                  <dt className="text-[11px] font-semibold text-muted-foreground shrink-0">Dose</dt>
+                  <dt className="text-[11px] font-semibold text-muted-foreground shrink-0">{t.planner.dose}</dt>
                   <dd className="text-[12px] font-bold text-foreground text-right break-words">{detailMed.dosage}</dd>
                 </div>
               )}
               {detailMed.linkedBrandName && (
                 <div className="flex items-start justify-between gap-4">
-                  <dt className="text-[11px] font-semibold text-muted-foreground shrink-0">Linked medicine</dt>
+                  <dt className="text-[11px] font-semibold text-muted-foreground shrink-0">{t.planner.linkedMedicine}</dt>
                   <dd className="text-[12px] font-bold text-foreground text-right break-words">{detailMed.linkedBrandName}</dd>
                 </div>
               )}
               {detailMed.medicationReason && (
                 <div className="flex items-start justify-between gap-4">
-                  <dt className="text-[11px] font-semibold text-muted-foreground shrink-0">Reason</dt>
+                  <dt className="text-[11px] font-semibold text-muted-foreground shrink-0">{t.planner.reason}</dt>
                   <dd className="text-[12px] font-bold text-foreground text-right break-words">{detailMed.medicationReason}</dd>
                 </div>
               )}
@@ -1137,7 +1147,7 @@ export default function SchedulePlannerPage() {
           <div className="card-lift max-w-md w-full p-6 space-y-5" style={{ boxShadow: '0 8px 40px rgba(16, 28, 90, 0.18)' }}>
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-[11px] uppercase tracking-widest font-semibold text-muted-foreground">Adjust dose</p>
+                <p className="text-[11px] uppercase tracking-widest font-semibold text-muted-foreground">{t.planner.adjustDose}</p>
                 <h3 className="text-base font-bold tracking-tight text-foreground mt-0.5">{selectedMedForOverride.drug_name}</h3>
                 <p className="text-[11px] font-semibold text-primary mt-0.5">{selectedDateLong}</p>
               </div>
@@ -1163,7 +1173,7 @@ export default function SchedulePlannerPage() {
 
             {!skipForToday && (
               <label className="block">
-                <span className="text-[11px] uppercase font-black text-muted-foreground">New time</span>
+                <span className="text-[11px] uppercase font-black text-muted-foreground">{t.planner.newTime}</span>
                 <input
                   type="time"
                   value={newOverrideTime}

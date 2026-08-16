@@ -123,17 +123,24 @@ object WaterNudge {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
+        val res = AlarmPrefs.localized(context)
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_water_drop)
             // The scoped hydration accent, so a glass of water is never mistaken
             // for a dose even at a glance in the shade.
             .setColor(0xFF38A3D1.toInt())
             .setColorized(false)
-            .setContentTitle("Time for a glass of water")
-            .setContentText(if (goal > 0) "$cups of $goal today" else "Tap Taken to count it")
+            // Pulled through AlarmPrefs.localized so the nudge speaks the app's
+            // language rather than the phone's — the same reason the alarm does.
+            // The COUNTS stay Western numerals; only the frame translates.
+            .setContentTitle(res.getString(R.string.water_title))
+            .setContentText(
+                if (goal > 0) res.getString(R.string.water_progress, cups, goal)
+                else res.getString(R.string.water_untracked)
+            )
             // ONE action. "Taken" adds a cup; there is deliberately no Skip,
             // because skipping water is not an event worth recording.
-            .addAction(0, "Taken", drank)
+            .addAction(0, res.getString(R.string.water_taken), drank)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             // SWIPEABLE, and nothing happens when it is swiped. The opposite of

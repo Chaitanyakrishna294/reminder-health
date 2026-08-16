@@ -109,7 +109,7 @@ export default function PatientStockCard({
 
   if (!canEdit) {
     return (
-      <div className="card-lift p-5 flex flex-col justify-between shadow-sm">
+      <div className="card-lift stagger-in p-5 flex flex-col justify-between">
         {card}
       </div>
     );
@@ -121,7 +121,7 @@ export default function PatientStockCard({
         type="button"
         onClick={() => setOpen(true)}
         aria-label={`Lowest stock ${minDays} days. Open to refill this patient's medications.`}
-        className="card-lift p-5 flex flex-col justify-between shadow-sm text-left cursor-pointer transition-colors hover:border-primary/40"
+        className="card-lift press-sink stagger-in p-5 flex flex-col justify-between text-left cursor-pointer"
       >
         {card}
       </button>

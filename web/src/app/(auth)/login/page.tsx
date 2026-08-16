@@ -1,5 +1,7 @@
 'use client';
 
+import { useLanguage } from '@/context/language-context';
+import { format } from '@/lib/i18n/format';
 import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -28,6 +30,7 @@ import LoadingMark from '@/components/ui/loading-mark';
  * spam callout. All auth logic is unchanged from the pre-redesign page.
  */
 function LoginForm() {
+  const { t } = useLanguage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -58,7 +61,7 @@ function LoginForm() {
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (captchaEnabled && !captchaToken) {
-      setError('Please complete the verification challenge.');
+      setError(t.auth.errCaptcha);
       return;
     }
     setLoading(true);
@@ -87,11 +90,11 @@ function LoginForm() {
   // NOTE: the Supabase "Magic Link" email template must include {{ .Token }} for the code to show.
   const handleSendCode = async () => {
     if (!email) {
-      setError('Please enter your email to get a sign-in code.');
+      setError(t.auth.errEmailForCode);
       return;
     }
     if (captchaEnabled && !captchaToken) {
-      setError('Please complete the verification challenge.');
+      setError(t.auth.errCaptcha);
       return;
     }
     setLoading(true);
@@ -107,9 +110,9 @@ function LoginForm() {
     if (otpErr) {
       const m = (otpErr.message || '').toLowerCase();
       if (m.includes('not allowed') || m.includes('signups')) {
-        setError('No account found for that email. Tap "Create account" below to sign up first.');
+        setError(format(t.auth.errNoAccount, { label: t.auth.createAccount }));
       } else if (m.includes('rate limit') || m.includes('security purposes') || m.includes('too many')) {
-        setError('Too many email requests — please wait a minute, or sign in with your password.');
+        setError(t.auth.errTooManyEmail);
       } else {
         setError(otpErr.message);
       }
@@ -119,7 +122,7 @@ function LoginForm() {
       // First send: the code screen's own heading says where the code went, so a
       // banner would say it twice. On a RESEND the screen doesn't change, so the
       // banner is the only feedback that anything happened.
-      setInfo(resending ? `A fresh code is on its way to ${email}.` : null);
+      setInfo(resending ? format(t.auth.freshCodeSent, { email }) : null);
     }
   };
 
@@ -127,7 +130,7 @@ function LoginForm() {
     e.preventDefault();
     const token = code.trim();
     if (token.length < 6) {
-      setError('Enter the full code from your email.');
+      setError(t.auth.errFullCode);
       return;
     }
     setLoading(true);
@@ -141,7 +144,7 @@ function LoginForm() {
       const m = (verifyErr.message || '').toLowerCase();
       setError(
         m.includes('expired') || m.includes('invalid')
-          ? 'That code is invalid or expired. Tap "Resend code" for a fresh one.'
+          ? format(t.auth.errCodeInvalid, { label: t.auth.resendCode })
           : verifyErr.message
       );
       setLoading(false);
@@ -175,21 +178,18 @@ function LoginForm() {
         {/* The heart is INLINE, not a flex sibling — a flex heart detaches and
             floats beside the text block whenever the title wraps to two lines. */}
         <h1
-          className={`font-mono font-black tracking-tight text-foreground ${codeSent ? 'text-center' : ''} ${isElderly ? 'text-4xl' : 'text-[2rem]'}`}
+          className={`title-page text-foreground ${codeSent ? 'text-center' : ''} ${isElderly ? 'text-4xl' : ''}`}
         >
-          {codeSent ? 'Check your email' : 'Welcome back'}{' '}
+          {codeSent ? t.auth.checkYourEmail : t.auth.welcomeBack}{' '}
           <Heart className="inline-block w-7 h-7 text-primary align-[-0.1em]" aria-hidden />
         </h1>
         <p
           className={`mt-2 text-muted-foreground ${codeSent ? 'text-center' : ''} ${isElderly ? 'text-lg' : 'text-sm'}`}
         >
           {codeSent ? (
-            <>
-              We emailed a sign-in code to{' '}
-              <b className="text-foreground break-all">{email}</b>.
-            </>
+            <>{format(t.auth.emailedCodeTo, { email })}</>
           ) : (
-            'Sign in to continue your journey towards better health.'
+            t.auth.signInSubtitle
           )}
         </p>
       </header>
@@ -226,7 +226,7 @@ function LoginForm() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className={inputClass}
-                  placeholder="you@example.com"
+                  placeholder={t.auth.emailPlaceholder}
                 />
               </div>
             </div>
@@ -246,7 +246,7 @@ function LoginForm() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className={`${inputClass} pr-14`}
-                  placeholder="Your password"
+                  placeholder={t.auth.loginPasswordPlaceholder}
                 />
                 <button
                   type="button"
@@ -301,7 +301,7 @@ function LoginForm() {
               "Already have an account?" line and buys back ~32px of the one-screen
               vertical budget (see the layout's header comment). */}
           <p className={`text-center ${isElderly ? 'text-base' : 'text-sm'}`}>
-            <span className="text-muted-foreground">New here? </span>
+            <span className="text-muted-foreground">{t.auth.newHere} </span>
             <Link href="/register" className="font-semibold text-primary-strong hover:underline">
               Create account
             </Link>

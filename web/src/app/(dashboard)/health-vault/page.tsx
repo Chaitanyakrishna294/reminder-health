@@ -5,6 +5,7 @@ import { resolveUserData } from '@/lib/supabase/cached-queries';
 import HealthVaultClientView from './health-vault-client-view';
 import GuestGate from '@/components/guest/guest-gate';
 import { GUEST_LOCKED } from '@/lib/auth/guest';
+import { getServerMessages } from '@/lib/i18n/server';
 
 export const revalidate = 0; // Dynamic rendering, always fresh
 
@@ -29,7 +30,8 @@ export default async function HealthVaultPage({ searchParams }: PageProps) {
   // insert, and a file uploaded against a session that dies with the browser
   // cookie would be unreachable anyway.
   if (userData.isGuest) {
-    return <GuestGate title="Health Vault needs a saved account" reason={GUEST_LOCKED.healthVault} />;
+    // Server-rendered, so the locale comes from the cookie rather than the context.
+    return <GuestGate title={(await getServerMessages()).vault.needsAccount} reason={GUEST_LOCKED.healthVault} />;
   }
 
   const supabase = await createClient();

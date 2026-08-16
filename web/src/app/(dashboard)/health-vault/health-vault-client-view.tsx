@@ -3,6 +3,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUiMode } from '@/context/ui-mode-context';
+import { useLanguage } from '@/context/language-context';
+import { format } from '@/lib/i18n/format';
 import { createClient } from '@/lib/supabase/client';
 import FolderCarousel from '@/components/health-vault/folder-carousel';
 import { useDensity } from '@/context/density-context';
@@ -103,6 +105,7 @@ export default function HealthVaultClientView({
   patientId,
 }: HealthVaultClientViewProps) {
   const { isElderly } = useUiMode();
+  const { t } = useLanguage();
   const router = useRouter();
   const supabase = createClient();
 
@@ -356,7 +359,7 @@ export default function HealthVaultClientView({
       }
     } catch (err: any) {
       console.error('[TIMELINE_FETCH_ERROR]', err);
-      setRecordsError('Failed to load medical records timeline.');
+      setRecordsError(t.vault.errTimeline);
     } finally {
       setIsLoadingRecords(false);
     }
@@ -388,7 +391,7 @@ export default function HealthVaultClientView({
       document.body.removeChild(a);
     } catch (err) {
       console.error('Download error:', err);
-      alert('Failed to generate download link.');
+      alert(t.vault.errDownloadLink);
     }
   };
 
@@ -424,7 +427,7 @@ export default function HealthVaultClientView({
       setPreviewPath(path); // enables auto-refresh of the signed URL (see effect below)
     } catch (err) {
       console.error('Preview generation error:', err);
-      alert('Failed to load document preview.');
+      alert(t.vault.errPreview);
     }
   };
 
@@ -478,7 +481,7 @@ export default function HealthVaultClientView({
 
   // Soft Delete handler
   const handleSoftDelete = async (recordId: string) => {
-    if (!confirm('Are you sure you want to move this record to the Trash?')) return;
+    if (!confirm(t.vault.confirmTrash)) return;
     try {
       const { error } = await supabase
         .from('health_records')
@@ -503,7 +506,7 @@ export default function HealthVaultClientView({
       router.refresh();
     } catch (err) {
       console.error('Soft delete error:', err);
-      alert('Failed to delete record.');
+      alert(t.vault.errDelete);
     }
   };
 
@@ -530,7 +533,7 @@ export default function HealthVaultClientView({
       router.refresh();
     } catch (err) {
       console.error('Restore error:', err);
-      alert('Failed to restore record.');
+      alert(t.vault.errRestore);
     }
   };
 
@@ -538,7 +541,7 @@ export default function HealthVaultClientView({
   const handlePermanentDelete = async () => {
     if (!recordToPermanentlyDelete) return;
     if (deleteConfirmationText.trim().toUpperCase() !== 'DELETE') {
-      alert('Please type DELETE to confirm permanent destruction.');
+      alert(format(t.vault.errTypeDelete, { token: t.vault.confirmToken }));
       return;
     }
 
@@ -582,7 +585,7 @@ export default function HealthVaultClientView({
       router.refresh();
     } catch (err: any) {
       console.error('Permanent delete error:', err);
-      alert('Failed to permanently delete record.');
+      alert(t.vault.errPermanentDelete);
     } finally {
       setIsDeletingPermanently(false);
     }
@@ -592,15 +595,15 @@ export default function HealthVaultClientView({
   const handleSaveEdit = async () => {
     if (!recordToEdit) return;
     if (!editTitle.trim()) {
-      alert('Title is required.');
+      alert(t.vault.errTitleRequired);
       return;
     }
     if (!editDate) {
-      alert('Record date is required.');
+      alert(t.vault.errDateRequired);
       return;
     }
     if (!editCategoryId) {
-      alert('Category folder selection is required.');
+      alert(t.vault.errCategoryRequired);
       return;
     }
 
@@ -650,7 +653,7 @@ export default function HealthVaultClientView({
       router.refresh();
     } catch (err: any) {
       console.error('Error saving metadata edit:', err);
-      alert('Failed to save record changes.');
+      alert(t.vault.errSaveChanges);
     } finally {
       setIsSavingEdit(false);
     }
@@ -890,11 +893,11 @@ export default function HealthVaultClientView({
 
   const handleUploadSave = async () => {
     if (!userId) {
-      setUploadError('Session expired. Please log in.');
+      setUploadError(t.vault.errSessionExpired);
       return;
     }
     if (!selectedFile) {
-      setUploadError('Please select a file.');
+      setUploadError(t.vault.errSelectFile);
       return;
     }
     // Re-checked here and not only at the modal's door: the count may have moved
@@ -905,15 +908,15 @@ export default function HealthVaultClientView({
       return;
     }
     if (!selectedCategoryId || selectedCategoryId.startsWith('default-')) {
-      setUploadError('Select a valid folder category.');
+      setUploadError(t.vault.errValidFolder);
       return;
     }
     if (!recordTitle.trim()) {
-      setUploadError('Record title is required.');
+      setUploadError(t.vault.errTitleRequired);
       return;
     }
     if (!recordDate) {
-      setUploadError('Record date is required.');
+      setUploadError(t.vault.errDateRequired);
       return;
     }
 
@@ -958,7 +961,7 @@ export default function HealthVaultClientView({
 
       if (dbError) {
         await supabase.storage.from('health-vault').remove([uniquePath]);
-        throw new Error(`Database error: ${dbError.message}`);
+        throw new Error(format(t.vault.errDatabase, { detail: dbError.message }));
       }
 
       // Log upload action
@@ -1077,7 +1080,7 @@ export default function HealthVaultClientView({
               swipe is discoverable without a label. Stacked full-width, four folders were
               four screens of scrolling before you reached a document. */}
           <div className="space-y-3">
-            <h3 className={`font-black text-foreground ${isElderly ? 'text-xl' : 'text-sm'}`}>Folders</h3>
+            <h3 className={`font-black text-foreground ${isElderly ? 'text-xl' : 'text-sm'}`}>{t.vault.folders}</h3>
 
             <FolderCarousel
               isElderly={isElderly}
@@ -1109,14 +1112,14 @@ export default function HealthVaultClientView({
 
           {/* Recent documents — the thing you actually came for, now on the first screen. */}
           <div className="space-y-3">
-            <h3 className={`font-black text-foreground ${isElderly ? 'text-xl' : 'text-sm'}`}>Recent documents</h3>
+            <h3 className={`font-black text-foreground ${isElderly ? 'text-xl' : 'text-sm'}`}>{t.vault.recentDocuments}</h3>
 
             {isLoadingRecent ? (
               <div className="space-y-2" aria-live="polite">
                 {[0, 1, 2].map(i => (
                   <div key={i} className="h-14 rounded-2xl bg-muted animate-pulse" />
                 ))}
-                <span className="sr-only">Loading your documents…</span>
+                <span className="sr-only">{t.vault.loading}</span>
               </div>
             ) : recentRecords.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-border bg-card/60 p-5 text-center">
@@ -1155,7 +1158,7 @@ export default function HealthVaultClientView({
                   return (
                     <li
                       key={item.id}
-                      className="rise-in flex items-center gap-3 card-lift p-3 shadow-sm transition-colors hover:border-input"
+                      className="rise-in flex items-center gap-3 card-lift p-3 transition-colors hover:border-input"
                       style={{ ['--rise-delay' as string]: `${Math.min(idx, 6) * 60}ms` }}
                     >
                       {/* File type is metadata, not a status — a red PDF badge would read
@@ -1212,7 +1215,7 @@ export default function HealthVaultClientView({
             <div className="flex items-start gap-3">
               <ShieldCheck className={`text-info shrink-0 ${isElderly ? 'w-8 h-8' : 'w-5 h-5'}`} />
               <div>
-                <h4 className="font-extrabold mb-0.5">Your records are private</h4>
+                <h4 className="font-extrabold mb-0.5">{t.vault.privateNotice}</h4>
                 <p className="font-medium">
                   Only you — and anyone you invite through Care Circle — can open these files.
                 </p>
@@ -1262,11 +1265,11 @@ export default function HealthVaultClientView({
             className="flex items-center gap-1.5 text-xs font-black text-muted-foreground hover:text-foreground cursor-pointer transition-all hover:-translate-x-0.5"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Back to Folder Vaults</span>
+            <span>{t.vault.backToFolders}</span>
           </button>
 
           {/* Folder Details Header Panel */}
-          <div className={`flex flex-col md:flex-row md:items-center md:justify-between card-lift shadow-sm transition-all duration-300 gap-4 ${
+          <div className={`flex flex-col md:flex-row md:items-center md:justify-between card-lift transition-all duration-300 gap-4 ${
             isElderly ? 'p-8 border-4 border-primary/30' : 'p-5'
           }`}>
             <div className="flex items-center gap-4">
@@ -1310,7 +1313,7 @@ export default function HealthVaultClientView({
               <ShieldCheck className="w-5 h-5 shrink-0 text-primary mt-0.5" />
               <div className="space-y-1">
                 <h4 className="font-extrabold text-sm text-foreground">Documents Shared by {patientName}</h4>
-                <p className="font-bold text-primary opacity-90">Shared through Care Circle. You currently have read-only access.</p>
+                <p className="font-bold text-primary opacity-90">{t.vault.sharedReadOnly}</p>
                 <p className="text-muted-foreground mt-1.5 leading-relaxed font-semibold">
                   {patientName} has chosen to share their health documents with you. You may review prescriptions, lab reports, and medical records. All documents remain read-only.
                 </p>
@@ -1340,7 +1343,7 @@ export default function HealthVaultClientView({
                 } ${isElderly ? 'px-5 py-2.5 text-sm' : 'px-3 py-1.5 text-xs'}`}
               >
                 <Trash2 className="w-3.5 h-3.5 shrink-0" />
-                <span>Trash Folder</span>
+                <span>{t.vault.trashFolder}</span>
               </button>
             </div>
 
@@ -1353,7 +1356,7 @@ export default function HealthVaultClientView({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by title or file name..."
+                placeholder={t.vault.searchPlaceholder}
                 className={`w-full bg-muted border border-border/80 rounded-2xl pl-9 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary/20 text-foreground font-semibold placeholder:text-muted-foreground/50 ${
                   isElderly ? 'text-sm' : 'text-xs'
                 }`}
@@ -1386,7 +1389,7 @@ export default function HealthVaultClientView({
             </div>
           ) : records.length === 0 ? (
             // Trashed or Active Empty State
-            <div className={`card-lift text-center shadow-sm flex flex-col items-center justify-center max-w-xl mx-auto space-y-4 py-16 ${
+            <div className={`card-lift text-center flex flex-col items-center justify-center max-w-xl mx-auto space-y-4 py-16 ${
               isElderly ? 'p-16 border-4 border-dashed' : 'p-12 border-dashed'
             }`}>
               <div className={`rounded-full bg-muted flex items-center justify-center text-muted-foreground/60 ${
@@ -1419,7 +1422,7 @@ export default function HealthVaultClientView({
                   } ${isFull ? 'opacity-40 cursor-not-allowed' : 'hover:bg-primary-strong-hover cursor-pointer'}`}
                 >
                   <Upload className="w-4 h-4 mr-1.5 shrink-0" />
-                  <span>Upload Document</span>
+                  <span>{t.vault.uploadDocument}</span>
                 </button>
               )}
             </div>
@@ -1459,7 +1462,7 @@ export default function HealthVaultClientView({
                           {dateGroup.items.map((item) => (
                             <div
                               key={item.id}
-                              className={`card-lift flex flex-col lg:flex-row lg:items-center justify-between gap-4 transition-all duration-300 shadow-sm ${
+                              className={`card-lift flex flex-col lg:flex-row lg:items-center justify-between gap-4 transition-all duration-300 ${
                                 isElderly 
                                   ? 'p-6 border-2 hover:scale-[1.005] hover:shadow-md' 
                                   : 'p-4 hover:scale-[1.005] hover:shadow-md'
@@ -1496,7 +1499,7 @@ export default function HealthVaultClientView({
                                       }`}
                                     >
                                       <Eye className="w-3.5 h-3.5 mr-1 shrink-0" />
-                                      <span>Preview</span>
+                                      <span>{t.vault.preview}</span>
                                     </button>
 
                                     <button
@@ -1506,7 +1509,7 @@ export default function HealthVaultClientView({
                                       }`}
                                     >
                                       <Download className="w-3.5 h-3.5 mr-1 shrink-0" />
-                                      <span>Download</span>
+                                      <span>{t.vault.download}</span>
                                     </button>
 
                                     {userRole !== 'CAREGIVER' && (
@@ -1518,7 +1521,7 @@ export default function HealthVaultClientView({
                                           }`}
                                         >
                                           <Edit className="w-3.5 h-3.5 mr-1 shrink-0" />
-                                          <span>Edit</span>
+                                          <span>{t.vault.edit}</span>
                                         </button>
 
                                         <button
@@ -1528,7 +1531,7 @@ export default function HealthVaultClientView({
                                           }`}
                                         >
                                           <Trash2 className="w-3.5 h-3.5 mr-1 shrink-0" />
-                                          <span>Delete</span>
+                                          <span>{t.vault.delete}</span>
                                         </button>
                                       </>
                                     )}
@@ -1543,7 +1546,7 @@ export default function HealthVaultClientView({
                                         }`}
                                       >
                                         <RotateCcw className="w-3.5 h-3.5 mr-1 shrink-0" />
-                                        <span>Restore</span>
+                                        <span>{t.vault.restore}</span>
                                       </button>
 
                                       <button
@@ -1553,7 +1556,7 @@ export default function HealthVaultClientView({
                                         }`}
                                       >
                                         <Trash className="w-3.5 h-3.5 mr-1 shrink-0" />
-                                        <span>Purge Forever</span>
+                                        <span>{t.vault.purgeForever}</span>
                                       </button>
                                     </>
                                   )
@@ -1581,10 +1584,10 @@ export default function HealthVaultClientView({
                     {isLoadingRecords ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-                        <span>Loading more...</span>
+                        <span>{t.vault.loadingMore}</span>
                       </>
                     ) : (
-                      <span>Load More Records</span>
+                      <span>{t.vault.loadMore}</span>
                     )}
                   </button>
                 </div>
@@ -1600,8 +1603,8 @@ export default function HealthVaultClientView({
           <div className={`bg-card border border-border shadow-2xl rounded-3xl w-full max-w-md relative p-6 ${isElderly ? 'p-8 border-2' : 'p-6'}`}>
             <div className="flex items-center justify-between border-b border-border/50 pb-4 mb-4">
               <div>
-                <h3 className={`font-black text-foreground ${isElderly ? 'text-2xl' : 'text-lg'}`}>Edit Record Details</h3>
-                <p className={`text-muted-foreground ${isElderly ? 'text-base' : 'text-xs'}`}>Modify record categorizations and dates.</p>
+                <h3 className={`font-black text-foreground ${isElderly ? 'text-2xl' : 'text-lg'}`}>{t.vault.editTitle}</h3>
+                <p className={`text-muted-foreground ${isElderly ? 'text-base' : 'text-xs'}`}>{t.vault.editSubtitle}</p>
               </div>
               <button onClick={() => setRecordToEdit(null)} className="text-muted-foreground hover:text-foreground hover:bg-muted p-1.5 rounded-full cursor-pointer">
                 <X className="w-5 h-5 shrink-0" />
@@ -1610,7 +1613,7 @@ export default function HealthVaultClientView({
 
             <div className="space-y-4">
               <div className="space-y-1">
-                <label className={`block font-black text-foreground ${isElderly ? 'text-lg' : 'text-xs'}`}>Title</label>
+                <label className={`block font-black text-foreground ${isElderly ? 'text-lg' : 'text-xs'}`}>{t.vault.fieldTitle}</label>
                 <input
                   type="text"
                   value={editTitle}
@@ -1622,7 +1625,7 @@ export default function HealthVaultClientView({
               </div>
 
               <div className="space-y-1">
-                <label className={`block font-black text-foreground ${isElderly ? 'text-lg' : 'text-xs'}`}>Record Date</label>
+                <label className={`block font-black text-foreground ${isElderly ? 'text-lg' : 'text-xs'}`}>{t.vault.fieldDate}</label>
                 <input
                   type="date"
                   value={editDate}
@@ -1634,7 +1637,7 @@ export default function HealthVaultClientView({
               </div>
 
               <div className="space-y-1">
-                <label className={`block font-black text-foreground ${isElderly ? 'text-lg' : 'text-xs'}`}>Category Folder</label>
+                <label className={`block font-black text-foreground ${isElderly ? 'text-lg' : 'text-xs'}`}>{t.vault.fieldCategory}</label>
                 <select
                   value={editCategoryId}
                   onChange={(e) => setEditCategoryId(e.target.value)}
@@ -1665,7 +1668,7 @@ export default function HealthVaultClientView({
                 className="px-4 py-2 rounded-xl text-xs font-black bg-primary-strong text-primary-strong-foreground hover:bg-primary-strong-hover flex items-center gap-1 cursor-pointer"
               >
                 {isSavingEdit ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-                <span>Save Changes</span>
+                <span>{t.vault.saveChanges}</span>
               </button>
             </div>
           </div>
@@ -1684,13 +1687,13 @@ export default function HealthVaultClientView({
 
             <div className="space-y-2">
               <h3 className={`font-black text-foreground ${isElderly ? 'text-2xl' : 'text-lg'}`}>
-                Confirm Permanent Deletion
+                {t.vault.confirmDeleteTitle}
               </h3>
               <p className={`text-muted-foreground leading-relaxed ${isElderly ? 'text-base' : 'text-xs'}`}>
-                This action is irreversible. The record metadata and physical storage file will be deleted forever.
+                {t.vault.irreversible}
               </p>
               <p className={`font-extrabold text-foreground ${isElderly ? 'text-sm mt-2' : 'text-[11px] mt-2'}`}>
-                Please type <b className="text-danger">DELETE</b> below to confirm:
+                {format(t.vault.typeToConfirm, { token: t.vault.confirmToken })}
               </p>
             </div>
 
@@ -1698,7 +1701,7 @@ export default function HealthVaultClientView({
               type="text"
               value={deleteConfirmationText}
               onChange={(e) => setDeleteConfirmationText(e.target.value)}
-              placeholder="Type DELETE here..."
+              placeholder={format(t.vault.confirmPlaceholder, { token: t.vault.confirmToken })}
               className={`w-full bg-muted border border-danger/30 rounded-xl px-4 py-2.5 text-center text-foreground focus:outline-none focus:ring-2 focus:ring-danger/20 font-black uppercase tracking-widest ${
                 isElderly ? 'text-sm' : 'text-xs'
               }`}
@@ -1721,7 +1724,7 @@ export default function HealthVaultClientView({
                 className="flex-1 px-4 py-2.5 rounded-xl text-xs font-black bg-danger-solid text-danger-solid-foreground hover:bg-danger/95 flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isDeletingPermanently ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-                <span>Delete Forever</span>
+                <span>{t.vault.deleteForever}</span>
               </button>
             </div>
           </div>
@@ -1757,10 +1760,10 @@ export default function HealthVaultClientView({
 
             {/* Step Indicators */}
             <div className="flex items-center justify-between px-2 mb-6 text-[10px] font-black text-muted-foreground uppercase tracking-wider">
-              <span className={activeStep === 1 ? "text-primary border-b-2 border-primary pb-0.5" : ""}>Step 1: Category</span>
-              <span className={activeStep === 2 ? "text-primary border-b-2 border-primary pb-0.5" : ""}>Step 2: File</span>
-              <span className={activeStep === 3 ? "text-primary border-b-2 border-primary pb-0.5" : ""}>Step 3: Details</span>
-              <span className={activeStep === 4 ? "text-primary border-b-2 border-primary pb-0.5" : ""}>Step 4: Save</span>
+              <span className={activeStep === 1 ? "text-primary border-b-2 border-primary pb-0.5" : ""}>{t.vault.step1}</span>
+              <span className={activeStep === 2 ? "text-primary border-b-2 border-primary pb-0.5" : ""}>{t.vault.step2}</span>
+              <span className={activeStep === 3 ? "text-primary border-b-2 border-primary pb-0.5" : ""}>{t.vault.step3}</span>
+              <span className={activeStep === 4 ? "text-primary border-b-2 border-primary pb-0.5" : ""}>{t.vault.step4}</span>
             </div>
 
             {/* Error Message Panel */}
@@ -1824,7 +1827,7 @@ export default function HealthVaultClientView({
                         }`}
                       >
                         <Camera className={isElderly ? 'w-8 h-8' : 'w-6 h-6'} aria-hidden />
-                        <span>Take photo</span>
+                        <span>{t.vault.takePhoto}</span>
                       </button>
                     )}
                     <button
@@ -1836,7 +1839,7 @@ export default function HealthVaultClientView({
                       }`}
                     >
                       <FolderOpen className={isElderly ? 'w-8 h-8' : 'w-6 h-6'} aria-hidden />
-                      <span>Choose file</span>
+                      <span>{t.vault.chooseFile}</span>
                     </button>
                   </div>
 
@@ -1926,7 +1929,7 @@ export default function HealthVaultClientView({
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={filePreviewUrl}
-                          alt="The photo you just took"
+                          alt={t.vault.photoAlt}
                           className={`w-full object-contain ${isElderly ? 'max-h-72' : 'max-h-56'}`}
                         />
                       </div>
@@ -1939,12 +1942,12 @@ export default function HealthVaultClientView({
                           }`}
                         >
                           {fromCamera
-                            ? <><Camera className={isElderly ? 'w-6 h-6' : 'w-4 h-4'} aria-hidden /> Retake</>
-                            : <><FolderOpen className={isElderly ? 'w-6 h-6' : 'w-4 h-4'} aria-hidden /> Choose another</>}
+                            ? <><Camera className={isElderly ? 'w-6 h-6' : 'w-4 h-4'} aria-hidden /> {t.vault.retake}</>
+                            : <><FolderOpen className={isElderly ? 'w-6 h-6' : 'w-4 h-4'} aria-hidden /> {t.vault.chooseAnother}</>}
                         </button>
                       </div>
                       <p className={`text-muted-foreground font-semibold ${isElderly ? 'text-sm' : 'text-[11px]'}`}>
-                        Can you read it? If not, take it again — nothing is saved yet.
+                        {t.vault.canYouReadIt}
                       </p>
                     </div>
                   )}
@@ -1974,8 +1977,8 @@ export default function HealthVaultClientView({
                     </div>
                   )}
                   <p className="text-[10px] text-muted-foreground leading-relaxed">
-                    Supported extensions: PDF, JPG, JPEG, PNG, WEBP, DOC, DOCX, TXT, ZIP. <br/>
-                    Maximum file size limit: <b>20 MB</b>.
+                    {format(t.vault.formats, { formats: VAULT_ALLOWED_LABEL })} <br/>
+                    {format(t.vault.maxSize, { size: `${Math.round(VAULT_MAX_BYTES / 1024 / 1024)} MB` })}
                   </p>
                 </div>
               )}
@@ -1990,7 +1993,7 @@ export default function HealthVaultClientView({
                       type="text"
                       value={recordTitle}
                       onChange={(e) => setRecordTitle(e.target.value)}
-                      placeholder="e.g. Blood Test Report Q1"
+                      placeholder={t.vault.titlePlaceholder}
                       className={`w-full bg-muted border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 ${
                         isElderly ? 'text-lg font-bold' : 'text-sm font-semibold'
                       }`}
@@ -2029,29 +2032,29 @@ export default function HealthVaultClientView({
                     </div>
                   ) : (
                     <div className="bg-muted p-5 rounded-3xl text-left space-y-3 text-xs font-semibold text-foreground">
-                      <h4 className="font-black border-b border-border/40 pb-2 text-foreground">Upload Details Summary</h4>
+                      <h4 className="font-black border-b border-border/40 pb-2 text-foreground">{t.vault.summaryTitle}</h4>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Category:</span>
+                        <span className="text-muted-foreground">{t.vault.labelCategory}</span>
                         <span className="text-foreground font-black">
                           {categories.find(c => c.id === selectedCategoryId)?.name || 'Unknown'}
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Title:</span>
+                        <span className="text-muted-foreground">{t.vault.labelTitle}</span>
                         <span className="text-foreground font-black truncate max-w-[60%]">{recordTitle}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Date:</span>
+                        <span className="text-muted-foreground">{t.vault.labelDate}</span>
                         <span className="text-foreground font-black">{recordDate}</span>
                       </div>
                       <div className="flex justify-between border-t border-border/40 pt-2">
-                        <span className="text-muted-foreground">File Name:</span>
+                        <span className="text-muted-foreground">{t.vault.labelFileName}</span>
                         <span className="text-foreground font-black truncate max-w-[60%]">
                           {selectedFile?.name}
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">File Size:</span>
+                        <span className="text-muted-foreground">{t.vault.labelFileSize}</span>
                         <span className="text-foreground font-black font-mono">
                           {selectedFile ? (selectedFile.size / (1024 * 1024)).toFixed(2) : '0'} MB
                         </span>
@@ -2075,7 +2078,7 @@ export default function HealthVaultClientView({
                       }`}
                     >
                       <ArrowLeft className="w-3.5 h-3.5 mr-1 shrink-0" />
-                      <span>Back</span>
+                      <span>{t.vault.back}</span>
                     </button>
                   )}
                 </div>
@@ -2085,11 +2088,11 @@ export default function HealthVaultClientView({
                     <button
                       onClick={() => {
                         if (activeStep === 2 && !selectedFile) {
-                          setUploadError('Please choose or drop a file before proceeding.');
+                          setUploadError(t.vault.errChooseFileFirst);
                           return;
                         }
                         if (activeStep === 3 && !recordTitle.trim()) {
-                          setUploadError('Please specify a title for this health record.');
+                          setUploadError(t.vault.errTitleForRecord);
                           return;
                         }
                         setUploadError(null);
@@ -2099,7 +2102,7 @@ export default function HealthVaultClientView({
                         isElderly ? 'px-5 py-3 text-base' : 'px-3.5 py-2 text-xs'
                       }`}
                     >
-                      <span>Next</span>
+                      <span>{t.vault.next}</span>
                       <ArrowRight className="w-3.5 h-3.5 ml-1 shrink-0" />
                     </button>
                   ) : (
@@ -2113,10 +2116,10 @@ export default function HealthVaultClientView({
                       {isUploading ? (
                         <>
                           <Loader2 className="w-4 h-4 shrink-0 animate-spin" />
-                          <span>Saving...</span>
+                          <span>{t.vault.saving}</span>
                         </>
                       ) : (
-                        <span>Upload & Save</span>
+                        <span>{t.vault.uploadAndSave}</span>
                       )}
                     </button>
                   )}
@@ -2167,11 +2170,11 @@ export default function HealthVaultClientView({
                   }`}
                 >
                   <Eye className="w-4 h-4 shrink-0" />
-                  <span>Open</span>
+                  <span>{t.vault.open}</span>
                 </a>
                 <button
                   onClick={closePreview}
-                  aria-label="Close preview"
+                  aria-label={t.vault.closePreview}
                   className="text-muted-foreground hover:text-foreground hover:bg-muted p-1.5 rounded-full transition-all cursor-pointer"
                 >
                   <X className="w-5 h-5 shrink-0" />
@@ -2205,7 +2208,7 @@ export default function HealthVaultClientView({
                       <div className="w-full h-full flex flex-col items-center justify-center text-center gap-4 p-8">
                         <FileText className="w-12 h-12 text-primary mx-auto shrink-0" />
                         <div>
-                          <h4 className="font-black text-foreground">Tap to view this PDF</h4>
+                          <h4 className="font-black text-foreground">{t.vault.tapToViewPdf}</h4>
                           <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto leading-relaxed">
                             Inline preview isn't supported in this browser. Open it in your device's
                             viewer instead.
@@ -2221,7 +2224,7 @@ export default function HealthVaultClientView({
                             }`}
                           >
                             <Eye className="w-4 h-4 mr-1.5 shrink-0" />
-                            <span>Open PDF</span>
+                            <span>{t.vault.openPdf}</span>
                           </a>
                           <button
                             onClick={() => previewName && previewUrl && handleDownloadUrl(previewUrl, previewName)}
@@ -2230,7 +2233,7 @@ export default function HealthVaultClientView({
                             }`}
                           >
                             <Download className="w-4 h-4 mr-1.5 shrink-0" />
-                            <span>Download</span>
+                            <span>{t.vault.download}</span>
                           </button>
                         </div>
                       </div>
@@ -2253,7 +2256,7 @@ export default function HealthVaultClientView({
                   <div className="text-center space-y-4 p-8">
                     <AlertCircle className="w-12 h-12 text-warning mx-auto shrink-0" />
                     <div>
-                      <h4 className="font-black text-foreground">Preview not available in-app</h4>
+                      <h4 className="font-black text-foreground">{t.vault.previewUnavailable}</h4>
                       <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto leading-relaxed">
                         {getExt(previewName || '') ? `.${getExt(previewName || '')} files` : 'This file type'} can't
                         be shown here. Open it in your device's app or download it.
@@ -2269,7 +2272,7 @@ export default function HealthVaultClientView({
                         }`}
                       >
                         <Eye className="w-4 h-4 mr-1.5 shrink-0" />
-                        <span>Open</span>
+                        <span>{t.vault.open}</span>
                       </a>
                       <button
                         onClick={() => previewName && previewUrl && handleDownloadUrl(previewUrl, previewName)}
@@ -2278,7 +2281,7 @@ export default function HealthVaultClientView({
                         }`}
                       >
                         <Download className="w-4 h-4 mr-1.5 shrink-0" />
-                        <span>Download File</span>
+                        <span>{t.vault.download}</span>
                       </button>
                     </div>
                   </div>

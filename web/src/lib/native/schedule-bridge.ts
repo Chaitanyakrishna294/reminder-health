@@ -194,6 +194,8 @@ declare global {
             userId?: string;
             elderly?: boolean;
             ringSeconds?: number;
+            /** BCP-47 base tag: en · hi · te · ta · kn · ml · mr. See below. */
+            language?: string;
           }) => Promise<{ synced: number; canScheduleExactAlarms: boolean }>;
           /**
            * Optional: an APK older than 2026-08-14 has neither. Every caller must
@@ -293,6 +295,23 @@ export async function syncScheduleToNative(
    * default rather than being reset by an absent field.
    */
   ringSeconds?: number,
+  /**
+   * THE IN-APP LANGUAGE, mirrored so the native alarm speaks it.
+   *
+   * This is the field CLAUDE.md marks CRITICAL, and the reason is that Android
+   * resource qualifiers (`values-hi/`) follow the DEVICE locale, not the choice
+   * made in this app. A patient whose phone is in English but who set the app to
+   * Telugu would otherwise meet an English alarm at 3am — the one screen that has
+   * to work offline, at speed, for the least technical user. The bridged value is
+   * what makes the two agree, and native applies it with an explicit
+   * `Configuration` rather than trusting the system locale.
+   *
+   * BCP-47 base tag only ('te', not 'te-IN'). Undefined leaves whatever the
+   * device already has, so an older APK is unaffected and a newer one keeps its
+   * last known choice rather than being reset to English by an absent field —
+   * same contract as `ringSeconds`.
+   */
+  language?: string,
 ): Promise<{ synced: number; canScheduleExactAlarms: boolean } | null> {
   if (!isNativeApp()) return null;
   const bridge = window.Capacitor?.Plugins?.ScheduleBridge;
@@ -300,7 +319,7 @@ export async function syncScheduleToNative(
   // userId keys the native store to one identity. Without it, signing in as a
   // guest left the previous account's medications in place and ringing for
   // doses the current user doesn't have (found on-device 2026-08-11).
-  return bridge.syncSchedule({ medications, userId, elderly, ringSeconds });
+  return bridge.syncSchedule({ medications, userId, elderly, ringSeconds, language });
 }
 
 /**

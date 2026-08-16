@@ -1,3 +1,4 @@
+import { getServerMessages } from '@/lib/i18n/server';
 import React from 'react';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
@@ -94,6 +95,9 @@ function generateHealthStory(
 }
 
 export default async function PatientConsolePage({ params }: PageProps) {
+  // Server component, so the locale comes from the `language` cookie rather than
+  // the context hook. See lib/i18n/server.ts.
+  const t = await getServerMessages();
   const { patientId } = await params;
   const userData = await resolveUserData();
   
@@ -112,9 +116,9 @@ export default async function PatientConsolePage({ params }: PageProps) {
 
   if (!connection || connection.connection_status !== 'ACCEPTED') {
     return (
-      <div className="max-w-xl mx-auto mt-12 p-8 card-lift text-center space-y-6 shadow-sm">
+      <div className="max-w-xl mx-auto mt-12 p-8 card-lift text-center space-y-6">
         <ShieldAlert className="w-12 h-12 mx-auto text-danger" />
-        <h2 className="text-xl font-black text-foreground">Access Restricted</h2>
+        <h2 className="text-xl font-black text-foreground">{t.patient.accessRestricted}</h2>
         <p className="text-xs text-muted-foreground">
           You do not have an active caregiver relationship connection with this user, or the link is still pending acceptance.
         </p>
@@ -224,7 +228,7 @@ export default async function PatientConsolePage({ params }: PageProps) {
       )}
 
       {/* 2. Relationship Header Card */}
-      <div className="card-lift p-6 md:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-sm">
+      <div className="card-lift p-6 md:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div className="flex items-center gap-4">
           <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center font-extrabold border border-primary/20 text-2xl overflow-hidden">
             {patientAvatarUrl ? (
@@ -235,7 +239,7 @@ export default async function PatientConsolePage({ params }: PageProps) {
             )}
           </div>
           <div>
-            <h1 className="text-2xl font-black text-foreground tracking-tight">{patientName}</h1>
+            <h1 className="title-page text-foreground">{patientName}</h1>
             <div className="flex flex-wrap items-center gap-2 mt-1.5 text-xs text-muted-foreground font-semibold">
               <span>{patientRoleLabel(connection.relationship_type)}</span>
               <span>•</span>
@@ -249,8 +253,8 @@ export default async function PatientConsolePage({ params }: PageProps) {
         <div className="flex items-center gap-3 bg-muted/60 border border-border px-4 py-3 rounded-2xl">
           <div className="h-2.5 w-2.5 rounded-full bg-success animate-pulse" />
           <div className="text-xs">
-            <p className="text-muted-foreground font-bold">Monitoring Status</p>
-            <p className="text-foreground font-extrabold mt-0.5">Active</p>
+            <p className="text-muted-foreground font-bold">{t.patient.monitoringStatus}</p>
+            <p className="text-foreground font-extrabold mt-0.5">{t.patient.active}</p>
           </div>
         </div>
       </div>
@@ -273,9 +277,9 @@ export default async function PatientConsolePage({ params }: PageProps) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         
         {/* Adherence Rate */}
-        <div className="card-lift p-5 flex flex-col justify-between shadow-sm">
+        <div className="card-lift p-5 flex flex-col justify-between">
           <div>
-            <span className="text-[10px] text-muted-foreground font-bold tracking-wider uppercase">30d Adherence</span>
+            <span className="text-[10px] text-muted-foreground font-bold tracking-wider uppercase">{t.patient.adherence30d}</span>
             <h3 className="text-3xl font-extrabold text-foreground mt-1.5">{metrics.adherenceRate}%</h3>
           </div>
           <div className="text-[10px] text-primary font-bold mt-3 flex items-center gap-1.5 bg-primary/10 px-2 py-1 rounded-md w-max border border-primary/20">
@@ -284,9 +288,9 @@ export default async function PatientConsolePage({ params }: PageProps) {
         </div>
 
         {/* Active Medications */}
-        <div className="card-lift p-5 flex flex-col justify-between shadow-sm">
+        <div className="card-lift p-5 flex flex-col justify-between">
           <div>
-            <span className="text-[10px] text-muted-foreground font-bold tracking-wider uppercase">Active Medications</span>
+            <span className="text-[10px] text-muted-foreground font-bold tracking-wider uppercase">{t.patient.activeMedications}</span>
             <h3 className="text-3xl font-extrabold text-foreground mt-1.5">{metrics.activeMedicationsCount}</h3>
           </div>
           <div className="text-[10px] text-muted-foreground font-bold mt-3 flex items-center gap-1.5 bg-muted px-2 py-1 rounded-md w-max border border-border">
@@ -305,9 +309,9 @@ export default async function PatientConsolePage({ params }: PageProps) {
         />
 
         {/* Missed Doses */}
-        <div className="card-lift p-5 flex flex-col justify-between shadow-sm">
+        <div className="card-lift p-5 flex flex-col justify-between">
           <div>
-            <span className="text-[10px] text-muted-foreground font-bold tracking-wider uppercase">Missed Doses Today</span>
+            <span className="text-[10px] text-muted-foreground font-bold tracking-wider uppercase">{t.patient.missedDosesToday}</span>
             <h3 className="text-3xl font-extrabold text-foreground mt-1.5">{metrics.missedDosesCountToday}</h3>
           </div>
           <div className={`text-[10px] font-bold mt-3 flex items-center gap-1.5 px-2 py-1 rounded-md w-max border ${
@@ -328,8 +332,8 @@ export default async function PatientConsolePage({ params }: PageProps) {
         <div className="space-y-6 lg:col-span-1">
           
           {/* Routine Stability Card */}
-          <div className="card-lift p-6 space-y-4 shadow-sm">
-            <h3 className="text-xs font-black text-foreground uppercase tracking-wider">Routine Stability</h3>
+          <div className="card-lift p-6 space-y-4">
+            <h3 className="text-xs font-black text-foreground uppercase tracking-wider">{t.patient.routineStability}</h3>
             <div className="flex items-baseline gap-2">
               <span className="text-5xl font-black text-foreground">{metrics.relationshipHealthScore}</span>
               <span className="text-muted-foreground font-bold">/ 100</span>
@@ -346,27 +350,27 @@ export default async function PatientConsolePage({ params }: PageProps) {
           </div>
 
           {/* Caregiving Milestones Card */}
-          <div className="card-lift p-6 space-y-4 shadow-sm">
-            <h3 className="text-xs font-black text-foreground uppercase tracking-wider">Caregiving Milestones</h3>
+          <div className="card-lift p-6 space-y-4">
+            <h3 className="text-xs font-black text-foreground uppercase tracking-wider">{t.patient.milestones}</h3>
             <div className="space-y-3 text-xs text-foreground font-medium">
               <div className="flex justify-between items-center py-1.5 border-b border-border">
-                <span className="text-muted-foreground">Relation</span>
+                <span className="text-muted-foreground">{t.patient.relation}</span>
                 <span className="font-bold">{patientRoleLabel(connection.relationship_type)}</span>
               </div>
               <div className="flex justify-between items-center py-1.5 border-b border-border">
-                <span className="text-muted-foreground">Role</span>
+                <span className="text-muted-foreground">{t.patient.role}</span>
                 <span className="font-bold">{connection.is_primary ? 'Primary Care Coordinator' : 'Secondary Coordinator'}</span>
               </div>
               <div className="flex justify-between items-center py-1.5">
-                <span className="text-muted-foreground">Longevity</span>
+                <span className="text-muted-foreground">{t.patient.longevity}</span>
                 <span className="font-bold">Caring together since {connectionDate}</span>
               </div>
             </div>
           </div>
 
           {/* Relationship Permissions (Trust-Oriented Copy) */}
-          <div className="card-lift p-6 space-y-4 shadow-sm">
-            <h3 className="text-xs font-black text-foreground uppercase tracking-wider">Shared Trust</h3>
+          <div className="card-lift p-6 space-y-4">
+            <h3 className="text-xs font-black text-foreground uppercase tracking-wider">{t.patient.sharedTrust}</h3>
             
             <div className="space-y-3 text-xs text-foreground font-medium">
               <div className="flex items-start gap-2.5">
@@ -428,7 +432,7 @@ export default async function PatientConsolePage({ params }: PageProps) {
           />
 
           {/* Medications schedule card */}
-          <div className="card-lift p-6 space-y-4 shadow-sm">
+          <div className="card-lift p-6 space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-xs font-black text-foreground uppercase tracking-wider flex items-center gap-2">
                 <Clock className="w-4 h-4 text-primary" /> Schedule List
@@ -448,7 +452,7 @@ export default async function PatientConsolePage({ params }: PageProps) {
                 </p>
               </div>
             ) : medications.length === 0 ? (
-              <p className="text-xs text-muted-foreground py-6 text-center">No active medications scheduled today.</p>
+              <p className="text-xs text-muted-foreground py-6 text-center">{t.patient.noActiveMeds}</p>
             ) : (
               <div className="divide-y divide-border text-xs">
                 {medications.map((med) => (
@@ -473,7 +477,7 @@ export default async function PatientConsolePage({ params }: PageProps) {
           </div>
 
           {/* Adherence log card */}
-          <div className="card-lift p-6 space-y-4 shadow-sm">
+          <div className="card-lift p-6 space-y-4">
             <h3 className="text-xs font-black text-foreground uppercase tracking-wider flex items-center gap-2">
               <BarChart3 className="w-4 h-4 text-primary" /> Recent Compliance Logs
             </h3>
@@ -486,7 +490,7 @@ export default async function PatientConsolePage({ params }: PageProps) {
                 </p>
               </div>
             ) : recentLogs.length === 0 ? (
-              <p className="text-xs text-muted-foreground py-6 text-center">No compliance logs registered in the last 7 days.</p>
+              <p className="text-xs text-muted-foreground py-6 text-center">{t.patient.noComplianceLogs}</p>
             ) : (
               <div className="divide-y divide-border text-xs">
                 {recentLogs.map((log) => {
@@ -520,7 +524,7 @@ export default async function PatientConsolePage({ params }: PageProps) {
           </div>
 
           {/* Health Vault Documents Card */}
-          <div className="card-lift p-6 space-y-4 shadow-sm">
+          <div className="card-lift p-6 space-y-4">
             <h3 className="text-xs font-black text-foreground uppercase tracking-wider flex items-center gap-2">
               <FileText className="w-4 h-4 text-primary" /> Documents Shared by {patientName}
             </h3>
@@ -548,7 +552,7 @@ export default async function PatientConsolePage({ params }: PageProps) {
                       <h4 className="font-bold text-foreground text-xs mt-3">{folder}</h4>
                     </div>
                     <span className="text-[9px] text-primary mt-2 font-bold flex items-center gap-1">
-                      <span>View Folder</span>
+                      <span>{t.patient.viewFolder}</span>
                       <span className="opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all">→</span>
                     </span>
                   </Link>

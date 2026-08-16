@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useLinkStatus } from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useUiMode } from '@/context/ui-mode-context';
+import { useLanguage } from '@/context/language-context';
 import { createClient } from '@/lib/supabase/client';
 import { ESCALATION_STATUSES } from '@/lib/schedule/dose-attention';
 import { isRootPath } from '@/lib/navigation/stack';
@@ -105,6 +106,7 @@ export default function DashboardMainLayout({
   patientChatId?: string | null;
 }) {
   const { isElderly, viewMode, setViewMode, showNavLabels } = useUiMode();
+  const { t } = useLanguage();
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
@@ -219,12 +221,15 @@ export default function DashboardMainLayout({
     // overrides it where the elderly nav's four tabs leave room for the plainer
     // word — "Meds" is idiomatic rather than plain, and elderly mode is the one
     // density that can afford "Medicines".
+    //
+    // Translated, so the five tabs read in the chosen language. The COUNT is
+    // untouched — "exactly 5 icons" is a hard rule and no locale changes it.
     const baseItems = [
-      { href: '/dashboard', label: 'Dashboard', short: 'Today', icon: LayoutDashboard },
-      { href: '/care-circle', label: 'Care Circle', short: 'Care', icon: Users },
-      { href: '/medications', label: 'Medications', short: 'Meds', shortElderly: 'Medicines', icon: Pill },
-      { href: '/health-vault', label: 'Health Vault', short: 'Vault', icon: FolderHeart },
-      { href: '/settings', label: 'Settings', short: 'Settings', icon: Settings },
+      { href: '/dashboard', label: t.nav.dashboard, short: t.nav.dashboardShort, icon: LayoutDashboard },
+      { href: '/care-circle', label: t.nav.careCircle, short: t.nav.careCircleShort, icon: Users },
+      { href: '/medications', label: t.nav.medications, short: t.nav.medicationsShort, shortElderly: t.nav.medicationsElderly, icon: Pill },
+      { href: '/health-vault', label: t.nav.healthVault, short: t.nav.healthVaultShort, icon: FolderHeart },
+      { href: '/settings', label: t.nav.settings, short: t.nav.settingsShort, icon: Settings },
     ];
 
     // ELDERLY = the third density, and its nav collapses with everything else.
@@ -363,7 +368,7 @@ export default function DashboardMainLayout({
       <nav
         data-tour="dash-nav"
         aria-label="Main navigation"
-        className={`md:hidden fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-40 rounded-[32px] bg-white/85 dark:bg-card/80 backdrop-blur-xl border border-border/70 shadow-lg flex items-center justify-around px-4 transition-all duration-300 ${
+        className={`md:hidden fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-40 rounded-[32px] bg-white/85 dark:bg-card/80 backdrop-blur-xl border border-border/70 card-overlay flex items-center justify-around px-4 transition-all duration-300 ${
           isElderly
             ? 'w-[94%] h-[104px] border-2 border-primary/50'
             : `w-[92%] max-w-[480px] ${showNavLabels ? 'h-[84px]' : 'h-[72px]'}`
@@ -388,9 +393,18 @@ export default function DashboardMainLayout({
                   ? `h-[84px] flex-1 ${
                       active ? 'bg-primary-strong text-primary-strong-foreground shadow-lg' : 'text-foreground bg-muted/40'
                     }`
-                  : `${showNavLabels ? 'h-[68px]' : 'h-12 max-w-[56px]'} flex-1 ${
-                      active 
-                        ? 'bg-primary-strong text-primary-strong-foreground shadow-md shadow-primary/20' 
+                  : `${showNavLabels ? 'h-[68px]' : 'h-12 max-w-[56px]'} flex-1 relative z-10 ${
+                      active
+                        /* THE ACTIVE TAB OWNS ITS FILL AGAIN.
+                           A sliding indicator was tried in this round and shipped
+                           GREY in light mode twice — first as `bg-primary-strong`,
+                           then as an inline `var(--primary-strong)` read, neither
+                           reproducible from the source. Reverted rather than
+                           guessed at a third time: the nav is the frame around
+                           every screen, and a verified-correct block beats an
+                           unverifiable animation. The slide is worth retrying
+                           when someone can watch it render. */
+                        ? 'bg-primary-strong text-primary-strong-foreground shadow-md shadow-primary/20'
                         : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
                     }`
               }`}
@@ -534,7 +548,11 @@ export default function DashboardMainLayout({
             <PageBack />
           </div>
         )}
-        <div className="w-full">
+        {/* SHARED-AXIS PAGE ENTER. Keyed on the pathname so React remounts the
+            wrapper on every navigation — without the key the animation runs once
+            on first load and never again, which is the usual way this ends up
+            defined and invisible. Reduced motion drops it to a plain appearance. */}
+        <div key={pathname} className="w-full page-enter">
           {children}
         </div>
       </main>

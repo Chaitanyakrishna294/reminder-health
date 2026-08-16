@@ -150,86 +150,59 @@ export default function FolderCarousel({ items, isElderly, onSelect }: FolderCar
             /* Only transform and opacity are transitioned — both are GPU-composited, so
                the scale change costs no layout or paint. box-shadow was in here too and
                repaints the card on every frame of the transition. */
-            className={`folder-card snap-center shrink-0 relative text-left transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none disabled:cursor-not-allowed enabled:cursor-pointer ${
+            className={`card-lift press-sink overflow-hidden snap-center shrink-0 relative text-left transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none disabled:cursor-not-allowed enabled:cursor-pointer ${
               // 0.7 opacity dropped the side cards' text to 4.14:1. Scale alone carries
               // the "this one is centred" hierarchy, so the fade only needs to be slight.
               isActive ? 'scale-100 opacity-100' : 'scale-[0.88] opacity-[0.88]'
             }`}
           >
-            {/* An actual folder, not a rounded rectangle: a TAB, sheets of paper, then the
-                front panel over them. The old card was a flat colour block whose only
-                folder gesture was one un-rounded corner, so it read as a swatch.
-                Three layers, back to front. */}
+            {/* A CARD ON THE BOARD, not a paper folder (looks-maxx stage 2).
+                The skeuomorphic version — tab, stacked sheets, a front panel under
+                a black scrim — was a good drawing of a folder and the one object
+                in the app that belonged to a different world. Everything else is
+                now a card floating on the tray, so this is too.
 
-            {/* 1. Tab — the shape that says "folder" before anything is read. Slightly
-                   darker than the body so the fold catches light. */}
+                WHAT SURVIVES, because it was carrying information rather than
+                decoration:
+                  - the token-derived cover colour, which is the folder's identity
+                    (--category-N, never status — see globals.css);
+                  - the count, which the stacked paper used to imply by thickness.
+                    It is now a WORD AND A NUMBER rather than a shape, which is
+                    also the a11y rule: never encode meaning in form alone.
+
+                WHAT GOES, and why it is a gain: the black gradient scrim existed
+                to force white text to clear contrast over four arbitrary hues. The
+                label now sits in ink on the card, which clears it by construction
+                and puts the folder name in the same type system as every other
+                name in the app. */}
+
+            {/* The cover. A SURFACE, in the slot-tint tradition — colour that
+                identifies, never colour that invites a tap. The whole card is the
+                target; this band is not a button of its own. */}
             <span
               aria-hidden
-              className="absolute left-0 top-0 h-[22px] w-[46%] rounded-t-[10px]"
-              style={{ background: 'color-mix(in srgb, var(--folder) 78%, black)' }}
-            />
-
-            {/* 2. The paper inside. Peeks above the front panel, and there is simply less
-                   of it when the folder holds less — an empty folder shows no paper at
-                   all, so "nothing in here yet" is legible from the shape alone.
-
-                   SOLID white with an edge, not `bg-white/55`: the part that shows sits
-                   above the panel, so its backdrop is the PAGE, and translucent white on
-                   the near-white light theme was invisible. Paper is paper in both
-                   themes, so the fill is committed rather than tokenised — the hairline
-                   and the lift above it are what separate it from a light background. */}
-            {item.count > 0 && (
-              <span aria-hidden>
-                <span
-                  className="absolute left-4 right-6 top-[13px] h-4 rounded-t-[5px] border border-b-0"
-                  style={{ background: '#fff', borderColor: 'rgba(15, 28, 90, 0.18)' }}
-                />
-                {item.count > 1 && (
-                  <span
-                    className="absolute left-6 right-4 top-[9px] h-4 rounded-t-[5px] border border-b-0"
-                    style={{
-                      background: '#fff',
-                      borderColor: 'rgba(15, 28, 90, 0.18)',
-                      boxShadow: '0 -1px 2px rgba(15, 28, 90, 0.10)',
-                    }}
-                  />
-                )}
-              </span>
-            )}
-
-            {/* 3. Front panel, carrying the label. */}
-            <span
-              className="absolute inset-x-0 bottom-0 top-[18px] overflow-hidden rounded-[18px] rounded-tl-[4px] shadow-md"
+              className="absolute inset-x-0 top-0 h-[44%]"
               style={{ background: 'var(--folder)' }}
             >
-              {/* The glyph was 80px at white/20, pushed off the top-right corner so it
-                  rendered as a large cropped smudge across the panel — and now that the
-                  card has a tab and paper edges, it was competing with the shape that
-                  actually says "folder". Small, fully inside the panel, and bright enough
-                  to be read as an icon: it labels the folder instead of texturing it. */}
-              <span
-                aria-hidden
-                className="absolute right-2.5 top-2.5 flex items-center justify-center rounded-lg bg-black/20 text-white/90 w-7 h-7 [&_svg]:w-4 [&_svg]:h-4"
-              >
+              <span className="absolute right-2.5 top-2.5 flex items-center justify-center rounded-[10px] bg-black/25 text-white w-7 h-7 [&_svg]:w-4 [&_svg]:h-4">
                 {item.icon}
               </span>
+            </span>
 
-              {/* A gradient scrim instead of the old hard black band. It still guarantees
-                  contrast on any of the four cover hues — the worst of them, category-4,
-                  measures ~11:1 for white text at this opacity — but it fades into the
-                  colour instead of cutting it with a straight edge.
-                  Deliberately NOT backdrop-blur: twelve of these live in a horizontal
-                  scroller and backdrop-filter re-resolves every frame while it moves,
-                  for a blur you could not see over a flat fill. */}
-              <span className="absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-black/70 via-black/40 to-transparent" />
-
-              <span className="absolute inset-x-0 bottom-0 px-3 py-2.5">
-                <span className={`block font-bold text-white/85 ${isElderly ? 'text-xs' : 'text-[11px]'}`}>
-                  {item.caption}
-                </span>
-                <span className={`block font-black text-white tracking-tight truncate mt-0.5 ${isElderly ? 'text-lg' : 'text-sm'}`}>
-                  {item.name}
-                </span>
+            <span className="absolute inset-x-0 bottom-0 top-[44%] px-3 py-2.5 flex flex-col justify-center min-w-0">
+              {/* Mono, uppercase, small: a structural label, which is exactly what
+                  mono is for and the one thing it is still allowed to be. */}
+              <span className={`block font-mono uppercase tracking-[0.06em] text-muted-foreground ${isElderly ? 'text-[11px]' : 'text-[10px]'}`}>
+                {item.caption}
+              </span>
+              {/* The folder's NAME is user content — truncated, never restyled into
+                  something clever. */}
+              <span className={`block font-bold text-foreground tracking-tight truncate mt-0.5 ${isElderly ? 'text-lg' : 'text-sm'}`}>
+                {item.name}
+              </span>
+              {/* What the stacked paper used to say, said. */}
+              <span className={`block font-mono tabular-nums text-muted-foreground mt-0.5 ${isElderly ? 'text-xs' : 'text-[10px]'}`}>
+                {item.count === 0 ? 'Empty' : item.count}
               </span>
             </span>
           </button>

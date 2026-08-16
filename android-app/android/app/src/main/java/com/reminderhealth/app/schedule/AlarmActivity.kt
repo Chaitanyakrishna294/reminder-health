@@ -102,6 +102,24 @@ import java.time.format.DateTimeFormatter
  */
 class AlarmActivity : Activity() {
 
+    /**
+     * THE WHOLE SCREEN SPEAKS THE APP'S LANGUAGE, not the phone's.
+     *
+     * Done here rather than at each `getString` because the alarm's copy is not
+     * all in Kotlin — `activity_alarm.xml` references string resources directly,
+     * and a layout inflated from an un-localized base context would resolve them
+     * against the DEVICE locale. Overriding the base context is the one place
+     * that covers both halves at once, which is exactly what you want on a screen
+     * where a half-translated result is the failure mode.
+     *
+     * `AlarmPreview.renderAlarmPreview` inflates the same XML through
+     * `AlarmScreenBinder`; it localizes its own context for the same reason, so
+     * the Settings miniature keeps matching the real screen in every language.
+     */
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AlarmPrefs.localized(newBase))
+    }
+
     companion object {
         /** Mirrors src/constants.js SNOOZE_MINUTES so device and bot agree. */
         const val SNOOZE_MINUTES = 10

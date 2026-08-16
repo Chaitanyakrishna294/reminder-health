@@ -1,11 +1,13 @@
 'use client';
 
+import { useLanguage } from '@/context/language-context';
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Bot, Check, AlertTriangle } from 'lucide-react';
 
 export default function LinkAccountPage() {
+  const { t } = useLanguage();
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +32,7 @@ export default function LinkAccountPage() {
       const body = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setError(body?.error || 'An unexpected error occurred. Please try again.');
+        setError(body?.error || t.linkAccount.errUnexpected);
         setLoading(false);
         return;
       }
@@ -44,7 +46,7 @@ export default function LinkAccountPage() {
       }, 1500);
     } catch (err) {
       console.error('[LinkAccount] Unexpected error:', err);
-      setError('An unexpected error occurred. Please try again.');
+      setError(t.linkAccount.errUnexpected);
       setLoading(false);
     }
   };
@@ -55,7 +57,7 @@ export default function LinkAccountPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        setError('You must be signed in.');
+        setError(t.linkAccount.errMustSignIn);
         setLoading(false);
         return;
       }
@@ -79,7 +81,7 @@ export default function LinkAccountPage() {
       router.push('/dashboard');
     } catch (err) {
       console.error('[LinkAccount] Skip error:', err);
-      setError('Failed to skip. Please try again.');
+      setError(t.linkAccount.errSkipFailed);
       setLoading(false);
     }
   };
@@ -113,7 +115,7 @@ export default function LinkAccountPage() {
             <div className="inline-flex items-center justify-center w-16 h-16 bg-success/15 text-success rounded-full shadow-lg border border-success/30 animate-pulse">
               <Check className="w-8 h-8" />
             </div>
-            <h3 className="text-xl font-black text-foreground">Verification Confirmed!</h3>
+            <h3 className="text-xl font-black text-foreground">{t.linkAccount.verificationConfirmed}</h3>
             <p className="text-sm text-muted-foreground font-semibold">
               Redirecting you to your workspace dashboard...
             </p>
@@ -132,21 +134,21 @@ export default function LinkAccountPage() {
               
               {/* Steps Checklist */}
               <div className="md:col-span-7 space-y-4">
-                <h3 className="text-xs font-black text-muted-foreground uppercase tracking-widest">Setup Guide</h3>
+                <h3 className="text-xs font-black text-muted-foreground uppercase tracking-widest">{t.linkAccount.setupGuide}</h3>
                 
                 <div className="space-y-3">
                   <div className="flex items-start gap-3">
                     <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-black flex items-center justify-center">1</span>
                     <div>
-                      <p className="text-xs font-black text-foreground">Open Telegram Bot</p>
-                      <p className="text-[10px] text-muted-foreground font-medium">Search for bot or click QR connect.</p>
+                      <p className="text-xs font-black text-foreground">{t.linkAccount.openTelegramBot}</p>
+                      <p className="text-[10px] text-muted-foreground font-medium">{t.linkAccount.openTelegramBotHint}</p>
                     </div>
                   </div>
 
                   <div className="flex items-start gap-3">
                     <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-black flex items-center justify-center">2</span>
                     <div>
-                      <p className="text-xs font-black text-foreground">Request Pairing Code</p>
+                      <p className="text-xs font-black text-foreground">{t.linkAccount.requestPairingCode}</p>
                       <p className="text-[10px] text-muted-foreground font-medium">Send <code className="bg-muted px-1 py-0.5 rounded font-mono font-bold text-[10px]">/linkweb</code> to the bot.</p>
                     </div>
                   </div>
@@ -154,8 +156,8 @@ export default function LinkAccountPage() {
                   <div className="flex items-start gap-3">
                     <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-black flex items-center justify-center">3</span>
                     <div>
-                      <p className="text-xs font-black text-foreground">Enter Pairing Code</p>
-                      <p className="text-[10px] text-muted-foreground font-medium">Copy & paste code in the field below.</p>
+                      <p className="text-xs font-black text-foreground">{t.linkAccount.enterPairingCode}</p>
+                      <p className="text-[10px] text-muted-foreground font-medium">{t.linkAccount.enterPairingCodeHint}</p>
                     </div>
                   </div>
                 </div>
@@ -203,7 +205,7 @@ export default function LinkAccountPage() {
                       <rect x="80" y="80" width="12" height="12" fill="currentColor" />
                     </svg>
                   </div>
-                  <span className="text-[9px] font-black text-muted-foreground tracking-wider text-center uppercase">Quick Link</span>
+                  <span className="text-[9px] font-black text-muted-foreground tracking-wider text-center uppercase">{t.linkAccount.quickLink}</span>
                 </a>
               </div>
 
@@ -212,14 +214,14 @@ export default function LinkAccountPage() {
             {/* Pairing Code Verification Form */}
             <form onSubmit={handleVerify} className="space-y-4">
               <div>
-                <label className="block text-xs font-black text-foreground uppercase tracking-widest mb-1.5 text-center">Verification Code</label>
+                <label className="block text-xs font-black text-foreground uppercase tracking-widest mb-1.5 text-center">{t.linkAccount.verificationCode}</label>
                 <input
                   type="text"
                   required
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
                   className="block w-full px-4 py-3 border border-input rounded-2xl bg-background text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-center font-mono font-black text-xl placeholder-muted-foreground/45 uppercase tracking-widest"
-                  placeholder="RMDR-XXXXXX"
+                  placeholder={t.linkAccount.codePlaceholder}
                   maxLength={11}
                 />
               </div>
@@ -235,7 +237,7 @@ export default function LinkAccountPage() {
 
             <div className="relative flex py-1 items-center">
               <div className="flex-grow border-t border-border/60"></div>
-              <span className="flex-shrink mx-4 text-muted-foreground text-[10px] font-black uppercase tracking-wider">Or</span>
+              <span className="flex-shrink mx-4 text-muted-foreground text-[10px] font-black uppercase tracking-wider">{t.linkAccount.or}</span>
               <div className="flex-grow border-t border-border/60"></div>
             </div>
 

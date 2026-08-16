@@ -155,7 +155,13 @@ keep in sync and less that goes stale on the device.
 ### Call-level fields alongside `medications`
 
 ```ts
-syncSchedule({ medications, userId?: string, elderly?: boolean, ringSeconds?: number })
+syncSchedule({
+  medications,
+  userId?: string,
+  elderly?: boolean,
+  ringSeconds?: number,
+  language?: string,   // 2026-08-15
+})
 ```
 
 - **`userId`** keys the native store to one identity (account-switch guard, 2026-08-11).
@@ -178,6 +184,47 @@ syncSchedule({ medications, userId?: string, elderly?: boolean, ringSeconds?: nu
   `SessionStore`, which is wiped on sign-out — wiping "this person needs the simplified screen"
   at sign-out resets the person least able to put it back). Absent leaves the stored value
   alone, so an APK newer than the deployed web keeps whatever it last learned.
+- **`language`** (2026-08-15) — **BUILT.** The field CLAUDE.md marked CRITICAL, and no longer
+  "planned" anywhere above. BCP-47 base tag, one of `en · hi · te · ta · kn · ml · mr`.
+
+  **Why a bridged value and not just `values-hi/`:** Android resource qualifiers select on the
+  **device** locale, which is not the language the user chose in this app. A patient whose phone
+  is in English but whose app is Telugu would get `values/` — an English alarm — on the one
+  screen that has to work offline, at 3am, for the least technical person we have. Dropping
+  translated resource folders in does **nothing** on its own; something has to force the
+  configuration. That is `AlarmPrefs.localized(context)`, and **every user-facing native string
+  goes through it**:
+  - `AlarmActivity` via `attachBaseContext` — which also covers `activity_alarm.xml`, since the
+    layout references string resources directly and an un-localized base context would resolve
+    those against the device locale. Half a translated screen is the failure mode here.
+  - `DoseNotifications` via a private `Context.t(...)` extension (17 call sites): notification
+    actions, the coalesced-group titles, the retry rung copy (`alarm_title_retry`) and the
+    sticky missed notice.
+  - `WaterNudge` — title, progress and its single Taken action.
+  - `AlarmPreview` explicitly, because it inflates the same XML by hand rather than through the
+    Activity. A Settings miniature that stopped matching the real screen would be a promise
+    about something the user next sees at 3am.
+
+  Validated and narrowed in `AlarmPrefs.setLanguage` against a **supported-language allowlist**
+  rather than passed through: an unknown tag would resolve to the default resources — the right
+  outcome for the wrong reason — and the allowlist makes "which languages does the alarm speak"
+  answerable from one Kotlin file. Absent or unrecognised leaves the stored value alone, same
+  contract as `ringSeconds`, so an older APK is unaffected and a newer one is never reset to
+  English by a missing field.
+
+  **The web must re-sync when the language changes, not only on navigation.** `locale` is in
+  `ScheduleSync`'s effect deps alongside `isElderly`; without it, switching to Telugu in Settings
+  would leave the alarm in English until the next route change — and Settings → Language is a
+  leaf, so the user's next action is usually *back*, not forward.
+
+  **Frame only, in Kotlin as on the web.** Medication names reach the alarm and the notifications
+  as `%1$s` format arguments straight from the Room store, exactly as the user typed them. Counts
+  stay Western numerals. `app_name` and the URL-scheme strings are absent from the translated
+  files on purpose — a brand and two machine tokens are not words.
+
+  **Checked mechanically:** every key present in all six locales, and every format specifier
+  identical to `values/`. A `%1$d` where the base has `%1$s` is not a cosmetic bug — it is an
+  `IllegalFormatConversionException` on the alarm path.
 
 ---
 

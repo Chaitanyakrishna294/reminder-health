@@ -39,8 +39,22 @@ export const SENTRY_DSN = (
   RAW_SENTRY_DSN.charCodeAt(0) === 0xfeff ? RAW_SENTRY_DSN.slice(1) : RAW_SENTRY_DSN
 ).trim();
 
-/** Everything is a no-op without a DSN, so shipping this is free and inert. */
-export const SENTRY_ENABLED = SENTRY_DSN.length > 0;
+/**
+ * Everything is a no-op without a DSN, so shipping this is free and inert.
+ *
+ * AND ONLY IN PRODUCTION (2026-08-15). A DSN alone used to be enough, so the
+ * local dev server reported too — the first sighting was an `EPIPE: broken pipe`
+ * from `_next\dev\server\chunks`, i.e. Next tearing down a chunk stream on a
+ * Windows dev machine. It was correctly tagged `environment: development`, so it
+ * was never masquerading as a production fault, but a tagged event still costs
+ * quota and still lands in the issue list somebody has to triage.
+ *
+ * VERCEL_ENV first: a Vercel PREVIEW deploy has NODE_ENV=production, and preview
+ * noise is the same problem as dev noise. Only a real production deploy reports.
+ */
+const SENTRY_ENVIRONMENT = process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? 'development';
+
+export const SENTRY_ENABLED = SENTRY_DSN.length > 0 && SENTRY_ENVIRONMENT === 'production';
 
 /**
  * Query strings routinely carry ids (`?patient=…`, `?token=…`). Sentry groups by
@@ -117,7 +131,7 @@ export function scrubEvent(event: ErrorEvent, _hint: EventHint): ErrorEvent | nu
 export const sharedSentryOptions = {
   dsn: SENTRY_DSN,
   enabled: SENTRY_ENABLED,
-  environment: process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? 'development',
+  environment: SENTRY_ENVIRONMENT,
   // Explicit rather than relying on the SDK default staying false.
   sendDefaultPii: false,
   // Opt-in only: tracing multiplies event volume and this runs on free tiers.

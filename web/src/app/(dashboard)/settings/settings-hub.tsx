@@ -24,12 +24,15 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useUiMode } from '@/context/ui-mode-context';
+import { useLanguage } from '@/context/language-context';
+import { LOCALE_META } from '@/lib/i18n/locales';
 import { clearNativeSchedule } from '@/lib/native/schedule-bridge';
 import SettingsRow, { SettingsGroup } from '@/components/settings/settings-row';
 import VersionLine from '@/components/settings/version-line';
 
 export default function SettingsHub() {
   const { isElderly } = useUiMode();
+  const { locale, t } = useLanguage();
   const router = useRouter();
   const [signingOut, setSigningOut] = React.useState(false);
 
@@ -39,7 +42,7 @@ export default function SettingsHub() {
     // native AlarmManager registrations on this device, so signing out DOES stop
     // them here. That is worth saying plainly; it is the one consequence a user
     // would not guess.
-    if (!window.confirm('Log out?\n\nReminders on this phone will stop until you sign in again.')) return;
+    if (!window.confirm(t.settings.logOutConfirm)) return;
     setSigningOut(true);
     try {
       // BEFORE signOut, while the session is still valid: wipe the Android app's
@@ -57,63 +60,69 @@ export default function SettingsHub() {
   return (
     <div className={`max-w-2xl mx-auto ${isElderly ? 'space-y-7' : 'space-y-6'}`}>
       <header className="px-1">
-        <h1 className={`font-black text-foreground tracking-tight ${isElderly ? 'text-4xl' : 'text-2xl'}`}>
-          Settings
+        <h1 className={`font-black text-foreground tracking-tight ${isElderly ? 'text-4xl' : 'title-page'}`}>
+          {t.settings.title}
         </h1>
       </header>
 
       {!isElderly && (
         <SettingsGroup>
-          <SettingsRow icon={UserCircle} label="Account" href="/settings/account" />
+          <SettingsRow icon={UserCircle} label={t.settings.account} href="/settings/account" />
           {/* Was /settings/account#notifications — an anchor that did not exist,
               because the preferences did not either. It now has a real page. */}
-          <SettingsRow icon={Bell} label="Notifications" href="/settings/notifications" />
+          <SettingsRow icon={Bell} label={t.settings.notifications} href="/settings/notifications" />
           {/* Its own row rather than a card inside Notifications: a full-height
               render of the alarm plus the controls that change it is a page. */}
-          <SettingsRow icon={Palette} label="Notification style" href="/settings/notification-style" />
-          <SettingsRow icon={Monitor} label="Display" href="/settings/display" />
+          <SettingsRow icon={Palette} label={t.settings.notificationStyle} href="/settings/notification-style" />
+          <SettingsRow icon={Monitor} label={t.settings.display} href="/settings/display" />
           {/* Opt-in and off by default. It lives here rather than under
               Notifications because it is a thing you set up, not a channel you
               switch on — and it is not medication, which is the distinction the
               scoped sky-blue exists to keep visible. */}
-          <SettingsRow icon={Droplets} label="Water" href="/settings/water" />
+          <SettingsRow icon={Droplets} label={t.settings.water} href="/settings/water" />
         </SettingsGroup>
       )}
 
       {isElderly && (
         <SettingsGroup>
           {/* Display carries the lock. See the anti-jail note above. */}
-          <SettingsRow icon={Monitor} label="Display" href="/settings/display" />
+          <SettingsRow icon={Monitor} label={t.settings.display} href="/settings/display" />
         </SettingsGroup>
       )}
 
       {!isElderly && (
-        <SettingsGroup title="Care">
+        <SettingsGroup title={t.settings.groupCare}>
           {/* Connections is codes — share yours, enter theirs. Care circle is the
               relationships those codes create. Two rows because they are two tasks:
               you connect once and manage for months. */}
-          <SettingsRow icon={Link2} label="Connections" href="/settings/connections" />
-          <SettingsRow icon={Users} label="Care circle" href="/care-circle" />
-          <SettingsRow icon={ClipboardCheck} label="Setup guide" href="/settings/setup-guide" />
+          <SettingsRow icon={Link2} label={t.settings.connections} href="/settings/connections" />
+          <SettingsRow icon={Users} label={t.settings.careCircle} href="/care-circle" />
+          <SettingsRow icon={ClipboardCheck} label={t.settings.setupGuide} href="/settings/setup-guide" />
         </SettingsGroup>
       )}
 
-      <SettingsGroup title="About">
+      <SettingsGroup title={t.settings.groupAbout}>
         {!isElderly && (
-          /* Mono value, per the design rules — and it shows the CURRENT language
-             rather than promising a picker that does not exist yet. */
-          <SettingsRow icon={Globe} label="Language" value="English" href="/settings/language" />
+          /* The value shows the CURRENT language in its own script — the same
+             reason the picker itself does. "English" written on a row whose page
+             is in Telugu would be the one label a Telugu reader cannot check. */
+          <SettingsRow
+            icon={Globe}
+            label={t.settings.language}
+            value={LOCALE_META[locale].nativeName}
+            href="/settings/language"
+          />
         )}
-        <SettingsRow icon={LifeBuoy} label="Help & support" href="/settings/help" />
+        <SettingsRow icon={LifeBuoy} label={t.settings.help} href="/settings/help" />
         {!isElderly && (
-          <SettingsRow icon={ShieldCheck} label="Privacy & terms" href="/settings/legal" />
+          <SettingsRow icon={ShieldCheck} label={t.settings.legal} href="/settings/legal" />
         )}
       </SettingsGroup>
 
       <SettingsGroup>
         <SettingsRow
           icon={LogOut}
-          label={signingOut ? 'Logging out…' : 'Log out'}
+          label={signingOut ? t.settings.loggingOut : t.settings.logOut}
           tone="danger"
           onClick={handleLogout}
         />

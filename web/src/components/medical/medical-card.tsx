@@ -59,7 +59,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 
 export default function MedicalCard({ name, data }: { name: string; data: MedicalCardData }) {
   return (
-    <div className="card-lift p-6 shadow-sm space-y-5">
+    <div className="card-lift p-6 space-y-5">
       <div className="flex items-center gap-2">
         <HeartPulse className="w-5 h-5 text-primary" />
         <h3 className="font-black text-foreground">Medical Profile: {name}</h3>

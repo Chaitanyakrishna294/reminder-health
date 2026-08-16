@@ -87,7 +87,13 @@ object AlarmPreview {
         // do there. AlarmTheme is pinned to Theme.Material.Light on purpose — a
         // dose alarm looks identical at 3am and 3pm (CLAUDE.md's theme rule), and
         // that has to be true of its preview too.
-        val themed = ContextThemeWrapper(context, R.style.AlarmTheme)
+        //
+        // AND ITS LANGUAGE. AlarmActivity localizes via attachBaseContext; this
+        // preview inflates the same XML by hand, so it has to do the same thing
+        // explicitly or the miniature would show English while the real alarm
+        // shows Telugu. A preview that stops matching is worse than no preview —
+        // it is a promise about a screen the user next sees at 3am.
+        val themed = ContextThemeWrapper(AlarmPrefs.localized(context), R.style.AlarmTheme)
         val root = LayoutInflater.from(themed).inflate(R.layout.activity_alarm, null, false)
 
         val backdrop = AlarmMedia.resolveImage(context)

@@ -15,6 +15,20 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 /**
+ * Strings in the APP's language rather than the phone's.
+ *
+ * `context.getString(...)` resolves against the DEVICE locale, so a phone set to
+ * English would post an English notification to someone whose app is in Telugu —
+ * the exact mismatch the bridged `language` field exists to prevent. One
+ * extension, so the call sites stay readable and none of them can forget.
+ *
+ * The FRAME only. Medication names are interpolated as arguments straight from
+ * the Room store, exactly as the user typed them.
+ */
+private fun Context.t(resId: Int, vararg args: Any): String =
+    AlarmPrefs.localized(this).getString(resId, *args)
+
+/**
  * Dose-reminder notifications.
  *
  * The notification is not a fallback for the alarm — much of the time it IS the
@@ -61,9 +75,7 @@ import java.time.format.DateTimeFormatter
  */
 object DoseNotifications {
     private const val CHANNEL_ID = "dose_reminders"
-    private const val CHANNEL_NAME = "Medication reminders"
     private const val MISSED_CHANNEL_ID = "dose_missed"
-    private const val MISSED_CHANNEL_NAME = "Missed doses"
 
     /**
      * Notification-id space, kept deliberately far apart so nothing collides.
@@ -119,8 +131,8 @@ object DoseNotifications {
         // guarantee the app cannot make. IMPORTANCE_HIGH is what actually buys
         // the heads-up + sound, and the full-screen intent is what makes a dose
         // alarm genuinely hard to miss.
-        val channel = NotificationChannel(CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH).apply {
-            description = "Alerts when it is time to take a medication"
+        val channel = NotificationChannel(CHANNEL_ID, context.t(R.string.channel_dose_name), NotificationManager.IMPORTANCE_HIGH).apply {
+            description = context.t(R.string.channel_dose_description)
             enableVibration(true)
         }
         manager.createNotificationChannel(channel)
@@ -132,7 +144,7 @@ object DoseNotifications {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
         if (manager.getNotificationChannel(MISSED_CHANNEL_ID) != null) return
         manager.createNotificationChannel(
-            NotificationChannel(MISSED_CHANNEL_ID, MISSED_CHANNEL_NAME, NotificationManager.IMPORTANCE_LOW).apply {
+            NotificationChannel(MISSED_CHANNEL_ID, context.t(R.string.channel_missed_name), NotificationManager.IMPORTANCE_LOW).apply {
                 description = "A dose alarm that rang without being answered"
             },
         )
@@ -274,7 +286,7 @@ object DoseNotifications {
 
         if (many) {
             builder
-                .setContentTitle(context.getString(R.string.alarm_group_title, rows.size))
+                .setContentTitle(context.t(R.string.alarm_group_title, rows.size))
                 .setContentText(rows.joinToString(", ") { it.drugName })
                 .setStyle(
                     NotificationCompat.InboxStyle().also { style ->
@@ -287,9 +299,9 @@ object DoseNotifications {
                 // deferral. Skip-all is deliberately not a one-tap on a lock
                 // screen — declining every medicine at once deserves the screen
                 // that shows you which ones.
-                .addAction(0, context.getString(R.string.alarm_taken_all), groupAction(context, DoseActionReceiver.ACTION_TAKEN, scheduledForIso))
-                .addAction(0, context.getString(R.string.alarm_open), fullScreen)
-                .addAction(0, context.getString(R.string.alarm_snooze), groupAction(context, DoseActionReceiver.ACTION_SNOOZE, scheduledForIso))
+                .addAction(0, context.t(R.string.alarm_taken_all), groupAction(context, DoseActionReceiver.ACTION_TAKEN, scheduledForIso))
+                .addAction(0, context.t(R.string.alarm_open), fullScreen)
+                .addAction(0, context.t(R.string.alarm_snooze), groupAction(context, DoseActionReceiver.ACTION_SNOOZE, scheduledForIso))
         } else {
             val row = rows.first()
             builder
@@ -299,16 +311,16 @@ object DoseNotifications {
                         row.drugName,
                     ),
                 )
-                .setContentText(row.doseLabel ?: context.getString(R.string.alarm_tap_to_open))
+                .setContentText(row.doseLabel ?: context.t(R.string.alarm_tap_to_open))
                 // All three actions straight on the notification. When the phone is
                 // unlocked and in use, Android suppresses the full-screen intent and
                 // this heads-up notification IS the alarm — so it has to be fully
                 // answerable on its own, not a signpost to another screen. Order
                 // mirrors the alarm screen's S30 hierarchy: primary, honest decline,
                 // deferral last.
-                .addAction(0, context.getString(R.string.alarm_taken), singleAction(context, DoseActionReceiver.ACTION_TAKEN, scheduledForIso, row))
-                .addAction(0, context.getString(R.string.alarm_skip), singleAction(context, DoseActionReceiver.ACTION_SKIP, scheduledForIso, row))
-                .addAction(0, context.getString(R.string.alarm_snooze), singleAction(context, DoseActionReceiver.ACTION_SNOOZE, scheduledForIso, row))
+                .addAction(0, context.t(R.string.alarm_taken), singleAction(context, DoseActionReceiver.ACTION_TAKEN, scheduledForIso, row))
+                .addAction(0, context.t(R.string.alarm_skip), singleAction(context, DoseActionReceiver.ACTION_SKIP, scheduledForIso, row))
+                .addAction(0, context.t(R.string.alarm_snooze), singleAction(context, DoseActionReceiver.ACTION_SNOOZE, scheduledForIso, row))
         }
 
         val manager = context.getSystemService(NotificationManager::class.java) ?: run {
@@ -425,28 +437,28 @@ object DoseNotifications {
         // dose you slept through.
         if (many) {
             builder
-                .setContentTitle(context.getString(R.string.alarm_missed_group_title, rows.size))
+                .setContentTitle(context.t(R.string.alarm_missed_group_title, rows.size))
                 .setContentText(rows.joinToString(", ") { it.drugName })
                 .setStyle(
                     NotificationCompat.InboxStyle().also { style ->
                         rows.forEach { style.addLine(doseLine(it)) }
                     },
                 )
-                .addAction(0, context.getString(R.string.alarm_taken_all), groupAction(context, DoseActionReceiver.ACTION_TAKEN, scheduledForIso))
-                .addAction(0, context.getString(R.string.alarm_open), reopen)
-                .addAction(0, context.getString(R.string.alarm_snooze), groupAction(context, DoseActionReceiver.ACTION_SNOOZE, scheduledForIso))
+                .addAction(0, context.t(R.string.alarm_taken_all), groupAction(context, DoseActionReceiver.ACTION_TAKEN, scheduledForIso))
+                .addAction(0, context.t(R.string.alarm_open), reopen)
+                .addAction(0, context.t(R.string.alarm_snooze), groupAction(context, DoseActionReceiver.ACTION_SNOOZE, scheduledForIso))
         } else {
             val row = rows.first()
             builder
-                .setContentTitle(context.getString(R.string.alarm_missed_title, row.drugName))
+                .setContentTitle(context.t(R.string.alarm_missed_title, row.drugName))
                 .setContentText(
                     listOfNotNull(row.doseLabel, localTimeOrNull(scheduledForIso)?.let { "due $it" })
                         .joinToString(" · ")
-                        .ifEmpty { context.getString(R.string.alarm_tap_to_record) },
+                        .ifEmpty { context.t(R.string.alarm_tap_to_record) },
                 )
-                .addAction(0, context.getString(R.string.alarm_taken), singleAction(context, DoseActionReceiver.ACTION_TAKEN, scheduledForIso, row))
-                .addAction(0, context.getString(R.string.alarm_skip), singleAction(context, DoseActionReceiver.ACTION_SKIP, scheduledForIso, row))
-                .addAction(0, context.getString(R.string.alarm_snooze), singleAction(context, DoseActionReceiver.ACTION_SNOOZE, scheduledForIso, row))
+                .addAction(0, context.t(R.string.alarm_taken), singleAction(context, DoseActionReceiver.ACTION_TAKEN, scheduledForIso, row))
+                .addAction(0, context.t(R.string.alarm_skip), singleAction(context, DoseActionReceiver.ACTION_SKIP, scheduledForIso, row))
+                .addAction(0, context.t(R.string.alarm_snooze), singleAction(context, DoseActionReceiver.ACTION_SNOOZE, scheduledForIso, row))
         }
 
         manager.notify(missedGroupId(scheduledForIso, rows.first().medicationId), builder.build())

@@ -31,7 +31,7 @@ import { useRealtimeNotifications, type Notification } from '@/hooks/use-realtim
 import { useUiMode } from '@/context/ui-mode-context';
 import { dayKeyForDose, timeOfDayForDose } from '@/lib/design/slots';
 import { notificationMeta, notificationTarget, type NotificationMeta } from '@/lib/design/notification-kinds';
-import BrainMascot from '@/components/dashboard/brain-mascot';
+import BrainMascot, { mascotSlot } from '@/components/dashboard/brain-mascot';
 
 /** The page holds real history, not a badge's worth. */
 const PAGE_LIMIT = 200;
@@ -224,7 +224,7 @@ export default function NotificationsClientView({
         {/* No PageBack here: DashboardMainLayout renders one above every sub-page,
             so a local copy would show two arrows stacked. */}
         <div className="min-w-0">
-          <h1 className={`font-black text-foreground tracking-tight ${isElderly ? 'text-4xl' : 'text-2xl'}`}>
+          <h1 className={`font-black text-foreground tracking-tight ${isElderly ? 'text-4xl' : 'title-page'}`}>
             Notifications
           </h1>
           <p className={`text-muted-foreground font-semibold ${isElderly ? 'text-xl mt-2' : 'text-xs mt-1'}`}>
@@ -295,7 +295,7 @@ export default function NotificationsClientView({
            not an error, and the calm rule says the mascot never escalates a
            non-event. No call to action: there is nothing here to do. */
         <div className="px-6 py-10 flex flex-col items-center text-center gap-5 bg-card/60 rounded-3xl border border-dashed border-border/80">
-          <BrainMascot size={isElderly ? 176 : 144} mood="peaceful" />
+          <BrainMascot {...mascotSlot('emptyState', isElderly)} />
           <p className={`text-muted-foreground font-semibold text-balance ${isElderly ? 'text-lg' : 'text-base'}`}>
             No notifications — all caught up.
           </p>
@@ -331,7 +331,14 @@ export default function NotificationsClientView({
                         // menu over our own selection mode.
                         onContextMenu={(e) => { if (selecting || pressedId.current) e.preventDefault(); }}
                         aria-pressed={selecting ? isSelected : undefined}
-                        className={`w-full text-left rounded-2xl border p-3.5 flex items-start gap-3 select-none transition-colors cursor-pointer
+                        className={`w-full text-left rounded-2xl border p-3.5 flex items-start gap-3 select-none transition-colors cursor-pointer stagger-in
+                                    /* NO press-sink here, deliberately: these rows
+                                       carry state TINTS rather than elevation, and
+                                       press-sink resolves to lift-1 on :active — on
+                                       an element with no resting shadow that reads
+                                       as the row LIFTING under the finger, which is
+                                       backwards. The existing colour transition is
+                                       the press feedback. */
                                     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background
                                     ${isSelected
                                       ? 'bg-primary-soft border-primary/40'

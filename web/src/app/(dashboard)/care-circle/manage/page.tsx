@@ -24,6 +24,8 @@ import {
 } from 'lucide-react';
 import moment from 'moment-timezone';
 import { caregiverRoleLabel, patientRoleLabel } from '@/lib/care-circle/relationship';
+import { useLanguage } from '@/context/language-context';
+import { format } from '@/lib/i18n/format';
 
 interface CareCircleConnection {
   connection_id: string;
@@ -100,6 +102,7 @@ const PERMISSION_PRESETS = {
 };
 
 export default function SharedTrustCenter() {
+  const { t } = useLanguage();
   const supabase = createClient();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [peopleSupportingMe, setPeopleSupportingMe] = useState<CareCircleConnection[]>([]);
@@ -402,8 +405,8 @@ export default function SharedTrustCenter() {
     if (log.action_type === 'GRANTED') {
       return (
         <div className="space-y-0.5">
-          <p className="text-xs text-foreground font-bold flex items-center gap-1.5"><Heart className="w-3.5 h-3.5 text-primary shrink-0" /> Shared Trust Granted</p>
-          <p className="text-[11px] text-muted-foreground">You approved request and shared your Care Circle with <b>{log.caregiver_name}</b>.</p>
+          <p className="text-xs text-foreground font-bold flex items-center gap-1.5"><Heart className="w-3.5 h-3.5 text-primary shrink-0" /> {t.care.trustGranted}</p>
+          <p className="text-[11px] text-muted-foreground">{format(t.care.trustGrantedBody, { name: log.caregiver_name })}</p>
           <span className="text-[9px] text-muted-foreground block pt-0.5">{timeStr}</span>
         </div>
       );
@@ -411,8 +414,8 @@ export default function SharedTrustCenter() {
     if (log.action_type === 'PRIMARY_PROMOTED') {
       return (
         <div className="space-y-0.5">
-          <p className="text-xs text-foreground font-bold flex items-center gap-1.5"><Heart className="w-3.5 h-3.5 text-primary shrink-0" /> Care Circle Coordinator Updated</p>
-          <p className="text-[11px] text-muted-foreground"><b>{log.caregiver_name}</b> was promoted to Primary Care Coordinator.</p>
+          <p className="text-xs text-foreground font-bold flex items-center gap-1.5"><Heart className="w-3.5 h-3.5 text-primary shrink-0" /> {t.care.coordinatorUpdated}</p>
+          <p className="text-[11px] text-muted-foreground">{format(t.care.coordinatorUpdatedBody, { name: log.caregiver_name })}</p>
           <span className="text-[9px] text-muted-foreground block pt-0.5">{timeStr}</span>
         </div>
       );
@@ -420,8 +423,8 @@ export default function SharedTrustCenter() {
     if (log.action_type === 'REVOKED') {
       return (
         <div className="space-y-0.5">
-          <p className="text-xs text-danger font-bold flex items-center gap-1.5"><HeartOff className="w-3.5 h-3.5 shrink-0" /> Shared Trust Access Revoked</p>
-          <p className="text-[11px] text-muted-foreground">Access revoked for caregiver <b>{log.caregiver_name}</b>.</p>
+          <p className="text-xs text-danger font-bold flex items-center gap-1.5"><HeartOff className="w-3.5 h-3.5 shrink-0" /> {t.care.accessRevoked}</p>
+          <p className="text-[11px] text-muted-foreground">{format(t.care.accessRevokedBody, { name: log.caregiver_name })}</p>
           <span className="text-[9px] text-muted-foreground block pt-0.5">{timeStr}</span>
         </div>
       );
@@ -451,7 +454,7 @@ export default function SharedTrustCenter() {
       // user-controlled value — cannot inject HTML/script (stored XSS).
       return (
         <div className="space-y-0.5">
-          <p className="text-xs text-foreground font-bold flex items-center gap-1.5"><Heart className="w-3.5 h-3.5 text-primary shrink-0" /> Shared Trust Updated</p>
+          <p className="text-xs text-foreground font-bold flex items-center gap-1.5"><Heart className="w-3.5 h-3.5 text-primary shrink-0" /> {t.care.trustUpdated}</p>
           <p className="text-[11px] text-muted-foreground">
             You updated permissions for <b>{log.caregiver_name}</b>
             {changeDescriptions.length > 0 ? ` (${changeDescriptions.join(', ')}).` : '.'}
@@ -481,13 +484,13 @@ export default function SharedTrustCenter() {
               is already 44px with a label; matched here. */}
           <Link
             href="/care-circle"
-            aria-label="Back to Care Circle"
+            aria-label={t.care.backToCareCircle}
             className="w-11 h-11 shrink-0 flex items-center justify-center hover:bg-muted rounded-xl transition-all border border-transparent hover:border-border text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
-            <h1 className="text-2xl font-black tracking-tight text-foreground">Shared Trust Center</h1>
+            <h1 className="text-2xl font-black tracking-tight text-foreground">{t.care.trustCenter}</h1>
             <p className="text-xs text-muted-foreground font-semibold mt-1">
               Manage who helps support your health journey.
             </p>
@@ -514,8 +517,8 @@ export default function SharedTrustCenter() {
           <p className="font-black text-foreground flex items-center gap-1.5 text-sm">
             <span>❤️</span> Shared Trust
           </p>
-          <p className="text-foreground font-bold mt-1">You stay in control of who can support you.</p>
-          <p className="text-muted-foreground font-semibold mt-0.5">Access can be changed or revoked at any time.</p>
+          <p className="text-foreground font-bold mt-1">{t.care.inControl1}</p>
+          <p className="text-muted-foreground font-semibold mt-0.5">{t.care.inControl2}</p>
         </div>
       </div>
 
@@ -528,16 +531,16 @@ export default function SharedTrustCenter() {
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <UserCheck className="w-4 h-4 text-primary" />
-              <h2 className="text-xs font-black text-foreground uppercase tracking-wider">People Supporting Me</h2>
+              <h2 className="text-xs font-black text-foreground uppercase tracking-wider">{t.care.peopleSupportingMe}</h2>
               <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border font-bold">
                 {peopleSupportingMe.length}
               </span>
             </div>
 
             {peopleSupportingMe.length === 0 ? (
-              <div className="card-lift p-8 text-center text-muted-foreground shadow-sm">
+              <div className="card-lift p-8 text-center text-muted-foreground">
                 <Info className="w-8 h-8 mx-auto text-muted-foreground mb-2 opacity-50" />
-                <p className="text-xs font-bold text-foreground">No caregiver access granted yet</p>
+                <p className="text-xs font-bold text-foreground">{t.care.noCaregivers}</p>
                 <p className="text-[10px] text-muted-foreground mt-1 max-w-sm mx-auto leading-relaxed">
                   Go to Settings to add a caregiver using their ID. Once they request, you can configure presets and share schedules.
                 </p>
@@ -549,7 +552,7 @@ export default function SharedTrustCenter() {
                   const daysCaring = Math.max(1, moment().diff(moment(conn.created_at), 'days'));
                   
                   return (
-                    <div key={conn.connection_id} className="card-lift p-6 shadow-sm space-y-5">
+                    <div key={conn.connection_id} className="card-lift p-6 space-y-5">
                       {/* Stacks below sm. Side by side at 375px this row asked an
                           identity block AND three buttons to share 287px, so the
                           "Primary Coordinator" badge wrapped to two lines inside a 73px
@@ -593,7 +596,7 @@ export default function SharedTrustCenter() {
                               /* `hover:bg-slate-100` was a raw palette colour — near-white,
                                  so in dark mode this button flashed white on hover. */
                               className="h-11 px-3 text-[11px] font-bold text-muted-foreground bg-muted hover:bg-input rounded-lg cursor-pointer transition-all border border-border whitespace-nowrap"
-                              title="Promote Coordinator"
+                              title={t.care.promoteCoordinator}
                             >
                               Make Primary
                             </button>
@@ -602,7 +605,7 @@ export default function SharedTrustCenter() {
                             onClick={() => handleRevokeConnection(conn, false)}
                             aria-label={`Revoke ${conn.resolved_name || 'this caregiver'}'s access`}
                             className="w-11 h-11 flex items-center justify-center text-danger-strong bg-danger/10 hover:bg-danger/20 rounded-lg cursor-pointer transition-all"
-                            title="Revoke Access"
+                            title={t.care.revokeAccess}
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -614,7 +617,7 @@ export default function SharedTrustCenter() {
                       {/* Shared Trust preset info */}
                       <div className="space-y-3">
                         <div className="flex justify-between items-center text-xs">
-                          <span className="text-muted-foreground font-semibold">Access Level:</span>
+                          <span className="text-muted-foreground font-semibold">{t.care.accessLevel}</span>
                           <span className="font-extrabold text-foreground">{PERMISSION_PRESETS[preset].name}</span>
                         </div>
 
@@ -623,31 +626,31 @@ export default function SharedTrustCenter() {
                             <span className={conn.can_view_medications ? 'text-success' : 'text-muted-foreground opacity-50'}>
                               {conn.can_view_medications ? '✓' : '✕'}
                             </span>
-                            <span className={conn.can_view_medications ? 'text-foreground font-bold' : ''}>Medication Schedule</span>
+                            <span className={conn.can_view_medications ? 'text-foreground font-bold' : ''}>{t.care.permMedSchedule}</span>
                           </div>
                           <div className="flex items-center gap-1.5">
                             <span className={conn.can_receive_escalations ? 'text-success' : 'text-muted-foreground opacity-50'}>
                               {conn.can_receive_escalations ? '✓' : '✕'}
                             </span>
-                            <span className={conn.can_receive_escalations ? 'text-foreground font-bold' : ''}>Missed Dose Alerts</span>
+                            <span className={conn.can_receive_escalations ? 'text-foreground font-bold' : ''}>{t.care.permMissedAlerts}</span>
                           </div>
                           <div className="flex items-center gap-1.5">
                             <span className={conn.can_view_reports ? 'text-success' : 'text-muted-foreground opacity-50'}>
                               {conn.can_view_reports ? '✓' : '✕'}
                             </span>
-                            <span className={conn.can_view_reports ? 'text-foreground font-bold' : ''}>Compliance Reports</span>
+                            <span className={conn.can_view_reports ? 'text-foreground font-bold' : ''}>{t.care.permComplianceReports}</span>
                           </div>
                           <div className="flex items-center gap-1.5">
                             <span className={conn.can_view_vault ? 'text-success' : 'text-muted-foreground opacity-50'}>
                               {conn.can_view_vault ? '✓' : '✕'}
                             </span>
-                            <span className={conn.can_view_vault ? 'text-foreground font-bold' : ''}>Health Vault Documents</span>
+                            <span className={conn.can_view_vault ? 'text-foreground font-bold' : ''}>{t.care.permVaultDocs}</span>
                           </div>
                           <div className="flex items-center gap-1.5">
                             <span className={conn.can_edit_medications ? 'text-success' : 'text-muted-foreground opacity-50'}>
                               {conn.can_edit_medications ? '✓' : '✕'}
                             </span>
-                            <span className={conn.can_edit_medications ? 'text-foreground font-bold' : ''}>Modify Schedules</span>
+                            <span className={conn.can_edit_medications ? 'text-foreground font-bold' : ''}>{t.care.permModifySchedules}</span>
                           </div>
                         </div>
                       </div>
@@ -663,16 +666,16 @@ export default function SharedTrustCenter() {
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <Stethoscope className="w-4 h-4 text-primary" />
-              <h2 className="text-xs font-black text-foreground uppercase tracking-wider">People I Support</h2>
+              <h2 className="text-xs font-black text-foreground uppercase tracking-wider">{t.care.peopleISupport}</h2>
               <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border font-bold">
                 {peopleISupport.length}
               </span>
             </div>
 
             {peopleISupport.length === 0 ? (
-              <div className="card-lift p-8 text-center text-muted-foreground shadow-sm">
+              <div className="card-lift p-8 text-center text-muted-foreground">
                 <Info className="w-8 h-8 mx-auto text-muted-foreground mb-2 opacity-50" />
-                <p className="text-xs font-bold text-foreground">You support no active patients</p>
+                <p className="text-xs font-bold text-foreground">{t.care.noPatients}</p>
                 <p className="text-[10px] text-muted-foreground mt-1 max-w-sm mx-auto leading-relaxed">
                   You are currently not registered to support any family members. Share your Caregiver ID from settings with a patient to be invited.
                 </p>
@@ -682,7 +685,7 @@ export default function SharedTrustCenter() {
                 {peopleISupport.map((conn) => {
                   const preset = resolvePreset(conn);
                   return (
-                    <div key={conn.connection_id} className="card-lift p-5 shadow-sm flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
+                    <div key={conn.connection_id} className="card-lift p-5 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="shrink-0 w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold border border-primary/20">
                           {conn.resolved_name?.substring(0, 2).toUpperCase() || 'PT'}
@@ -729,12 +732,12 @@ export default function SharedTrustCenter() {
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <History className="w-4 h-4 text-primary" />
-            <h2 className="text-xs font-black text-foreground uppercase tracking-wider">Consent History Log</h2>
+            <h2 className="text-xs font-black text-foreground uppercase tracking-wider">{t.care.consentHistory}</h2>
           </div>
 
-          <div className="card-lift p-5 shadow-sm space-y-4">
+          <div className="card-lift p-5 space-y-4">
             {auditLogs.length === 0 ? (
-              <p className="text-[11px] text-muted-foreground text-center py-8">No consent history logged yet.</p>
+              <p className="text-[11px] text-muted-foreground text-center py-8">{t.care.noConsentHistory}</p>
             ) : (
               <div className="relative border-l border-border pl-4 space-y-5 text-xs">
                 {auditLogs.map((log) => (
@@ -753,15 +756,15 @@ export default function SharedTrustCenter() {
       {/* Editor Permissions Modal Overlay */}
       {editingConnection && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="card-lift max-w-lg w-full p-6 shadow-2xl space-y-6">
+          <div className="card-lift max-w-lg w-full p-6 space-y-6">
             <div className="space-y-1">
               <h2 className="text-base font-black text-foreground">Edit Shared Trust: {editingConnection.resolved_name}</h2>
-              <p className="text-[11px] text-muted-foreground">Adjust presets or customize individual permissions directly.</p>
+              <p className="text-[11px] text-muted-foreground">{t.care.adjustPresets}</p>
             </div>
 
             {/* Relationship selector */}
             <div className="space-y-2">
-              <label className="block text-[10px] font-black text-foreground uppercase tracking-wider">Relationship Type</label>
+              <label className="block text-[10px] font-black text-foreground uppercase tracking-wider">{t.care.relationshipType}</label>
               <select
                 value={editRelationship}
                 onChange={(e) => setEditRelationship(e.target.value)}
@@ -771,20 +774,20 @@ export default function SharedTrustCenter() {
                    list's modal input. */
                 className="w-full h-11 px-3 bg-muted border border-border rounded-xl focus:outline-none focus:border-primary text-xs font-bold"
               >
-                <option value="SON">Son</option>
-                <option value="DAUGHTER">Daughter</option>
-                <option value="SPOUSE">Spouse</option>
-                <option value="PARENT">Parent</option>
-                <option value="SIBLING">Sibling</option>
-                <option value="FRIEND">Friend</option>
-                <option value="DOCTOR">Doctor</option>
-                <option value="OTHER">Other</option>
+                <option value="SON">{t.care.relSon}</option>
+                <option value="DAUGHTER">{t.care.relDaughter}</option>
+                <option value="SPOUSE">{t.care.relSpouse}</option>
+                <option value="PARENT">{t.care.relParent}</option>
+                <option value="SIBLING">{t.care.relSibling}</option>
+                <option value="FRIEND">{t.care.relFriend}</option>
+                <option value="DOCTOR">{t.care.relDoctor}</option>
+                <option value="OTHER">{t.care.relOther}</option>
               </select>
             </div>
 
             {/* Presets selector slider */}
             <div className="space-y-3">
-              <label className="block text-[10px] font-black text-foreground uppercase tracking-wider">Access Presets</label>
+              <label className="block text-[10px] font-black text-foreground uppercase tracking-wider">{t.care.accessPresets}</label>
               <div className="grid grid-cols-4 gap-2">
                 {(['BASIC', 'FAMILY', 'FULL', 'CUSTOM'] as PermissionPreset[]).map((p) => (
                   <button
@@ -806,7 +809,7 @@ export default function SharedTrustCenter() {
 
             {/* Granular checkboxes */}
             <div className="space-y-3 text-xs font-semibold">
-              <label className="block text-[10px] font-black text-foreground uppercase tracking-wider">Granular Toggles</label>
+              <label className="block text-[10px] font-black text-foreground uppercase tracking-wider">{t.care.granularToggles}</label>
               
               <div className="space-y-2.5">
                 {[

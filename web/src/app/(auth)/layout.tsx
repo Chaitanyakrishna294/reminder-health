@@ -1,7 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { ShieldCheck } from 'lucide-react';
-import BrainMascot from '@/components/dashboard/brain-mascot';
+import BrainMascot, { mascotSlot } from '@/components/dashboard/brain-mascot';
 
 /**
  * Auth shell, redesigned 2026-08-09 from the generated mockups: brand row kept
@@ -35,7 +35,7 @@ export default function AuthLayout({
           trust strip's Terms links — must fit WITHOUT scrolling (mockup parity).
           Change these paddings only with a scrollHeight check at 375x812. */}
       <header className="w-full max-w-sm mx-auto flex items-center gap-3 px-6 pt-5">
-        <BrainMascot mood="happy" size={42} />
+        <BrainMascot {...mascotSlot('welcome')} />
         <div className="leading-tight">
           <p className="font-mono font-black text-lg text-foreground tracking-tight">
             Re-MIND-eЯ

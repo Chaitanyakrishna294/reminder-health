@@ -1,5 +1,6 @@
 'use client';
 
+import { useLanguage } from '@/context/language-context';
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
@@ -10,6 +11,7 @@ import { buttonClasses } from '@/components/ui/button';
 // Restyled 2026-08-09 to the redesigned (auth) system — the login page is the
 // reference implementation. Update logic unchanged.
 export default function UpdatePasswordPage() {
+  const { t } = useLanguage();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -27,13 +29,13 @@ export default function UpdatePasswordPage() {
     setError(null);
 
     if (password.length < 6) {
-      setError('Password must be at least 6 characters long.');
+      setError(t.auth.errPasswordTooShort);
       setLoading(false);
       return;
     }
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match.');
+      setError(t.auth.errPasswordMismatch);
       setLoading(false);
       return;
     }
@@ -62,7 +64,7 @@ export default function UpdatePasswordPage() {
         <div className={`inline-flex items-center justify-center bg-success/10 text-success rounded-full ${isElderly ? 'w-16 h-16' : 'w-12 h-12'}`}>
           <CheckCircle className={isElderly ? 'w-8 h-8' : 'w-6 h-6'} aria-hidden />
         </div>
-        <h1 className={`font-mono font-black tracking-tight text-foreground ${isElderly ? 'text-4xl' : 'text-[2rem]'}`}>
+        <h1 className={`title-page text-foreground ${isElderly ? 'text-4xl' : ''}`}>
           Password updated
         </h1>
         <p className={`text-muted-foreground ${isElderly ? 'text-lg' : 'text-sm'}`}>
@@ -83,7 +85,7 @@ export default function UpdatePasswordPage() {
   return (
     <div className="space-y-5">
       <header>
-        <h1 className={`font-mono font-black tracking-tight text-foreground ${isElderly ? 'text-4xl' : 'text-[2rem]'}`}>
+        <h1 className={`title-page text-foreground ${isElderly ? 'text-4xl' : ''}`}>
           New password{' '}
           <Lock className="inline-block w-7 h-7 text-primary align-[-0.1em]" aria-hidden />
         </h1>
@@ -101,7 +103,7 @@ export default function UpdatePasswordPage() {
 
       <form onSubmit={handleUpdatePassword} className="space-y-4">
         <div>
-          <label htmlFor="new-password" className={labelClass}>New password</label>
+          <label htmlFor="new-password" className={labelClass}>{t.auth.newPassword}</label>
           <div className="relative flex items-center">
             <Lock className={iconClass} aria-hidden />
             <input
@@ -113,7 +115,7 @@ export default function UpdatePasswordPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className={`${inputClass} pr-14`}
-              placeholder="At least 6 characters"
+              placeholder={t.auth.newPasswordPlaceholder}
             />
             <button
               type="button"
@@ -127,7 +129,7 @@ export default function UpdatePasswordPage() {
         </div>
 
         <div>
-          <label htmlFor="confirm-password" className={labelClass}>Confirm new password</label>
+          <label htmlFor="confirm-password" className={labelClass}>{t.auth.confirmNewPassword}</label>
           <div className="relative flex items-center">
             <Lock className={iconClass} aria-hidden />
             <input
@@ -139,7 +141,7 @@ export default function UpdatePasswordPage() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               className={`${inputClass} pr-14`}
-              placeholder="Type it again"
+              placeholder={t.auth.confirmNewPasswordPlaceholder}
             />
             <button
               type="button"

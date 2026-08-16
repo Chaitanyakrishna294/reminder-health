@@ -1,0 +1,52 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!--
+    മലയാളം (Malayalam) — the alarm, its notifications, and the water nudge.
+
+    THESE ARE NOT SELECTED BY THE DEVICE LOCALE. Android would normally pick this
+    directory only when the PHONE is set to ml, which is not the same as the
+    language the user chose in this app. AlarmPrefs.localized() forces the
+    configuration from the bridged `language` field so the alarm speaks the app's
+    language on an English phone. See AlarmPrefs.kt and BRIDGE_CONTRACT.md.
+
+    Only the FRAME is here. Medication names arrive as %1$s format arguments
+    straight from the Room store, exactly as the user typed them — never
+    translated, never transliterated.
+
+    Counts stay Western numerals, matching the web (see lib/i18n/format.ts).
+    app_name and the URL-scheme strings are deliberately absent: a brand and two
+    machine tokens are not words.
+-->
+<resources>
+    <string name="alarm_taken">കഴിച്ചു</string>
+    <string name="alarm_skip">ഒഴിവാക്കുക</string>
+    <string name="alarm_snooze">10 മിനിറ്റ് കഴിഞ്ഞ്</string>
+    <string name="alarm_eyebrow_prefix">ഡോസ് സമയം</string>
+    <string name="alarm_photo_description">നിങ്ങളുടെ പരിചരണ വലയത്തിന്റെ ഫോട്ടോ</string>
+    <string name="alarm_title">%1$s കഴിക്കാനുള്ള സമയം</string>
+    <string name="alarm_title_retry">%1$s ഇനിയും കഴിക്കാനുണ്ട്</string>
+    <string name="alarm_group_title">%1$d മരുന്നുകളുടെ സമയം</string>
+    <string name="alarm_missed_title">നഷ്ടപ്പെട്ടു: %1$s കഴിക്കുക</string>
+    <string name="alarm_missed_group_title">നഷ്ടപ്പെട്ടവ: %1$d മരുന്നുകൾ</string>
+    <string name="alarm_tap_to_open">Re-MIND-eЯ തുറക്കാൻ അമർത്തുക</string>
+    <string name="alarm_tap_to_record">ഈ ഡോസ് രേഖപ്പെടുത്താൻ അമർത്തുക</string>
+    <string name="alarm_group_count">%1$d മരുന്നുകൾ</string>
+    <string name="alarm_group_progress">%2$dൽ %1$d</string>
+    <string name="alarm_taken_all">എല്ലാം കഴിച്ചു</string>
+    <string name="alarm_open">തുറക്കുക</string>
+    <string name="alarm_recorded_taken">✓ കഴിച്ചു</string>
+    <string name="alarm_recorded_skipped">✓ ഒഴിവാക്കി</string>
+    <string name="alarm_recorded">✓ രേഖപ്പെടുത്തി</string>
+    <string name="alarm_all_done">എല്ലാം കഴിഞ്ഞു</string>
+    <string name="alarm_waiting">കാത്തിരിക്കുന്നു</string>
+    <string name="alarm_not_answered">മറുപടി നൽകിയിട്ടില്ല</string>
+    <string name="alarm_tap_to_answer">ഇതിന് ഇപ്പോൾ മറുപടി നൽകുക</string>
+    <string name="water_title">വെള്ളം കുടിക്കാനുള്ള സമയം</string>
+    <string name="water_progress">ഇന്ന് %2$dൽ %1$d</string>
+    <string name="water_untracked">എണ്ണാൻ കഴിച്ചു അമർത്തുക</string>
+    <string name="water_taken">കഴിച്ചു</string>
+    <string name="channel_dose_name">മരുന്ന് ഓർമ്മപ്പെടുത്തലുകൾ</string>
+    <string name="channel_dose_description">മരുന്ന് കഴിക്കാനുള്ള സമയമാകുമ്പോൾ അറിയിപ്പ്</string>
+    <string name="channel_missed_name">നഷ്ടപ്പെട്ട ഡോസുകൾ</string>
+    <string name="channel_water_name">വെള്ളത്തിന്റെ ഓർമ്മപ്പെടുത്തലുകൾ</string>
+    <string name="channel_water_description">വെള്ളം കുടിക്കാൻ സൗമ്യമായ ഓർമ്മപ്പെടുത്തൽ. ഒരിക്കലും പൂർണ്ണ സ്ക്രീൻ അല്ല.</string>
+</resources>

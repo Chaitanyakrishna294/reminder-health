@@ -45,7 +45,14 @@ export default async function EmergencyPage() {
           that is exactly what `--danger-solid` is for (see globals.css; `--danger` is too
           light to carry white, and `--danger-strong` deliberately flips lightness between
           modes, which a fill must never do). Was the raw `red-600`. */}
-      <div className="rounded-3xl bg-danger-solid text-danger-solid-foreground shadow-2xl p-6 sm:p-8">
+      {/* THE ONE CARD THAT DOES NOT JOIN THE BOARD.
+          Every other surface in the app is a white card floating on the tray. This
+          is a solid danger fill at the top of the elevation ladder, and it stays
+          that way on purpose: it is read by a stranger, in an emergency, on
+          somebody else's locked phone. Looking like the rest of the app is the
+          opposite of what it needs. It takes the OVERLAY step (--lift-3) rather
+          than shadow-2xl so it is on the ladder even while it refuses the tray. */}
+      <div className="rounded-[20px] bg-danger-solid text-danger-solid-foreground card-overlay p-6 sm:p-8">
         <div className="flex items-center justify-between">
           <span className="inline-flex items-center gap-2 text-sm font-black uppercase tracking-widest bg-white/15 px-3 py-1 rounded-full">
             <Siren className="w-4 h-4" /> Emergency Card

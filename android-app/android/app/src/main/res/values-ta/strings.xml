@@ -1,0 +1,52 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!--
+    தமிழ் (Tamil) — the alarm, its notifications, and the water nudge.
+
+    THESE ARE NOT SELECTED BY THE DEVICE LOCALE. Android would normally pick this
+    directory only when the PHONE is set to ta, which is not the same as the
+    language the user chose in this app. AlarmPrefs.localized() forces the
+    configuration from the bridged `language` field so the alarm speaks the app's
+    language on an English phone. See AlarmPrefs.kt and BRIDGE_CONTRACT.md.
+
+    Only the FRAME is here. Medication names arrive as %1$s format arguments
+    straight from the Room store, exactly as the user typed them — never
+    translated, never transliterated.
+
+    Counts stay Western numerals, matching the web (see lib/i18n/format.ts).
+    app_name and the URL-scheme strings are deliberately absent: a brand and two
+    machine tokens are not words.
+-->
+<resources>
+    <string name="alarm_taken">எடுத்துவிட்டேன்</string>
+    <string name="alarm_skip">தவிர்</string>
+    <string name="alarm_snooze">10 நிமிடம் கழித்து</string>
+    <string name="alarm_eyebrow_prefix">அளவு நேரம்</string>
+    <string name="alarm_photo_description">உங்கள் பராமரிப்பு வட்டத்தின் புகைப்படம்</string>
+    <string name="alarm_title">%1$s எடுக்க வேண்டிய நேரம்</string>
+    <string name="alarm_title_retry">%1$s இன்னும் எடுக்க வேண்டும்</string>
+    <string name="alarm_group_title">%1$d மருந்துகளுக்கான நேரம்</string>
+    <string name="alarm_missed_title">தவறியது: %1$s எடுங்கள்</string>
+    <string name="alarm_missed_group_title">தவறியவை: %1$d மருந்துகள்</string>
+    <string name="alarm_tap_to_open">Re-MIND-eЯ திறக்க தட்டவும்</string>
+    <string name="alarm_tap_to_record">இந்த அளவைப் பதிவு செய்ய தட்டவும்</string>
+    <string name="alarm_group_count">%1$d மருந்துகள்</string>
+    <string name="alarm_group_progress">%2$dல் %1$d</string>
+    <string name="alarm_taken_all">எல்லாம் எடுத்துவிட்டேன்</string>
+    <string name="alarm_open">திற</string>
+    <string name="alarm_recorded_taken">✓ எடுத்தேன்</string>
+    <string name="alarm_recorded_skipped">✓ தவிர்த்தேன்</string>
+    <string name="alarm_recorded">✓ பதிவானது</string>
+    <string name="alarm_all_done">எல்லாம் முடிந்தது</string>
+    <string name="alarm_waiting">காத்திருக்கிறது</string>
+    <string name="alarm_not_answered">பதிலளிக்கவில்லை</string>
+    <string name="alarm_tap_to_answer">இதற்கு இப்போது பதிலளிக்கவும்</string>
+    <string name="water_title">தண்ணீர் குடிக்கும் நேரம்</string>
+    <string name="water_progress">இன்று %2$dல் %1$d</string>
+    <string name="water_untracked">கணக்கிட எடுத்தேன் தட்டவும்</string>
+    <string name="water_taken">எடுத்தேன்</string>
+    <string name="channel_dose_name">மருந்து நினைவூட்டல்கள்</string>
+    <string name="channel_dose_description">மருந்து எடுக்கும் நேரம் வரும்போது அறிவிப்பு</string>
+    <string name="channel_missed_name">தவறிய அளவுகள்</string>
+    <string name="channel_water_name">தண்ணீர் நினைவூட்டல்கள்</string>
+    <string name="channel_water_description">தண்ணீர் குடிக்க மென்மையான நினைவூட்டல். ஒருபோதும் முழுத் திரை அல்ல.</string>
+</resources>

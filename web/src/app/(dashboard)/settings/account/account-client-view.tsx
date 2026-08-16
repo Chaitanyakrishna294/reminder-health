@@ -77,7 +77,7 @@ export default function AccountClientView({ fullName, email, role, isGuest }: Ac
   return (
     <div className={`max-w-2xl mx-auto ${isElderly ? 'space-y-7' : 'space-y-6'}`}>
       <header className="px-1">
-        <h1 className={`font-black text-foreground tracking-tight ${isElderly ? 'text-4xl' : 'text-2xl'}`}>
+        <h1 className={`font-black text-foreground tracking-tight ${isElderly ? 'text-4xl' : 'title-page'}`}>
           Account
         </h1>
       </header>
@@ -175,7 +175,7 @@ export default function AccountClientView({ fullName, email, role, isGuest }: Ac
             aria-modal="true"
             aria-labelledby="delete-title"
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-sm card-lift shadow-xl p-6 space-y-4"
+            className="w-full max-w-sm card-lift p-6 space-y-4"
           >
             <h2 id="delete-title" className="text-lg font-black text-foreground">Delete this account?</h2>
             <p className="text-xs text-muted-foreground font-semibold text-balance">

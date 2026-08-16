@@ -99,6 +99,13 @@ class ScheduleBridgePlugin : Plugin() {
         // drives a lit, ringing screen and the device must be safe against a bad
         // sync as well as a bad form.
         call.getInt("ringSeconds")?.let { AlarmPrefs.setRingSeconds(context, it) }
+        // THE IN-APP LANGUAGE. Same argument again, and the sharpest case of it:
+        // Android picks `values-hi/` from the DEVICE locale, which is not the
+        // language the user chose in this app. Without this the alarm speaks the
+        // phone's language while every other screen speaks theirs. Validated and
+        // narrowed to a base tag inside setLanguage; an unknown or absent value
+        // leaves the last known choice alone rather than resetting to English.
+        AlarmPrefs.setLanguage(context, call.getString("language"))
 
         scope.launch {
             val dao = ScheduleDatabase.getInstance(context).medicationDao()

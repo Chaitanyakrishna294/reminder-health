@@ -1,5 +1,6 @@
 'use client';
 
+import { useLanguage } from '@/context/language-context';
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -11,6 +12,7 @@ import { buttonClasses } from '@/components/ui/button';
 import { CodeInput, SpamCallout } from '@/components/auth/code-entry';
 
 export default function RegisterPage() {
+  const { t } = useLanguage();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -29,11 +31,11 @@ export default function RegisterPage() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!agreed) {
-      setError('Please confirm you are 18+ and accept the Terms and Privacy Policy.');
+      setError(t.auth.errAgeTerms);
       return;
     }
     if (captchaEnabled && !captchaToken) {
-      setError('Please complete the verification challenge.');
+      setError(t.auth.errCaptcha);
       return;
     }
     setLoading(true);
@@ -75,7 +77,7 @@ export default function RegisterPage() {
     e.preventDefault();
     const token = code.trim();
     if (token.length < 6) {
-      setError('Enter the full code from your email.');
+      setError(t.auth.errFullCode);
       return;
     }
     setLoading(true);
@@ -134,7 +136,7 @@ export default function RegisterPage() {
               className="w-[88px] h-[88px] object-contain"
             />
           </div>
-          <h1 className={`font-mono font-black tracking-tight text-foreground text-center ${isElderly ? 'text-4xl' : 'text-[2rem]'}`}>
+          <h1 className={`title-page text-foreground text-center ${isElderly ? 'text-4xl' : ''}`}>
             Check your email{' '}
             <Heart className="inline-block w-7 h-7 text-primary align-[-0.1em]" aria-hidden />
           </h1>
@@ -146,7 +148,7 @@ export default function RegisterPage() {
 
         <form onSubmit={handleVerifyCode} className="space-y-4">
           <div>
-            <label htmlFor="reg-code" className={labelClass}>Confirmation code</label>
+            <label htmlFor="reg-code" className={labelClass}>{t.auth.confirmationCode}</label>
             <CodeInput id="reg-code" value={code} onChange={setCode} autoFocus />
           </div>
 
@@ -179,7 +181,7 @@ export default function RegisterPage() {
       {/* Headline matches the redesigned login page — the (auth) layout no longer
           renders a big brand hero, so each page owns its own heading. */}
       <header>
-        <h1 className={`font-mono font-black tracking-tight text-foreground ${isElderly ? 'text-4xl' : 'text-[2rem]'}`}>
+        <h1 className={`title-page text-foreground ${isElderly ? 'text-4xl' : ''}`}>
           Create account{' '}
           <Heart className="inline-block w-7 h-7 text-primary align-[-0.1em]" aria-hidden />
         </h1>
@@ -196,7 +198,7 @@ export default function RegisterPage() {
 
       <form onSubmit={handleRegister} className="space-y-3">
         <div>
-          <label htmlFor="reg-name" className={labelClass}>Full name</label>
+          <label htmlFor="reg-name" className={labelClass}>{t.auth.fullName}</label>
           <div className="relative">
             <User className={iconClass} />
             <input
@@ -208,13 +210,13 @@ export default function RegisterPage() {
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               className={inputClass}
-              placeholder="Full name"
+              placeholder={t.auth.fullNamePlaceholder}
             />
           </div>
         </div>
 
         <div>
-          <label htmlFor="reg-email" className={labelClass}>Email</label>
+          <label htmlFor="reg-email" className={labelClass}>{t.auth.email}</label>
           <div className="relative">
             <Mail className={iconClass} />
             <input
@@ -228,13 +230,13 @@ export default function RegisterPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className={inputClass}
-              placeholder="you@example.com"
+              placeholder={t.auth.emailPlaceholder}
             />
           </div>
         </div>
 
         <div>
-          <label htmlFor="reg-password" className={labelClass}>Password</label>
+          <label htmlFor="reg-password" className={labelClass}>{t.auth.password}</label>
           <div className="relative flex items-center">
           <Lock className={iconClass} />
           <input
@@ -246,7 +248,7 @@ export default function RegisterPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className={`${inputClass} pr-14`}
-            placeholder="Choose a password"
+            placeholder={t.auth.passwordPlaceholder}
           />
           <button
             type="button"
@@ -268,15 +270,15 @@ export default function RegisterPage() {
           />
           <span>
             I am 18 or older and I agree to the{' '}
-            <Link href="/terms" target="_blank" className="text-primary-strong font-semibold hover:underline">Terms of Service</Link>{' '}
+            <Link href="/terms" target="_blank" className="text-primary-strong font-semibold hover:underline">{t.legal.terms}</Link>{' '}
             and{' '}
-            <Link href="/privacy" target="_blank" className="text-primary-strong font-semibold hover:underline">Privacy Policy</Link>,
+            <Link href="/privacy" target="_blank" className="text-primary-strong font-semibold hover:underline">{t.legal.privacy}</Link>,
             {' '}and I understand this is a reminder tool, not medical advice{' '}
             {/* Named at the moment of consent, not only in Settings: someone signing
                 up for a medication app should know what it is not BEFORE they rely
                 on it. Play policy for health apps expects the disclaimer to be
                 surfaced, not merely reachable. */}
-            (<Link href="/disclaimer" target="_blank" className="text-primary-strong font-semibold hover:underline">Medical Disclaimer</Link>).
+            (<Link href="/disclaimer" target="_blank" className="text-primary-strong font-semibold hover:underline">{t.legal.disclaimer}</Link>).
           </span>
         </label>
 
@@ -292,7 +294,7 @@ export default function RegisterPage() {
       </form>
 
       <div className={`text-center ${isElderly ? 'text-base' : 'text-sm'}`}>
-        <span className="text-muted-foreground">Already have an account? </span>
+        <span className="text-muted-foreground">{t.auth.alreadyHaveAccount} </span>
         <Link href="/login" className="font-semibold text-primary-strong hover:underline">
           Sign In
         </Link>

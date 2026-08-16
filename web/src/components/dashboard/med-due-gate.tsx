@@ -366,9 +366,22 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
         ))}
       </div>
 
-      {/* No justify-center: the actions claim the bottom of the column via mt-auto, so
-          they land in thumb reach instead of floating mid-screen above dead space. */}
-      <div className="relative flex-1 flex flex-col items-center px-6 pt-12 pb-6 text-center">
+      {/* ONE GLANCE: QUESTION AND ANSWERS TOGETHER.
+          `justify-center` with the content at its natural height, NOT a stretched
+          column with the actions pinned to the bottom by `mt-auto`.
+
+          The previous arrangement chased thumb reach — actions at the bottom of the
+          viewport — and on a phone that put the medication name at the top, the
+          buttons a full screen below it, and dead space between. The gate's whole
+          job is "did you take this?" answerable in one look; a gate you have to
+          SCROLL to answer has already failed at the only thing it does. Thumb reach
+          is worth having, but not at the cost of the question and its answers being
+          on the same screen.
+
+          `flex-1` stays: it lets this column fill the fixed overlay so the content
+          can centre inside it. What changed is that the content is now centred as
+          one block instead of being pushed apart. */}
+      <div className="relative flex-1 flex flex-col items-center justify-center px-6 pt-12 pb-6 text-center">
       {remaining > 1 && (
         <span className="absolute top-6 text-xs font-mono font-bold text-muted-foreground tracking-widest">
           {remaining} doses to confirm
@@ -495,7 +508,7 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
 
           {permanentError && permanentError.id === event.id ? (
             /* Unsaveable dose: honest message + explicit OK before it disappears. */
-            <div className="mt-auto pt-8 w-full max-w-sm space-y-3">
+            <div className="mt-8 w-full max-w-sm space-y-3">
               <p className={`flex items-start justify-center gap-2 text-danger font-semibold ${isElderly ? 'text-lg' : 'text-sm'}`}>
                 <AlertTriangle className={`shrink-0 mt-0.5 ${isElderly ? 'w-6 h-6' : 'w-4 h-4'}`} />
                 <span>{permanentError.message}</span>
@@ -514,7 +527,7 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
              an inner glass plate inside it — so the answer area reads as a distinct
              object resting on the gate rather than three buttons floating on a wash.
              Radii are concentric: 32px outer, 32-6=26 inner, 16 on the buttons. */
-          <div className="mt-auto pt-8 w-full max-w-sm">
+          <div className="mt-8 w-full max-w-sm">
             <div className="rounded-[2rem] p-1.5 bg-foreground/[0.04] dark:bg-white/[0.06] ring-1 ring-foreground/[0.06] dark:ring-white/10">
               <div className="rounded-[calc(2rem-0.375rem)] p-3 space-y-3 bg-card/70 dark:bg-white/[0.05] backdrop-blur-xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.6)] dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08)]">
             <button
@@ -570,7 +583,7 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
               return (
                 <div
                   key={q.id}
-                  className="flex flex-wrap items-center justify-between gap-3 card-lift card-lift-2 px-4 py-3 shadow-sm"
+                  className="flex flex-wrap items-center justify-between gap-3 card-lift card-lift-2 px-4 py-3"
                 >
                   <div className="min-w-0">
                     <p className={`font-black text-foreground truncate ${isElderly ? 'text-xl' : 'text-sm'}`}>

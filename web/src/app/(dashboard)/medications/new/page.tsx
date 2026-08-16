@@ -30,6 +30,7 @@ import { useGuide } from '@/components/guide/guide-context';
 import { TOURS } from '@/components/guide/guide-content';
 import { searchMedicationCatalog, type CatalogLinkValue } from '@/lib/medications/catalog';
 import { validateMedicationStep, buildSharedMedicationFields, normalizeDoseDays } from '@/lib/medications/form-logic';
+import { useLanguage } from '@/context/language-context';
 import {
   Pill,
   Clock,
@@ -49,9 +50,12 @@ import {
 } from 'lucide-react';
 
 // Soft diffuse card shadow shared across the Apple-Health-styled pages.
-const CARD_SHADOW = '0 1px 3px rgba(16, 28, 90, 0.04), 0 10px 30px rgba(16, 28, 90, 0.06)';
+/* CARD_SHADOW was a private elevation system living beside the token ladder —
+   two values that happened to look alike, so any future change to --lift-1 would
+   have silently skipped the wizard. Removed; the panels use `card-lift`. */
 
 export default function NewMedicationPage() {
+  const { t } = useLanguage();
   const [step, setStep] = useState(1);
   // Seeded from ?name= when arriving via "Add <query>" from the medications search, so
   // the term already typed there is not typed again. Only the free-text name field is
@@ -249,7 +253,7 @@ export default function NewMedicationPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!targetTelegramChatId) {
-      setError('Patient Telegram account could not be resolved.');
+      setError(t.medForm.errNoTelegram);
       return;
     }
 
@@ -262,7 +266,7 @@ export default function NewMedicationPage() {
     // already block this, but guard here too rather than let a throw crash the
     // page for any path that reaches submit without it (e.g. direct step jump).
     if (sortedTimes.length === 0) {
-      setError('Please add at least one reminder time.');
+      setError(t.medForm.errNoTimes);
       setLoading(false);
       return;
     }
@@ -360,7 +364,7 @@ export default function NewMedicationPage() {
       )}
 
       {targetTelegramChatId ? (
-        <div className="bg-white rounded-[22px] overflow-hidden" style={{ boxShadow: CARD_SHADOW }}>
+        <div className="card-lift overflow-hidden">
           
           {/* ── Premium Stepper ── */}
           <div className="px-6 pt-6 pb-4 md:px-8 md:pt-8">
@@ -428,7 +432,7 @@ export default function NewMedicationPage() {
               {step === 1 && (
                 <div className="space-y-6">
                   <div>
-                    <label className={labelClass}>Medication Name</label>
+                    <label className={labelClass}>{t.medForm.name}</label>
                     <input
                       type="text"
                       required
@@ -436,7 +440,7 @@ export default function NewMedicationPage() {
                       value={drugName}
                       onChange={(e) => setDrugName(e.target.value)}
                       className={inputClass}
-                      placeholder="e.g., Paracetamol, Atorvastatin"
+                      placeholder={t.medForm.namePlaceholder}
                       autoFocus
                     />
                     <div data-tour="mednew-catalog">
@@ -445,8 +449,8 @@ export default function NewMedicationPage() {
                   </div>
 
                   <div data-tour="mednew-form">
-                    <label className={labelClass}>Medication Form</label>
-                    <p className="text-xs text-muted-foreground mb-3">Select the type of medication unit.</p>
+                    <label className={labelClass}>{t.medForm.form}</label>
+                    <p className="text-xs text-muted-foreground mb-3">{t.medForm.formHint}</p>
                     <div className="flex flex-col gap-2">
                       {(unitOpen ? unitOptions : unitOptions.filter((o) => o.id === unitType)).map((opt) => {
                         const isSel = unitType === opt.id;
@@ -493,7 +497,7 @@ export default function NewMedicationPage() {
               {step === 2 && (
                 <div className="space-y-6">
                   <div data-tour="mednew-frequency">
-                    <label className={labelClass}>Select Frequency</label>
+                    <label className={labelClass}>{t.medForm.selectFrequency}</label>
                     <div className="grid grid-cols-1 gap-3 mt-1">
                       {frequencies.map((freq) => (
                         <button
@@ -528,7 +532,7 @@ export default function NewMedicationPage() {
                   </div>
 
                   <div className="pt-4 border-t border-border">
-                    <label className={labelClass} id="dose-days-label">Which Days?</label>
+                    <label className={labelClass} id="dose-days-label">{t.medForm.whichDays}</label>
                     <p className="text-xs text-muted-foreground mb-3">
                       For medicines taken only on some days — twice a week, alternate days, Sundays only.
                       Leave all off for every day.
@@ -562,8 +566,8 @@ export default function NewMedicationPage() {
                   </div>
 
                   <div data-tour="mednew-times" className="pt-4 border-t border-border">
-                    <label className={labelClass}>Reminder Times</label>
-                    <p className="text-xs text-muted-foreground mb-3">Set the time for each dose in 24-hour format.</p>
+                    <label className={labelClass}>{t.medForm.reminderTimes}</label>
+                    <p className="text-xs text-muted-foreground mb-3">{t.medForm.reminderTimesHint}</p>
                     <div className="grid grid-cols-1 gap-2.5">
                       {times.map((time, idx) => (
                         <div key={idx} className="bg-muted p-4 rounded-2xl flex items-center justify-between gap-4">
@@ -596,13 +600,13 @@ export default function NewMedicationPage() {
                     {/* Step 1 marks its optional field as such; this one didn't, so
                         skipping it felt like an error until "No strength specified"
                         turned up on the review screen. */}
-                    <label className={labelClass}>Strength <span className="font-normal text-muted-foreground">(optional)</span></label>
+                    <label className={labelClass}>{t.medForm.strength} <span className="font-normal text-muted-foreground">{t.medForm.optional}</span></label>
                     <input
                       type="text"
                       value={strength}
                       onChange={(e) => setStrength(e.target.value)}
                       className={inputClass}
-                      placeholder="e.g., 500mg, 10ml, 0.5%"
+                      placeholder={t.medForm.strengthPlaceholder}
                     />
                     {/* Suggestions follow the form picked in step 1 — a syrup no longer
                         gets offered six tablet strengths. */}
@@ -627,8 +631,8 @@ export default function NewMedicationPage() {
                   </div>
 
                   <div data-tour="mednew-amount" className="pt-4 border-t border-border">
-                    <label className={labelClass}>Dosage Amount</label>
-                    <p className="text-xs text-muted-foreground mb-3">Units taken per reminder.</p>
+                    <label className={labelClass}>{t.medForm.dosageAmount}</label>
+                    <p className="text-xs text-muted-foreground mb-3">{t.medForm.dosageAmountHint}</p>
                     <div className="flex items-center gap-3 mt-2">
                       <button
                         type="button"
@@ -672,8 +676,8 @@ export default function NewMedicationPage() {
                         <Layers className="w-5 h-5 text-primary" />
                       </div>
                       <div>
-                        <h3 id="inventory-toggle-label" className="font-bold text-sm text-foreground">Track Stock Inventory</h3>
-                        <p className="text-xs text-muted-foreground mt-0.5">Auto-deduct stock on each dose</p>
+                        <h3 id="inventory-toggle-label" className="font-bold text-sm text-foreground">{t.medForm.trackStock}</h3>
+                        <p className="text-xs text-muted-foreground mt-0.5">{t.medForm.trackStockHint}</p>
                       </div>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
@@ -700,7 +704,7 @@ export default function NewMedicationPage() {
                   {enableInventory && (
                     <div data-tour="mednew-stock" className="space-y-4 pt-2" style={{ animation: 'fadeIn 0.2s ease-out' }}>
                       <div>
-                        <label className={labelClass}>Current Stock</label>
+                        <label className={labelClass}>{t.medForm.currentStock}</label>
                         <div className="relative">
                           <input
                             type="number"
@@ -709,7 +713,7 @@ export default function NewMedicationPage() {
                             value={currentStock}
                             onChange={(e) => setCurrentStock(e.target.value)}
                             className={inputClass}
-                            placeholder="e.g., 30"
+                            placeholder={t.medForm.currentStockPlaceholder}
                           />
                           <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">
                             {unitPhrase(unitType, 2)}
@@ -717,7 +721,7 @@ export default function NewMedicationPage() {
                         </div>
                       </div>
                       <div>
-                        <label className={labelClass}>Low Stock Threshold</label>
+                        <label className={labelClass}>{t.medForm.lowStockThreshold}</label>
                         <div className="relative">
                           <input
                             type="number"
@@ -726,7 +730,7 @@ export default function NewMedicationPage() {
                             value={stockThreshold}
                             onChange={(e) => setStockThreshold(e.target.value)}
                             className={inputClass}
-                            placeholder="e.g., 4"
+                            placeholder={t.medForm.lowStockThresholdPlaceholder}
                           />
                           <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">
                             {unitPhrase(unitType, 2)}
@@ -745,20 +749,20 @@ export default function NewMedicationPage() {
               {step === 5 && (
                 <div className="space-y-6">
                   <div data-tour="mednew-reason">
-                    <label className={labelClass}>Medication Reason</label>
-                    <p className="text-xs text-muted-foreground mb-2">Optional. Helps identify the purpose.</p>
+                    <label className={labelClass}>{t.medForm.reason}</label>
+                    <p className="text-xs text-muted-foreground mb-2">{t.medForm.reasonHint}</p>
                     <input
                       type="text"
                       value={medicationReason}
                       onChange={(e) => setMedicationReason(e.target.value)}
                       className={inputClass}
-                      placeholder="e.g., For Blood Pressure, Headache"
+                      placeholder={t.medForm.reasonPlaceholder}
                     />
                   </div>
 
                   <div data-tour="mednew-priority" className="pt-4 border-t border-border">
-                    <label className={labelClass}>Priority Level</label>
-                    <p className="text-xs text-muted-foreground mb-3">Determines escalation behavior on missed doses.</p>
+                    <label className={labelClass}>{t.medForm.priorityLevel}</label>
+                    <p className="text-xs text-muted-foreground mb-3">{t.medForm.priorityHint}</p>
                     <div className="grid grid-cols-1 gap-2.5">
                       {/* This used to build a three-branch colorMap object inside the
                           map callback on every render, and derive the same colors again
@@ -896,7 +900,7 @@ export default function NewMedicationPage() {
                       >
                         <div className="flex items-center gap-2.5 shrink-0 text-muted-foreground">
                           {stepMeta[4].icon}
-                          <span className="text-xs font-semibold">Priority</span>
+                          <span className="text-xs font-semibold">{t.medForm.reviewPriority}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className={`text-sm font-bold flex items-center gap-1.5 ${getToneTheme(priorityMeta(priority).tone).text}`}>
@@ -976,7 +980,7 @@ export default function NewMedicationPage() {
           </div>
         </div>
       ) : (
-        <div className="bg-white p-12 text-center text-sm text-muted-foreground rounded-[22px]" style={{ boxShadow: CARD_SHADOW }}>
+        <div className="card-lift p-12 text-center text-sm text-muted-foreground">
           <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
             <Activity className="w-5 h-5 text-muted-foreground" />
           </div>

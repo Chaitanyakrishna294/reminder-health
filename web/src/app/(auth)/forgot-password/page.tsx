@@ -27,6 +27,7 @@
  * again, on the flow nobody exercises weekly.
  */
 
+import { useLanguage } from '@/context/language-context';
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -38,6 +39,7 @@ import { CodeInput, SpamCallout } from '@/components/auth/code-entry';
 import Turnstile, { captchaEnabled } from '@/components/turnstile';
 
 export default function ForgotPasswordPage() {
+  const { t } = useLanguage();
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [codeSent, setCodeSent] = useState(false);
@@ -56,11 +58,11 @@ export default function ForgotPasswordPage() {
 
   const sendCode = async () => {
     if (!email) {
-      setError('Enter your email to get a reset code.');
+      setError(t.auth.errEmailForReset);
       return;
     }
     if (captchaEnabled && !captchaToken) {
-      setError('Please complete the verification challenge.');
+      setError(t.auth.errCaptcha);
       return;
     }
     setLoading(true);
@@ -79,9 +81,9 @@ export default function ForgotPasswordPage() {
     if (resetErr) {
       const m = (resetErr.message || '').toLowerCase();
       if (m.includes('rate limit') || m.includes('security purposes') || m.includes('too many')) {
-        setError('Too many requests just now. Please wait a minute and try again.');
+        setError(t.auth.errTooManyRequests);
       } else if (m.includes('captcha')) {
-        setError('The verification challenge did not go through. Please try it again.');
+        setError(t.auth.errCaptchaFailed);
       } else {
         setError(resetErr.message);
       }
@@ -104,7 +106,7 @@ export default function ForgotPasswordPage() {
     e.preventDefault();
     const token = code.trim();
     if (token.length < 6) {
-      setError('Enter the full code from your email.');
+      setError(t.auth.errFullCode);
       return;
     }
     setLoading(true);
@@ -138,7 +140,7 @@ export default function ForgotPasswordPage() {
   return (
     <div className="space-y-5">
       <header>
-        <h1 className={`font-mono font-black tracking-tight text-foreground ${isElderly ? 'text-4xl' : 'text-[2rem]'}`}>
+        <h1 className={`title-page text-foreground ${isElderly ? 'text-4xl' : ''}`}>
           {codeSent ? 'Enter the code' : 'Reset password'}{' '}
           <KeyRound className="inline-block w-7 h-7 text-primary align-[-0.1em]" aria-hidden />
         </h1>
@@ -170,7 +172,7 @@ export default function ForgotPasswordPage() {
       {!codeSent ? (
         <form onSubmit={handleSendSubmit} className="space-y-4">
           <div>
-            <label htmlFor="forgot-email" className={labelClass}>Email</label>
+            <label htmlFor="forgot-email" className={labelClass}>{t.auth.email}</label>
             <div className="relative">
               <Mail className={iconClass} aria-hidden />
               <input
@@ -181,7 +183,7 @@ export default function ForgotPasswordPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className={inputClass}
-                placeholder="you@example.com"
+                placeholder={t.auth.emailPlaceholder}
               />
             </div>
           </div>
@@ -200,7 +202,7 @@ export default function ForgotPasswordPage() {
       ) : (
         <form onSubmit={handleVerify} className="space-y-4">
           <div>
-            <label htmlFor="reset-code" className={labelClass}>Reset code</label>
+            <label htmlFor="reset-code" className={labelClass}>{t.auth.resetCode}</label>
             <CodeInput id="reset-code" value={code} onChange={setCode} autoFocus />
           </div>
 
