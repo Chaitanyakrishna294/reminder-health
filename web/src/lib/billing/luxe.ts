@@ -33,14 +33,23 @@ export const accentGlow = '0 0 0 1px rgba(242,107,138,0.20), 0 18px 50px -20px r
 export const luxeInk = '#EAF0FF';
 export const luxeMuted = '#A6B6DD';
 
-// Reusable light-sweep overlay (uses the luxeSheen keyframe in globals.css).
-// Drop into a `position: relative; overflow: hidden` parent.
+// Reusable light-sweep overlay. Drop into a `position: relative; overflow:
+// hidden` parent.
+//
+// The SWEEP IS STATIC now. It carried `luxeSheen 5s ease-in-out infinite`, and
+// §6 forbids idle motion outright — the recorded exception list is closed and
+// Care+ is not on it. The gradient still reads as a highlight across the panel;
+// it simply no longer travels across it forever.
+//
+// The rest of this file's palette is untouched on purpose. Care+ is a documented,
+// deliberate always-dark skin (see the header), and swapping its colours for
+// system tokens would be a redesign rather than conformance — that one is the
+// maintainer's call, and it is written up as D5 in the conformance audit.
 export const sheenStyle: CSSProperties = {
   position: 'absolute',
   top: 0,
   bottom: 0,
   width: '40%',
   background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.12) 50%, transparent 100%)',
-  animation: 'luxeSheen 5s ease-in-out infinite',
   pointerEvents: 'none',
 };

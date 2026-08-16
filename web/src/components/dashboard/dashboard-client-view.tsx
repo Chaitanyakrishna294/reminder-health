@@ -1417,15 +1417,19 @@ export default function DashboardClientView({
                     </div>
                   </foreignObject>
    
-                  {/* Compliance Ring Markers — orbit the center, pause while inspecting one */}
-                  <g
-                    className="origin-center"
-                    style={{
-                      transformOrigin: '150px 150px',
-                      animation: 'dose-orbit 40s linear infinite',
-                      animationPlayState: activeEvent ? 'paused' : 'running',
-                    }}
-                  >
+                  {/* Dose markers, placed around the ring and STILL.
+                      They used to carry `dose-orbit 40s linear infinite` — the
+                      largest piece of idle motion in the app, on a card someone
+                      reads to check a dose. §6 is absolute (motion is feedback,
+                      never attention) and the recorded exception list is closed:
+                      auth's radial ground, the dose-strip domes, water's blue,
+                      Remi's bob. This was not on it.
+
+                      Only the rotation goes. The circular arrangement, the
+                      status colours, the hover/click inspection and the pause-on-
+                      inspect intent all survive, because none of them needed the
+                      spin to work. */}
+                  <g className="origin-center" style={{ transformOrigin: '150px 150px' }}>
                     {events.map((event, idx) => {
                       const angle = (idx * 2 * Math.PI) / events.length - Math.PI / 2;
                       const cx = 150 + 85 * Math.cos(angle);
