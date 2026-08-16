@@ -43,16 +43,16 @@ import type { ReminderEvent } from '@/components/dashboard/todays-schedule';
  *  shadow does most of the work; the highlight only has to say where the light is. */
 const DOMED: React.CSSProperties = {
   backgroundImage:
-    'radial-gradient(110% 85% at 30% 16%, rgba(255,255,255,0.42), rgba(255,255,255,0) 58%)',
+    'radial-gradient(110% 85% at 30% 16%, var(--pocket-sheen), rgba(255,255,255,0) 58%)',
   boxShadow:
-    'inset 0 1px 1px rgba(255,255,255,0.55), inset 0 -5px 8px rgba(0,0,0,0.17), 0 1px 1.5px rgba(0,0,0,0.06)',
+    'inset 0 1px 1px var(--pocket-rim), inset 0 -5px 8px var(--pocket-shade), 0 1px 1.5px rgba(0,0,0,0.06)',
 };
 
 /** Concave: the highlight moves to the bottom lip and the shadow falls inside the
  *  top edge — the same trick, inverted, which is what makes it read as pushed-in. */
 const PRESSED: React.CSSProperties = {
   boxShadow:
-    'inset 0 3px 6px rgba(0,0,0,0.16), inset 0 -1px 1px rgba(255,255,255,0.35)',
+    'inset 0 3px 6px var(--pocket-well), inset 0 -1px 1px var(--pocket-lip)',
 };
 
 /** Per-pocket presentation. Derived from the dose's tone so it can never drift from

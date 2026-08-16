@@ -162,6 +162,14 @@
   --glass-rim: rgba(255, 255, 255, 0.60);
   --glass-floor: rgba(15, 28, 90, 0.06);
 
+  /* The dose-strip pockets. Same family, same reason: a dome is a highlight and a
+     shadow, and both are fractions of the room's light. */
+  --pocket-sheen: rgba(255, 255, 255, 0.42);
+  --pocket-rim: rgba(255, 255, 255, 0.55);
+  --pocket-lip: rgba(255, 255, 255, 0.35);
+  --pocket-shade: rgba(0, 0, 0, 0.17);
+  --pocket-well: rgba(0, 0, 0, 0.16);
+
   /* ── RADIUS: one scale, three steps (§2) ──
      20 cards and sheets · 14 buttons, inputs, chips · 10 swatches and badges.
      Concentric rule: a child's radius = the parent's minus its inset. Today's
@@ -251,6 +259,14 @@
   --glass-sheen: rgba(255, 255, 255, 0.16);
   --glass-rim: rgba(255, 255, 255, 0.20);
   --glass-floor: rgba(0, 0, 0, 0.30);
+
+  /* Pockets on a near-black ground: the highlight drops hard, the shade deepens.
+     A dome lit for a white page reads as a bright blister on a dark one. */
+  --pocket-sheen: rgba(255, 255, 255, 0.13);
+  --pocket-rim: rgba(255, 255, 255, 0.16);
+  --pocket-lip: rgba(255, 255, 255, 0.10);
+  --pocket-shade: rgba(0, 0, 0, 0.42);
+  --pocket-well: rgba(0, 0, 0, 0.46);
 
   /* Hydration, lifted for the navy ground. Scoped to the water surfaces only —
      see the light-mode block for why this is the one exception to one accent. */
