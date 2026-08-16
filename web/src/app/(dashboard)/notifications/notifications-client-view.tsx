@@ -31,7 +31,8 @@ import { useRealtimeNotifications, type Notification } from '@/hooks/use-realtim
 import { useUiMode } from '@/context/ui-mode-context';
 import { dayKeyForDose, timeOfDayForDose } from '@/lib/design/slots';
 import { notificationMeta, notificationTarget, type NotificationMeta } from '@/lib/design/notification-kinds';
-import BrainMascot, { mascotSlot } from '@/components/dashboard/brain-mascot';
+import BrainMascot from '@/components/dashboard/brain-mascot';
+import { mascotSlot } from '@/components/dashboard/mascot-slots';
 
 /** The page holds real history, not a badge's worth. */
 const PAGE_LIMIT = 200;

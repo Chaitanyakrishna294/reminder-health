@@ -14,7 +14,8 @@ import { PremiumToast } from '@/components/ui/premium-toast';
 import { doseTone, doseLabel } from '@/lib/design/semantics';
 import { Badge } from '@/components/ui/badge';
 import DayRail from '@/components/dashboard/day-rail';
-import BrainMascot, { mascotSlot } from '@/components/dashboard/brain-mascot';
+import BrainMascot from '@/components/dashboard/brain-mascot';
+import { mascotSlot } from '@/components/dashboard/mascot-slots';
 
 export interface ReminderEvent {
   id: number;
