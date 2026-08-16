@@ -50,7 +50,9 @@ import {
 } from 'lucide-react';
 
 // Soft diffuse card shadow shared across the Apple-Health-styled pages.
-const CARD_SHADOW = '0 1px 3px rgba(16, 28, 90, 0.04), 0 10px 30px rgba(16, 28, 90, 0.06)';
+/* CARD_SHADOW was a private elevation system living beside the token ladder —
+   two values that happened to look alike, so any future change to --lift-1 would
+   have silently skipped the wizard. Removed; the panels use `card-lift`. */
 
 export default function NewMedicationPage() {
   const { t } = useLanguage();
@@ -362,7 +364,7 @@ export default function NewMedicationPage() {
       )}
 
       {targetTelegramChatId ? (
-        <div className="bg-white rounded-[22px] overflow-hidden" style={{ boxShadow: CARD_SHADOW }}>
+        <div className="card-lift overflow-hidden">
           
           {/* ── Premium Stepper ── */}
           <div className="px-6 pt-6 pb-4 md:px-8 md:pt-8">
@@ -978,7 +980,7 @@ export default function NewMedicationPage() {
           </div>
         </div>
       ) : (
-        <div className="bg-white p-12 text-center text-sm text-muted-foreground rounded-[22px]" style={{ boxShadow: CARD_SHADOW }}>
+        <div className="card-lift p-12 text-center text-sm text-muted-foreground">
           <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
             <Activity className="w-5 h-5 text-muted-foreground" />
           </div>
