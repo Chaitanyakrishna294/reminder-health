@@ -403,7 +403,7 @@ function DoseCard({
     return (
       <article {...anchor} {...tourAttr} className={`rounded-[20px] ground-hero card-raised press-sink p-5 ${selectedRing}`}>
         <div className="flex items-center gap-3">
-          <span className={`rounded-2xl flex items-center justify-center shrink-0 ${isElderly ? 'w-16 h-16' : 'w-12 h-12'} ${slotChip}`}>
+          <span className={`flex items-center justify-center shrink-0 ${isElderly ? 'rounded-2xl w-16 h-16' : 'rounded-[var(--r-control)] w-12 h-12'} ${slotChip}`}>
             {/* 28px in elderly — the written floor, not a judgement call. */}
             <Pill className={isElderly ? 'w-7 h-7' : 'w-6 h-6'} aria-hidden />
           </span>
@@ -426,7 +426,7 @@ function DoseCard({
                this is THE action of the whole screen for someone who may be shaky —
                the old elderly view gave it 88px and that instinct was right, even if
                its shouting copy was not. */
-            className={`rounded-2xl bg-primary-strong text-primary-strong-foreground font-mono font-bold hover:bg-primary-strong-hover active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 ${
+            className={`rounded-[var(--r-control)] bg-primary-strong text-primary-strong-foreground font-mono font-bold hover:bg-primary-strong-hover active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 ${
               isElderly ? 'min-h-[72px] text-2xl' : 'min-h-[52px] text-[15px]'
             }`}
           >
@@ -435,7 +435,7 @@ function DoseCard({
           <button
             onClick={() => onResolve(event, 'SKIP')}
             disabled={isUpdating}
-            className={`rounded-2xl border border-border text-muted-foreground font-mono font-bold hover:bg-muted active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 ${
+            className={`rounded-[var(--r-control)] border border-border text-muted-foreground font-mono font-bold hover:bg-muted active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 ${
               isElderly ? 'min-h-[72px] px-8 text-xl' : 'min-h-[52px] px-6 text-[15px]'
             }`}
           >
@@ -448,7 +448,7 @@ function DoseCard({
 
   return (
     <article {...anchor} {...tourAttr} className={`rounded-[20px] card-lift press-sink stagger-in px-4 py-3 flex items-center gap-3 ${selectedRing}`}>
-      <span className={`rounded-xl flex items-center justify-center shrink-0 ${isElderly ? 'w-14 h-14' : 'w-9 h-9'} ${slotChip}`}>
+      <span className={`flex items-center justify-center shrink-0 ${isElderly ? 'rounded-xl w-14 h-14' : 'rounded-[var(--r-control)] w-9 h-9'} ${slotChip}`}>
         {/* Was 24px in elderly, under the 28px floor. The tile grew with it —
             a 28px glyph in a 36px tile has no room to breathe. */}
         <Pill className={isElderly ? 'w-7 h-7' : 'w-[18px] h-[18px]'} aria-hidden />
