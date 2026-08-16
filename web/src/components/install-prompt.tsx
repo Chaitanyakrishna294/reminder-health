@@ -104,7 +104,7 @@ export default function InstallPrompt() {
       aria-label="Install app"
       className="floating-bottom fixed left-4 right-4 sm:right-auto sm:max-w-sm z-[90]"
     >
-      <div className="rounded-2xl border border-border bg-card shadow-2xl p-4 flex items-center gap-3">
+      <div className="rounded-[var(--r-card)] border border-border bg-card shadow-2xl p-4 flex items-center gap-3">
         <div className="shrink-0 w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
           <Download className="w-5 h-5" />
         </div>

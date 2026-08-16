@@ -15,7 +15,7 @@ export default function GuestBanner() {
   return (
     <Link
       href="/save-account"
-      className="group mb-4 flex items-center gap-3 rounded-2xl bg-amber-500/10 ring-1 ring-amber-500/25 px-4 py-3 hover:bg-amber-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50 transition-colors"
+      className="group mb-4 flex items-center gap-3 rounded-[var(--r-card)] bg-warning/10 ring-1 ring-warning/25 px-4 py-3 hover:bg-amber-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50 transition-colors"
     >
       <span className="w-9 h-9 shrink-0 rounded-xl bg-amber-500/20 flex items-center justify-center text-amber-700 dark:text-amber-400">
         <ShieldAlert className="w-5 h-5" aria-hidden />

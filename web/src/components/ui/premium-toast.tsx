@@ -60,7 +60,7 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: (id: str
 
   return (
     <div
-      className={`pointer-events-auto flex items-start gap-3 px-4 py-3.5 rounded-2xl shadow-lg ${
+      className={`pointer-events-auto flex items-start gap-3 px-4 py-3.5 rounded-[var(--r-card)] shadow-lg ${
         isExiting ? 'animate-toast-out' : 'animate-toast-in'
       } ${
         isError
