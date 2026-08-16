@@ -678,24 +678,50 @@ body {
 
    What is left here is the honest list: badges, metrics, times, nav labels. Each
    is a VALUE or a label, never a sentence. */
-.font-mono, .badge, .metric, .time-tag, .navigation-label {
-  font-family: var(--font-mono), var(--font-indic-tail), monospace !important;
-  letter-spacing: -0.01em;
+/* IN @layer components, and that is the whole point — see §10.3.
+   Unlayered, this rule's `letter-spacing` outranked every Tailwind `tracking-*`
+   utility, so a label written `font-mono uppercase tracking-[0.14em]` rendered at
+   -0.11px instead of the declared +1.54px. The declared style was silently
+   discarded app-wide, and NEGATIVE tracking on uppercase is the wrong direction
+   for legibility — on the settings eyebrows, the notification labels, every caps
+   micro-label the spec gives `.06em`.
+
+   Layered, the normal contract is restored: this stays the default for anything
+   that only says `font-mono`, and a utility that explicitly sets tracking wins.
+   The `!important` on font-family is untouched and still wins regardless of
+   layer — the Indic fallback tail must not be beatable. */
+@layer components {
+  .font-mono, .badge, .metric, .time-tag, .navigation-label {
+    font-family: var(--font-mono), var(--font-indic-tail), monospace !important;
+    letter-spacing: -0.01em;
+  }
 }
 
-/* Headings: Inter, with the weight hierarchy the type scale in the spec sets.
+/* IN @layer base — element DEFAULTS, which is exactly what a layer is for.
+   Unlayered, these beat every Tailwind utility (§10.3), so `tracking-[0.14em]`
+   on an <h2> micro-label was discarded in favour of this -0.018em. Layering
+   `.font-mono` alone did not fix it; this rule simply took over as the winner,
+   which is how the second half of the bug was found.
+
+   In `base` they remain the default for any heading that says nothing, and a
+   utility that explicitly sets tracking or leading now wins — the normal
+   contract.
+
+   Headings: Inter, with the weight hierarchy the type scale in the spec sets.
    Tracking tightens as type grows, which is what makes a large title read as
    composed rather than merely big. */
-h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-sans), var(--font-indic-tail), sans-serif;
-  letter-spacing: -0.018em;
-  text-wrap: balance;
-}
+@layer base {
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-sans), var(--font-indic-tail), sans-serif;
+    letter-spacing: -0.018em;
+    text-wrap: balance;
+  }
 
-/* Tighter rhythm on real display headings so large titles read as composed,
-   not just big. (Scoped to h1/h2 to avoid disturbing dense label text.) */
-h1, h2 {
-  line-height: 1.12;
+  /* Tighter rhythm on real display headings so large titles read as composed,
+     not just big. (Scoped to h1/h2 to avoid disturbing dense label text.) */
+  h1, h2 {
+    line-height: 1.12;
+  }
 }
 
 /* Tabular figures for metrics/times so numbers don't wobble as they change. */
