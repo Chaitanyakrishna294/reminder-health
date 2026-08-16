@@ -149,6 +149,25 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [small, setSmall] = useState(false);
+  /**
+   * SHORT VIEWPORT — the gate's budget is VERTICAL, and nothing here was
+   * measuring it.
+   *
+   * `small` below tests WIDTH, which says nothing about whether the question and
+   * its three answers fit on one screen. So a 412x915 phone took the LARGER ring
+   * (width ≥ 420) and overflowed, while a 375x812 one squeaked by; add browser
+   * chrome, a two-line drug name or the view toggle and it scrolled either way.
+   * The container is `overflow-y-auto`, so it did scroll — silently, with no
+   * affordance, which reads as the screen being stuck rather than scrollable.
+   *
+   * A gate you have to scroll to answer has already failed at the only thing it
+   * does (see the note on the layout below, which fixed the same failure from the
+   * other direction). This measures the axis that actually constrains it.
+   *
+   * NON-ELDERLY ONLY. Elderly owns its own scale and is excluded from the
+   * redesign; every use of `compact` below sits behind `!isElderly`.
+   */
+  const [compact, setCompact] = useState(false);
   // Session-local: every gate appearance starts back at one-by-one (safety default).
   /**
    * ALL-AT-ONCE IS THE DEFAULT, except in elderly.
@@ -178,10 +197,22 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
   const [permanentError, setPermanentError] = useState<{ id: number; message: string } | null>(null);
 
   useEffect(() => {
-    const f = () => setSmall(window.innerWidth < 420);
+    const f = () => {
+      setSmall(window.innerWidth < 420);
+      // 760 is the measured threshold: below it the one-by-one view at its full
+      // spacing exceeds the viewport once the drug name takes two lines, which
+      // long Indian brand names routinely do.
+      setCompact(window.innerHeight < 760);
+    };
     f();
     window.addEventListener('resize', f);
-    return () => window.removeEventListener('resize', f);
+    // A phone turned sideways loses ~half its height in one frame; without this
+    // the gate keeps the tall layout and scrolls again.
+    window.addEventListener('orientationchange', f);
+    return () => {
+      window.removeEventListener('resize', f);
+      window.removeEventListener('orientationchange', f);
+    };
   }, []);
 
   // Modal focus management: the gate covers the dashboard, but without this a
@@ -381,7 +412,11 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
           `flex-1` stays: it lets this column fill the fixed overlay so the content
           can centre inside it. What changed is that the content is now centred as
           one block instead of being pushed apart. */}
-      <div className="relative flex-1 flex flex-col items-center justify-center px-6 pt-12 pb-6 text-center">
+      <div
+        className={`relative flex-1 flex flex-col items-center justify-center px-6 text-center ${
+          !isElderly && compact ? 'pt-6 pb-4' : 'pt-12 pb-6'
+        }`}
+      >
       {remaining > 1 && (
         <span className="absolute top-6 text-xs font-mono font-bold text-muted-foreground tracking-widest">
           {remaining} doses to confirm
@@ -392,10 +427,14 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
           drug — 168px of brain against a 24px medication name. It now sits inside
           the lateness ring at roughly a third of that, so the name can lead. */}
       {(() => {
+        // Elderly's two values are deliberately untouched — it is excluded from
+        // the redesign and its ring is sized for its own arm's-length scale.
         const ringSize =
           effectiveView === 'list'
-            ? (small ? 96 : 108)
-            : isElderly ? (small ? 152 : 172) : (small ? 132 : 148);
+            ? (compact ? 84 : small ? 96 : 108)
+            : isElderly
+              ? (small ? 152 : 172)
+              : compact ? (small ? 104 : 116) : (small ? 132 : 148);
         const mood =
           missedMode || minutesLate(event.scheduled_for) >= 30 ? 'concerned' : 'reminder';
         return (
@@ -417,7 +456,7 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
         <div
           role="tablist"
           aria-label="Question view"
-          className="mt-5 inline-flex rounded-full border border-border bg-card p-1 shadow-sm"
+          className={`${!isElderly && compact ? 'mt-3' : 'mt-5'} inline-flex rounded-full border border-border bg-card p-1 shadow-sm`}
         >
           <button
             role="tab"
@@ -461,7 +500,7 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
           {/* Lateness as a chip beside the ring, not a sentence. The tint says the
               same thing the arc does, and the figure is spelled out either way. */}
           <span
-            className={`mt-5 inline-flex items-center gap-1.5 rounded-full font-bold ${
+            className={`${!isElderly && compact ? 'mt-3' : 'mt-5'} inline-flex items-center gap-1.5 rounded-full font-bold ${
               missedMode ? 'bg-danger/15 text-danger-strong' : 'bg-warning/15 text-warning-strong'
             } ${isElderly ? 'px-4 py-2 text-base' : 'px-3 py-1.5 text-xs'}`}
           >
@@ -472,7 +511,7 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
           {/* The question is the eyebrow; the DRUG NAME is the headline. The old markup
               split one sentence across two nodes with an icon wedged between them, so it
               rendered as two fragments in two different typefaces. */}
-          <p className={`mt-5 font-semibold text-muted-foreground ${isElderly ? 'text-lg' : 'text-sm'}`}>
+          <p className={`${!isElderly && compact ? 'mt-3' : 'mt-5'} font-semibold text-muted-foreground ${isElderly ? 'text-lg' : 'text-sm'}`}>
             {missedMode ? 'You missed' : 'Did you take'}
           </p>
           {/* Never truncate a drug name on the screen that asks you to confirm it:
@@ -527,7 +566,7 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
              an inner glass plate inside it — so the answer area reads as a distinct
              object resting on the gate rather than three buttons floating on a wash.
              Radii are concentric: 32px outer, 32-6=26 inner, 16 on the buttons. */
-          <div className="mt-8 w-full max-w-sm">
+          <div className={`${!isElderly && compact ? 'mt-5' : 'mt-8'} w-full max-w-sm`}>
             <div className="rounded-[2rem] p-1.5 bg-foreground/[0.04] dark:bg-white/[0.06] ring-1 ring-foreground/[0.06] dark:ring-white/10">
               <div className="rounded-[calc(2rem-0.375rem)] p-3 space-y-3 bg-card/70 dark:bg-white/[0.05] backdrop-blur-xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.6)] dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08)]">
             <button
@@ -667,7 +706,7 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
       {/* Safety carve-out: the emergency card is always reachable, even mid-gate. */}
       <button
         onClick={() => router.push('/emergency')}
-        className="mt-6 inline-flex items-center justify-center gap-1.5 min-h-11 px-3 text-xs font-bold text-danger-strong hover:text-danger transition-colors cursor-pointer"
+        className={`${!isElderly && compact ? 'mt-4' : 'mt-6'} inline-flex items-center justify-center gap-1.5 min-h-11 px-3 text-xs font-bold text-danger-strong hover:text-danger transition-colors cursor-pointer`}
       >
         <Siren className="w-3.5 h-3.5" /> Emergency card
       </button>
