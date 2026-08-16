@@ -118,7 +118,7 @@ export default function LegalDocument({ docKey, footerLinks = [] }: LegalDocumen
       </div>
 
       <article lang={effectiveLocale}>
-        <h1 className="text-3xl font-black mb-2">{doc.title}</h1>
+        <h1 className="title-page mb-2">{doc.title}</h1>
         <p className="text-sm text-muted-foreground mb-6">
           {t.legal.lastUpdated}: {doc.updated}
         </p>
