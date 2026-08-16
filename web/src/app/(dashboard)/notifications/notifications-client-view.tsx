@@ -331,7 +331,14 @@ export default function NotificationsClientView({
                         // menu over our own selection mode.
                         onContextMenu={(e) => { if (selecting || pressedId.current) e.preventDefault(); }}
                         aria-pressed={selecting ? isSelected : undefined}
-                        className={`w-full text-left rounded-2xl border p-3.5 flex items-start gap-3 select-none transition-colors cursor-pointer
+                        className={`w-full text-left rounded-2xl border p-3.5 flex items-start gap-3 select-none transition-colors cursor-pointer stagger-in
+                                    /* NO press-sink here, deliberately: these rows
+                                       carry state TINTS rather than elevation, and
+                                       press-sink resolves to lift-1 on :active — on
+                                       an element with no resting shadow that reads
+                                       as the row LIFTING under the finger, which is
+                                       backwards. The existing colour transition is
+                                       the press feedback. */
                                     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background
                                     ${isSelected
                                       ? 'bg-primary-soft border-primary/40'
