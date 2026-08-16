@@ -56,7 +56,7 @@ export default function UpdatePasswordPage() {
   const iconClass = 'absolute left-4 top-1/2 -translate-y-1/2 text-primary pointer-events-none w-[18px] h-[18px]';
   const labelClass = `block font-bold text-foreground mb-1.5 ${isElderly ? 'text-base' : 'text-xs'}`;
   const eyeClass =
-    'absolute right-1.5 w-11 h-11 flex items-center justify-center rounded-xl text-muted-foreground hover:text-primary-strong transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer';
+    'absolute right-1.5 w-11 h-11 flex items-center justify-center rounded-[var(--r-control)] text-muted-foreground hover:text-primary-strong transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer';
 
   if (success) {
     return (
@@ -95,7 +95,7 @@ export default function UpdatePasswordPage() {
       </header>
 
       {error && (
-        <div className="bg-danger/10 text-danger-strong text-sm p-3 rounded-2xl border border-danger/20 flex items-start gap-2">
+        <div className="bg-danger/10 text-danger-strong text-sm p-3 rounded-[var(--r-card)] border border-danger/20 flex items-start gap-2">
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
           <span>{error}</span>
         </div>

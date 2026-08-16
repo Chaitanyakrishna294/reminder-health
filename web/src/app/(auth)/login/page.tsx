@@ -195,13 +195,13 @@ function LoginForm() {
       </header>
 
       {error && (
-        <div className="bg-danger/10 text-danger-strong text-sm p-3 rounded-2xl border border-danger/20 flex items-start gap-2">
+        <div className="bg-danger/10 text-danger-strong text-sm p-3 rounded-[var(--r-card)] border border-danger/20 flex items-start gap-2">
           <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden /> <span>{error}</span>
         </div>
       )}
 
       {info && (
-        <div className="bg-primary/10 text-primary-strong text-sm p-3 rounded-2xl border border-primary/20 flex items-start gap-2">
+        <div className="bg-primary/10 text-primary-strong text-sm p-3 rounded-[var(--r-card)] border border-primary/20 flex items-start gap-2">
           <Info className="w-4 h-4 shrink-0 mt-0.5" aria-hidden /> <span>{info}</span>
         </div>
       )}
@@ -252,7 +252,7 @@ function LoginForm() {
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  className="absolute right-1.5 w-11 h-11 flex items-center justify-center rounded-xl text-muted-foreground hover:text-primary-strong transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+                  className="absolute right-1.5 w-11 h-11 flex items-center justify-center rounded-[var(--r-control)] text-muted-foreground hover:text-primary-strong transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
                 >
                   {showPassword ? <EyeOff className="w-[18px] h-[18px]" aria-hidden /> : <Eye className="w-[18px] h-[18px]" aria-hidden />}
                 </button>
@@ -291,7 +291,7 @@ function LoginForm() {
             type="button"
             disabled={loading}
             onClick={handleSendCode}
-            className={`w-full inline-flex items-center justify-center gap-2 font-bold rounded-2xl border border-primary/35 text-primary-strong hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none cursor-pointer ${isElderly ? 'h-16 text-lg' : 'h-14 text-sm'}`}
+            className={`w-full inline-flex items-center justify-center gap-2 font-bold rounded-[var(--r-control)] border border-primary/35 text-primary-strong hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none cursor-pointer ${isElderly ? 'h-16 text-lg' : 'h-14 text-sm'}`}
           >
             <Send className="w-4 h-4" aria-hidden />
             Email me a sign-in code

@@ -47,8 +47,10 @@ export default function ExitDialog({ open, onCancel, onExit }: ExitDialogProps) 
 
   if (!open) return null;
 
-  const btn = `w-full rounded-2xl font-bold transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-    isElderly ? 'min-h-16 text-lg' : 'min-h-12 text-sm'
+  // Radius joins the scale (§2). Branch-guarded: the dialog renders in every
+  // mode and elderly is excluded, so it keeps the 16 it had.
+  const btn = `w-full font-bold transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+    isElderly ? 'rounded-2xl min-h-16 text-lg' : 'rounded-[var(--r-control)] min-h-12 text-sm'
   }`;
 
   return (

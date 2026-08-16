@@ -112,7 +112,7 @@ export default async function EmergencyPage() {
                      dark mode, which turned this into dark-red text on a navy pill over a
                      red card. The two `danger-solid` tokens are #fff / #B3261E in both
                      modes, so the pairing holds either way. Also now a 44px target. */
-                  className="inline-flex items-center justify-center gap-1.5 bg-danger-solid-foreground text-danger-solid font-black rounded-xl px-3 h-11 text-sm shrink-0"
+                  className="inline-flex items-center justify-center gap-1.5 bg-danger-solid-foreground text-danger-solid font-black rounded-[var(--r-control)] px-3 h-11 text-sm shrink-0"
                 >
                   <Phone className="w-4 h-4" /> Call
                 </a>

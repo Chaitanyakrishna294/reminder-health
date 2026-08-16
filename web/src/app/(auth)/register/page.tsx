@@ -118,7 +118,7 @@ export default function RegisterPage() {
     return (
       <div className={`space-y-5 ${isElderly ? 'max-w-2xl' : ''}`}>
         {error && (
-          <div className="bg-danger/10 text-danger-strong text-sm p-3 rounded-2xl border border-danger/20 flex items-start gap-2">
+          <div className="bg-danger/10 text-danger-strong text-sm p-3 rounded-[var(--r-card)] border border-danger/20 flex items-start gap-2">
             <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /> <span>{error}</span>
           </div>
         )}
@@ -191,7 +191,7 @@ export default function RegisterPage() {
       </header>
 
       {error && (
-        <div className="bg-danger/10 text-danger-strong text-sm p-3 rounded-2xl border border-danger/20 flex items-start gap-2">
+        <div className="bg-danger/10 text-danger-strong text-sm p-3 rounded-[var(--r-card)] border border-danger/20 flex items-start gap-2">
           <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /> <span>{error}</span>
         </div>
       )}
@@ -254,7 +254,7 @@ export default function RegisterPage() {
             type="button"
             onClick={() => setShowPassword(!showPassword)}
             aria-label={showPassword ? 'Hide password' : 'Show password'}
-            className="absolute right-1.5 w-11 h-11 flex items-center justify-center rounded-xl text-muted-foreground hover:text-primary-strong transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+            className="absolute right-1.5 w-11 h-11 flex items-center justify-center rounded-[var(--r-control)] text-muted-foreground hover:text-primary-strong transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
           >
             {showPassword ? <EyeOff className="w-[18px] h-[18px]" aria-hidden /> : <Eye className="w-[18px] h-[18px]" aria-hidden />}
           </button>

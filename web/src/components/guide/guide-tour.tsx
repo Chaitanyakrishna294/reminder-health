@@ -125,7 +125,7 @@ export default function GuideTour() {
       {/* Spotlight: highlight the target and lightly dim everything else. */}
       {hasTarget && rect && (
         <div
-          className="absolute rounded-2xl pointer-events-none transition-all duration-300"
+          className="absolute rounded-[var(--r-card)] pointer-events-none transition-all duration-300"
           style={{
             top: holeTop,
             left: holeLeft,
@@ -177,11 +177,11 @@ export default function GuideTour() {
           </div>
           <div className="flex items-center gap-2">
             {index > 0 && (
-              <button onClick={goBack} className="inline-flex items-center gap-1 text-xs font-bold text-muted-foreground hover:text-foreground px-2.5 py-1.5 rounded-xl cursor-pointer">
+              <button onClick={goBack} className="inline-flex items-center gap-1 text-xs font-bold text-muted-foreground hover:text-foreground px-2.5 py-1.5 rounded-[var(--r-control)] cursor-pointer">
                 <ArrowLeft className="w-3.5 h-3.5" /> Back
               </button>
             )}
-            <button onClick={goNext} className="inline-flex items-center gap-1 text-xs font-black text-primary-strong-foreground bg-primary-strong hover:bg-primary-strong-hover px-3.5 py-1.5 rounded-xl cursor-pointer">
+            <button onClick={goNext} className="inline-flex items-center gap-1 text-xs font-black text-primary-strong-foreground bg-primary-strong hover:bg-primary-strong-hover px-3.5 py-1.5 rounded-[var(--r-control)] cursor-pointer">
               {isLast ? (<><Check className="w-3.5 h-3.5" /> Done</>) : (<>Next <ArrowRight className="w-3.5 h-3.5" /></>)}
             </button>
           </div>
