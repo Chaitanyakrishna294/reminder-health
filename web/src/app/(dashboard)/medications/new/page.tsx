@@ -329,7 +329,7 @@ export default function NewMedicationPage() {
   };
 
   const labelClass = `block font-semibold text-foreground ${isElderly ? 'text-xl mb-2' : 'text-sm mb-1.5'}`;
-  const inputClass = `mt-1 block w-full px-4 py-3 min-h-11 rounded-2xl bg-muted text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm transition-all duration-200 font-[var(--font-sans)] ${
+  const inputClass = `mt-1 block w-full px-4 py-3 min-h-11 rounded-[var(--r-control)] bg-muted text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm transition-all duration-200 font-[var(--font-sans)] ${
     isElderly ? 'py-4 text-xl' : ''
   }`;
 
@@ -357,7 +357,7 @@ export default function NewMedicationPage() {
 
       {/* Error Banner */}
       {error && (
-        <div className="flex items-start gap-3 bg-danger/10 text-danger-strong text-sm p-4 rounded-2xl">
+        <div className="flex items-start gap-3 bg-danger/10 text-danger-strong text-sm p-4 rounded-[var(--r-card)]">
           <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
           <span className="font-medium">{error}</span>
         </div>
@@ -463,7 +463,7 @@ export default function NewMedicationPage() {
                               setUnitType(opt.id);
                               setUnitOpen(false);
                             }}
-                            className={`px-3.5 py-3 rounded-2xl text-left transition-all duration-200 flex items-center justify-between gap-3 cursor-pointer ${
+                            className={`px-3.5 py-3 rounded-[var(--r-control)] text-left transition-all duration-200 flex items-center justify-between gap-3 cursor-pointer ${
                               isSel
                                 ? 'bg-primary/8 ring-2 ring-primary/25'
                                 : 'bg-muted hover:bg-accent-surface'
@@ -504,7 +504,7 @@ export default function NewMedicationPage() {
                           key={freq.id}
                           type="button"
                           onClick={() => setFrequency(freq.id as any)}
-                          className={`p-4 rounded-2xl text-left transition-all duration-200 flex items-center justify-between cursor-pointer ${
+                          className={`p-4 rounded-[var(--r-control)] text-left transition-all duration-200 flex items-center justify-between cursor-pointer ${
                             frequency === freq.id
                               ? 'bg-primary/8 ring-2 ring-primary/25'
                               : 'bg-muted hover:bg-accent-surface'
@@ -570,7 +570,7 @@ export default function NewMedicationPage() {
                     <p className="text-xs text-muted-foreground mb-3">{t.medForm.reminderTimesHint}</p>
                     <div className="grid grid-cols-1 gap-2.5">
                       {times.map((time, idx) => (
-                        <div key={idx} className="bg-muted p-4 rounded-2xl flex items-center justify-between gap-4">
+                        <div key={idx} className="bg-muted p-4 rounded-[var(--r-card)] flex items-center justify-between gap-4">
                           <div className="flex items-center gap-2.5">
                             <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
                               <Clock className="w-4 h-4 text-primary" />
@@ -641,7 +641,7 @@ export default function NewMedicationPage() {
                       >
                         <Minus className="w-4 h-4 text-foreground" strokeWidth={2.5} />
                       </button>
-                      <div className="flex items-center gap-2 bg-muted rounded-2xl px-4 py-2.5">
+                      <div className="flex items-center gap-2 bg-muted rounded-[var(--r-control)] px-4 py-2.5">
                         <input
                           type="number"
                           step="0.5"
@@ -670,7 +670,7 @@ export default function NewMedicationPage() {
               {/* STEP 4: Inventory Tracking */}
               {step === 4 && (
                 <div className="space-y-5">
-                  <div data-tour="mednew-inventory" className="flex items-center justify-between p-4 bg-muted rounded-2xl">
+                  <div data-tour="mednew-inventory" className="flex items-center justify-between p-4 bg-muted rounded-[var(--r-card)]">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                         <Layers className="w-5 h-5 text-primary" />
@@ -776,7 +776,7 @@ export default function NewMedicationPage() {
                             type="button"
                             onClick={() => setPriority(p.id as any)}
                             aria-pressed={isSelected}
-                            className={`p-4 rounded-2xl text-left transition-all duration-200 flex items-center justify-between cursor-pointer ${
+                            className={`p-4 rounded-[var(--r-control)] text-left transition-all duration-200 flex items-center justify-between cursor-pointer ${
                               isSelected ? `${t.bg} ring-2 ${t.border}` : 'bg-muted hover:bg-accent-surface'
                             }`}
                           >
@@ -823,7 +823,7 @@ export default function NewMedicationPage() {
               {step === 6 && (
                 <div className="space-y-5">
                   {/* Summary Card */}
-                  <div data-tour="mednew-review" className="rounded-2xl bg-muted overflow-hidden">
+                  <div data-tour="mednew-review" className="rounded-[var(--r-card)] bg-muted overflow-hidden">
                     {/* Drug name header */}
                     <div className="bg-primary/8 px-5 py-4">
                       <div className="flex items-center gap-3">
@@ -914,7 +914,7 @@ export default function NewMedicationPage() {
                   </div>
 
                   {/* Info Note */}
-                  <div className="p-4 bg-primary/5 rounded-2xl flex items-start gap-3">
+                  <div className="p-4 bg-primary/5 rounded-[var(--r-card)] flex items-start gap-3">
                     <ShieldAlert className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                     <p className="text-xs text-muted-foreground leading-relaxed">
                       Saving will activate automated reminders. You can pause or edit this medication at any time from the Medications page.
