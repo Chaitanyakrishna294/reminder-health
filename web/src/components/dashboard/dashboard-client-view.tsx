@@ -815,7 +815,7 @@ export default function DashboardClientView({
 
   const getGreetingIcon = () => {
     const hours = new Date().getHours();
-    if (hours < 12) return <Sun className="w-5 h-5 text-warning animate-pulse shrink-0" />;
+    if (hours < 12) return <Sun className="w-5 h-5 text-warning shrink-0" />;
     if (hours < 17) return <CloudSun className="w-5 h-5 text-warning/80 shrink-0" />;
     return <Moon className="w-5 h-5 text-primary shrink-0" />;
   };
@@ -887,7 +887,7 @@ export default function DashboardClientView({
         <div className="bg-white/10 dark:bg-slate-900/40 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-3xl p-5 shadow-lg relative overflow-hidden flex flex-col sm:flex-row items-center justify-between gap-4 animate-fade-in z-45">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-primary/10 text-foreground flex items-center justify-center shrink-0">
-              <Send className="w-5 h-5 animate-bounce" />
+              <Send className="w-5 h-5" />
             </div>
             <div>
               <h4 className="text-sm font-black text-foreground">{t.dashboard.enableNotifications}</h4>
@@ -953,7 +953,7 @@ export default function DashboardClientView({
           <div className="flex justify-between items-start gap-4">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-full bg-primary/10 text-foreground flex items-center justify-center shrink-0">
-                <Sparkles className="w-6 h-6 animate-pulse" />
+                <Sparkles className="w-6 h-6" />
               </div>
               <div>
                 <h2 className="text-base font-black text-foreground">{t.dashboard.welcomeTitle}</h2>
@@ -1046,7 +1046,7 @@ export default function DashboardClientView({
             <p className="text-xs text-muted-foreground font-semibold mt-1 flex items-center gap-1.5">
               {activeEscalations > 0 ? (
                 <>
-                  <AlertTriangle className="w-3.5 h-3.5 text-danger shrink-0 animate-bounce" />
+                  <AlertTriangle className="w-3.5 h-3.5 text-danger shrink-0" />
                   <span>{t.dashboard.statusIntervention}</span>
                 </>
               ) : todayMissed > 0 ? (
@@ -1106,8 +1106,8 @@ export default function DashboardClientView({
             <Eyebrow as="span" className="text-primary">{t.dashboard.alertStatus}</Eyebrow>
             <div className="mt-0.5">
               {activeEscalations > 0 ? (
-                <span className="inline-flex items-center gap-1.5 text-[10px] font-black text-danger bg-danger/10 border border-danger/25 px-2.5 py-0.5 rounded-full animate-pulse uppercase tracking-wider">
-                  <AlertTriangle className="w-3 h-3 text-danger shrink-0" /> Escalation Active
+                <span className="inline-flex items-center gap-1.5 text-[10px] font-black text-danger bg-danger/10 border border-danger/25 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                  <AlertTriangle className="w-3 h-3 text-danger shrink-0" /> Escalation active
                 </span>
               ) : todayMissed > 0 ? (
                 <span className="inline-flex items-center gap-1.5 text-[10px] font-black text-warning bg-warning/10 border border-warning/25 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
@@ -1442,16 +1442,20 @@ export default function DashboardClientView({
                           onMouseLeave={() => setHoveredEvent(null)}
                           onClick={() => setSelectedEvent(prev => prev?.id === event.id ? null : event)}
                         >
-                          {/* Ping ring for alarms */}
+                          {/* A STATIC ring for escalated doses. It was `animate-ping`
+                              — an infinite pulse, which §6 forbids outright — with a
+                              hardcoded #FF9FA5 stroke that could not follow the theme
+                              (§10.2). The ring still marks the node; it just stops
+                              throbbing, and the status colour and the detail panel
+                              carry the same fact without the motion. */}
                           {isEscalated && (
-                            <circle 
-                              cx={cx} 
-                              cy={cy} 
-                              r="16" 
-                              fill="none" 
-                              stroke="#FF9FA5" 
-                              strokeWidth="2" 
-                              className="animate-ping"
+                            <circle
+                              cx={cx}
+                              cy={cy}
+                              r="16"
+                              fill="none"
+                              stroke="var(--danger)"
+                              strokeWidth="2"
                             />
                           )}
    
