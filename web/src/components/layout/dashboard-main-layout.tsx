@@ -319,7 +319,7 @@ export default function DashboardMainLayout({
       {/* LEFT VERTICAL RAIL (Desktop/Tablet) */}
       <aside
         aria-label="Main navigation"
-        className={`hidden md:flex flex-col items-center justify-center fixed left-6 top-1/2 -translate-y-1/2 z-40 rounded-[28px] bg-white/80 dark:bg-card/70 backdrop-blur-xl border border-border/70 shadow-lg transition-all duration-300 ${
+        className={`hidden md:flex flex-col items-center justify-center fixed left-6 top-1/2 -translate-y-1/2 z-40 rounded-[var(--r-card)] bg-white/80 dark:bg-card/70 backdrop-blur-xl border border-border/70 shadow-lg transition-all duration-300 ${
           isElderly
             ? 'w-24 py-10 space-y-8 border-2 border-primary/50'
             : 'w-[72px] py-8 space-y-6'

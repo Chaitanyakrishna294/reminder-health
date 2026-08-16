@@ -98,7 +98,7 @@ export default function InstallPage() {
           alt="Re-MIND-eЯ"
           width={72}
           height={72}
-          className="mx-auto rounded-2xl shadow-md"
+          className="mx-auto rounded-[var(--r-control)] shadow-md"
         />
 
         <div>

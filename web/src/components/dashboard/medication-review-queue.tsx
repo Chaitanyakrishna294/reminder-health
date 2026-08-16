@@ -170,7 +170,7 @@ export default function MedicationReviewQueue({
             return (
               <div
                 key={event.id}
-                className="py-4 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all hover:bg-muted/30 -mx-6 px-6 rounded-2xl"
+                className="py-4 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all hover:bg-muted/30 -mx-6 px-6 rounded-[var(--r-card)]"
               >
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-full bg-primary/5 text-primary border border-primary/10 flex items-center justify-center shrink-0">
