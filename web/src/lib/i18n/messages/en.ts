@@ -537,6 +537,47 @@ export interface Messages {
     emailAddress: string;
     enterTheCode: string;
   };
+  /** The profile dropdown in the top bar — where the non-tab destinations live. */
+  profileMenu: {
+    signedInAs: string;
+    scheduler: string;
+    emergencyCard: string;
+    signOut: string;
+  };
+  /**
+   * The medications list screen.
+   *
+   * `prevWeek`, `nextWeek` and `clearDay` are NOT here — they already exist in
+   * `planner` and mean the same thing on both screens. One key per idea; a second
+   * copy is a second thing to keep in step across seven languages.
+   */
+  meds: {
+    openPlanner: string;
+    addMedication: string;
+    searchPlaceholder: string;
+    searchAria: string;
+    clearSearch: string;
+    searchingDirectory: string;
+    /** Catalog status, shown after a brand name. Lowercase, prefixed by " · " in code. */
+    discontinued: string;
+    filterMeds: string;
+    addStock: string;
+  };
+  /** Care-circle requests, both directions. */
+  requests: {
+    confirmDecline: string;
+    confirmWithdraw: string;
+    loading: string;
+    title: string;
+    toSupportYou: string;
+    noPending: string;
+    confirmShare: string;
+    decline: string;
+    youveSent: string;
+    noSent: string;
+    pending: string;
+    withdraw: string;
+  };
   greeting: {
     morning: string;
     afternoon: string;
@@ -971,6 +1012,37 @@ const en: Messages = {
     namePlaceholder: 'What should we call you?',
     emailAddress: 'Email address',
     enterTheCode: 'Enter the code',
+  },
+  profileMenu: {
+    signedInAs: 'Signed in as',
+    scheduler: 'Schedule planner',
+    emergencyCard: 'Emergency card',
+    signOut: 'Sign out',
+  },
+  meds: {
+    openPlanner: 'Open the schedule planner',
+    addMedication: 'Add a medicine',
+    searchPlaceholder: 'Search medicines',
+    searchAria: 'Search your medicines or the medicine directory',
+    clearSearch: 'Clear the search',
+    searchingDirectory: 'Searching the medicine directory…',
+    discontinued: 'discontinued',
+    filterMeds: 'Filter medicines',
+    addStock: 'Add stock',
+  },
+  requests: {
+    confirmDecline: 'Decline this request?',
+    confirmWithdraw: 'Withdraw this request? They will no longer see it.',
+    loading: 'Loading requests…',
+    title: 'Care circle requests',
+    toSupportYou: 'People asking to support you',
+    noPending: 'No requests waiting',
+    confirmShare: 'Accept and share',
+    decline: 'Decline',
+    youveSent: 'Requests you have sent',
+    noSent: 'You have not sent any requests',
+    pending: 'Waiting',
+    withdraw: 'Withdraw',
   },
   greeting: {
     morning: 'Good morning',
