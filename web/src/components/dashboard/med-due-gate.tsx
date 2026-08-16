@@ -150,24 +150,35 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
   const [error, setError] = useState<string | null>(null);
   const [small, setSmall] = useState(false);
   /**
-   * SHORT VIEWPORT — the gate's budget is VERTICAL, and nothing here was
-   * measuring it.
+   * FIT LEVEL — 0 roomy, 1 compact, 2 tight. Chosen by MEASURING, never guessed.
    *
-   * `small` below tests WIDTH, which says nothing about whether the question and
-   * its three answers fit on one screen. So a 412x915 phone took the LARGER ring
-   * (width ≥ 420) and overflowed, while a 375x812 one squeaked by; add browser
-   * chrome, a two-line drug name or the view toggle and it scrolled either way.
-   * The container is `overflow-y-auto`, so it did scroll — silently, with no
-   * affordance, which reads as the screen being stuck rather than scrollable.
+   * Two attempts got this wrong before, both by picking a number:
+   *
+   * 1. `small` (below) tests WIDTH, which says nothing about whether the question
+   *    and its three answers fit. A 412x915 phone took the LARGER ring for being
+   *    wide, then overflowed.
+   * 2. Replacing it with `innerHeight < 760` failed on the actual device, because
+   *    a modern Android webview is ~830-900 CSS px tall — the condition was simply
+   *    false and the screen never changed.
+   *
+   * There is no threshold worth guessing here. The content's height depends on the
+   * drug name's length, the LANGUAGE (the same sentence in Tamil or Hindi sets
+   * taller than in English), the queue's size, whether the view toggle is present,
+   * and the user's own font scaling. So this measures the rendered column against
+   * the viewport and steps down until it fits.
+   *
+   * It only ever steps DOWN within a viewport, and resets to 0 when the viewport
+   * changes, so it converges instead of oscillating between two levels.
    *
    * A gate you have to scroll to answer has already failed at the only thing it
-   * does (see the note on the layout below, which fixed the same failure from the
-   * other direction). This measures the axis that actually constrains it.
+   * does. The container is `overflow-y-auto`, so it did scroll — silently, with
+   * no affordance, which is why it read as stuck rather than scrollable.
    *
-   * NON-ELDERLY ONLY. Elderly owns its own scale and is excluded from the
-   * redesign; every use of `compact` below sits behind `!isElderly`.
+   * NON-ELDERLY ONLY. Elderly owns its scale and is excluded from the redesign, so
+   * it is pinned at level 0 and every value below is guarded.
    */
-  const [compact, setCompact] = useState(false);
+  const [level, setLevel] = useState(0);
+  const contentRef = useRef<HTMLDivElement>(null);
   // Session-local: every gate appearance starts back at one-by-one (safety default).
   /**
    * ALL-AT-ONCE IS THE DEFAULT, except in elderly.
@@ -196,24 +207,26 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
   // unmount the gate before the message paints, indistinguishable from a save.
   const [permanentError, setPermanentError] = useState<{ id: number; message: string } | null>(null);
 
+  /** Bumped on any viewport change, to restart the fit search from roomy. */
+  const [viewportKey, setViewportKey] = useState(0);
+
   useEffect(() => {
     const f = () => {
       setSmall(window.innerWidth < 420);
-      // 760 is the measured threshold: below it the one-by-one view at its full
-      // spacing exceeds the viewport once the drug name takes two lines, which
-      // long Indian brand names routinely do.
-      setCompact(window.innerHeight < 760);
+      // Re-measure from the top: a phone turned sideways loses half its height in
+      // one frame, and a level chosen for the tall orientation is wrong for it.
+      setLevel(0);
+      setViewportKey((k) => k + 1);
     };
     f();
     window.addEventListener('resize', f);
-    // A phone turned sideways loses ~half its height in one frame; without this
-    // the gate keeps the tall layout and scrolls again.
     window.addEventListener('orientationchange', f);
     return () => {
       window.removeEventListener('resize', f);
       window.removeEventListener('orientationchange', f);
     };
   }, []);
+
 
   // Modal focus management: the gate covers the dashboard, but without this a
   // keyboard/screen-reader user could Tab into the dashboard's own Take/Skip
@@ -289,7 +302,51 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
   }, [queue]);
 
   const remaining = queue.length;
+
+  /**
+   * THE FIT SEARCH. After every paint that could change the column's height — a
+   * new level, a different dose, a view change, a viewport change — measure the
+   * rendered content against the space it has and step down one level if it
+   * overflows. Two levels down is the floor; past that the screen would be
+   * shrinking type on a medication confirmation, which is the wrong trade.
+   *
+   * Sits ABOVE the `if (!event)` return on purpose — a hook after a conditional
+   * return is a hook that sometimes does not run.
+   *
+   * `useLayoutEffect` is the textbook choice for measure-then-adjust, but it warns
+   * during SSR and this mounts on a server-rendered route. One frame at a too-tall
+   * level is invisible next to a gate that never fits at all.
+   */
+  useEffect(() => {
+    if (isElderly) return;
+    const outer = containerRef.current;
+    const inner = contentRef.current;
+    if (!outer || !inner) return;
+    // A couple of px of slack: sub-pixel rounding is not a reason to shrink the
+    // one screen that has to stay readable.
+    if (inner.scrollHeight > outer.clientHeight + 2 && level < 2) {
+      const id = requestAnimationFrame(() => setLevel((l) => Math.min(2, l + 1)));
+      return () => cancelAnimationFrame(id);
+    }
+  }, [level, viewportKey, isElderly, event?.id, remaining, view, flashIds.length]);
+
   if (!event) return null;
+
+  /**
+   * The three fits, as a TABLE — so the whole difference between roomy and tight
+   * is readable in one place rather than scattered across a dozen ternaries.
+   * Every value stays on the 8pt grid (spec §5); nothing here is a new token, a
+   * new type size or a new radius, so the design freeze is untouched.
+   *
+   * Level 2 is the only one that shrinks a button, and only to `py-3 text-base`,
+   * which still clears the 44px target with room. The drug name never shrinks.
+   */
+  const fit = isElderly ? 0 : level;
+  const FIT = [
+    { pad: 'pt-12 pb-6', gap: 'mt-5', tray: 'mt-8', emg: 'mt-6', btn: 'py-4 text-lg', ring: small ? 132 : 148, ringList: small ? 96 : 108 },
+    { pad: 'pt-6 pb-4',  gap: 'mt-3', tray: 'mt-5', emg: 'mt-4', btn: 'py-4 text-lg', ring: small ? 104 : 116, ringList: small ? 84 : 92 },
+    { pad: 'pt-4 pb-3',  gap: 'mt-2', tray: 'mt-4', emg: 'mt-3', btn: 'py-3 text-base', ring: small ? 80 : 88, ringList: small ? 68 : 74 },
+  ] as const;
 
   const missedMode = isAttentionStatus(event.reminder_status);
   const med = event.medications;
@@ -413,9 +470,8 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
           can centre inside it. What changed is that the content is now centred as
           one block instead of being pushed apart. */}
       <div
-        className={`relative flex-1 flex flex-col items-center justify-center px-6 text-center ${
-          !isElderly && compact ? 'pt-6 pb-4' : 'pt-12 pb-6'
-        }`}
+        ref={contentRef}
+        className={`relative flex-1 flex flex-col items-center justify-center px-6 text-center ${FIT[fit].pad}`}
       >
       {remaining > 1 && (
         <span className="absolute top-6 text-xs font-mono font-bold text-muted-foreground tracking-widest">
@@ -431,10 +487,10 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
         // the redesign and its ring is sized for its own arm's-length scale.
         const ringSize =
           effectiveView === 'list'
-            ? (compact ? 84 : small ? 96 : 108)
+            ? FIT[fit].ringList
             : isElderly
               ? (small ? 152 : 172)
-              : compact ? (small ? 104 : 116) : (small ? 132 : 148);
+              : FIT[fit].ring;
         const mood =
           missedMode || minutesLate(event.scheduled_for) >= 30 ? 'concerned' : 'reminder';
         return (
@@ -456,7 +512,7 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
         <div
           role="tablist"
           aria-label="Question view"
-          className={`${!isElderly && compact ? 'mt-3' : 'mt-5'} inline-flex rounded-full border border-border bg-card p-1 shadow-sm`}
+          className={`${FIT[fit].gap} inline-flex rounded-full border border-border bg-card p-1 shadow-sm`}
         >
           <button
             role="tab"
@@ -500,7 +556,7 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
           {/* Lateness as a chip beside the ring, not a sentence. The tint says the
               same thing the arc does, and the figure is spelled out either way. */}
           <span
-            className={`${!isElderly && compact ? 'mt-3' : 'mt-5'} inline-flex items-center gap-1.5 rounded-full font-bold ${
+            className={`${FIT[fit].gap} inline-flex items-center gap-1.5 rounded-full font-bold ${
               missedMode ? 'bg-danger/15 text-danger-strong' : 'bg-warning/15 text-warning-strong'
             } ${isElderly ? 'px-4 py-2 text-base' : 'px-3 py-1.5 text-xs'}`}
           >
@@ -511,7 +567,7 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
           {/* The question is the eyebrow; the DRUG NAME is the headline. The old markup
               split one sentence across two nodes with an icon wedged between them, so it
               rendered as two fragments in two different typefaces. */}
-          <p className={`${!isElderly && compact ? 'mt-3' : 'mt-5'} font-semibold text-muted-foreground ${isElderly ? 'text-lg' : 'text-sm'}`}>
+          <p className={`${FIT[fit].gap} font-semibold text-muted-foreground ${isElderly ? 'text-lg' : 'text-sm'}`}>
             {missedMode ? 'You missed' : 'Did you take'}
           </p>
           {/* Never truncate a drug name on the screen that asks you to confirm it:
@@ -555,7 +611,7 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
               <button
                 onClick={acknowledgeUnsaveable}
                 className={`w-full flex items-center justify-center gap-2 rounded-2xl bg-card text-foreground border border-border font-black hover:bg-muted active:scale-[0.98] transition-all cursor-pointer ${
-                  isElderly ? 'py-5 text-2xl' : 'py-4 text-lg'
+                  isElderly ? 'py-5 text-2xl' : FIT[fit].btn
                 }`}
               >
                 OK
@@ -566,14 +622,14 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
              an inner glass plate inside it — so the answer area reads as a distinct
              object resting on the gate rather than three buttons floating on a wash.
              Radii are concentric: 32px outer, 32-6=26 inner, 16 on the buttons. */
-          <div className={`${!isElderly && compact ? 'mt-5' : 'mt-8'} w-full max-w-sm`}>
+          <div className={`${FIT[fit].tray} w-full max-w-sm`}>
             <div className="rounded-[2rem] p-1.5 bg-foreground/[0.04] dark:bg-white/[0.06] ring-1 ring-foreground/[0.06] dark:ring-white/10">
               <div className="rounded-[calc(2rem-0.375rem)] p-3 space-y-3 bg-card/70 dark:bg-white/[0.05] backdrop-blur-xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.6)] dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08)]">
             <button
               onClick={() => answer(event, 'TAKEN', false)}
               disabled={busyId !== null}
               className={`w-full flex items-center justify-center gap-2 rounded-2xl bg-success text-success-foreground font-black shadow-[0_6px_16px_-6px_var(--success)] hover:bg-success/90 active:scale-[0.98] transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] disabled:opacity-50 cursor-pointer ${
-                isElderly ? 'py-5 text-2xl' : 'py-4 text-lg'
+                isElderly ? 'py-5 text-2xl' : FIT[fit].btn
               }`}
             >
               <Check className={isElderly ? 'w-7 h-7' : 'w-5 h-5'} />
@@ -583,7 +639,7 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
               onClick={() => answer(event, 'SKIP', false)}
               disabled={busyId !== null}
               className={`w-full flex items-center justify-center gap-2 rounded-2xl bg-card text-foreground border border-border font-black hover:bg-muted active:scale-[0.98] transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] disabled:opacity-50 cursor-pointer ${
-                isElderly ? 'py-5 text-2xl' : 'py-4 text-lg'
+                isElderly ? 'py-5 text-2xl' : FIT[fit].btn
               }`}
             >
               <X className={isElderly ? 'w-7 h-7' : 'w-5 h-5'} />
@@ -706,7 +762,7 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
       {/* Safety carve-out: the emergency card is always reachable, even mid-gate. */}
       <button
         onClick={() => router.push('/emergency')}
-        className={`${!isElderly && compact ? 'mt-4' : 'mt-6'} inline-flex items-center justify-center gap-1.5 min-h-11 px-3 text-xs font-bold text-danger-strong hover:text-danger transition-colors cursor-pointer`}
+        className={`${FIT[fit].emg} inline-flex items-center justify-center gap-1.5 min-h-11 px-3 text-xs font-bold text-danger-strong hover:text-danger transition-colors cursor-pointer`}
       >
         <Siren className="w-3.5 h-3.5" /> Emergency card
       </button>
