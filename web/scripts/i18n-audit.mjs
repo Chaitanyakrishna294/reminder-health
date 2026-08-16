@@ -70,6 +70,15 @@ function walk(dir, out = []) {
   return out;
 }
 
+/**
+ * The product's own name, in the fragments the markup splits it into.
+ *
+ * `Re-MIND-eЯ` is styled per-syllable in a few headers, so the raw pattern sees
+ * "Re", "MIND" and "eЯ" as three separate strings. A brand is not translated in
+ * any language, and counting its pieces as three outstanding items is noise.
+ */
+const BRAND_FRAGMENTS = new Set(['Re', 'MIND', 'eЯ', 'Re-MIND-eЯ', 'MIND-eЯ', 'Re-MIND']);
+
 /** A string worth translating: has a letter, and is more than a lone symbol. */
 function isCopy(s) {
   const t = s.trim();
@@ -77,6 +86,12 @@ function isCopy(s) {
   if (!/[A-Za-z]/.test(t)) return false;            // numbers/punctuation only
   if (/^[a-z0-9-]+$/.test(t) && !t.includes(' ')) return false; // slug/ident
   if (/^(https?:|\/|#|@)/.test(t)) return false;    // urls, paths, anchors
+  if (BRAND_FRAGMENTS.has(t)) return false;
+  // DEVELOPER INVARIANTS, not user copy. `throw new Error('useTheme must be used
+  // within a ThemeProvider')` fires when a programmer wires a component wrong; it
+  // reaches a console and a Sentry event, never a patient. Translating it would
+  // make the one audience who reads it — us — worse off.
+  if (/must be used within|is not (defined|available)|^no session$/i.test(t)) return false;
   return true;
 }
 

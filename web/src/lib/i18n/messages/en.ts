@@ -491,6 +491,51 @@ export interface Messages {
     password: string;
     passwordPlaceholder: string;
     alreadyHaveAccount: string;
+    // -- sign in --
+    createAccount: string;
+    newHere: string;
+    loginPasswordPlaceholder: string;
+    errEmailForCode: string;
+    /**
+     * "No account found… Tap {label} below to sign up first."
+     * {label} is `createAccount` — a slot rather than a repeated literal, so the
+     * sentence and the button it points at cannot drift apart in seven languages.
+     */
+    errNoAccount: string;
+    errTooManyEmail: string;
+    // -- forgot / reset password --
+    errEmailForReset: string;
+    errTooManyRequests: string;
+    errCaptchaFailed: string;
+    resetCode: string;
+    // -- set a new password --
+    errPasswordTooShort: string;
+    errPasswordMismatch: string;
+    newPassword: string;
+    newPasswordPlaceholder: string;
+    confirmNewPassword: string;
+    confirmNewPasswordPlaceholder: string;
+    // -- guest → saved account --
+    /**
+     * Login's headline copy. NONE of these were visible to the audit — they live
+     * in ternaries and template literals, which no `>text<` pattern can reach.
+     * Found by reading the file, like the planner's outcome words.
+     */
+    welcomeBack: string;
+    checkYourEmail: string;
+    signInSubtitle: string;
+    /** "We emailed a sign-in code to {email}." — {email} is the user's own address. */
+    emailedCodeTo: string;
+    /** "A fresh code is on its way to {email}." */
+    freshCodeSent: string;
+    /** "That code is invalid or expired. Tap {label} for a fresh one." */
+    errCodeInvalid: string;
+    resendCode: string;
+    errEmailRequired: string;
+    whyThisMatters: string;
+    namePlaceholder: string;
+    emailAddress: string;
+    enterTheCode: string;
   };
   greeting: {
     morning: string;
@@ -898,6 +943,34 @@ const en: Messages = {
     password: 'Password',
     passwordPlaceholder: 'Choose a password',
     alreadyHaveAccount: 'Already have an account?',
+    createAccount: 'Create account',
+    newHere: 'New here?',
+    loginPasswordPlaceholder: 'Your password',
+    errEmailForCode: 'Please enter your email to get a sign-in code.',
+    errNoAccount: 'No account found for that email. Tap {label} below to sign up first.',
+    errTooManyEmail: 'Too many email requests. Please wait a minute, or sign in with your password.',
+    errEmailForReset: 'Enter your email to get a reset code.',
+    errTooManyRequests: 'Too many requests just now. Please wait a minute and try again.',
+    errCaptchaFailed: 'The check did not go through. Please try it again.',
+    resetCode: 'Reset code',
+    errPasswordTooShort: 'Your password must be at least 6 characters.',
+    errPasswordMismatch: 'The two passwords do not match.',
+    newPassword: 'New password',
+    newPasswordPlaceholder: 'At least 6 characters',
+    confirmNewPassword: 'Confirm new password',
+    confirmNewPasswordPlaceholder: 'Type it again',
+    welcomeBack: 'Welcome back',
+    checkYourEmail: 'Check your email',
+    signInSubtitle: 'Sign in to carry on looking after yourself.',
+    emailedCodeTo: 'We emailed a sign-in code to {email}.',
+    freshCodeSent: 'A fresh code is on its way to {email}.',
+    errCodeInvalid: 'That code is invalid or has expired. Tap {label} for a new one.',
+    resendCode: 'Resend code',
+    errEmailRequired: 'Please enter your email address.',
+    whyThisMatters: 'Why this matters',
+    namePlaceholder: 'What should we call you?',
+    emailAddress: 'Email address',
+    enterTheCode: 'Enter the code',
   },
   greeting: {
     morning: 'Good morning',

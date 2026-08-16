@@ -1,5 +1,6 @@
 'use client';
 
+import { useLanguage } from '@/context/language-context';
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -24,6 +25,7 @@ import { Mail, KeyRound, ShieldCheck, Loader2, UserRound } from 'lucide-react';
  * the existing /update-password page.
  */
 export default function SaveAccountForm({ currentName }: { currentName: string }) {
+  const { t } = useLanguage();
   const [fullName, setFullName] = useState(currentName);
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
@@ -39,7 +41,7 @@ export default function SaveAccountForm({ currentName }: { currentName: string }
     e.preventDefault();
     const trimmed = email.trim();
     if (!trimmed) {
-      setError('Please enter your email address.');
+      setError(t.auth.errEmailRequired);
       return;
     }
     setLoading(true);
@@ -75,7 +77,7 @@ export default function SaveAccountForm({ currentName }: { currentName: string }
     e.preventDefault();
     const token = code.trim();
     if (token.length < 6) {
-      setError('Enter the full code from your email.');
+      setError(t.auth.errFullCode);
       return;
     }
     setLoading(true);
@@ -124,7 +126,7 @@ export default function SaveAccountForm({ currentName }: { currentName: string }
           clear it, switch device, or reinstall, and the data is unreachable —
           not deleted, but with no email there is no way to prove it is yours. */}
       <div className="rounded-2xl bg-amber-500/10 ring-1 ring-amber-500/25 px-5 py-4">
-        <p className="text-sm font-semibold text-foreground">Why this matters</p>
+        <p className="text-sm font-semibold text-foreground">{t.auth.whyThisMatters}</p>
         <p className="text-[13px] text-muted-foreground mt-1 leading-relaxed">
           Right now your medicines exist only in this browser&apos;s session. If you clear your
           browser data, switch phones, or reinstall the app, there is no way to prove the account is
@@ -142,7 +144,7 @@ export default function SaveAccountForm({ currentName }: { currentName: string }
         <form onSubmit={handleSendCode} className="space-y-4">
           <div>
             <label htmlFor="save-name" className={labelClass}>
-              Your name <span className="font-normal text-muted-foreground">(optional)</span>
+              Your name <span className="font-normal text-muted-foreground">{t.medForm.optional}</span>
             </label>
             <div className="relative">
               <UserRound
@@ -154,14 +156,14 @@ export default function SaveAccountForm({ currentName }: { currentName: string }
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="What should we call you?"
+                placeholder={t.auth.namePlaceholder}
                 className={`${inputClass} pl-12`}
               />
             </div>
           </div>
 
           <div>
-            <label htmlFor="save-email" className={labelClass}>Email address</label>
+            <label htmlFor="save-email" className={labelClass}>{t.auth.emailAddress}</label>
             <div className="relative">
               <Mail
                 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none"
@@ -173,7 +175,7 @@ export default function SaveAccountForm({ currentName }: { currentName: string }
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                placeholder={t.auth.emailPlaceholder}
                 autoComplete="email"
                 className={`${inputClass} pl-12`}
               />
@@ -195,7 +197,7 @@ export default function SaveAccountForm({ currentName }: { currentName: string }
       ) : (
         <form onSubmit={handleVerify} className="space-y-4">
           <div>
-            <label htmlFor="save-code" className={labelClass}>Enter the code</label>
+            <label htmlFor="save-code" className={labelClass}>{t.auth.enterTheCode}</label>
             <p className="text-xs text-muted-foreground mb-2">
               Sent to <span className="font-semibold text-foreground">{email.trim()}</span>.
             </p>
