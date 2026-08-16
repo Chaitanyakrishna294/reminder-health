@@ -162,7 +162,7 @@ export default function Navbar({ user }: NavbarProps) {
               </button>
 
               {userDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-card rounded-2xl shadow-lg border border-border py-1.5 z-50 overflow-hidden animate-fade-in">
+                <div className="absolute right-0 mt-2 w-56 bg-card rounded-[var(--r-card)] shadow-lg border border-border py-1.5 z-50 overflow-hidden animate-fade-in">
                   <div className="px-4 py-2 border-b border-border">
                     <p className="text-xs text-muted-foreground">Signed in as</p>
                     <p className="text-sm font-semibold text-foreground truncate">{user.email}</p>

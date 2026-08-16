@@ -27,7 +27,7 @@ export default function ReminderSetupGuide() {
   const allDone = done === items.length;
 
   return (
-    <section id="reminder-setup" className="scroll-mt-20 rounded-2xl border border-border bg-card p-4 sm:p-5">
+    <section id="reminder-setup" className="scroll-mt-20 rounded-[var(--r-card)] border border-border bg-card p-4 sm:p-5">
       <div className="flex items-start gap-2.5">
         <ShieldCheck
           className={`mt-0.5 h-5 w-5 shrink-0 ${allDone ? 'text-success' : 'text-warning-strong'}`}

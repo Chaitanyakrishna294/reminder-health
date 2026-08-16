@@ -41,7 +41,7 @@ export default function ReliabilityCheck() {
   return (
     <section
       aria-labelledby="reliability-heading"
-      className="mb-4 rounded-2xl border border-warning/40 bg-warning/10 p-4"
+      className="mb-4 rounded-[var(--r-card)] border border-warning/40 bg-warning/10 p-4"
     >
       <h2
         id="reliability-heading"

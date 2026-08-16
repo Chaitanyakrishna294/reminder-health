@@ -388,7 +388,7 @@ export default function DashboardMainLayout({
               /* Was an aspect-square pill. Squares cannot hold a word, so the tabs
                  now share the dock's width evenly and run icon-over-label. Both
                  densities stay well past the 44px target in each dimension. */
-              className={`flex items-center justify-center rounded-2xl transition-all min-w-0 ${
+              className={`flex items-center justify-center rounded-[var(--r-control)] transition-all min-w-0 ${
                 isElderly
                   ? `h-[84px] flex-1 ${
                       active ? 'bg-primary-strong text-primary-strong-foreground shadow-lg' : 'text-foreground bg-muted/40'
@@ -414,7 +414,7 @@ export default function DashboardMainLayout({
             >
               {/* `relative` so the pending wash positions against this tab and not
                   the dock — without it every tap would flash the whole bar. */}
-              <span className="relative flex flex-col items-center justify-center gap-1 w-full h-full rounded-2xl px-0.5">
+              <span className="relative flex flex-col items-center justify-center gap-1 w-full h-full rounded-[var(--r-control)] px-0.5">
                 <NavPending />
                 <NavIcon icon={item.icon} size={isElderly ? 'w-7 h-7' : 'w-5 h-5'} />
                 {/* aria-label always carries the FULL destination name, labels or
@@ -446,7 +446,7 @@ export default function DashboardMainLayout({
         }`}
       >
         {viewMode === 'PATIENT_MONITOR' && (
-          <div className="sticky top-0 z-50 mb-6 bg-white border border-border rounded-3xl p-4 shadow-md flex flex-col md:flex-row items-center justify-between gap-4 animate-fade-in">
+          <div className="sticky top-0 z-50 mb-6 bg-card rounded-[var(--r-card)] p-4 card-lift flex flex-col md:flex-row items-center justify-between gap-4 animate-fade-in">
             {/* Left section: Badges & Patient Selector */}
             <div className="flex flex-wrap items-center gap-3">
               {hasEscalation ? (
@@ -503,7 +503,7 @@ export default function DashboardMainLayout({
 
               {/* Desktop Call Popover */}
               {showCallPopover && (
-                <div className="absolute right-0 top-12 w-64 bg-white border border-border rounded-2xl p-4 shadow-xl z-50 animate-fade-in space-y-3">
+                <div className="absolute right-0 top-12 w-64 bg-card rounded-[var(--r-card)] card-overlay p-4 shadow-xl z-50 animate-fade-in space-y-3">
                   <h4 className="text-xs font-black text-foreground border-b border-border/40 pb-2">Patient Phone Number</h4>
                   <p className="text-sm font-bold text-foreground font-mono bg-muted p-2 rounded-lg text-center">{patientPhone || 'Not Registered'}</p>
                   {patientPhone && (
