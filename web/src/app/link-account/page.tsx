@@ -92,18 +92,18 @@ export default function LinkAccountPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4 py-12 sm:px-6 lg:px-8 bg-[#f8fafc]">
+    <div className="flex min-h-screen items-center justify-center px-4 py-12 sm:px-6 lg:px-8 board">
       
       {/* Crisp Soft White Card Container */}
-      <div className="w-full max-w-lg bg-white border border-border/80 shadow-sm rounded-3xl p-8 space-y-8">
+      <div className="w-full max-w-lg card-lift p-8 space-y-8">
         
         {/* Header Branding */}
         <div className="text-center space-y-2">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-primary/10 text-primary border border-primary/20">
-            <Bot className="w-3.5 h-3.5" /> Telegram Syncing
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-primary/10 text-primary-strong border border-primary/20">
+            <Bot className="w-3.5 h-3.5" /> Telegram syncing
           </span>
-          <h2 className="text-3xl font-black text-foreground tracking-tight">
-            Connect Your Account
+          <h2 className="title-page text-foreground">
+            Connect your account
           </h2>
           <p className="text-xs text-muted-foreground font-semibold">
             To view reminders and track your progress, let's pair your Telegram bot.
@@ -112,25 +112,27 @@ export default function LinkAccountPage() {
 
         {success ? (
           <div className="space-y-4 text-center py-6">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-success/15 text-success rounded-full shadow-lg border border-success/30 animate-pulse">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-success/15 text-success rounded-full shadow-lg border border-success/30">
               <Check className="w-8 h-8" />
             </div>
             <h3 className="text-xl font-black text-foreground">{t.linkAccount.verificationConfirmed}</h3>
             <p className="text-sm text-muted-foreground font-semibold">
-              Redirecting you to your workspace dashboard...
+              Taking you to your dashboard…
             </p>
           </div>
         ) : (
           <div className="space-y-6">
             
             {error && (
-              <div className="bg-danger/10 text-danger text-xs p-4 rounded-2xl border border-danger/20 font-bold flex items-start gap-2">
+              <div className="bg-danger/10 text-danger text-xs p-4 rounded-[var(--r-card)] border border-danger/20 font-bold flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 shrink-0" /> <span>{error}</span>
               </div>
             )}
 
             {/* Premium 3-Step Flow and QR Container */}
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center border border-border bg-muted/30 p-5 rounded-2xl">
+            {/* A well (§1): it receives content, so it sits below the page
+                rather than being a bordered box. Radius joins the scale (§2). */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center surface-sunk rounded-[var(--r-card)] p-5">
               
               {/* Steps Checklist */}
               <div className="md:col-span-7 space-y-4">
@@ -138,7 +140,7 @@ export default function LinkAccountPage() {
                 
                 <div className="space-y-3">
                   <div className="flex items-start gap-3">
-                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-black flex items-center justify-center">1</span>
+                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary-strong border border-primary/20 text-xs font-black flex items-center justify-center">1</span>
                     <div>
                       <p className="text-xs font-black text-foreground">{t.linkAccount.openTelegramBot}</p>
                       <p className="text-[10px] text-muted-foreground font-medium">{t.linkAccount.openTelegramBotHint}</p>
@@ -146,7 +148,7 @@ export default function LinkAccountPage() {
                   </div>
 
                   <div className="flex items-start gap-3">
-                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-black flex items-center justify-center">2</span>
+                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary-strong border border-primary/20 text-xs font-black flex items-center justify-center">2</span>
                     <div>
                       <p className="text-xs font-black text-foreground">{t.linkAccount.requestPairingCode}</p>
                       <p className="text-[10px] text-muted-foreground font-medium">Send <code className="bg-muted px-1 py-0.5 rounded font-mono font-bold text-[10px]">/linkweb</code> to the bot.</p>
@@ -154,7 +156,7 @@ export default function LinkAccountPage() {
                   </div>
 
                   <div className="flex items-start gap-3">
-                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-black flex items-center justify-center">3</span>
+                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary-strong border border-primary/20 text-xs font-black flex items-center justify-center">3</span>
                     <div>
                       <p className="text-xs font-black text-foreground">{t.linkAccount.enterPairingCode}</p>
                       <p className="text-[10px] text-muted-foreground font-medium">{t.linkAccount.enterPairingCodeHint}</p>
@@ -169,11 +171,18 @@ export default function LinkAccountPage() {
                   href="https://t.me/reminder_health_bot" 
                   target="_blank" 
                   rel="noreferrer"
-                  className="relative group overflow-hidden border border-white/50 dark:border-slate-800/50 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md rounded-2xl p-3 flex flex-col items-center justify-center space-y-2 transition-all hover:scale-105 active:scale-95 shadow-md max-w-[140px] w-full"
+                  className="relative group overflow-hidden border border-white/50 dark:border-slate-800/50 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md rounded-[var(--r-control)] p-3 flex flex-col items-center justify-center space-y-2 transition-all hover:scale-105 active:scale-95 shadow-md max-w-[140px] w-full"
                 >
-                  {/* Scanner moving light line */}
-                  <div className="absolute left-0 right-0 h-0.5 bg-primary/75 animate-bounce shadow-[0_0_6px_#5B8DEF] z-10" style={{ top: '25%' }} />
-                  
+                  {/* The "scanner line" is GONE, not restyled. It was
+                      `animate-bounce` — an infinite idle animation on a screen
+                      someone reads while typing a code — which the calm rule
+                      forbids outright: motion is feedback, never attention.
+                      §6, and CLAUDE.md's standing refusal of an ambient layer.
+
+                      It also carried `shadow-[0_0_6px_#5B8DEF]`, a blue that
+                      exists nowhere in the palette and could not follow the
+                      theme (§10.2). Both left with it. */}
+
                   <div className="w-24 h-24 bg-white rounded-xl p-1 flex items-center justify-center border border-primary/20">
                     <svg viewBox="0 0 100 100" className="w-full h-full text-slate-950">
                       {/* Left Top square */}
@@ -220,7 +229,7 @@ export default function LinkAccountPage() {
                   required
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
-                  className="block w-full px-4 py-3 border border-input rounded-2xl bg-background text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-center font-mono font-black text-xl placeholder-muted-foreground/45 uppercase tracking-widest"
+                  className="block w-full px-4 py-3 border border-input rounded-[var(--r-control)] bg-background text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-center font-mono font-black text-xl placeholder-muted-foreground/45 uppercase tracking-widest"
                   placeholder={t.linkAccount.codePlaceholder}
                   maxLength={11}
                 />
@@ -229,9 +238,9 @@ export default function LinkAccountPage() {
               <button
                 type="submit"
                 disabled={loading || code.trim().length < 11}
-                className="w-full flex justify-center py-3.5 px-4 border border-transparent rounded-2xl shadow-lg text-sm font-black text-primary-strong-foreground bg-primary-strong hover:bg-primary-strong-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 transition-all cursor-pointer active:scale-[0.98]"
+                className="w-full flex justify-center py-3.5 px-4 border border-transparent rounded-[var(--r-control)] shadow-lg text-sm font-black text-primary-strong-foreground bg-primary-strong hover:bg-primary-strong-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 transition-all cursor-pointer active:scale-[0.98]"
               >
-                {loading ? 'Confirming Code...' : 'Synchronize Bot'}
+                {loading ? 'Confirming code…' : 'Connect the bot'}
               </button>
             </form>
 
@@ -245,7 +254,7 @@ export default function LinkAccountPage() {
               type="button"
               onClick={handleSkip}
               disabled={loading}
-              className="w-full flex justify-center py-3.5 px-4 border border-border rounded-2xl shadow-sm text-sm font-black text-foreground bg-muted hover:bg-muted/80 transition-all cursor-pointer active:scale-[0.98]"
+              className="w-full flex justify-center py-3.5 px-4 border border-border rounded-[var(--r-control)] shadow-sm text-sm font-black text-foreground bg-muted hover:bg-muted/80 transition-all cursor-pointer active:scale-[0.98]"
             >
               Skip for Now (Use Web-Only)
             </button>
