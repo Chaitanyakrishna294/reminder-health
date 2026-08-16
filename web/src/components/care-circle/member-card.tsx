@@ -73,7 +73,7 @@ export default function MemberCard({
 
   return (
     <div
-      className={`card-lift flex flex-col gap-3 ${
+      className={`card-lift stagger-in flex flex-col gap-3 ${
         isElderly ? 'p-6' : 'p-5'
       }`}
     >
