@@ -232,7 +232,7 @@ function DoseCard({
   if (narrow) {
     return (
       <div
-        className={'group/card flex flex-col gap-1 rounded-2xl px-2.5 py-2 select-none w-full ' + (med.isSkipped ? 'opacity-60' : '')}
+        className={'group/card flex flex-col gap-1 rounded-[var(--r-control)] px-2.5 py-2 select-none w-full ' + (med.isSkipped ? 'opacity-60' : '')}
         style={{ background: cardBg, boxShadow: CARD_SHADOW }}
       >
         <div className="flex items-center gap-2 min-w-0">
@@ -251,7 +251,7 @@ function DoseCard({
 
   return (
     <div
-      className={'group/card flex items-center gap-2 rounded-2xl px-2.5 py-2 select-none w-full ' + (med.isSkipped ? 'opacity-60' : '')}
+      className={'group/card flex items-center gap-2 rounded-[var(--r-control)] px-2.5 py-2 select-none w-full ' + (med.isSkipped ? 'opacity-60' : '')}
       style={{ background: cardBg, boxShadow: CARD_SHADOW }}
     >
       {dragHandle}
@@ -1159,7 +1159,7 @@ export default function SchedulePlannerPage() {
             <button
               onClick={() => setSkipForToday((s) => !s)}
               className={
-                'w-full flex items-center justify-between px-4 py-3 rounded-2xl border cursor-pointer transition-all ' +
+                'w-full flex items-center justify-between px-4 py-3 rounded-[var(--r-card)] border cursor-pointer transition-all ' +
                 (skipForToday ? 'bg-danger/10 border-danger/40' : 'bg-muted border-border hover:bg-muted/70')
               }
             >
@@ -1178,7 +1178,7 @@ export default function SchedulePlannerPage() {
                   type="time"
                   value={newOverrideTime}
                   onChange={(e) => setNewOverrideTime(e.target.value)}
-                  className="mt-1.5 w-full px-4 py-3 bg-muted border border-border rounded-2xl text-sm font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  className="mt-1.5 w-full px-4 py-3 bg-muted border border-border rounded-[var(--r-control)] text-sm font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
                 />
               </label>
             )}

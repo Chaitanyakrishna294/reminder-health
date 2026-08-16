@@ -167,7 +167,7 @@ export default function ConnectionsClientView({
         <div className="flex items-center gap-3 flex-wrap">
           {/* Mono and wide-tracked: this is a value to read aloud and type, and the
               tracking is what stops O and 0 blurring together on a small screen. */}
-          <code className={`font-mono font-black tracking-[0.2em] bg-muted border border-border rounded-2xl px-4 py-3 ${
+          <code className={`font-mono font-black tracking-[0.2em] bg-muted border border-border rounded-[var(--r-control)] px-4 py-3 ${
             isElderly ? 'text-2xl' : 'text-lg'
           }`}>
             {connectCode || '—'}
@@ -176,7 +176,7 @@ export default function ConnectionsClientView({
             type="button"
             onClick={copyCode}
             disabled={!connectCode}
-            className={`inline-flex items-center gap-2 rounded-2xl border border-border font-bold hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+            className={`inline-flex items-center gap-2 rounded-[var(--r-control)] border border-border font-bold hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
               isElderly ? 'min-h-14 px-5 text-base' : 'min-h-11 px-4 text-xs'
             }`}
           >
@@ -202,14 +202,14 @@ export default function ConnectionsClientView({
             autoCorrect="off"
             spellCheck={false}
             aria-label="Their code"
-            className={`w-full font-mono font-bold tracking-[0.2em] bg-background border border-input rounded-2xl px-4 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring ${
+            className={`w-full font-mono font-bold tracking-[0.2em] bg-background border border-input rounded-[var(--r-control)] px-4 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring ${
               isElderly ? 'min-h-16 text-2xl' : 'min-h-12 text-base'
             }`}
           />
           <button
             type="submit"
             disabled={busy || !codeInput.trim()}
-            className={`w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-primary-strong text-primary-strong-foreground font-black hover:bg-primary-strong-hover active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+            className={`w-full inline-flex items-center justify-center gap-2 rounded-[var(--r-control)] bg-primary-strong text-primary-strong-foreground font-black hover:bg-primary-strong-hover active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
               isElderly ? 'min-h-16 text-xl' : 'min-h-12 text-sm'
             }`}
           >
@@ -232,7 +232,7 @@ export default function ConnectionsClientView({
                 type="button"
                 onClick={sendInvite}
                 disabled={busy}
-                className={`flex-1 inline-flex items-center justify-center gap-2 rounded-2xl bg-primary-strong text-primary-strong-foreground font-black hover:bg-primary-strong-hover active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                className={`flex-1 inline-flex items-center justify-center gap-2 rounded-[var(--r-control)] bg-primary-strong text-primary-strong-foreground font-black hover:bg-primary-strong-hover active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                   isElderly ? 'min-h-16 text-xl' : 'min-h-12 text-sm'
                 }`}
               >
@@ -243,7 +243,7 @@ export default function ConnectionsClientView({
                 type="button"
                 onClick={() => { setPendingInvite(null); setError(null); }}
                 disabled={busy}
-                className={`inline-flex items-center justify-center rounded-2xl border border-border font-bold text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                className={`inline-flex items-center justify-center rounded-[var(--r-control)] border border-border font-bold text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                   isElderly ? 'min-h-16 text-lg' : 'min-h-12 px-5 text-sm'
                 }`}
               >
@@ -272,7 +272,7 @@ export default function ConnectionsClientView({
           isElderly ? 'min-h-[72px]' : 'min-h-[56px]'
         }`}
       >
-        <span aria-hidden className={`shrink-0 rounded-2xl bg-muted text-muted-foreground flex items-center justify-center ${isElderly ? 'w-14 h-14' : 'w-10 h-10'}`}>
+        <span aria-hidden className={`shrink-0 bg-muted text-muted-foreground flex items-center justify-center ${isElderly ? 'rounded-2xl w-14 h-14' : 'rounded-[var(--r-control)] w-10 h-10'}`}>
           <Users className={isElderly ? 'w-7 h-7' : 'w-5 h-5'} />
         </span>
         <span className={`flex-1 font-bold text-foreground ${isElderly ? 'text-xl' : 'text-[15px]'}`}>
