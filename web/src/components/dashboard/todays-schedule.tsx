@@ -297,7 +297,11 @@ export default function TodaysSchedule({
   const getStatusBadge = (status: string) => (
     <Badge
       tone={doseTone(status)}
-      className={status === 'ESCALATED_TO_CG' ? 'animate-pulse' : ''}
+      /* No pulse on an escalated dose (§6). The status colour and the label
+         already say it; a throbbing row on the screen someone opens six times
+         a day is how a signal gets tuned out. Same removal as the escalation
+         markers on Today. */
+      className=""
     >
       {STATUS_ICON[status] ?? <Clock className="w-3 h-3" />}
       {status === 'ESCALATED_TO_CG' ? 'Escalated' : doseLabel(status)}

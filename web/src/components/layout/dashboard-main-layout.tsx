@@ -450,7 +450,10 @@ export default function DashboardMainLayout({
             {/* Left section: Badges & Patient Selector */}
             <div className="flex flex-wrap items-center gap-3">
               {hasEscalation ? (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black bg-danger/10 text-danger border border-danger/25 animate-pulse uppercase tracking-wider shrink-0">
+                /* No pulse (§6). A caregiver looking at this banner is already
+                   looking at it; the danger tint, the icon and the word carry
+                   the alarm without it throbbing. */
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black bg-danger/10 text-danger-strong border border-danger/25 uppercase tracking-wider shrink-0">
                   <AlertTriangle className="w-4 h-4" /> CRITICAL ALARM
                 </span>
               ) : (

@@ -251,7 +251,10 @@ export default async function PatientConsolePage({ params }: PageProps) {
         </div>
 
         <div className="flex items-center gap-3 bg-muted/60 border border-border px-4 py-3 rounded-2xl">
-          <div className="h-2.5 w-2.5 rounded-full bg-success animate-pulse" />
+          {/* A static dot (§6). It pulsed to say "live", but the line beside it
+              already reads "Active" — the motion was repeating in animation
+              what the words say in words. */}
+          <div className="h-2.5 w-2.5 rounded-full bg-success" />
           <div className="text-xs">
             <p className="text-muted-foreground font-bold">{t.patient.monitoringStatus}</p>
             <p className="text-foreground font-extrabold mt-0.5">{t.patient.active}</p>
