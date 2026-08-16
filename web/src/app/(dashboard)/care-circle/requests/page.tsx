@@ -273,13 +273,13 @@ export default function CareCircleRequestsPage() {
 
       {/* Status Messages */}
       {successMsg && (
-        <div className="bg-success/10 border border-success/30 text-success-strong p-4 rounded-2xl flex items-start gap-2.5 animate-fade-in">
+        <div className="bg-success/10 border border-success/30 text-success-strong p-4 rounded-[var(--r-card)] flex items-start gap-2.5 animate-fade-in">
           <CheckCircle2 className="w-5 h-5 shrink-0 text-success mt-0.5" />
           <p className="font-bold text-xs">{successMsg}</p>
         </div>
       )}
       {errorMsg && (
-        <div className="bg-danger/10 border border-danger/30 text-danger-strong p-4 rounded-2xl flex items-start gap-2.5 animate-fade-in">
+        <div className="bg-danger/10 border border-danger/30 text-danger-strong p-4 rounded-[var(--r-card)] flex items-start gap-2.5 animate-fade-in">
           <XCircle className="w-5 h-5 shrink-0 text-danger mt-0.5" />
           <p className="font-bold text-xs">{errorMsg}</p>
         </div>
@@ -312,7 +312,7 @@ export default function CareCircleRequestsPage() {
               const isProcessing = processing === request.id;
 
               return (
-                <div key={request.id} className="border border-primary/15 rounded-2xl overflow-hidden">
+                <div key={request.id} className="border border-primary/15 rounded-[var(--r-card)] overflow-hidden">
                   {/* Request Header */}
                   <div className="bg-primary/5 p-4 space-y-3">
                     <div className="flex items-start justify-between">
@@ -411,7 +411,7 @@ export default function CareCircleRequestsPage() {
               const isProcessing = processing === request.id;
 
               return (
-                <div key={request.id} className="border border-border rounded-2xl p-4 flex items-center justify-between gap-4">
+                <div key={request.id} className="border border-border rounded-[var(--r-card)] p-4 flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-9 h-9 rounded-full bg-muted text-muted-foreground flex items-center justify-center font-bold text-xs border border-border shrink-0">
                       {request.patient_name.substring(0, 2).toUpperCase()}

@@ -500,18 +500,18 @@ export default function SharedTrustCenter() {
 
       {/* Success/Error Alerts */}
       {successMsg && (
-        <div className="p-4 bg-success/10 border border-success/20 text-success text-xs font-bold rounded-2xl flex items-center gap-2">
+        <div className="p-4 bg-success/10 border border-success/20 text-success text-xs font-bold rounded-[var(--r-card)] flex items-center gap-2">
           <CheckCircle className="w-4 h-4" /> {successMsg}
         </div>
       )}
       {errorMsg && (
-        <div className="p-4 bg-danger/10 border border-danger/20 text-danger text-xs font-bold rounded-2xl flex items-center gap-2">
+        <div className="p-4 bg-danger/10 border border-danger/20 text-danger text-xs font-bold rounded-[var(--r-card)] flex items-center gap-2">
           <ShieldAlert className="w-4 h-4" /> {errorMsg}
         </div>
       )}
 
       {/* Patient Reassurance Banner */}
-      <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 flex items-start gap-3 text-primary">
+      <div className="bg-primary/5 border border-primary/20 rounded-[var(--r-card)] p-4 flex items-start gap-3 text-primary-strong">
         <Heart className="w-5 h-5 text-primary shrink-0 mt-0.5" />
         <div className="text-xs">
           <p className="font-black text-foreground flex items-center gap-1.5 text-sm">
