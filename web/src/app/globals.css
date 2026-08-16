@@ -226,6 +226,23 @@
   --danger: #D45A50;
   --danger-foreground: #ffffff;
 
+  /* SECONDARY COPY ON A DARK GROUND. --muted-foreground was defined only in
+     :root, so the dark theme inherited the LIGHT value (#556274) and every piece
+     of secondary text in the app measured 2.74:1 on --surface and 3.15:1 on the
+     board — far under the 4.5:1 floor, on the token whose own comment says it
+     "carries most of the app's secondary copy".
+
+     It was already wrong on the old navy palette and got worse when the ground
+     went near-black, which is the honest version: darkening the ground exposed it
+     rather than caused it. Found by COMPUTING the ratios rather than looking,
+     which is the only way a mid-grey-on-dark failure gets caught — it looks
+     plausible right up until someone tries to read it.
+
+     #98A3C0: 6.74:1 on a card, 7.75:1 on the board, 6.91:1 on the hero gradient.
+     A cool grey in the same family as --foreground #EAF0FF, so it still reads as
+     secondary rather than as a second ink. */
+  --muted-foreground: #98A3C0;
+
   /* The board on navy. Shadows do almost nothing on a dark ground, so the
      separation becomes a lightness step and a hairline ring instead — the same
      system, re-derived rather than re-decided. Fully applied in stage 2. */
