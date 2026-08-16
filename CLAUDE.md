@@ -885,6 +885,41 @@ than letting someone discover it at 3am.
   resource qualifiers (`values-hi/`) pick up the *device* locale, which is NOT necessarily the
   language chosen in-app; the bridged value is what makes the two agree.
 
+## TWO SESSIONS DEPLOYING = SILENT OVERWRITES, AND IT LOOKS LIKE A BROKEN FIX
+
+Paid for 2026-08-16. A fix was deployed to production, verified, and reported
+done; six minutes later **another chat's `--prod` deploy replaced it** with that
+session's working tree, which did not contain the fix. The symptom on the device
+was "no change" — three times in a row — which reads as the fix being wrong and
+sent the debugging in entirely the wrong direction.
+
+- **`vercel ls` is the check.** If the newest Production deployment is not the one
+  you just created, yours has been overwritten. Do this BEFORE re-diagnosing a fix
+  that "did not work" — it is cheap and it rules out the most misleading cause.
+- Confusing detail to expect: **older commits survive the overwrite** (the other
+  tree had them from an earlier pull) while the newest fix vanishes, so the app
+  looks partially updated, which argues *against* a stale build.
+- Only one session should hold the deploy at a time.
+
+## SEE THE SCREEN BEFORE FIXING IT — BUILD A HARNESS FOR AUTHED SURFACES
+
+Same day, same bug, and this is the one that cost the most: three fixes shipped to
+the dose gate without the screen ever being rendered, because the gate only
+appears behind auth with a dose outstanding. All three reasoned from source — a
+guessed width breakpoint, a guessed height breakpoint, then a diagnosis that could
+not be completed. All three were wrong or invisible.
+
+**A temporary route rendering the real component with fabricated props takes about
+five minutes** (`app/<name>/page.tsx`, `'use client'`, mount the component inside a
+copy of its real wrapper, delete it after). Every provider it needs — theme, UI
+mode, density, language — is in the ROOT layout, so a scratch route anywhere gets
+them. That harness answered in one run what three rounds of reading could not, and
+`getBoundingClientRect()` against `window.innerHeight` is what made the real cause
+undeniable.
+
+**Delete it before deploying** — Vercel ships the working tree, so a diagnostic
+route left in place ships to production.
+
 ## `position: fixed` IS NOT VIEWPORT-RELATIVE IF ANY ANCESTOR HAS A TRANSFORM
 
 **Full-screen overlays go through `createPortal` into `document.body`. Always.**
