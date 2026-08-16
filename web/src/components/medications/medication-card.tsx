@@ -128,6 +128,22 @@ export default function MedicationCard({
             <span className="sr-only">{formLabel}</span>
           </div>
 
+          {/* HOW MANY ARE LEFT — top-right corner, opposite the dose-form tile.
+              It sits in the header rather than down in the chip strip because it is
+              the question this card gets asked most: scanning a column of cards to
+              decide what to reorder should be one vertical glance down the right
+              edge, not a hunt through a row of chips that also holds priority and
+              paused. It used to render at the same 11px as those chips, which made
+              "3 left" and "30 left" cost the same effort to tell apart.
+
+              The NUMBER is what grew; the unit stays small and quiet underneath.
+              That contrast is the whole effect — sizing both up would just be a
+              bigger chip in a different place.
+
+              Colour semantics unchanged: low stock keeps the warning ink AND the
+              Package icon, because colour alone is never a status (project-a11y).
+              `shrink-0` + `tabular-nums` keep the name's truncation and the digits
+              from fighting each other as the count changes. */}
           <div className="flex-1 min-w-0">
             <h3
               className={`font-black tracking-[-0.01em] text-foreground ${
@@ -190,6 +206,67 @@ export default function MedicationCard({
               </div>
             )}
           </div>
+
+          {/* HOW MANY ARE LEFT — the top-right corner of the card, opposite the
+              dose-form tile.
+
+              It lives in the header rather than down in the status row because it
+              is the question this card gets asked most, and scanning a column of
+              cards to decide what needs reordering should be one glance down the
+              right edge — not a hunt through a chip strip that also carries
+              priority and paused. It used to render at the same 11px as those
+              chips, which made "3 left" and "30 left" cost the same effort to tell
+              apart on the one screen built for that decision.
+
+              The NUMBER is what grew; the unit stays small and quiet beneath it.
+              That contrast is the effect — sizing both up would just be a bigger
+              chip in a new place.
+
+              LAST IN THE DOM, deliberately. Visually it is top-right, but a screen
+              reader reaches it after the medicine name and schedule, which is the
+              order a person needs: what it is, then when, then how many are left.
+              An earlier draft used `order:-1` to fake the position and would have
+              announced "30 tablets left" before the drug name.
+
+              Colour semantics unchanged: low stock keeps the warning ink AND the
+              Package icon, because colour alone is never a status. */}
+          {stock !== null ? (
+            <div
+              className={`shrink-0 text-right leading-none ${
+                isLowStock ? 'text-warning-strong' : 'text-foreground'
+              }`}
+            >
+              <div className="flex items-center justify-end gap-1">
+                {isLowStock && (
+                  <Package className={isElderly ? 'w-4 h-4' : 'w-3.5 h-3.5'} aria-hidden />
+                )}
+                <span
+                  className={`font-mono font-black tabular-nums tracking-tight ${
+                    isElderly ? 'text-4xl' : 'text-3xl'
+                  }`}
+                >
+                  {stock}
+                </span>
+              </div>
+              <p
+                className={`font-semibold mt-1 ${
+                  isLowStock ? 'text-warning-strong' : 'text-muted-foreground'
+                } ${isElderly ? 'text-sm' : 'text-[11px]'}`}
+              >
+                {unitPhrase(med.unit_type, Number(stock))} left
+              </p>
+            </div>
+          ) : (
+            <p
+              className={`shrink-0 text-right text-muted-foreground font-semibold leading-tight ${
+                isElderly ? 'text-sm' : 'text-[11px]'
+              }`}
+            >
+              Stock not
+              <br />
+              tracked
+            </p>
+          )}
         </div>
 
         {/* STATUS ROW — full width, so it never has to wrap. Every chip pairs a
@@ -204,20 +281,8 @@ export default function MedicationCard({
             <span className={`${chip} bg-muted text-muted-foreground`}>Paused</span>
           )}
 
-          {stock !== null ? (
-            <span
-              className={`${chip} ${
-                isLowStock
-                  ? 'bg-warning/15 text-warning-strong'
-                  : 'bg-muted text-muted-foreground'
-              } tabular-nums`}
-            >
-              {isLowStock && <Package className="w-3 h-3 shrink-0" aria-hidden />}
-              {stock} {unitPhrase(med.unit_type, Number(stock))} left
-            </span>
-          ) : (
-            <span className={`${chip} bg-muted text-muted-foreground`}>Stock not tracked</span>
-          )}
+          {/* Stock is NOT repeated here — it moved to the card's top-right corner
+              above. Two places showing the same count is how they drift apart. */}
         </div>
       </div>
 

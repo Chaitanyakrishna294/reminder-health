@@ -40,6 +40,21 @@ const SCAN_ROOT = join(ROOT, pathArgIdx > -1 ? args[pathArgIdx + 1] : 'src');
 
 /** Directories whose contents are never user-facing copy. */
 const SKIP_DIRS = new Set(['node_modules', '.next', 'lib/i18n']);
+
+/**
+ * Surfaces deliberately EXCLUDED from the translation target, with the reason.
+ *
+ * The count is supposed to mean "work left to do". Anything counted here that
+ * nobody will translate makes the number a lie, and a number people stop trusting
+ * is worse than no number.
+ *
+ * · admin-diagnostics — server-gated behind `getAdminUser()` / ADMIN_EMAILS, which
+ *   is deliberately unset (see the project memory). It is a maintainer's
+ *   instrument panel; no patient can reach it in any language.
+ */
+const EXCLUDED = [
+  { match: 'admin-diagnostics', why: 'maintainer-only, ADMIN_EMAILS-gated' },
+];
 /** Attributes that reach a human. Everything else is a machine string. */
 const UI_ATTRS = ['aria-label', 'placeholder', 'title', 'alt'];
 
@@ -71,16 +86,29 @@ const findings = [];
 // case while working through a surface.
 const targets = statSync(SCAN_ROOT).isDirectory() ? walk(SCAN_ROOT) : [SCAN_ROOT];
 
+const skipped = [];
+
 for (const file of targets) {
   const rel = relative(ROOT, file).replace(/\\/g, '/');
+
+  const excluded = EXCLUDED.find((e) => rel.includes(e.match));
+  if (excluded) { skipped.push(`${rel} — ${excluded.why}`); continue; }
+
   const lines = readFileSync(file, 'utf8').split('\n');
+  // JSX exists only in .tsx. Applying the `>text<` rule to a .ts file matches
+  // TypeScript generics instead — `Promise<void>`, `Record<string, X>` — which is
+  // where 24 phantom "strings" in schedule-bridge.ts came from. Attributes and
+  // toast/confirm copy CAN appear in .ts, so those rules still run below.
+  const isTsx = rel.endsWith('.tsx');
 
   lines.forEach((line, i) => {
     const at = { file: rel, line: i + 1 };
 
     // JSX text between tags, excluding anything that is an expression.
-    for (const m of line.matchAll(/>([^<>{}]{2,120})</g)) {
-      if (isCopy(m[1])) findings.push({ ...at, kind: 'jsx', text: m[1].trim() });
+    if (isTsx) {
+      for (const m of line.matchAll(/>([^<>{}]{2,120})</g)) {
+        if (isCopy(m[1])) findings.push({ ...at, kind: 'jsx', text: m[1].trim() });
+      }
     }
     // User-facing attributes.
     for (const attr of UI_ATTRS) {
@@ -113,6 +141,12 @@ if (DETAIL) {
 console.log('── i18n audit ──────────────────────────────────');
 console.log(`untranslated strings : ${findings.length}`);
 console.log(`files affected       : ${byFile.size}`);
+// Say what was left out. A silent exclusion is how a number quietly stops
+// meaning what everyone thinks it means.
+if (skipped.length) {
+  console.log(`excluded by policy   : ${skipped.length} file(s)`);
+  for (const s of skipped) console.log(`  · ${s}`);
+}
 console.log('\nworst 15 files:');
 for (const [file, n] of ranked.slice(0, 15)) {
   console.log(`  ${String(n).padStart(4)}  ${file}`);
