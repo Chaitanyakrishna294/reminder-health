@@ -16,6 +16,7 @@
 // per-med snoozes would re-gate the user the moment a second medication went low.
 
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useUiMode } from '@/context/ui-mode-context';
@@ -64,6 +65,11 @@ export default function RefillGate({ meds, canEdit, onSnooze }: RefillGateProps)
   // approach (focus on mount, trap Tab within the container, restore focus on
   // unmount) minus its dose-specific one-at-a-time logic, which doesn't apply here.
   const containerRef = useRef<HTMLDivElement>(null);
+  // Portalled for the same reason as MedDueGate — see the long note there. An
+  // ancestor transform makes `fixed inset-0` resolve to that ancestor's box
+  // instead of the viewport, and the dashboard's page wrapper has one.
+  const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
+  useEffect(() => setPortalHost(document.body), []);
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -141,7 +147,9 @@ export default function RefillGate({ meds, canEdit, onSnooze }: RefillGateProps)
   // a missing event).
   if (remaining.length === 0) return null;
 
-  return (
+  if (!portalHost) return null;
+
+  return createPortal(
     <div
       ref={containerRef}
       tabIndex={-1}
@@ -259,6 +267,7 @@ export default function RefillGate({ meds, canEdit, onSnooze }: RefillGateProps)
           <Clock className="w-4 h-4" aria-hidden="true" /> Remind me tomorrow
         </button>
       </div>
-    </div>
+    </div>,
+    portalHost,
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { resolveReminderEvent } from '@/lib/reminder-events';
@@ -179,6 +180,31 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
    */
   const [level, setLevel] = useState(0);
   const contentRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * THE GATE RENDERS INTO document.body, NOT WHERE IT IS WRITTEN.
+   *
+   * `position: fixed` is only relative to the viewport if NO ancestor establishes
+   * a containing block — and a transform, filter, backdrop-filter, perspective or
+   * `contain` on any ancestor does exactly that. The dashboard's `page-enter`
+   * wrapper carries an animated transform and keeps it applied, so measured on a
+   * 764px-tall viewport a `fixed inset-0` child inside it came out **3000px tall**,
+   * i.e. sized to the whole scrollable page.
+   *
+   * Every symptom followed from that one fact: the gate no longer covered the
+   * screen (the header and the nav painted over it), `justify-center` centred the
+   * question in a 3000px box so there were hundreds of blank pixels above and
+   * below it, and the fit search below compared against a 3000px clientHeight,
+   * found no overflow, and never stepped down — which is why the previous two
+   * spacing fixes appeared to do nothing at all.
+   *
+   * A portal to `document.body` puts the gate outside every wrapper, so no styling
+   * choice made in a layout above it can ever resize or re-stack it again. This is
+   * also why the nav (z-40) stopped covering it: the gate's z-[120] finally sits in
+   * the same stacking context as the nav rather than trapped beneath it.
+   */
+  const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
+  useEffect(() => setPortalHost(document.body), []);
   // Session-local: every gate appearance starts back at one-by-one (safety default).
   /**
    * ALL-AT-ONCE IS THE DEFAULT, except in elderly.
@@ -428,7 +454,12 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
     setPermanentError(null);
   };
 
-  return (
+  // One frame with no gate while the host resolves — it mounts on the client
+  // anyway, and a gate that renders in the wrong containing block for a frame is
+  // worse than one that renders a frame later.
+  if (!portalHost) return null;
+
+  return createPortal(
     <div
       ref={containerRef}
       tabIndex={-1}
@@ -767,6 +798,7 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
         <Siren className="w-3.5 h-3.5" /> Emergency card
       </button>
       </div>
-    </div>
+    </div>,
+    portalHost,
   );
 }
