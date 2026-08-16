@@ -993,6 +993,21 @@ never the reverse. That ordering is not ceremony: the spec sat one round out of
 date until 2026-08-16, and a session "following" it would have reverted the four
 elevation steps to three and re-derived dark mode from the light tokens.
 
+**THE DESIGN TRACK IS CLOSED (2026-08-16)** — no further visual work until
+Remi's final art lands. `design/looks-maxx` is merged and its branch deleted.
+This is stronger than the freeze below: the freeze governs *how* a change is
+made, this says there is no design work to make. Bug fixes to shipped surfaces
+are of course still fixes.
+
+Two exceptions were re-confirmed as WON'T-FIX when the track closed, so nobody
+re-opens them as tidying:
+- **`/welcome`'s hardcoded palette stays** (`#0F1C5A`, `#CC3D64`, `#F59FB4`). It
+  is the recorded auth-world exception. Revisit only if Remi's final art forces
+  a palette pass there.
+- **`space-y-3.5` on that screen stays.** It is off the 8pt grid, and the file's
+  "must fit 375x812 without scrolling" warning outranks grid purity — 4px is not
+  worth re-running the scrollHeight check for.
+
 The visual language is **finished and frozen**. Changing any of it needs an
 explicit unfreeze decision from the maintainer, stated as such. A drive-by edit to
 a token, a type size, an elevation step or a motion timing is a defect, not a
