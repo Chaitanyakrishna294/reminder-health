@@ -885,6 +885,36 @@ than letting someone discover it at 3am.
   resource qualifiers (`values-hi/`) pick up the *device* locale, which is NOT necessarily the
   language chosen in-app; the bridged value is what makes the two agree.
 
+## A `'use client'` FILE EXPORTS NO VALUE A SERVER COMPONENT MAY CALL — AND NOTHING CATCHES IT
+
+Paid for 2026-08-16 with a **production outage**: every route under `(auth)` —
+login, register, forgot-password — returned a 500 for as long as it took to
+notice. `mascotSlot()` lived in `brain-mascot.tsx`, which is `'use client'`, and
+`(auth)/layout.tsx` is a **server** component that called it for Remi's greeting:
+
+    Attempted to call mascotSlot() from the server but mascotSlot is on the
+    client. It's not possible to invoke a client function from the server.
+
+- **`next build` passes. `tsc --noEmit` passes. CI passes.** The boundary is
+  enforced at REQUEST time, so nothing in the pipeline says a word — the first
+  thing that knows is a user who cannot sign in. This is the opposite failure
+  mode from most of this repo's landmines, which are loud and immediate.
+- **It looked half-working**, which delayed the diagnosis: `/welcome` sits
+  outside the route group and kept rendering perfectly, so the app appeared to
+  load and only the sign-in step was dead.
+- **Shared data goes in a plain module, not in the component file.** The registry
+  now lives in `components/dashboard/mascot-slots.ts` — no `'use client'`, no
+  React import — and `brain-mascot.tsx` re-exports only the **type**.
+  **Re-exporting the VALUE through the client file puts it straight back behind
+  the boundary**, which is the tempting "compatibility" fix and is the bug again.
+- **Verifying a build is not verifying this.** It takes a running server:
+  `next start` and an actual request to the route. A `web-prod` entry in
+  `.claude/launch.json` (port 3005, gitignored so add it yourself) exists for
+  exactly that — the dev server cannot always be reused, and two Next dev servers
+  fight over one `.next`.
+- Same shape to watch for anywhere else a server component imports from a
+  component file: **importing a type is always fine; importing a value is not.**
+
 ## DESIGN DNA — FROZEN 2026-08-15
 
 **READ THE SPEC BEFORE ANY VISUAL CHANGE — it is the constitution, and this
