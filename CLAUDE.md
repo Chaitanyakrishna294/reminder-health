@@ -885,6 +885,76 @@ than letting someone discover it at 3am.
   resource qualifiers (`values-hi/`) pick up the *device* locale, which is NOT necessarily the
   language chosen in-app; the bridged value is what makes the two agree.
 
+## DESIGN DNA — FROZEN 2026-08-15
+
+The visual language is **finished and frozen**. Changing any of it needs an
+explicit unfreeze decision from the maintainer, stated as such. A drive-by edit to
+a token, a type size, an elevation step or a motion timing is a defect, not a
+tweak — the whole point of a system is that it is not re-decided per screen, and
+this one was re-decided twice before it settled.
+
+**Tokens.** Paper ground · white cards · ink text · **mind pink is THE one
+accent** and only ever on touchable things · slot tints are SURFACES, never text
+without `-ink` · verdict colours are softened on purpose. `--hydration-*` is the
+single scoped exception and belongs to water alone. `--category-*` is folder
+identity, never status.
+
+**Type.** Inter for every sentence and heading; `title-page` for page titles.
+**Mono is for VALUES ONLY** — times, counts, codes, structural labels, the
+wordmark. Never a sentence. That rule was violated app-wide by one CSS selector
+putting mono on `h1`–`h6`, and again on the auth headline, which sits outside the
+`(dashboard)` group and is styled by class rather than tag. Both are fixed; if a
+third turns up, it will be somewhere the tag selector cannot reach.
+
+**Elevation.** Four visibly distinct steps: board → `card-lift` → `card-raised`
+→ `card-overlay`. No borders on cards; a border survives only where it is a
+BOUNDARY (input outlines, dividers, focus rings). Two shadow layers always.
+
+**@layer components is not optional.** Everything this project writes in
+`globals.css` outside a layer is UNLAYERED, and unlayered CSS BEATS Tailwind
+utilities at equal specificity. That silently ate a `bg-primary-strong` on the nav
+pill (which rendered grey for two failed fixes), 37 `shadow-*`, 2 `rounded-*`, and
+would have left the redesigned Vault folder with one square corner and a stray CSS
+tab. **Any new component class goes inside `@layer components`.**
+
+**Dark is hand-tuned, not derived.** Near-black OLED ground; the cards are the
+light, the same figure/ground relationship as day rather than its inverse.
+Separation is a lightness step plus a hairline ring, because shadows barely read
+on dark. **Anything hardcoded in a component slips straight through a token
+re-derivation** — that is how the tumbler glass and the dose-strip pockets stayed
+lit for a white page. Highlights are FRACTIONS OF THE ROOM'S LIGHT: on dark they
+drop hard while shades DEEPEN, which is not a proportional dim.
+
+**Motion is feedback, never attention.** `stagger-in` (40ms, capped at six) ·
+`press-sink` · `page-enter` keyed on pathname · `check-draw` on the SVG path ·
+`numeral-tick` · the nav pill's `translateX`. All ≤400ms, transforms only,
+`prefers-reduced-motion` a REAL branch rather than a shorter duration.
+- **`press-sink` belongs only to elements that rest at an elevation.** It resolves
+  to `lift-1` on `:active`; on a tinted, borderless row that makes it LIFT under
+  the finger. And never on a non-interactive `<div>` — `:active` fires there, so
+  the press effect renders on something that does not respond.
+- **Remi's idle bob is the one sanctioned loop** (with the all-taken
+  celebration). It is a carve-out, not an oversight — but it must keep its
+  reduced-motion branch.
+
+**`motion-design`'s "always include an ambient layer" is a STANDING REFUSAL.**
+Refused four times now: an ambient layer is a looping idle animation, and nothing
+in this app may move for attention.
+
+**Layout.** 8pt spacing · radius 20/14/10 with the concentric rule · 44px targets
+(56–88px elderly) · 4.5:1 contrast · sentence case · zero-blame copy · light
+default.
+
+**Deliberate exceptions, so nobody "fixes" them:** the auth screens keep their own
+radial world (they are not a working surface); the emergency card stays a solid
+danger fill (a stranger reads it on a locked phone); elderly keeps its own scale
+throughout.
+
+**ELDERLY WAS EXCLUDED from the whole redesign.** Where it owns a file it was not
+touched; where markup is shared every change sits inside an `!isElderly` branch.
+The honest check is `git log <base>..HEAD -- <elderly file>`, not a diff — the
+i18n work legitimately edits those files.
+
 ## UI Redesign (planned — not started, do not begin without explicit go-ahead)
 Recorded 2026-08-10. Design-inspired by **"Pillo: Pill Reminder & Alarm"** (Play Store,
 pillo.care) — calm card-based UI, soft colors + one strong accent, a today-timeline of dose
