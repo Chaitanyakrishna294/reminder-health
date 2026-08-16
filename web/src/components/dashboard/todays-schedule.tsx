@@ -14,7 +14,7 @@ import { PremiumToast } from '@/components/ui/premium-toast';
 import { doseTone, doseLabel } from '@/lib/design/semantics';
 import { Badge } from '@/components/ui/badge';
 import DayRail from '@/components/dashboard/day-rail';
-import BrainMascot from '@/components/dashboard/brain-mascot';
+import BrainMascot, { mascotSlot } from '@/components/dashboard/brain-mascot';
 
 export interface ReminderEvent {
   id: number;
@@ -374,7 +374,7 @@ export default function TodaysSchedule({
              like a failed load and starts looking like a quiet day, which is what
              it actually is. */
           <div className="px-6 py-10 flex flex-col items-center text-center gap-5 bg-card/60 rounded-3xl border border-dashed border-border/80">
-            <BrainMascot size={isElderly ? 176 : 144} mood="peaceful" />
+            <BrainMascot {...mascotSlot('emptyState', isElderly)} />
             <p className={`text-muted-foreground font-semibold text-balance ${isElderly ? 'text-lg' : 'text-base'}`}>
               {isPastDay
                 /* Not "nothing scheduled": a past day with no rows means nothing was

@@ -48,7 +48,24 @@ export const MASCOT_SLOTS = {
   dialog: { size: 56, elderlySize: 64, mood: 'happy' as MascotMood },
   /** The guided tour's bubble. */
   guide: { size: 64, elderlySize: 80, mood: 'curious' as MascotMood },
+  /** First launch — the auth shell. The one place Remi greets a stranger. */
+  welcome: { size: 42, elderlySize: 56, mood: 'happy' as MascotMood },
+  /** Every dose answered. The one celebration in the product. */
+  celebration: { size: 120, elderlySize: 148, mood: 'proud' as MascotMood },
 } as const;
+
+export type MascotSlot = keyof typeof MASCOT_SLOTS;
+
+/**
+ * Slot props for a call site. Use this rather than typing a size and a mood:
+ * the registry exists so mascot placement is a DECISION MADE IN ONE PLACE
+ * (CLAUDE.md), and every inline `size={144} mood="peaceful"` is that decision
+ * quietly re-made somewhere nobody will look again.
+ */
+export function mascotSlot(slot: MascotSlot, isElderly = false) {
+  const s = MASCOT_SLOTS[slot];
+  return { size: isElderly ? s.elderlySize : s.size, mood: s.mood };
+}
 
 interface BrainMascotProps {
   size?: number;
@@ -63,11 +80,21 @@ export default function BrainMascot({ size = 160, mood = 'reminder', className =
 
   return (
     <span
-      className={`inline-block ${className}`}
-      style={{ width: size, height: size, animation: 'brainBob 4.5s ease-in-out infinite' }}
+      className={`remi-bob inline-block ${className}`}
+      style={{ width: size, height: size }}
       aria-hidden="true"
     >
-      <style>{'@keyframes brainBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}'}</style>
+      {/* REMI'S IDLE IS THE ONE SANCTIONED LOOP. CLAUDE.md names exactly two
+          earned motions — the all-taken celebration and this — so the calm rule
+          is not being bent here; this is the carve-out itself.
+
+          What was missing is the floor underneath it: the bob ran `infinite`
+          with NO prefers-reduced-motion branch, on the one element in the app
+          that never stops moving. For someone with vestibular sensitivity that
+          is the worst possible thing to leave unguarded, and it is exactly what
+          a blanket "nothing idle-animates" reading would have deleted rather
+          than fixed. It now stops for anyone who asks. */}
+      <style>{'@keyframes brainBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}.remi-bob{animation:brainBob 4.5s ease-in-out infinite}@media (prefers-reduced-motion: reduce){.remi-bob{animation:none}}'}</style>
       {imgOk ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img

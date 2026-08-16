@@ -31,7 +31,7 @@ import { useRealtimeNotifications, type Notification } from '@/hooks/use-realtim
 import { useUiMode } from '@/context/ui-mode-context';
 import { dayKeyForDose, timeOfDayForDose } from '@/lib/design/slots';
 import { notificationMeta, notificationTarget, type NotificationMeta } from '@/lib/design/notification-kinds';
-import BrainMascot from '@/components/dashboard/brain-mascot';
+import BrainMascot, { mascotSlot } from '@/components/dashboard/brain-mascot';
 
 /** The page holds real history, not a badge's worth. */
 const PAGE_LIMIT = 200;
@@ -295,7 +295,7 @@ export default function NotificationsClientView({
            not an error, and the calm rule says the mascot never escalates a
            non-event. No call to action: there is nothing here to do. */
         <div className="px-6 py-10 flex flex-col items-center text-center gap-5 bg-card/60 rounded-3xl border border-dashed border-border/80">
-          <BrainMascot size={isElderly ? 176 : 144} mood="peaceful" />
+          <BrainMascot {...mascotSlot('emptyState', isElderly)} />
           <p className={`text-muted-foreground font-semibold text-balance ${isElderly ? 'text-lg' : 'text-base'}`}>
             No notifications — all caught up.
           </p>
