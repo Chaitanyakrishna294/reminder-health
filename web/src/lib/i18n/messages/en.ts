@@ -399,6 +399,42 @@ export interface Messages {
     editPageTitle: string;
     editPageSubtitle: string;
   };
+  /** THE SCHEDULE PLANNER — the week grid, its controls, and the dose-record sheet. */
+  planner: {
+    skipped: string;
+    moved: string;
+    restoreToUsual: string;
+    adjustOrSkip: string;
+    schedule: string;
+    prevWeek: string;
+    nextWeek: string;
+    zoomOut: string;
+    zoomIn: string;
+    resetDay: string;
+    clearDay: string;
+    /** The "you are here" marker on the timeline. Short by design. */
+    now: string;
+    critical: string;
+    priorityKey: string;
+    timeOfDay: string;
+    doseRecord: string;
+    closeDetails: string;
+    outcome: string;
+    scheduledFor: string;
+    answeredAt: string;
+    dose: string;
+    linkedMedicine: string;
+    reason: string;
+    adjustDose: string;
+    newTime: string;
+    /**
+     * Outcome words on a PAST dose — a record of what happened, not a button.
+     * They live in a ternary rather than JSX text, which is why the audit's
+     * pattern cannot see them; found by reading the file.
+     */
+    outcomeTaken: string;
+    outcomeMissed: string;
+  };
   greeting: {
     morning: string;
     afternoon: string;
@@ -729,6 +765,35 @@ const en: Messages = {
     errNoTelegram: 'Could not find that patient’s Telegram account.',
     editPageTitle: 'Edit this medicine',
     editPageSubtitle: 'Change the times, the dose, how important it is, or how many you have.',
+  },
+  planner: {
+    skipped: 'Skipped',
+    moved: 'Moved',
+    restoreToUsual: 'Put back to the usual time',
+    adjustOrSkip: 'Move or skip this dose',
+    schedule: 'Schedule',
+    prevWeek: 'Previous week',
+    nextWeek: 'Next week',
+    zoomOut: 'Zoom out',
+    zoomIn: 'Zoom in',
+    resetDay: 'Undo all changes for this day',
+    clearDay: 'A clear day',
+    now: 'NOW',
+    critical: 'Critical',
+    priorityKey: 'What the colours mean',
+    timeOfDay: 'Time of day',
+    doseRecord: 'Dose record',
+    closeDetails: 'Close details',
+    outcome: 'What happened',
+    scheduledFor: 'Was due at',
+    answeredAt: 'Answered at',
+    dose: 'Dose',
+    linkedMedicine: 'Linked medicine',
+    reason: 'What for',
+    adjustDose: 'Move this dose',
+    newTime: 'New time',
+    outcomeTaken: 'Taken',
+    outcomeMissed: 'Missed',
   },
   greeting: {
     morning: 'Good morning',
