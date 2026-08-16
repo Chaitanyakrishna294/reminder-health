@@ -371,22 +371,12 @@ body:has(nav[data-tour="dash-nav"]) .floating-bottom {
    above a rounded body. Built from a pseudo-element rather than clip-path, because
    clip-path discards border-radius and the corners have to stay round. The tab inherits
    the card's own background so any tint or image carries onto it. */
-.folder-card {
-  position: relative;
-  border-top-left-radius: 0;
-  margin-top: 14px;
-}
-.folder-card::before {
-  content: "";
-  position: absolute;
-  top: -13px;
-  left: 0;
-  width: 46%;
-  height: 14px;
-  background: inherit;
-  border-radius: 10px 10px 0 0;
-  pointer-events: none;
-}
+/* `.folder-card` lived here and drew the folder TAB as a ::before, squared the
+   top-left corner, and pushed the card down 14px to make room for it. All three
+   are the skeuomorphic folder, which stage 2 replaced with a card on the board —
+   and being UNLAYERED it also outranked `card-lift`'s radius, so the new card
+   would have kept one square corner and grown a stray tab above it. Exactly the
+   cascade trap the @layer fix was written for, one file over. */
 
 /* THE INDIC TAIL — one list, appended to every font stack in this file.
    Defined as its own variable because it has to appear in four places (the two
