@@ -64,7 +64,7 @@ export default function UpdatePasswordPage() {
         <div className={`inline-flex items-center justify-center bg-success/10 text-success rounded-full ${isElderly ? 'w-16 h-16' : 'w-12 h-12'}`}>
           <CheckCircle className={isElderly ? 'w-8 h-8' : 'w-6 h-6'} aria-hidden />
         </div>
-        <h1 className={`font-mono font-black tracking-tight text-foreground ${isElderly ? 'text-4xl' : 'text-[2rem]'}`}>
+        <h1 className={`title-page text-foreground ${isElderly ? 'text-4xl' : ''}`}>
           Password updated
         </h1>
         <p className={`text-muted-foreground ${isElderly ? 'text-lg' : 'text-sm'}`}>
@@ -85,7 +85,7 @@ export default function UpdatePasswordPage() {
   return (
     <div className="space-y-5">
       <header>
-        <h1 className={`font-mono font-black tracking-tight text-foreground ${isElderly ? 'text-4xl' : 'text-[2rem]'}`}>
+        <h1 className={`title-page text-foreground ${isElderly ? 'text-4xl' : ''}`}>
           New password{' '}
           <Lock className="inline-block w-7 h-7 text-primary align-[-0.1em]" aria-hidden />
         </h1>

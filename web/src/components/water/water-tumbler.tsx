@@ -161,6 +161,29 @@ export default function WaterTumbler({
           />
         </span>
 
+        {/* GLASS, and every part of it is STATIC. The stillness rule is not
+            relaxed for polish: nothing here moves unless a finger asks. A
+            specular streak and a rim highlight are how a glass reads as glass in
+            a still frame, which is the only frame this widget ever has.
+
+            pointer-events-none on both, so the glass never eats the tap. */}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 left-[14%] w-[10%] rounded-full"
+          style={{
+            background: 'linear-gradient(to bottom, rgba(255,255,255,0.55), rgba(255,255,255,0.12) 45%, rgba(255,255,255,0) 75%)',
+          }}
+        />
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-0 rounded-[26px]"
+          style={{
+            // An inner rim rather than an outer shadow: the tumbler is a hollow
+            // object, so the light belongs on the inside of its wall.
+            boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.6), inset 0 -8px 14px rgba(15,28,90,0.06)',
+          }}
+        />
+
         {/* The count, over the liquid. Kept inside the tumbler so the number and
             the level are one object rather than a figure with a caption. */}
         <span

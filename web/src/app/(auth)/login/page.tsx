@@ -178,7 +178,7 @@ function LoginForm() {
         {/* The heart is INLINE, not a flex sibling — a flex heart detaches and
             floats beside the text block whenever the title wraps to two lines. */}
         <h1
-          className={`font-mono font-black tracking-tight text-foreground ${codeSent ? 'text-center' : ''} ${isElderly ? 'text-4xl' : 'text-[2rem]'}`}
+          className={`title-page text-foreground ${codeSent ? 'text-center' : ''} ${isElderly ? 'text-4xl' : ''}`}
         >
           {codeSent ? t.auth.checkYourEmail : t.auth.welcomeBack}{' '}
           <Heart className="inline-block w-7 h-7 text-primary align-[-0.1em]" aria-hidden />

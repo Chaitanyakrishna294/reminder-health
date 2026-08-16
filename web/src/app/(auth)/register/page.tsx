@@ -136,7 +136,7 @@ export default function RegisterPage() {
               className="w-[88px] h-[88px] object-contain"
             />
           </div>
-          <h1 className={`font-mono font-black tracking-tight text-foreground text-center ${isElderly ? 'text-4xl' : 'text-[2rem]'}`}>
+          <h1 className={`title-page text-foreground text-center ${isElderly ? 'text-4xl' : ''}`}>
             Check your email{' '}
             <Heart className="inline-block w-7 h-7 text-primary align-[-0.1em]" aria-hidden />
           </h1>
@@ -181,7 +181,7 @@ export default function RegisterPage() {
       {/* Headline matches the redesigned login page — the (auth) layout no longer
           renders a big brand hero, so each page owns its own heading. */}
       <header>
-        <h1 className={`font-mono font-black tracking-tight text-foreground ${isElderly ? 'text-4xl' : 'text-[2rem]'}`}>
+        <h1 className={`title-page text-foreground ${isElderly ? 'text-4xl' : ''}`}>
           Create account{' '}
           <Heart className="inline-block w-7 h-7 text-primary align-[-0.1em]" aria-hidden />
         </h1>

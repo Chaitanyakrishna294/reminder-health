@@ -140,7 +140,7 @@ export default function ForgotPasswordPage() {
   return (
     <div className="space-y-5">
       <header>
-        <h1 className={`font-mono font-black tracking-tight text-foreground ${isElderly ? 'text-4xl' : 'text-[2rem]'}`}>
+        <h1 className={`title-page text-foreground ${isElderly ? 'text-4xl' : ''}`}>
           {codeSent ? 'Enter the code' : 'Reset password'}{' '}
           <KeyRound className="inline-block w-7 h-7 text-primary align-[-0.1em]" aria-hidden />
         </h1>
