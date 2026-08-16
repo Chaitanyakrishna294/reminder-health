@@ -9,13 +9,18 @@ Full findings: [`docs/design/conformance-audit.md`](docs/design/conformance-audi
 
 ---
 
-## Not a clean sweep, deliberately
+## Where it landed
 
-Every surface has been read and recorded. The mechanical violation classes are
-closed. **Seven things remain and they are decisions, not undone work** — each
-needs an unfreeze, or would change elderly, or would redesign a surface rather
-than conform it. They are in the audit with the measurements behind them, and
-summarised at the bottom here.
+Every surface read; every violation of a written rule fixed. **Three items remain
+open and none of them is a defect left standing:** a token change the freeze
+reserves to you (D1), a disclosure about a fix that unavoidably reaches elderly
+(D2), and two server components elderly can reach where no branch exists to guard
+(D6).
+
+Four things I first flagged as "too big to decide alone" were over-caution on my
+part and are now closed — two fixed, two PASSed with the reasoning recorded. The
+clearest was the `dose-orbit` 40s rotation: the recorded exception list is CLOSED,
+that animation was not on it, so §6 applied to it like anything else.
 
 ## The three findings worth reading
 
@@ -79,17 +84,22 @@ skipping those screens wholesale would also have been wrong.
    4.29 on the background, 3.97 on the board. Every pink-text fix here improved
    2.68 → 4.29–4.39 and still sits under the floor.
 2. **The `@layer` fix reaches elderly** — a stylesheet cannot be mode-guarded.
-3. **`dose-orbit`'s 40s infinite rotation** — left running; removing it is closer
-   to deleting the concept.
-4. **Loading skeletons use `animate-pulse`** — left as-is; feedback or decoration
-   is your call.
-5. **Care+ and admin-diagnostics run deliberate parallel visual languages** —
-   `luxe.ts` documents Care+ as "intentionally always-dark". Conforming either is
-   a redesign. Care+ does contain one clear §6 breach (`luxeSheen … infinite`).
-6. **`/settings/help` and `/settings/display` are blocked** — server components
-   elderly can reach, so there is no branch to guard.
-7. **`bg-white` on the vault's document viewer** — arguably the content, not a
-   theme colour.
+3. **Care+ and admin-diagnostics run deliberate parallel visual languages** —
+   `luxe.ts` documents Care+ as "intentionally always-dark". Its one clear §6
+   breach (`luxeSheen … infinite`) is fixed; swapping the *palette* for system
+   tokens would be a redesign, and that half stays yours.
+4. **`/settings/help` and `/settings/display` are blocked** — server components
+   elderly can reach, so `useUiMode` is unavailable and there is no branch to
+   guard. Either accept the change (neither page has ever had elderly-specific
+   styling) or extract the card into a client component, which is structural
+   rather than presentational and so out of scope here.
+
+**Closed since the first draft:** the `dose-orbit` rotation and `luxeSheen` are
+removed (§6, and neither was on the closed exception list); loading indicators
+PASS as feedback — verified against the global
+`prefers-reduced-motion` rule at `globals.css:758` that stills every animation in
+the app; and the document viewer's `bg-white` PASSES as content rather than
+chrome.
 
 ## Verification
 

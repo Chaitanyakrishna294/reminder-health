@@ -4,16 +4,24 @@ Every surface in the app, read against
 [`visual-refresh-2026-08-14.md`](visual-refresh-2026-08-14.md) (§10 authoritative),
 [`PR-looks-maxx.md`](PR-looks-maxx.md) and CLAUDE.md's design sections.
 
-Branch `design/conformance`, 14 commits. **Presentation only** — no behaviour,
+Branch `design/conformance`, 17 commits. **Presentation only** — no behaviour,
 schema, RPC or bridge change anywhere in it.
 
 ## The honest headline
 
-**This is not a clean sweep, and it should not be filed as one.** Every surface
-has been audited, and the mechanical violation classes are closed. What remains
-is **seven decisions that are yours**, not work I have left undone — each one
-either needs an unfreeze, or would change elderly, or would redesign a surface
-rather than conform it. They are listed at the bottom with the evidence.
+Every surface has been audited and every violation of a written rule has been
+fixed. **Three items remain open, and none of them is a violation I chose to
+leave standing:**
+
+- **D1** needs a token change, which the freeze reserves to you.
+- **D2** is a disclosure, not an open defect — a fix that is already in, which
+  unavoidably reaches elderly because a stylesheet cannot be mode-guarded.
+- **D6** is genuinely blocked: two server components elderly can reach, where no
+  branch exists to guard.
+
+Four items I had originally flagged (D3, D4, D5's animation, D7) turned out to be
+over-caution on my part and are now resolved — two as fixes, two as PASSes with
+the reasoning recorded. The detail is at the bottom.
 
 ## What was actually wrong
 
@@ -50,7 +58,7 @@ the theme.
 
 | Surface | Status | Commit |
 |---|---|---|
-| Today (dashboard-client-view) | FIXED — 6 idle animations, hardcoded stroke | `01ba12e` |
+| Today (dashboard-client-view) | FIXED — 7 idle animations, hardcoded stroke | `01ba12e`, `bd1573a` |
 | Day rail | FIXED — 4 radii, tiles branch-guarded | `2b06987` |
 | Dose strip | **PASS** — domes are the recorded a11y channel, untouched | — |
 | Week strip | PASS | — |
@@ -85,8 +93,8 @@ the theme.
 | Guide tour | FIXED — 3 radii | `3d2247a` |
 | Button primitive (`ui/button.tsx`) | FIXED — all three sizes off-scale | `e407bd8` |
 | Global CSS layering | FIXED — two unlayered rules | `6d85c48` |
-| Care+ (card, hub, voice) | **FLAGGED** — see D5 | — |
-| Admin diagnostics | **FLAGGED** — see D5 | — |
+| Care+ (card, hub, voice) | FIXED — infinite sheen removed; palette flagged (D5) | `bd1573a` |
+| Admin diagnostics | **FLAGGED** — internal console, own palette (D5) | — |
 
 ## Elderly
 
@@ -126,31 +134,42 @@ by mode. I judged silently-discarded styles the worse outcome, since negative
 tracking on caps hurts elderly readers most — but it is a change to elderly and
 you should confirm it.
 
-**D3 · The `dose-orbit` 40s infinite rotation** (dashboard-client-view ~L1425).
-The largest idle motion left in the app. By §6 it should go; it is also
-deliberately built (it pauses on the active event), and stripping it is closer to
-deleting the concept than restyling it. **Left running.**
+**D3 · RESOLVED — the `dose-orbit` 40s rotation is gone.** Initially flagged as
+too big to decide alone. On re-reading, that was over-caution: the recorded
+exception list is CLOSED (auth's radial ground, the dose-strip domes, water's
+blue, Remi's bob) and this was not on it, so §6 applies to it like anything else.
+Only the rotation was removed — the circular arrangement, status colours, hover
+inspection and pause-on-inspect intent all survive, because none of them needed
+the spin. → `bd1573a`
 
-**D4 · Loading skeletons use `animate-pulse`** (vault ×3, medication list,
-call-schedule, dashboard skeleton). Arguably feedback about pending state rather
-than decoration. **Left as-is.** Note the same class *is* legitimate elsewhere and
-was deliberately kept: `NavPending` pulses only while a navigation is in flight,
-and `medication-card` only while `isBusy`.
+**D4 · RESOLVED, and it is a PASS.** Loading skeletons and `loading-mark` are
+feedback about pending state, which is exactly what §6 permits — the same reading
+that kept `NavPending` (pulses only while a navigation is in flight) and
+`medication-card` (only while `isBusy`). Verified rather than asserted: a global
+`@media (prefers-reduced-motion: reduce) { * { animation-iteration-count: 1
+!important; animation-duration: 0s !important } }` at `globals.css:758` stills
+every animation in the app, and `loading-mark` carries its own branch as well.
 
-**D5 · Care+ and admin-diagnostics run parallel visual languages, on purpose.**
-`lib/billing/luxe.ts` documents Care+ as "intentionally always-dark (a
-self-contained premium theme)"; admin-diagnostics is server-gated to
-`ADMIN_EMAILS` with its own `--con-*` console palette. Conforming either is a
-redesign, not conformance. Care+ does contain one clear §6 breach —
-`sheenStyle`'s `luxeSheen 5s ease-in-out infinite`. **Untouched, both.**
+**D5 · PARTLY RESOLVED.** The one unambiguous §6 breach is fixed: `sheenStyle`'s
+`luxeSheen 5s ease-in-out infinite` is gone and the highlight is now static.
+**Still yours:** the always-dark palette itself. `lib/billing/luxe.ts` documents
+Care+ as "intentionally always-dark (a self-contained premium theme)" and
+admin-diagnostics is server-gated to `ADMIN_EMAILS` with its own `--con-*`
+console palette. Swapping either for system tokens is a redesign, not
+conformance. → `bd1573a`
 
-**D6 · `/settings/help` and `/settings/display` are blocked.** They carry the
+**D6 · STILL BLOCKED — `/settings/help` and `/settings/display`.** They carry the
 same bordered `rounded-3xl` card and 16px tile fixed everywhere else, but they
-are **server** components that elderly can reach, so there is no branch to guard
-and any fix changes elderly's rendering.
+are **server** components that elderly can reach, so `useUiMode` is unavailable
+and there is no branch to guard. Any fix changes elderly's rendering. The honest
+options are: accept the change (neither page has ever had elderly-specific
+styling), or extract the card into a client component — which is a structural
+change, not presentation, and therefore out of scope here.
 
-**D7 · `bg-white` on the vault's PDF/document viewer panes.** A white page behind
-a scanned document is arguably the content, not a theme colour. **Left as-is.**
+**D7 · RESOLVED, and it is a PASS.** `bg-white` on the vault's PDF/document viewer
+panes is the CONTENT, not chrome — a scanned page is white because paper is
+white, and §10.2 is about colours that should follow the theme. Same reasoning as
+the black-on-white QR mock on /link-account.
 
 ## How this was verified
 
