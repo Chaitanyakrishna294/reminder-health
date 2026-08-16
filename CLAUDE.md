@@ -887,6 +887,21 @@ than letting someone discover it at 3am.
 
 ## DESIGN DNA — FROZEN 2026-08-15
 
+**READ THE SPEC BEFORE ANY VISUAL CHANGE — it is the constitution, and this
+section is only its summary.**
+[`docs/design/visual-refresh-2026-08-14.md`](docs/design/visual-refresh-2026-08-14.md)
+is the design language (**§10 is what actually shipped; §1–§9 are the round-one
+proposal kept for its reasoning**), and
+[`docs/design/PR-looks-maxx.md`](docs/design/PR-looks-maxx.md) is what shipped and
+why. Cited elsewhere as `design/…`; there is no top-level `design/` directory, so
+both names mean these two files under `docs/`.
+
+**Every change cites the spec section it satisfies.** If the spec is silent,
+propose the addition to the spec first and get approval — code follows the spec,
+never the reverse. That ordering is not ceremony: the spec sat one round out of
+date until 2026-08-16, and a session "following" it would have reverted the four
+elevation steps to three and re-derived dark mode from the light tokens.
+
 The visual language is **finished and frozen**. Changing any of it needs an
 explicit unfreeze decision from the maintainer, stated as such. A drive-by edit to
 a token, a type size, an elevation step or a motion timing is a defect, not a

@@ -1,5 +1,15 @@
 # Visual refresh — "cards on a board"
 
+**This file lives at `docs/design/visual-refresh-2026-08-14.md`**, alongside
+`docs/design/PR-looks-maxx.md`. They are cited elsewhere as `design/…`; there is no
+top-level `design/` directory, and both paths mean these two files.
+
+> **READ §10 FIRST.** §1–§9 are the round-one proposal, kept because they record
+> *why* each decision was made. **Round two ("looks maxx") changed several of the
+> values below, and §10 is what actually shipped.** Where the two disagree, §10
+> wins — the stale numbers have been corrected in place and marked, so citing §1
+> gives you the shipped value either way.
+
 **Stage 1 proposal.** Branch `design/visual-refresh`. Nothing merges without approval.
 Elderly is **excluded** — approved as-is and untouched by every rule below.
 
@@ -57,10 +67,16 @@ doing work that light should do.
 float. One layer alone reads as a drop shadow from 2009; two read as an object.
 
 ```
---lift-1: 0 1px 2px rgba(15,28,90,.05), 0 2px 8px rgba(15,28,90,.05);   /* resting card */
---lift-2: 0 2px 4px rgba(15,28,90,.06), 0 8px 24px rgba(15,28,90,.08);  /* raised: gate, dialog, focused dose */
---lift-0: none                                                          /* pressed — the card meets the board */
+/* CORRECTED to the shipped values — round two deepened every step and added a
+   fourth. Round one's numbers are in §10.1 with the reason they were replaced. */
+--lift-1: 0 1px 2px rgba(15,28,90,.06), 0 4px 14px rgba(15,28,90,.07);   /* resting card */
+--lift-2: 0 2px 6px rgba(15,28,90,.08), 0 14px 34px rgba(15,28,90,.12);  /* raised: focused dose, sheet */
+--lift-3: 0 4px 10px rgba(15,28,90,.10), 0 24px 56px rgba(15,28,90,.18); /* overlay: dialog, gate, nav pill */
 ```
+
+**Four steps, not three:** board → `card-lift` → `card-raised` → `card-overlay`.
+The press state is `press-sink`, which drops to `--lift-1` rather than to `none`
+— see §10.4 for why it may only go on something that rests at an elevation.
 
 **No hard borders on cards.** A border survives only where it is a *boundary*
 rather than an edge: input outlines, table rules, the focus ring.
@@ -114,7 +130,7 @@ where it lands near it:
 
 | Role | Size / weight | Colour |
 |---|---|---|
-| Page title | 28 / 800 | foreground |
+| Page title (`.title-page`) | 30 / 800, 34 at ≥640px | foreground |
 | Section heading | 20 / 700 | foreground |
 | Card title | 17 / 700 | foreground |
 | Body | 15 / 500 | foreground |
@@ -185,9 +201,13 @@ radii join the three-step scale.
 2. **The reliability banner's heading is mono** because it was styled as a
    structural label. Changing it to Inter is presentation; changing what it says
    is copy, and it was rewritten yesterday, so it is left alone.
-3. **Dark mode is re-derived in stage 2**, from the same elevation system —
+3. ~~**Dark mode is re-derived in stage 2**, from the same elevation system —
    shadows barely read on navy, so the dark board separates by *lightness step*
-   instead. Doing it in stage 1 would double the review surface.
+   instead.~~ **Superseded. Dark is HAND-TUNED, not derived** — see §10.2. A
+   derivation was attempted and produced a navy that read as "light mode with the
+   lights off"; the shipped answer is a near-black OLED ground where the cards are
+   the light source. Leaving the old sentence here would tell a future session to
+   re-derive it, which is precisely the revert §10 exists to prevent.
 
 ## 9. Skills — verdicts (per CLAUDE.md policy)
 
@@ -200,3 +220,159 @@ radii join the three-step scale.
 | `canvas-design` (registry) | **Rejected.** Static poster/PDF art. Not product UI. |
 | `theme-factory` (registry) | **Rejected, and it would have been harmful.** It applies one of ten preset palettes; our tokens are locked and evolve rather than get replaced — the brief says so explicitly. |
 | `frontend-design` (installed) | **Not invoked.** Overlaps `interface-design`, which CLAUDE.md already designates as primary for product UI. Running both invites two directions for one screen. |
+
+---
+
+# 10. ROUND TWO — "looks maxx". What actually shipped.
+
+Round one was correct and **invisible**: the user's verdict on the deployed
+preview was that it read as barely different from the app it replaced. A system
+nobody can see is not doing its job. Round two amplified it and, in doing so,
+changed things §1–§9 had already written down — which is why this section
+exists and why it outranks them.
+
+**Everything here is FROZEN** (CLAUDE.md, "DESIGN DNA — FROZEN 2026-08-15").
+Changing a token, a type size, an elevation step, a radius or a motion timing
+needs an explicit unfreeze from the maintainer, stated as such. Recording what
+shipped is not an unfreeze; this section changes no code.
+
+## 10.1 Elevation — four steps, each one visible
+
+Round one's `--lift-1: … 0 2px 8px …/.05` and `--lift-2: … 0 8px 24px …/.08`
+were replaced because at arm's length they were indistinguishable from each
+other and from a flat card. Shipped values are in §1, corrected. The ladder:
+
+| Step | Class | Used by |
+|---|---|---|
+| ground | *(none — the board)* | the tray itself |
+| card | `.card-lift` | resting cards |
+| raised | `.card-raised` | focused dose, sheets |
+| overlay | `.card-overlay` | dialogs, the dose gate, the nav pill |
+
+Still two layers (contact + diffuse), still no borders on cards. A border
+survives only where it is a **boundary**: input outlines, dividers, focus rings.
+
+**Gradient grounds** were added for the two cards that carry the app —
+`--ground-hero` (due-now dose) and `--ground-hydration` (the tumbler). Both are
+derived from hues already in the palette: the hero is the *same pink* at two
+opacities, so the one-accent rule holds rather than being bent.
+
+## 10.2 Dark is HAND-TUNED, and near-black
+
+Not a derivation, not a proportional dim. Near-black OLED ground; **the cards
+are the light**, which is the same figure/ground relationship as day rather than
+its inverse.
+
+```
+--board: #070B1E;  --surface: #131A3A;  --surface-sunk: #0C1229;
+--lift-1: 0 0 0 1px rgba(255,255,255,.07);
+--lift-2: 0 0 0 1px rgba(255,255,255,.11), 0 10px 30px rgba(0,0,0,.5);
+--lift-3: 0 0 0 1px rgba(255,255,255,.14), 0 20px 52px rgba(0,0,0,.65);
+```
+
+Separation is a **lightness step plus a hairline ring**, because a shadow barely
+reads on a near-black ground.
+
+**Highlights are fractions of the room's light.** On dark they drop hard while
+shades *deepen* — that is the rule, and it is not symmetric. It is why
+`--glass-*` and `--pocket-*` are tokens rather than literals.
+
+**Two lessons, both paid for:**
+
+- **Anything hardcoded in a component slips straight through a token
+  re-derivation.** The tumbler glass and the dose-strip pockets stayed lit for a
+  white page after dark was otherwise correct, because their highlights were
+  literals in JSX.
+- **Contrast is COMPUTED, never eyeballed.** `--muted-foreground` was simply
+  undefined in `.dark`, so it inherited the light value and every piece of
+  secondary text in the app measured **2.74:1**. Nothing looked obviously wrong.
+  Fixed to `#98A3C0` (6.74:1 on a card, 7.75:1 on the board, 6.91:1 on the hero
+  gradient). Compute the ratio whenever a colour changes.
+
+## 10.3 `@layer components` is load-bearing, not housekeeping
+
+Everything this project writes in `globals.css` **outside** a layer is
+UNLAYERED, and **unlayered CSS beats Tailwind utilities at equal specificity**.
+
+This is the single most expensive finding of the whole redesign. An unlayered
+`.card-lift { background: var(--surface) }` silently outranked every `bg-*`
+utility on the same element. It rendered the nav pill **grey through two failed
+fixes** — including an inline style, which is why the mechanism was wrongly
+ruled out — and it also ate 37 `shadow-*`, 2 `rounded-*`, and would have left
+the redesigned Vault folder with one square corner and a stray CSS tab.
+
+**Any new component class goes inside `@layer components`.** No exceptions.
+
+## 10.4 Motion — the full shipped set
+
+Round one's table (§6) still holds for press, lift, stagger and page. Added:
+
+| Move | Detail |
+|---|---|
+| `page-enter` | 250ms `--ease-out`, keyed on pathname so it re-runs per navigation |
+| `numeral-tick` | 260ms, for a hero count changing after a dose is answered |
+| `check-draw` | 340ms stroke-dashoffset on the SVG **path**, 60ms delay |
+| nav pill | `translateX` only — the pill slides between tabs |
+| `press-sink` | `--lift-1` + `scale(.982)`, 120ms `--ease-standard` |
+
+`.stagger-in` caps at six: items 1–6 step 40ms apart, item 7 onward appears
+immediately. Everything is ≤400ms and transform/opacity only.
+
+**`press-sink` belongs ONLY to elements that rest at an elevation.** It resolves
+*to* `--lift-1`, so on a tinted borderless row it makes the row **lift** under
+the finger. And never on a non-interactive `<div>` — `:active` fires there too,
+rendering a press on something that does not respond.
+
+`prefers-reduced-motion` is a **real branch**: transforms and animations off,
+opacity kept. Not a shortened duration.
+
+## 10.5 Type
+
+`.title-page` 30/800 (34 at ≥640px), `.title-section` 20/700, `.numeral-hero`
+44/800 tabular, `.numeral-lg` 28/800 tabular. Tight tracking on the large sizes
+is what separates *composed* from merely *enlarged*.
+
+**Mono is for VALUES ONLY** — times, counts, codes, structural labels, the
+wordmark. Never a sentence. Round one fixed this app-wide and **two violations
+still survived**, both in places a tag selector could not reach: the auth
+headline (outside the `(dashboard)` group, styled by class) and the wizard's
+private `CARD_SHADOW` constant — a second elevation system, close enough to
+`--lift-1` to look right and separate enough to drift. If a third turns up it
+will be somewhere similar.
+
+## 10.6 Deliberate exceptions and standing refusals
+
+These are decisions, not oversights. **Do not "fix" them.**
+
+- **Dose-strip pockets stay skeuomorphic.** The round-two brief asked for them
+  to be flattened into "a cleaner progress language"; **refused after reading
+  them.** The dome is a SECOND INFORMATION CHANNEL — domed means the pill is
+  still in the pocket (upcoming, due now, missed), pressed-in means the pocket
+  was emptied (taken, skipped). That is why "missed" keeps its dome rather than
+  borrowing the emptied look. Flattening would leave colour and a glyph carrying
+  state alone, and this app's audience includes people with age-related colour
+  vision changes. "Skeuomorphic" is not the test; whether the shape is doing a
+  job is. The Vault folders were rightly de-skeuomorphised (a drawn tab carried
+  nothing) and these were rightly not. Any future replacement must carry state
+  in form *before* the domes come out.
+- **Auth keeps its own `--auth-radial` world.** It is the one place in the app
+  that is not a working surface; pulling it onto the tray would make signing in
+  look like a task.
+- **`--hydration-*` is scoped to water** — the only exception to the one-accent
+  rule, so a glass of water is never mistaken for a dose. Use `--hydration-ink`
+  for any text; the raw hue is ~2.6:1 on paper.
+- **The emergency card stays a solid danger fill.** A stranger reads it on a
+  locked phone.
+- **`motion-design`'s "always include an ambient layer" is a STANDING REFUSAL** —
+  four times now. An ambient layer is a looping idle animation, and nothing in
+  this app may move for attention. Remi's idle bob and the all-taken celebration
+  are the two carve-outs, and the bob must keep its reduced-motion branch.
+
+## 10.7 Elderly
+
+Excluded from the entire redesign. Where it owns a file it was not touched by any
+design commit; where markup is shared, every change sits inside an `!isElderly`
+branch.
+
+**The honest check is `git log <base>..HEAD -- <elderly file>`, not a diff** — the
+i18n work legitimately edits those files, so a raw diff no longer proves anything.
