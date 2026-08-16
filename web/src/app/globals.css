@@ -156,6 +156,12 @@
   --ground-hero: linear-gradient(160deg, #FFFFFF 0%, #FFF7F9 58%, #FDEEF2 100%);
   --ground-hydration: linear-gradient(160deg, #FFFFFF 0%, #F4FAFD 58%, #E8F4FA 100%);
 
+  /* Glass, for the water tumbler. Tokenised because a specular highlight is a
+     fraction of the LIGHT in the room, and the room changes. */
+  --glass-sheen: rgba(255, 255, 255, 0.55);
+  --glass-rim: rgba(255, 255, 255, 0.60);
+  --glass-floor: rgba(15, 28, 90, 0.06);
+
   /* ── RADIUS: one scale, three steps (§2) ──
      20 cards and sheets · 14 buttons, inputs, chips · 10 swatches and badges.
      Concentric rule: a child's radius = the parent's minus its inset. Today's
@@ -233,8 +239,18 @@
   --lift-1: 0 0 0 1px rgba(255, 255, 255, 0.07);
   --lift-2: 0 0 0 1px rgba(255, 255, 255, 0.11), 0 10px 30px rgba(0, 0, 0, 0.5);
   --lift-3: 0 0 0 1px rgba(255, 255, 255, 0.14), 0 20px 52px rgba(0, 0, 0, 0.65);
-  --ground-hero: linear-gradient(160deg, #1B2247 0%, #1A1E42 58%, #221B3C 100%);
-  --ground-hydration: linear-gradient(160deg, #12203C 0%, #102138 58%, #0E2236 100%);
+  /* Re-derived for the near-black ground (the first pass was written against the
+     old navy palette and sat too light on it). Each starts a step above
+     --surface #131A3A and leans toward its accent, so the hero still reads as
+     the raised card rather than as a differently-coloured one. */
+  --ground-hero: linear-gradient(160deg, #1B1A3E 0%, #191634 58%, #221630 100%);
+  --ground-hydration: linear-gradient(160deg, #12203A 0%, #0F1D31 58%, #0D1B2A 100%);
+
+  /* A highlight is a fraction of the available light, and on a near-black ground
+     there is very little. 0.55 white here would be a torch, not a sheen. */
+  --glass-sheen: rgba(255, 255, 255, 0.16);
+  --glass-rim: rgba(255, 255, 255, 0.20);
+  --glass-floor: rgba(0, 0, 0, 0.30);
 
   /* Hydration, lifted for the navy ground. Scoped to the water surfaces only —
      see the light-mode block for why this is the one exception to one accent. */

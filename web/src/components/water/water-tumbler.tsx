@@ -171,7 +171,7 @@ export default function WaterTumbler({
           aria-hidden
           className="pointer-events-none absolute inset-y-0 left-[14%] w-[10%] rounded-full"
           style={{
-            background: 'linear-gradient(to bottom, rgba(255,255,255,0.55), rgba(255,255,255,0.12) 45%, rgba(255,255,255,0) 75%)',
+            background: 'linear-gradient(to bottom, var(--glass-sheen), rgba(255,255,255,0.10) 45%, rgba(255,255,255,0) 75%)',
           }}
         />
         <span
@@ -180,7 +180,7 @@ export default function WaterTumbler({
           style={{
             // An inner rim rather than an outer shadow: the tumbler is a hollow
             // object, so the light belongs on the inside of its wall.
-            boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.6), inset 0 -8px 14px rgba(15,28,90,0.06)',
+            boxShadow: 'inset 0 1px 2px var(--glass-rim), inset 0 -8px 14px var(--glass-floor)',
           }}
         />
 
