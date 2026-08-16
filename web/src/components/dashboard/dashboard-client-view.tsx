@@ -884,7 +884,7 @@ export default function DashboardClientView({
           would be offering a channel the app does not use, and ReliabilityCheck
           already owns the permission that DOES matter there. */}
       {layout.webPushBanner && showPushBanner && (
-        <div className="bg-white/10 dark:bg-slate-900/40 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-3xl p-5 shadow-lg relative overflow-hidden flex flex-col sm:flex-row items-center justify-between gap-4 animate-fade-in z-45">
+        <div className="bg-card card-overlay rounded-[var(--r-card)] p-5 shadow-lg relative overflow-hidden flex flex-col sm:flex-row items-center justify-between gap-4 animate-fade-in z-45">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-primary/10 text-foreground flex items-center justify-center shrink-0">
               <Send className="w-5 h-5" />
@@ -916,7 +916,7 @@ export default function DashboardClientView({
 
       {/* iOS PWA Installation Banner */}
       {showIosPwaBanner && (
-        <div className="bg-primary/5 dark:bg-primary/10 border border-primary/20 rounded-3xl p-5 shadow-lg relative overflow-hidden flex flex-col sm:flex-row items-center justify-between gap-4 animate-fade-in z-45">
+        <div className="bg-primary/5 dark:bg-primary/10 border border-primary/20 rounded-[var(--r-card)] p-5 shadow-lg relative overflow-hidden flex flex-col sm:flex-row items-center justify-between gap-4 animate-fade-in z-45">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-primary/10 text-foreground flex items-center justify-center shrink-0">
               <Plus className="w-5 h-5" />
@@ -949,7 +949,7 @@ export default function DashboardClientView({
 
       {/* Onboarding Setup Wizard Banner */}
       {showSetupWizard && (
-        <div className="bg-white border border-border rounded-[28px] p-6 shadow-md relative overflow-hidden animate-fade-in space-y-6">
+        <div className="bg-card rounded-[var(--r-card)] card-lift p-6 relative overflow-hidden animate-fade-in space-y-6">
           <div className="flex justify-between items-start gap-4">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-full bg-primary/10 text-foreground flex items-center justify-center shrink-0">
@@ -977,7 +977,7 @@ export default function DashboardClientView({
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             <Link
               href="/medications"
-              className="flex flex-col items-center text-center p-5 border border-border hover:border-primary/40 bg-card hover:bg-primary/[0.02] rounded-2xl cursor-pointer transition-all hover:scale-[1.02] group"
+              className="flex flex-col items-center text-center p-5 border border-border hover:border-primary/40 bg-card hover:bg-primary/[0.02] rounded-[var(--r-card)] cursor-pointer transition-all hover:scale-[1.02] group"
             >
               <Pill className="w-7 h-7 mb-2 text-primary group-hover:scale-110 transition-transform" />
               <span className="text-xs font-black text-foreground">{t.dashboard.guideMedsTitle}</span>
@@ -986,7 +986,7 @@ export default function DashboardClientView({
 
             <Link
               href="/settings"
-              className="flex flex-col items-center text-center p-5 border border-border hover:border-primary/40 bg-card hover:bg-primary/[0.02] rounded-2xl cursor-pointer transition-all hover:scale-[1.02] group"
+              className="flex flex-col items-center text-center p-5 border border-border hover:border-primary/40 bg-card hover:bg-primary/[0.02] rounded-[var(--r-card)] cursor-pointer transition-all hover:scale-[1.02] group"
             >
               <Users className="w-7 h-7 mb-2 text-primary group-hover:scale-110 transition-transform" />
               <span className="text-xs font-black text-foreground">{t.dashboard.guideInviteTitle}</span>
@@ -995,7 +995,7 @@ export default function DashboardClientView({
 
             <Link
               href="/settings"
-              className="flex flex-col items-center text-center p-5 border border-border hover:border-primary/40 bg-card hover:bg-primary/[0.02] rounded-2xl cursor-pointer transition-all hover:scale-[1.02] group"
+              className="flex flex-col items-center text-center p-5 border border-border hover:border-primary/40 bg-card hover:bg-primary/[0.02] rounded-[var(--r-card)] cursor-pointer transition-all hover:scale-[1.02] group"
             >
               <Stethoscope className="w-7 h-7 mb-2 text-primary group-hover:scale-110 transition-transform" />
               <span className="text-xs font-black text-foreground">{t.dashboard.guideCaregiverTitle}</span>
@@ -1007,7 +1007,7 @@ export default function DashboardClientView({
                 localStorage.setItem('dismissedSetupWizard', 'true');
                 setShowSetupWizard(false);
               }}
-              className="flex flex-col items-center text-center p-5 border border-border hover:border-primary/40 bg-card hover:bg-primary/[0.02] rounded-2xl cursor-pointer transition-all hover:scale-[1.02] group"
+              className="flex flex-col items-center text-center p-5 border border-border hover:border-primary/40 bg-card hover:bg-primary/[0.02] rounded-[var(--r-card)] cursor-pointer transition-all hover:scale-[1.02] group"
             >
               <SkipForward className="w-7 h-7 mb-2 text-muted-foreground group-hover:scale-110 transition-transform" />
               <span className="text-xs font-black text-foreground">{t.dashboard.guideSkipTitle}</span>
@@ -1068,7 +1068,7 @@ export default function DashboardClientView({
 
       {/* Patient Monitor Summary Card */}
       {viewMode === 'PATIENT_MONITOR' && (
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 bg-primary/5 border border-primary/20 rounded-3xl p-6 shadow-sm animate-fade-in">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 bg-primary/5 border border-primary/20 rounded-[var(--r-card)] p-6 shadow-sm animate-fade-in">
           <div className="md:col-span-1 border-b md:border-b-0 md:border-r border-primary/10 pb-3 md:pb-0 md:pr-4 flex flex-col justify-center">
             <Eyebrow as="span" className="text-primary">{t.dashboard.patientName}</Eyebrow>
             <h3 className="text-sm font-black text-foreground mt-0.5">{patientName}</h3>
@@ -1612,7 +1612,7 @@ export default function DashboardClientView({
                   const canRefill = viewMode !== 'PATIENT_MONITOR';
                   const isOpen = refillOpenId === m.id;
                   return (
-                    <div key={idx} className="bg-muted px-4 py-3 rounded-2xl border border-border text-xs font-mono space-y-2">
+                    <div key={idx} className="bg-muted px-4 py-3 rounded-[var(--r-card)] border border-border text-xs font-mono space-y-2">
                       <div className="flex justify-between items-center gap-2">
                         <div className="flex items-center gap-2 min-w-0">
                           <AlertTriangle className="w-3.5 h-3.5 text-warning shrink-0" />
@@ -1660,7 +1660,7 @@ export default function DashboardClientView({
                 })}
               </div>
             ) : (
-              <div className="bg-success/5 border border-success/20 p-4 rounded-2xl text-center text-xs space-y-1">
+              <div className="bg-success/5 border border-success/20 p-4 rounded-[var(--r-card)] text-center text-xs space-y-1">
                 <Package className="w-8 h-8 text-success mx-auto mb-2" />
                 <p className="font-black text-success-strong mt-1">{t.dashboard.inventoryBalanced}</p>
                 <p className="text-[11px] text-muted-foreground font-semibold">{t.dashboard.inventoryBalancedBody}</p>
