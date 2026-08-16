@@ -950,6 +950,23 @@ radial world (they are not a working surface); the emergency card stays a solid
 danger fill (a stranger reads it on a locked phone); elderly keeps its own scale
 throughout.
 
+**AND THE DOSE-STRIP POCKETS STAY SKEUOMORPHIC — this one is a REFUSAL, not an
+oversight.** The looks-maxx brief asked for them to be "redesigned as a cleaner
+progress language", and they were left alone on purpose after reading them.
+
+The dome is not decoration, it is a SECOND INFORMATION CHANNEL: domed means the
+pill is still in the pocket (upcoming, due now, missed), pressed-in means the
+pocket has been emptied (taken, skipped). That mapping is why "missed" keeps its
+dome rather than borrowing the emptied look. Flattening the pockets would leave
+colour and a glyph carrying the state alone — and this app's audience includes
+people with age-related colour vision changes, which is the exact case the
+never-colour-alone rule exists for.
+
+So the Vault folders were rightly de-skeuomorphised (a drawn folder tab carried
+nothing) and these were rightly not (the dome carries state). "Skeuomorphic" is
+not the test; whether the shape is doing a job is. If this is ever revisited, the
+replacement has to carry state in form BEFORE the domes come out.
+
 **ELDERLY WAS EXCLUDED from the whole redesign.** Where it owns a file it was not
 touched; where markup is shared every change sits inside an `!isElderly` branch.
 The honest check is `git log <base>..HEAD -- <elderly file>`, not a diff — the
