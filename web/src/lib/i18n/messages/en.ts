@@ -345,6 +345,60 @@ export interface Messages {
     accessPresets: string;
     granularToggles: string;
   };
+  /**
+   * THE MEDICATION FORM — shared by the add wizard and the edit form, which asked
+   * the same ~24 questions in the same words. One set of keys rather than two
+   * near-identical ones: they were already meant to agree, and two copies is how
+   * they stop agreeing.
+   *
+   * The two files' placeholder examples differed slightly ("e.g., Paracetamol" vs
+   * "e.g., Paracetamol, Atorvastatin"). Unified on the fuller version — a
+   * difference nobody chose is not a difference worth preserving in seven
+   * languages.
+   *
+   * `namePlaceholder` and `strengthPlaceholder` keep their DRUG NAMES and UNIT
+   * SYMBOLS in Latin ("Paracetamol", "500mg", "0.5%"). Only the "e.g." around them
+   * translates. Same reasoning as the allergy placeholders in `profile`: an
+   * example that teaches someone to type a transliterated drug name is worse than
+   * no example, because that spelling matches nothing on the box or in the catalog.
+   */
+  medForm: {
+    name: string;
+    namePlaceholder: string;
+    form: string;
+    formHint: string;
+    selectFrequency: string;
+    whichDays: string;
+    reminderTimes: string;
+    reminderTimesHint: string;
+    strength: string;
+    optional: string;
+    strengthPlaceholder: string;
+    dosageAmount: string;
+    dosageAmountHint: string;
+    trackStock: string;
+    trackStockHint: string;
+    currentStock: string;
+    currentStockPlaceholder: string;
+    lowStockThreshold: string;
+    lowStockThresholdPlaceholder: string;
+    reason: string;
+    reasonHint: string;
+    reasonPlaceholder: string;
+    priorityLevel: string;
+    priorityHint: string;
+    reviewSchedule: string;
+    reviewTimes: string;
+    reviewDosage: string;
+    reviewInventory: string;
+    reviewReason: string;
+    reviewPriority: string;
+    errNoTimes: string;
+    errNoTelegram: string;
+    /** The edit page's own header — server-rendered, so it reads the cookie. */
+    editPageTitle: string;
+    editPageSubtitle: string;
+  };
   greeting: {
     morning: string;
     afternoon: string;
@@ -639,6 +693,42 @@ const en: Messages = {
     relOther: 'Other',
     accessPresets: 'Presets',
     granularToggles: 'Each permission',
+  },
+  medForm: {
+    name: 'Medicine name',
+    namePlaceholder: 'e.g. Paracetamol, Atorvastatin',
+    form: 'What form is it?',
+    formHint: 'Tablet, syrup, drops, and so on.',
+    selectFrequency: 'How often?',
+    whichDays: 'Which days?',
+    reminderTimes: 'Reminder times',
+    reminderTimesHint: 'Set a time for each dose, in 24-hour format.',
+    strength: 'Strength',
+    optional: '(optional)',
+    strengthPlaceholder: 'e.g. 500mg, 10ml, 0.5%',
+    dosageAmount: 'How many per dose?',
+    dosageAmountHint: 'How many you take each time.',
+    trackStock: 'Keep count of what is left',
+    trackStockHint: 'Takes one off the count each time you record a dose.',
+    currentStock: 'How many do you have now?',
+    currentStockPlaceholder: 'e.g. 30',
+    lowStockThreshold: 'Warn me when it drops to',
+    lowStockThresholdPlaceholder: 'e.g. 4',
+    reason: 'What is it for?',
+    reasonHint: 'Optional. Helps you tell your medicines apart.',
+    reasonPlaceholder: 'e.g. for blood pressure, headache',
+    priorityLevel: 'How important is it?',
+    priorityHint: 'Decides who is told, and how soon, if a dose is missed.',
+    reviewSchedule: 'How often',
+    reviewTimes: 'Times',
+    reviewDosage: 'Each dose',
+    reviewInventory: 'Stock',
+    reviewReason: 'What for',
+    reviewPriority: 'Importance',
+    errNoTimes: 'Please add at least one reminder time.',
+    errNoTelegram: 'Could not find that patient’s Telegram account.',
+    editPageTitle: 'Edit this medicine',
+    editPageSubtitle: 'Change the times, the dose, how important it is, or how many you have.',
   },
   greeting: {
     morning: 'Good morning',

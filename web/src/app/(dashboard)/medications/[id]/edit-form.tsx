@@ -15,6 +15,7 @@ import { validateMedicationStep, buildSharedMedicationFields, normalizeDoseDays 
 import { getToneTheme } from '@/lib/severity-theme';
 import MedicationCatalogLink from '@/components/medications/medication-catalog-link';
 import type { CatalogLinkValue } from '@/lib/medications/catalog';
+import { useLanguage } from '@/context/language-context';
 import {
   Pill,
   Clock,
@@ -62,6 +63,7 @@ interface EditMedicationFormProps {
 }
 
 export default function EditMedicationForm({ medication }: EditMedicationFormProps) {
+  const { t } = useLanguage();
   const [step, setStep] = useState(1);
   const [drugName, setDrugName] = useState(medication.drug_name);
   const [catalogLink, setCatalogLink] = useState<CatalogLinkValue | null>(
@@ -200,7 +202,7 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
       // row edited without ever revisiting that step could still reach here —
       // guard rather than let a throw crash the page.
       if (sortedTimes.length === 0) {
-        setError('Please add at least one reminder time.');
+        setError(t.medForm.errNoTimes);
         setLoading(false);
         return;
       }
@@ -350,22 +352,22 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
             {step === 1 && (
               <div className="space-y-6">
                 <div>
-                  <label className={labelClass}>Medication Name</label>
+                  <label className={labelClass}>{t.medForm.name}</label>
                   <input
                     type="text"
                     required
                     value={drugName}
                     onChange={(e) => setDrugName(e.target.value)}
                     className={inputClass}
-                    placeholder="e.g., Paracetamol"
+                    placeholder={t.medForm.namePlaceholder}
                     autoFocus
                   />
                   <MedicationCatalogLink value={catalogLink} onChange={setCatalogLink} />
                 </div>
 
                 <div>
-                  <label className={labelClass}>Medication Form</label>
-                  <p className="text-xs text-muted-foreground mb-3">Select the type of medication unit.</p>
+                  <label className={labelClass}>{t.medForm.form}</label>
+                  <p className="text-xs text-muted-foreground mb-3">{t.medForm.formHint}</p>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                     {unitOptions.map((opt) => (
                       <button
@@ -393,7 +395,7 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
             {step === 2 && (
               <div className="space-y-6">
                 <div>
-                  <label className={labelClass}>Select Frequency</label>
+                  <label className={labelClass}>{t.medForm.selectFrequency}</label>
                   <div className="grid grid-cols-1 gap-3 mt-1">
                     {frequencies.map((freq) => (
                       <button
@@ -428,7 +430,7 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
                 </div>
 
                 <div className="pt-4 border-t border-border/40">
-                  <label className={labelClass} id="dose-days-label">Which Days?</label>
+                  <label className={labelClass} id="dose-days-label">{t.medForm.whichDays}</label>
                   <p className="text-xs text-muted-foreground mb-3">
                     For medicines taken only on some days. Leave all off for every day.
                   </p>
@@ -459,8 +461,8 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
                 </div>
 
                 <div className="pt-4 border-t border-border/40">
-                  <label className={labelClass}>Reminder Times</label>
-                  <p className="text-xs text-muted-foreground mb-3">Set the time for each dose in 24-hour format.</p>
+                  <label className={labelClass}>{t.medForm.reminderTimes}</label>
+                  <p className="text-xs text-muted-foreground mb-3">{t.medForm.reminderTimesHint}</p>
                   <div className="grid grid-cols-1 gap-2.5">
                     {times.map((time, idx) => (
                       <div key={idx} className="bg-muted/30 p-4 rounded-2xl border border-border flex items-center justify-between gap-4">
@@ -490,13 +492,13 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
             {step === 3 && (
               <div className="space-y-6">
                 <div>
-                  <label className={labelClass}>Strength</label>
+                  <label className={labelClass}>{t.medForm.strength}</label>
                   <input
                     type="text"
                     value={strength}
                     onChange={(e) => setStrength(e.target.value)}
                     className={inputClass}
-                    placeholder="e.g., 500mg, 10ml"
+                    placeholder={t.medForm.strengthPlaceholder}
                   />
                   <div className="flex flex-wrap gap-2 mt-3">
                     {['500mg', '650mg', '5mg', '10mg', '20mg', '100mcg'].map((s) => (
@@ -517,8 +519,8 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
                 </div>
 
                 <div className="pt-4 border-t border-border/40">
-                  <label className={labelClass}>Dosage Amount</label>
-                  <p className="text-xs text-muted-foreground mb-3">Units taken per reminder.</p>
+                  <label className={labelClass}>{t.medForm.dosageAmount}</label>
+                  <p className="text-xs text-muted-foreground mb-3">{t.medForm.dosageAmountHint}</p>
                   <div className="flex items-center gap-3 mt-2">
                     <button
                       type="button"
@@ -562,8 +564,8 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
                       <Layers className="w-5 h-5 text-primary" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-sm text-foreground">Track Stock Inventory</h3>
-                      <p className="text-xs text-muted-foreground mt-0.5">Auto-deduct stock on each dose</p>
+                      <h3 className="font-bold text-sm text-foreground">{t.medForm.trackStock}</h3>
+                      <p className="text-xs text-muted-foreground mt-0.5">{t.medForm.trackStockHint}</p>
                     </div>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
@@ -580,7 +582,7 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
                 {enableInventory && (
                   <div className="space-y-4 pt-2" style={{ animation: 'fadeIn 0.2s ease-out' }}>
                     <div>
-                      <label className={labelClass}>Current Stock</label>
+                      <label className={labelClass}>{t.medForm.currentStock}</label>
                       <div className="relative">
                         <input
                           type="number"
@@ -589,13 +591,13 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
                           value={currentStock}
                           onChange={(e) => setCurrentStock(e.target.value)}
                           className={inputClass}
-                          placeholder="e.g., 30"
+                          placeholder={t.medForm.currentStockPlaceholder}
                         />
                         <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">units</span>
                       </div>
                     </div>
                     <div>
-                      <label className={labelClass}>Low Stock Threshold</label>
+                      <label className={labelClass}>{t.medForm.lowStockThreshold}</label>
                       <div className="relative">
                         <input
                           type="number"
@@ -604,7 +606,7 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
                           value={stockThreshold}
                           onChange={(e) => setStockThreshold(e.target.value)}
                           className={inputClass}
-                          placeholder="e.g., 4"
+                          placeholder={t.medForm.lowStockThresholdPlaceholder}
                         />
                         <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">units</span>
                       </div>
@@ -621,20 +623,20 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
             {step === 5 && (
               <div className="space-y-6">
                 <div>
-                  <label className={labelClass}>Medication Reason</label>
-                  <p className="text-xs text-muted-foreground mb-2">Optional. Helps identify the purpose.</p>
+                  <label className={labelClass}>{t.medForm.reason}</label>
+                  <p className="text-xs text-muted-foreground mb-2">{t.medForm.reasonHint}</p>
                   <input
                     type="text"
                     value={medicationReason}
                     onChange={(e) => setMedicationReason(e.target.value)}
                     className={inputClass}
-                    placeholder="e.g., For Blood Pressure"
+                    placeholder={t.medForm.reasonPlaceholder}
                   />
                 </div>
 
                 <div className="pt-4 border-t border-border/40">
-                  <label className={labelClass}>Priority Level</label>
-                  <p className="text-xs text-muted-foreground mb-3">Determines escalation behavior on missed doses.</p>
+                  <label className={labelClass}>{t.medForm.priorityLevel}</label>
+                  <p className="text-xs text-muted-foreground mb-3">{t.medForm.priorityHint}</p>
                   <div className="grid grid-cols-1 gap-2.5">
                     {priorities.map((p) => {
                       const isSelected = priority === p.id;
@@ -714,28 +716,28 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
                     <div className="flex items-center justify-between px-5 py-3.5">
                       <div className="flex items-center gap-2.5">
                         <Clock className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-xs font-semibold text-muted-foreground">Schedule</span>
+                        <span className="text-xs font-semibold text-muted-foreground">{t.medForm.reviewSchedule}</span>
                       </div>
                       <span className="text-sm font-bold text-foreground font-[var(--font-mono)] capitalize">{frequency.replace(/_/g, ' ')}</span>
                     </div>
                     <div className="flex items-center justify-between px-5 py-3.5">
                       <div className="flex items-center gap-2.5">
                         <Clock className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-xs font-semibold text-muted-foreground">Times</span>
+                        <span className="text-xs font-semibold text-muted-foreground">{t.medForm.reviewTimes}</span>
                       </div>
                       <span className="text-sm font-bold text-foreground font-[var(--font-mono)]">{times.join(', ')}</span>
                     </div>
                     <div className="flex items-center justify-between px-5 py-3.5">
                       <div className="flex items-center gap-2.5">
                         <Beaker className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-xs font-semibold text-muted-foreground">Dosage</span>
+                        <span className="text-xs font-semibold text-muted-foreground">{t.medForm.reviewDosage}</span>
                       </div>
                       <span className="text-sm font-bold text-foreground font-[var(--font-mono)]">{dosageAmount} {unitPhrase(unitType, dosageAmount)}</span>
                     </div>
                     <div className="flex items-center justify-between px-5 py-3.5">
                       <div className="flex items-center gap-2.5">
                         <Layers className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-xs font-semibold text-muted-foreground">Inventory</span>
+                        <span className="text-xs font-semibold text-muted-foreground">{t.medForm.reviewInventory}</span>
                       </div>
                       <span className="text-sm font-bold text-foreground font-[var(--font-mono)]">
                         {enableInventory ? `${currentStock} units (alert at ${stockThreshold})` : 'Disabled'}
@@ -745,7 +747,7 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
                       <div className="flex items-center justify-between px-5 py-3.5">
                         <div className="flex items-center gap-2.5">
                           <FileText className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-xs font-semibold text-muted-foreground">Reason</span>
+                          <span className="text-xs font-semibold text-muted-foreground">{t.medForm.reviewReason}</span>
                         </div>
                         <span className="text-sm font-bold text-foreground">{medicationReason}</span>
                       </div>
@@ -753,7 +755,7 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
                     <div className="flex items-center justify-between px-5 py-3.5">
                       <div className="flex items-center gap-2.5">
                         <ShieldAlert className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-xs font-semibold text-muted-foreground">Priority</span>
+                        <span className="text-xs font-semibold text-muted-foreground">{t.medForm.reviewPriority}</span>
                       </div>
                       <span className={`text-sm font-bold font-[var(--font-mono)] capitalize flex items-center gap-1.5 ${
                         priority === 'normal' ? 'text-success' : priority === 'important' ? 'text-warning' : 'text-danger'
