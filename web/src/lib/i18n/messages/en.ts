@@ -435,6 +435,63 @@ export interface Messages {
     outcomeTaken: string;
     outcomeMissed: string;
   };
+  /** A caregiver's read-only view of one patient. SERVER-rendered — cookie path. */
+  patient: {
+    accessRestricted: string;
+    monitoringStatus: string;
+    active: string;
+    adherence30d: string;
+    activeMedications: string;
+    missedDosesToday: string;
+    routineStability: string;
+    milestones: string;
+    relation: string;
+    role: string;
+    longevity: string;
+    sharedTrust: string;
+    noActiveMeds: string;
+    noComplianceLogs: string;
+    viewFolder: string;
+  };
+  /**
+   * Linking a Telegram account.
+   *
+   * `codePlaceholder` ("RMDR-XXXXXX") is a FORMAT, not a word — it shows the shape
+   * of the code the bot sends. Translating the letters would describe a code that
+   * does not exist. Same class as the DELETE token and the IANA timezone.
+   */
+  linkAccount: {
+    errUnexpected: string;
+    errMustSignIn: string;
+    errSkipFailed: string;
+    verificationConfirmed: string;
+    setupGuide: string;
+    openTelegramBot: string;
+    openTelegramBotHint: string;
+    requestPairingCode: string;
+    /** "Send {command} to the bot." — {command} is a literal bot command. */
+    sendToBot: string;
+    enterPairingCode: string;
+    enterPairingCodeHint: string;
+    quickLink: string;
+    verificationCode: string;
+    codePlaceholder: string;
+    or: string;
+  };
+  /** Sign-up. The legal links reuse `legal.*` rather than duplicating them. */
+  auth: {
+    errAgeTerms: string;
+    errCaptcha: string;
+    errFullCode: string;
+    confirmationCode: string;
+    fullName: string;
+    fullNamePlaceholder: string;
+    email: string;
+    emailPlaceholder: string;
+    password: string;
+    passwordPlaceholder: string;
+    alreadyHaveAccount: string;
+  };
   greeting: {
     morning: string;
     afternoon: string;
@@ -794,6 +851,53 @@ const en: Messages = {
     newTime: 'New time',
     outcomeTaken: 'Taken',
     outcomeMissed: 'Missed',
+  },
+  patient: {
+    accessRestricted: 'Access restricted',
+    monitoringStatus: 'Monitoring',
+    active: 'On',
+    adherence30d: 'Doses taken, last 30 days',
+    activeMedications: 'Medicines being taken',
+    missedDosesToday: 'Doses missed today',
+    routineStability: 'Routine steadiness',
+    milestones: 'How long you have helped',
+    relation: 'Relationship',
+    role: 'Role',
+    longevity: 'Time together',
+    sharedTrust: 'What they share',
+    noActiveMeds: 'No medicines scheduled today.',
+    noComplianceLogs: 'Nothing recorded in the last 7 days.',
+    viewFolder: 'Open folder',
+  },
+  linkAccount: {
+    errUnexpected: 'Something went wrong. Please try again.',
+    errMustSignIn: 'Please sign in first.',
+    errSkipFailed: 'Could not skip. Please try again.',
+    verificationConfirmed: 'Connected',
+    setupGuide: 'How to connect',
+    openTelegramBot: 'Open the Telegram bot',
+    openTelegramBotHint: 'Search for it, or scan the QR code.',
+    requestPairingCode: 'Ask for a code',
+    sendToBot: 'Send {command} to the bot.',
+    enterPairingCode: 'Enter the code',
+    enterPairingCodeHint: 'Copy the code and paste it below.',
+    quickLink: 'Quick link',
+    verificationCode: 'Code',
+    codePlaceholder: 'RMDR-XXXXXX',
+    or: 'or',
+  },
+  auth: {
+    errAgeTerms: 'Please confirm you are 18 or older and accept the terms.',
+    errCaptcha: 'Please complete the check that you are a real person.',
+    errFullCode: 'Please enter the whole code from your email.',
+    confirmationCode: 'Confirmation code',
+    fullName: 'Full name',
+    fullNamePlaceholder: 'Full name',
+    email: 'Email',
+    emailPlaceholder: 'you@example.com',
+    password: 'Password',
+    passwordPlaceholder: 'Choose a password',
+    alreadyHaveAccount: 'Already have an account?',
   },
   greeting: {
     morning: 'Good morning',
