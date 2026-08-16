@@ -39,7 +39,7 @@ export default function AccessScopeSummary({
   const icon = isElderly ? 'w-5 h-5' : 'w-4 h-4';
 
   return (
-    <div className="rounded-2xl border border-border bg-muted/40 p-4 space-y-4">
+    <div className="rounded-[var(--r-card)] border border-border bg-muted/40 p-4 space-y-4">
       <p className={`font-extrabold text-foreground ${isElderly ? 'text-lg' : 'text-sm'}`}>
         What {personName} will be able to see
       </p>

@@ -63,7 +63,7 @@ export default function WaterSettingsClientView({ initial }: { initial: WaterSet
 
   const label = isElderly ? 'text-lg' : 'text-sm';
   const body = isElderly ? 'text-base' : 'text-xs';
-  const field = `w-full rounded-2xl border border-input bg-card px-4 text-foreground font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+  const field = `w-full rounded-[var(--r-control)] border border-input bg-card px-4 text-foreground font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
     isElderly ? 'min-h-16 text-lg' : 'min-h-12 text-base'
   }`;
 
@@ -114,7 +114,7 @@ export default function WaterSettingsClientView({ initial }: { initial: WaterSet
 
       {/* THE SAFETY LINE. First, not last, and never behind a disclosure. */}
       <section
-        className="rounded-3xl p-5 border"
+        className="rounded-[var(--r-card)] p-5 border"
         style={{ borderColor: 'var(--hydration)', background: 'var(--hydration-soft)' }}
       >
         <p className={`font-bold flex items-start gap-2 ${body}`} style={{ color: 'var(--hydration-ink)' }}>

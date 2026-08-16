@@ -26,14 +26,14 @@ export default function LegalLinks() {
         <h1 className="title-page text-foreground">{t.legal.title}</h1>
       </header>
 
-      <div className="rounded-3xl border border-border overflow-hidden divide-y divide-border">
+      <div className="card-lift overflow-hidden divide-y divide-border">
         {links.map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
             href={href}
             className="w-full flex items-center gap-3 px-4 min-h-[56px] py-2.5 bg-card hover:bg-muted/60 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
           >
-            <span aria-hidden className="shrink-0 w-10 h-10 rounded-2xl bg-muted text-muted-foreground flex items-center justify-center">
+            <span aria-hidden className="shrink-0 w-10 h-10 rounded-[var(--r-control)] bg-muted text-muted-foreground flex items-center justify-center">
               <Icon className="w-5 h-5" />
             </span>
             <span className="flex-1 min-w-0 font-bold text-foreground text-[15px]">{label}</span>

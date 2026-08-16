@@ -90,7 +90,7 @@ export default function NotificationsClientView({
 
       <section className="card-lift p-5 space-y-3">
         <div className="flex items-start gap-3">
-          <span aria-hidden className={`shrink-0 rounded-2xl flex items-center justify-center ${
+          <span aria-hidden className={`shrink-0 rounded-[var(--r-control)] flex items-center justify-center ${
             isElderly ? 'w-14 h-14' : 'w-10 h-10'
           } ${permission === 'granted' ? 'bg-success/15 text-success-strong' : 'bg-muted text-muted-foreground'}`}>
             {permission === 'granted'
@@ -118,7 +118,7 @@ export default function NotificationsClientView({
             type="button"
             onClick={enable}
             disabled={busy || permission === 'denied'}
-            className={`w-full rounded-2xl bg-primary-strong text-primary-strong-foreground font-black hover:bg-primary-strong-hover active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+            className={`w-full rounded-[var(--r-control)] bg-primary-strong text-primary-strong-foreground font-black hover:bg-primary-strong-hover active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
               isElderly ? 'min-h-16 text-xl' : 'min-h-12 text-sm'
             }`}
           >
@@ -139,7 +139,7 @@ export default function NotificationsClientView({
       <AlarmRingDuration initialSeconds={ringSeconds} largestHandful={largestHandful} />
 
       {/* The line that matters most on this page. */}
-      <section className="rounded-3xl border border-info/30 bg-info/5 p-5">
+      <section className="rounded-[var(--r-card)] border border-info/30 bg-info/5 p-5">
         <p className={`flex items-start gap-2 font-bold text-info-strong ${body}`}>
           <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
           <span className="text-balance">
