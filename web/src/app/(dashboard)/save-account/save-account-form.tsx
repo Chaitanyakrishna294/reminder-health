@@ -107,14 +107,21 @@ export default function SaveAccountForm({ currentName }: { currentName: string }
   };
 
   const labelClass = `block font-semibold text-foreground ${isElderly ? 'text-xl mb-2' : 'text-sm mb-1.5'}`;
-  const inputClass = `block w-full px-4 py-3 rounded-2xl bg-[#F2F2F7] text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm transition-all ${
-    isElderly ? 'py-4 text-xl' : ''
+  // `surface-sunk` (§1: inputs are wells, below the card) replaces a hardcoded
+  // #F2F2F7 — an iOS grey that is not in the palette and, being a literal, stayed
+  // light in dark mode (§10.2). It carries the well background AND the 14px
+  // control radius, so the off-scale `rounded-2xl` goes with it.
+  // Elderly keeps its exact previous classes: it is excluded, and the swap is a
+  // small warm/cool shift its branch should not inherit.
+  const inputClass = `block w-full px-4 py-3 text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm transition-all ${
+    isElderly ? 'rounded-2xl bg-[#F2F2F7] py-4 text-xl' : 'surface-sunk'
   }`;
 
   return (
     <div className={`mx-auto ${isElderly ? 'max-w-2xl space-y-6' : 'max-w-xl space-y-5'}`}>
       <div>
-        <h1 className={`font-bold tracking-tight text-foreground ${isElderly ? 'text-4xl' : 'text-[26px]'}`}>
+        {/* `title-page` (30/34) rather than an ad-hoc 26px — §4's scale. */}
+        <h1 className={`font-bold tracking-tight text-foreground ${isElderly ? 'text-4xl' : 'title-page'}`}>
           Save your account
         </h1>
         <p className={`text-muted-foreground mt-1 font-medium ${isElderly ? 'text-lg' : 'text-[13px]'}`}>
