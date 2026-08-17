@@ -4,7 +4,7 @@ Every surface in the app, read against
 [`visual-refresh-2026-08-14.md`](visual-refresh-2026-08-14.md) (§10 authoritative),
 [`PR-looks-maxx.md`](PR-looks-maxx.md) and CLAUDE.md's design sections.
 
-Branch `design/conformance`, 17 commits. **Presentation only** — no behaviour,
+Branch `design/conformance`, 29 commits. **Presentation only** — no behaviour,
 schema, RPC or bridge change anywhere in it.
 
 ## A correction to an earlier version of this file
@@ -21,25 +21,22 @@ The lesson is the brief's own: a per-file check of the files you thought of is
 not a sweep. The closing check here is a **full-tree scan**, not a list of
 surfaces I remembered to visit.
 
-## The honest headline
+## Status: CLOSED — 2026-08-17
 
-Every surface has been audited and every violation of a written rule has been
-fixed. **Three items remain open, and none of them is a violation I chose to
-leave standing:**
+Every surface audited, every violation of a written rule resolved, and both
+outstanding decisions returned by the maintainer.
 
-- **D1** needs a token change, which the freeze reserves to you. The value is
-  computed and waiting: `#BC385C`.
-- **D2** is a disclosure, not an open defect — a fix that is already in, which
+- **D1 — APPLIED.** Unfreeze granted for one token. `--primary-strong`
+  `#CC3D64` → `#BC385C`, hover `#BD2F58` → `#AE2B51`. Verified in the rendered
+  build: pink text is now **5.03:1** where it was 2.68 before this branch and
+  4.39 mid-way through it, and white-on-accent buttons are **5.44:1**.
+- **D2 — closed as a disclosure.** Not a defect; the fix is in and it
   unavoidably reaches elderly because a stylesheet cannot be mode-guarded.
-- **D6** is one page: `/settings/help`, a server component elderly can reach,
-  where `useUiMode` is unavailable so no branch exists to guard.
+- **D6 — ACCEPTED DEVIATION.** `/settings/help` keeps its old card. See below.
 
-**Why these cannot be closed from my side.** The brief asks for a sweep that ends
-at zero violations, and it also says any token change, and anything that would
-alter elderly, is yours to decide and must never be decided solo. D1 is a token
-change. D6 changes elderly or requires a structural edit, and the brief is
-presentation-only. Both sit exactly in the gap between those rules, which is why
-they are written up rather than done.
+The freeze worked exactly as designed here: a measured problem, a computed
+answer, an explicit authorization, and the change recorded in the spec and here
+in the same commit as the code.
 
 Four items I had originally flagged (D3, D4, D5's animation, D7) turned out to be
 over-caution on my part and are now resolved — two as fixes, two as PASSes with
@@ -101,8 +98,8 @@ the theme.
 | Settings · connections | FIXED — 7 radii | `5966283` |
 | Settings · notifications | **PASS** | — |
 | Settings · language / legal / setup-guide | **PASS** | — |
-| Settings · help | **BLOCKED** — see D6 | — |
-| Settings · display | **BLOCKED** — see D6 | — |
+| Settings · help | **ACCEPTED DEVIATION** — keeps its card, see D6 | — |
+| Settings · display | FIXED — toggle branch-guarded (was never blocked) | `44a6c85` |
 | Auth · login / register / forgot / update-password | FIXED — 11 radii | `3d2247a` |
 | Welcome | FIXED earlier (mono) — palette is a recorded won't-fix | `f0ae9d1` |
 | Legal (privacy / terms / disclaimer) | FIXED — pink text 2.68:1, radii | `5e4470c` |
@@ -135,9 +132,9 @@ ternary.
 **One known exception, and it is D2 below:** the `@layer` fix is global CSS and
 therefore reaches elderly.
 
-## Decisions waiting on you
+## The decisions, and how they closed
 
-**D1 · `--primary-strong` does not meet 4.5:1 off white.** Measured:
+**D1 · APPLIED — `--primary-strong` did not meet 4.5:1 off white.** Measured before:
 
 | ground | ratio | |
 |---|---|---|
@@ -218,12 +215,17 @@ elderly" (CLAUDE.md). So elderly would render the new card for one frame before
 the stamp corrects it. On a help page that is minor; it is still a flash shown to
 the audience least able to shrug it off, to fix a radius.
 
-Three options, all yours:
-1. **Accept the change outright** — this page has never had elderly-specific
-   styling, so "byte-identical" is protecting a difference that does not exist.
-2. **CSS guard on `[data-density="elderly"]`** — correct after first paint,
-   one frame wrong before it.
-3. **Leave it** — one page off the radius scale, documented here.
+**DECIDED: leave it. This is an ACCEPTED DEVIATION, not an oversight — do not
+"fix" it later.**
+
+The maintainer's reasoning, recorded so it survives: changing elderly's rendering
+violates the standing exclusion, and the CSS-guard route buys conformance at the
+cost of a first-frame flash shown to the audience least able to shrug it off. For
+a 24px radius on a help page, **the cure costs more than the disease.**
+
+So `/settings/help` keeps its bordered `rounded-3xl` card and 16px tile. It is
+the one surface in the app deliberately off the radius scale, and the reason is
+that the only available fixes are each worse than the deviation.
 
 **D7 · RESOLVED, and it is a PASS.** `bg-white` on the vault's PDF/document viewer
 panes is the CONTENT, not chrome — a scanned page is white because paper is

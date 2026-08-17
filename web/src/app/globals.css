@@ -23,11 +23,25 @@
   /* SOLID button fills only. White on Mind Pink is 2.9:1 — every primary CTA in the app
      failed the 4.5:1 floor, which is the single most-cited usability defect in mobile
      health apps and matters most for exactly the users Elderly Mode exists for. This is
-     the same hue carried down in lightness to 4.75:1, so buttons read as the brand while
-     staying legible. The lighter --primary above still owns every decorative use: tints,
-     borders, icons, the logo, focus rings. */
-  --primary-strong: #CC3D64;
-  --primary-strong-hover: #BD2F58;
+     the same hue carried down in lightness, so buttons read as the brand while staying
+     legible. The lighter --primary above still owns every decorative use: tints,
+     borders, icons, the logo, focus rings.
+
+     DARKENED 2026-08-17 (#CC3D64 -> #BC385C), on an explicit unfreeze from the
+     maintainer. The old value cleared 4.5:1 on a WHITE CARD ONLY — it measured 4.32 on
+     --surface-sunk, 4.29 on --background and 3.97 on --board, so every piece of pink
+     text sitting on the tray or in a well was below the floor by construction. Same
+     hue, ~8% darker in lightness. Measured after:
+
+         surface (white card)  5.45:1   surface-sunk  4.96:1
+         background            4.92:1   board         4.56:1
+
+     White on it is 5.44:1, so `bg-primary-strong` buttons keep their contrast too.
+     The hover moved with it, keeping the same per-channel relationship it had to the
+     old base (6.43:1 on white), or the pressed state would have stopped reading.
+     Dark mode's --primary-strong is hand-tuned separately below and is unaffected. */
+  --primary-strong: #BC385C;
+  --primary-strong-hover: #AE2B51;
   --primary-strong-foreground: #ffffff;
 
   /* VERDICT COLOURS — retuned away from the iOS system palette (redesign §01, approved
