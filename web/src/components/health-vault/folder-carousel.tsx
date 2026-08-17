@@ -109,9 +109,9 @@ export default function FolderCarousel({ items, isElderly, onSelect }: FolderCar
   return (
     <div
       ref={scrollerRef}
-      /* pb-8, not pb-2: the caption now sits BELOW each folder on the board, and
-         the old padding cropped it. */
-      className={`-mx-4 flex gap-3 overflow-x-auto overscroll-x-contain pb-8 pt-4 snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+      /* pb-3: the caption lives on the label inside the folder again, so the rail
+         no longer needs room under each card for a board-level caption. */
+      className={`-mx-4 flex gap-3 overflow-x-auto overscroll-x-contain pb-3 pt-4 snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
         loop ? '' : 'justify-center'
       }`}
       style={{
@@ -193,108 +193,118 @@ export default function FolderCarousel({ items, isElderly, onSelect }: FolderCar
                 The only white-on-colour element left is the icon, which is
                 non-text (3:1 floor) and clears it on all four at 4.18 minimum. */}
 
-            {/* THE TAB, and it is a real step now rather than a lighter patch.
-                The body starts BELOW it, so the folder's top edge is stepped —
-                tab on the left, board showing through on the right. That
-                silhouette is what makes it read as a folder before any colour or
-                label is processed. It was a white/25 wash on a full rectangle,
-                which had no step at all and so read as a stripe. */}
+            {/* ONE SHEET, TWO SHADES, AND A REAL FRONT PANEL.
+                v2 after the owner's "not nice". The previous attempt had TWO
+                separate white shapes — a rounded block floating in the middle plus
+                a strip across the bottom — and neither read as paper or as a label.
+                It looked like a coloured card with white boxes in it.
+
+                A folder is three planes at different depths, so it is built as
+                three: a DARKER BACK, ONE SHEET of paper tucked into it, and a
+                FRONT PANEL in the base colour overlapping the sheet's bottom edge.
+                Both folder planes are the same --category-N hue at different
+                brightness, so the depth comes from light rather than from a second
+                colour. Nothing here invents a token.
+
+                Text stays on the paper for the same measured reason as before:
+                white on the four hues is 5.17 / 4.18 / 5.89 / 4.23 in light mode,
+                so green and orange fail 4.5:1. The old skeuomorphic folder needed a
+                black scrim to hide exactly that. On paper it clears by
+                construction. */}
+
+            {/* TAB — steps up from the back plane, so the top edge is stepped. */}
             <span
               aria-hidden
-              className={`absolute left-0 top-0 rounded-t-[10px] ${isElderly ? 'w-[52%] h-5' : 'w-[50%] h-4'}`}
-              style={{ background: 'var(--folder)' }}
+              className={`absolute left-0 top-0 rounded-t-[10px] ${isElderly ? 'w-[46%] h-5' : 'w-[44%] h-4'}`}
+              style={{ background: 'var(--folder)', filter: 'brightness(0.82)' }}
             />
 
-            {/* The folder BODY. It carries the surface and the elevation, because
-                the button no longer can without filling in the step above. */}
+            {/* BACK PLANE — darker, so the sheet in front of it has something to sit
+                against and the folder has a visible inside. */}
             <span
-              aria-hidden={false}
-              className="absolute inset-x-0 bottom-0 rounded-[var(--r-card)] overflow-hidden transition-transform duration-150 group-active:scale-[0.98] motion-reduce:transition-none"
+              aria-hidden
+              className="absolute inset-x-0 bottom-0 rounded-[var(--r-card)]"
               style={{
-                top: isElderly ? 14 : 11,
+                top: isElderly ? 15 : 12,
                 background: 'var(--folder)',
+                filter: 'brightness(0.82)',
                 boxShadow: 'var(--lift-1)',
               }}
-            >
-              {/* THE STACK. Offsets are wider than before and STEP WITH THE COUNT,
-                  so a full folder is visibly fuller than a nearly-empty one. Still
-                  never the only carrier — the caption says the number in words
-                  (project-a11y). */}
-              {item.count > 1 && (
-                <span
-                  aria-hidden
-                  className="absolute rounded-t-[12px] bg-[var(--surface)] opacity-50"
-                  style={{ left: 34, right: 26, top: isElderly ? 40 : 30, bottom: isElderly ? 34 : 26 }}
-                />
-              )}
-              {item.count > 3 && (
-                <span
-                  aria-hidden
-                  className="absolute rounded-t-[12px] bg-[var(--surface)] opacity-75"
-                  style={{ left: 29, right: 31, top: isElderly ? 45 : 34, bottom: isElderly ? 34 : 26 }}
-                />
-              )}
+            />
 
-              {/* THE FRONT SHEET — smaller than before, so more of the folder shows
-                  and the colour does the identifying. Absent entirely when the
-                  folder is empty: an empty folder should look empty. */}
-              {item.count > 0 && (
-                <span
-                  className="absolute rounded-t-[12px] bg-[var(--surface)]"
-                  style={{ left: 24, right: 36, top: isElderly ? 50 : 38, bottom: isElderly ? 34 : 26 }}
-                />
-              )}
+            {/* THE SHEET — one, not three. Its top is tucked below the back plane's
+                rim and its bottom disappears behind the front panel, which is what
+                makes it read as being IN the folder. Square-cornered at the bottom
+                because that edge is never seen. */}
+            {item.count > 0 && (
+              <span
+                aria-hidden
+                className="absolute bg-[var(--surface)] rounded-t-[8px]"
+                style={{
+                  left: isElderly ? 16 : 12,
+                  right: isElderly ? 16 : 12,
+                  top: isElderly ? 24 : 19,
+                  bottom: isElderly ? 46 : 36,
+                  boxShadow: '0 -1px 2px rgba(0,0,0,0.10)',
+                }}
+              />
+            )}
+            {/* A second and third edge, just a few px each, for a fuller folder.
+                Thickness is never the only carrier — the caption states the number
+                (project-a11y). */}
+            {item.count > 2 && (
+              <span
+                aria-hidden
+                className="absolute bg-[var(--surface)] rounded-t-[8px] opacity-70"
+                style={{
+                  left: isElderly ? 22 : 17,
+                  right: isElderly ? 22 : 17,
+                  top: isElderly ? 20 : 16,
+                  bottom: isElderly ? 46 : 36,
+                }}
+              />
+            )}
 
-              {/* EMPTY: no paper, and an inner shadow so you are looking into an
-                  open, empty folder rather than at a flat colour chip. */}
-              {item.count === 0 && (
-                <span
-                  aria-hidden
-                  className="absolute inset-x-3 rounded-t-[12px]"
-                  style={{
-                    top: isElderly ? 22 : 17,
-                    bottom: isElderly ? 34 : 26,
-                    boxShadow: 'inset 0 8px 12px -6px rgba(0,0,0,0.45)',
-                  }}
-                />
-              )}
-            </span>
-
-            {/* THE LABEL, on its own paper strip across the folder's front.
-                Text CANNOT sit on the folder colour: white measures 5.17 / 4.18 /
-                5.89 / 4.23 over the four category hues in light mode, so green and
-                orange fail 4.5:1 — which is exactly why the old skeuomorphic
-                version needed a black scrim. The scrim was not decoration, it was
-                contrast machinery propping up an unsound arrangement. On paper it
-                clears by construction, and it is what a real folder looks like:
-                the colour is the folder, the writing is on the label. */}
+            {/* FRONT PANEL — the base colour, the dominant plane, overlapping the
+                sheet. This is the surface a real folder shows you. */}
             <span
-              className={`absolute inset-x-0 bottom-0 rounded-b-[var(--r-card)] bg-[var(--surface)] flex flex-col justify-center min-w-0 ${isElderly ? 'px-4 h-[34px]' : 'px-3 h-[26px]'}`}
+              aria-hidden
+              className="absolute inset-x-0 bottom-0 rounded-b-[var(--r-card)] rounded-t-[12px] transition-transform duration-150 group-active:scale-[0.99] motion-reduce:transition-none"
+              style={{
+                height: isElderly ? 62 : 48,
+                background: 'var(--folder)',
+                boxShadow: '0 -2px 6px rgba(0,0,0,0.14)',
+              }}
+            />
+
+            {/* THE LABEL — a paper patch stuck on the front panel, which is where a
+                filing folder actually carries its name. Inset from the panel on
+                three sides so it reads as applied to it, not as part of it. */}
+            <span
+              className={`absolute bg-[var(--surface)] rounded-[8px] flex flex-col justify-center min-w-0 ${isElderly ? 'px-3' : 'px-2.5'}`}
+              style={{
+                left: isElderly ? 14 : 10,
+                right: isElderly ? 56 : 44,
+                bottom: isElderly ? 12 : 9,
+                height: isElderly ? 38 : 30,
+                boxShadow: '0 1px 2px rgba(0,0,0,0.18)',
+              }}
             >
               <span className={`block font-bold text-foreground tracking-tight truncate leading-tight ${isElderly ? 'text-base' : 'text-[13px]'}`}>
                 {item.name}
               </span>
+              <span className={`block font-medium text-muted-foreground truncate tabular-nums leading-tight ${isElderly ? 'text-xs' : 'text-[11px]'}`}>
+                {item.caption}
+              </span>
             </span>
 
-            {/* The caption sits BELOW the folder, on the board — ink on the tray,
-                which passes on both themes, and it keeps the folder itself an
-                object rather than a form. */}
-            <span
-              className={`absolute left-1 -bottom-5 font-medium text-muted-foreground truncate tabular-nums ${isElderly ? 'text-sm' : 'text-xs'}`}
-              style={{ maxWidth: '100%' }}
-            >
-              {item.caption}
-            </span>
-
-            {/* The icon rides the folder's front-right, clear of the label strip.
-                Non-text, so the 3:1 floor applies and all four hues clear it. */}
+            {/* The icon sits on the front panel to the right of the label — on the
+                colour, where it is non-text and the 3:1 floor applies. All four
+                hues clear it at 4.18 minimum. */}
             <span
               aria-hidden
-              className={`absolute right-3 text-white ${isElderly ? 'top-[20px] [&_svg]:w-7 [&_svg]:h-7' : 'top-[16px] [&_svg]:w-5 [&_svg]:h-5'}`}
+              className={`absolute text-white ${isElderly ? 'right-4 bottom-[22px] [&_svg]:w-7 [&_svg]:h-7' : 'right-3 bottom-[17px] [&_svg]:w-5 [&_svg]:h-5'}`}
             >
-              {/* 28px elderly / 20px normal — the project-a11y icon floor. It was
-                  16px. Decorative (the name is stated in words), but sized to the
-                  same rule so nothing here is the exception. */}
               {item.icon}
             </span>
           </button>
