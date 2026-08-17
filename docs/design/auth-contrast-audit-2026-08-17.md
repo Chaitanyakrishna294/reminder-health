@@ -100,11 +100,13 @@ placeholder failure reaches every form in the app that uses the shared
 
 ## Proposals, with measured after-values
 
-> **Status 2026-08-17, after maintainer review: A and B are APPROVED and APPLIED**
-> (unfreeze granted for exactly these two, on the grounds that a typed email at
-> 1.14:1 is a defect rather than a style). Measured after-values below are now
-> confirmed on the rebuilt markup, not predicted. **C and D remain open** — they
-> were not part of the approval.
+> **Status 2026-08-17: ALL FOUR PROPOSALS APPROVED AND APPLIED.** A and B landed
+> first (unfreeze granted on the grounds that a typed email at 1.14:1 is a defect
+> rather than a style); C and D followed as one small commit. Every
+> after-value below is measured on the rebuilt markup, not predicted.
+>
+> **The auth-world audit is closed: 0 failures on `/welcome`, `/login` and
+> `/register`, in both themes.**
 
 ### A. Stop the dark ink shim reaching the poster — ✅ APPLIED, fixes 6 of 8
 
@@ -158,18 +160,37 @@ change the rendering of every typed value in the app during a frozen design
 track, to reinforce a cue that is already strong. Revisit only if the /90
 placeholder reads as a filled value on a real device.
 
-### C. Footer legal links — OPEN, not approved
+### C. Footer legal links — ✅ APPLIED
 
-`text-muted-foreground/80` → `text-muted-foreground` at 11px: light **3.93:1 →
-6.20:1**, dark 4.79 → 6.61:1. No visual cost worth defending; they are already
-the quietest text on the screen. Re-measured after the approved changes and still
-**3.94:1** — untouched, because it was not in the approval.
+`text-muted-foreground/80` → `text-muted-foreground` at 11px on the trust strip.
 
-### D. Captcha-state "Back" button — OPEN, not approved
+| | before | **measured after** |
+|---|---|---|
+| Light | 3.94:1 | **6.20:1** ✅ |
+| Dark | 4.79:1 | **6.61:1** ✅ |
 
-`#0F1C5A/70` → `/75`: **4.30:1 → 4.82:1**. This one is inside the hardcoded
-palette, so it needs the same kind of explicit go A got. It is only reachable in
-the guest-captcha state.
+The opacity was buying nothing that the size and placement do not already do —
+they remain the quietest text on the screen.
+
+**Still open and deliberately not changed here:** these sit at **11px**, under
+`project-a11y`'s 12px caption floor. Raising them is a size change, and the
+`(auth)` layout carries an explicit "must fit 375×812 without scrolling" warning,
+so it wants its own fit check rather than a drive-by.
+
+### D. Captcha-state "Back" button — ✅ APPLIED
+
+`#0F1C5A/70` → `/75` on the `#F59FB4` sheet: **4.30:1 → 4.81:1**, measured by
+mounting a probe with the shipped utility class inside the real sheet (the
+control itself only renders in the guest-captcha state, and driving that state
+locally would create a junk anonymous account against the live project).
+
+Two useful confirmations from that measurement: Tailwind no longer emits
+`text-[#0F1C5A]/70` at all, so the old value is gone from the codebase rather
+than merely unused on this control; and because item A's `data-fixed-palette`
+covers this subtree, the 4.81:1 holds in **both** themes rather than only light.
+
+/75 also keeps this control quieter than the guest action above it (/85, 5.97:1),
+which is the hierarchy the screen wants.
 
 ## Applied
 

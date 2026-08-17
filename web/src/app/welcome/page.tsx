@@ -347,11 +347,17 @@ export default function WelcomePage() {
             <Turnstile key={captchaNonce} onVerify={handleCaptchaVerify} />
             {/* Without this the focused state is a dead end: the sign-in form
                 and Create account are hidden, so a user who changed their mind
-                would have nothing to tap. */}
+                would have nothing to tap.
+
+                Ink is /75, not /70: on the #F59FB4 sheet /70 composites to
+                #544375 and measures 4.30:1 — under the floor. /75 gives
+                #493D71 at 4.82:1. The smallest change that clears it, and it
+                keeps this control quieter than the guest action above (/85),
+                which is what the hierarchy wants. (Audit item D.) */}
             <button
               type="button"
               onClick={() => { setShowCaptcha(false); setGuestError(null); }}
-              className="mt-3 w-full h-10 rounded-2xl text-[13px] font-bold text-[#0F1C5A]/70 hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 transition-colors cursor-pointer"
+              className="mt-3 w-full h-10 rounded-2xl text-[13px] font-bold text-[#0F1C5A]/75 hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 transition-colors cursor-pointer"
             >
               Back
             </button>
