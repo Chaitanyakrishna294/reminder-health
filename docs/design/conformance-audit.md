@@ -7,6 +7,20 @@ Every surface in the app, read against
 Branch `design/conformance`, 17 commits. **Presentation only** — no behaviour,
 schema, RPC or bridge change anywhere in it.
 
+## A correction to an earlier version of this file
+
+An earlier draft of this document claimed the sweep was complete. **It was not,
+and the way it was wrong is worth recording.** I had audited the PAGES on the
+screen map and missed much of the COMPONENT LAYER they compose from — the exact
+failure the brief warns about ("helper components hide violations"). A full-tree
+scan afterwards found **~60 more off-scale radii** in files I had never opened:
+the dose gate, the refill gate, the missed-dose strip, the nav rail, and six
+pieces of shared chrome that appear on many surfaces at once.
+
+The lesson is the brief's own: a per-file check of the files you thought of is
+not a sweep. The closing check here is a **full-tree scan**, not a list of
+surfaces I remembered to visit.
+
 ## The honest headline
 
 Every surface has been audited and every violation of a written rule has been
@@ -170,6 +184,30 @@ change, not presentation, and therefore out of scope here.
 panes is the CONTENT, not chrome — a scanned page is white because paper is
 white, and §10.2 is about colours that should follow the theme. Same reasoning as
 the black-on-white QR mock on /link-account.
+
+## Closing scan — 2026-08-17
+
+A full-tree `grep` for `rounded-3xl | rounded-2xl | rounded-[28px]` across every
+`.tsx` in `web/src` returns **zero** results that are not one of:
+
+- an **elderly arm** of a branch-guarded ternary (vault dialogs ×3, `SettingsRow`,
+  account and connections tiles, both day-rail tiles, exit dialog, edit-form
+  input, save-account input, `empty-state`, `ELDERLY_SIZES` in `button.tsx`);
+- a **loading skeleton** (D4 — feedback, not idle motion);
+- **`/settings/help`** (D6 — blocked);
+- a **recorded exception surface** (`/welcome`, Care+, admin-diagnostics,
+  elderly-today);
+- **the water tumbler's `rounded-[28px]`**, kept deliberately: that radius draws
+  the GLASS, and the test CLAUDE.md applies to the dose-strip domes is whether
+  the shape is doing a job, not whether it is on the scale;
+- a **comment** in this branch's own code.
+
+Same scan for idle motion (`animate-pulse|bounce|ping`, `infinite`) returns only
+Remi's bob, the loading indicators, and comments.
+
+Same scan for hardcoded colour (`bg-[#`, `text-[#`, raw Tailwind palette names)
+returns only the auth radial world and `/welcome` — both recorded exceptions —
+plus the document-viewer white (D7) and Care+'s luxe palette (D5).
 
 ## How this was verified
 
