@@ -79,7 +79,12 @@ export default function AuthLayout({
             <ShieldCheck className="w-4 h-4 text-success shrink-0" aria-hidden />
             Your health data is secure and private with us.
           </p>
-          <p className="mt-1 text-[11px] text-muted-foreground/80">
+          {/* Full --muted-foreground, not /80: at 11px on the card the faded
+              version measured 3.94:1 in light mode, under the 4.5:1 floor.
+              These are already the quietest text on the screen, so the opacity
+              was buying nothing that the size and placement do not. Light
+              3.94 -> 6.20:1, dark 4.79 -> 6.61:1. (Audit item C.) */}
+          <p className="mt-1 text-[11px] text-muted-foreground">
             <Link href="/privacy" className="hover:underline">
               Privacy Policy
             </Link>
