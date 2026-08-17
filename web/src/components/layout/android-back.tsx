@@ -22,6 +22,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { onBackButton, minimizeApp } from '@/lib/native/app-bridge';
 import { isRootPath } from '@/lib/navigation/stack';
+import { consumeBack } from '@/lib/navigation/back-stack';
 import ExitDialog from '@/components/layout/exit-dialog';
 
 export default function AndroidBack() {
@@ -30,6 +31,21 @@ export default function AndroidBack() {
   const [askingExit, setAskingExit] = useState(false);
 
   const handleBack = useCallback(() => {
+    /**
+     * OVERLAYS FIRST, ROUTES SECOND.
+     *
+     * This component reasoned only from `pathname`, so anything that opens without
+     * changing the URL was invisible to it — the vault's full-screen viewer, the
+     * folder drilldown, the upload wizard, every dialog. Back then navigated the
+     * webview out from under an open overlay, which on a viewer with no close
+     * button is a trap with no exit at all.
+     *
+     * Any overlay that registers via `useBackHandler` gets the press first, and if
+     * one takes it we stop here rather than ALSO navigating. See
+     * lib/navigation/back-stack.ts.
+     */
+    if (consumeBack()) return;
+
     // A dialog is itself a level of "back": dismiss it rather than acting twice.
     setAskingExit((asking) => {
       if (asking) return false;

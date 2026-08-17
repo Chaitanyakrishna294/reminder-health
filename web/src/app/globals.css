@@ -704,6 +704,21 @@ body {
    that only says `font-mono`, and a utility that explicitly sets tracking wins.
    The `!important` on font-family is untouched and still wins regardless of
    layer — the Indic fallback tail must not be beatable. */
+/* A FOCUSED TASK OWNS THE BOTTOM EDGE.
+
+   useFocusTask() stamps data-focus-task on <html> while a surface that owns the
+   whole screen is open — today the vault's upload wizard. The floating bottom nav
+   is fixed to that same edge and rendered from a different component with no shared
+   state, so it drew straight over the wizard's controls. Same collision as the dose
+   gate. Hiding the nav is the honest fix: a nav you cannot reach past is worse than
+   a nav that steps aside for one task.
+
+   IN @layer components — unlayered, this would outrank Tailwind utilities and could
+   not be overridden per surface (§10.3). */
+@layer components {
+  [data-focus-task] [data-app-nav] { display: none; }
+}
+
 @layer components {
   .font-mono, .badge, .metric, .time-tag, .navigation-label {
     font-family: var(--font-mono), var(--font-indic-tail), monospace !important;

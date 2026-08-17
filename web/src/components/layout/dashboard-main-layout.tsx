@@ -365,8 +365,14 @@ export default function DashboardMainLayout({
       </aside>
 
       {/* BOTTOM FLOATING PILL DOCK (Mobile) */}
+      {/* `data-app-nav` is the hook one rule in globals.css uses to hide this while a
+          FOCUSED TASK owns the screen (the vault upload wizard). The nav and those
+          tasks live several components apart with no shared state, and both are
+          `position: fixed` at the bottom edge — the same collision as the dose gate,
+          where whichever wins is decided by stacking context rather than intent. */}
       <nav
         data-tour="dash-nav"
+        data-app-nav
         aria-label="Main navigation"
         className={`md:hidden fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-40 rounded-[32px] bg-white/85 dark:bg-card/80 backdrop-blur-xl border border-border/70 card-overlay flex items-center justify-around px-4 transition-all duration-300 ${
           isElderly

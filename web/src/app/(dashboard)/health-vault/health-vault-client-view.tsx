@@ -8,6 +8,7 @@ import { format } from '@/lib/i18n/format';
 import { createClient } from '@/lib/supabase/client';
 import FolderCarousel from '@/components/health-vault/folder-carousel';
 import { useDensity } from '@/context/density-context';
+import { useBackHandler, useFocusTask } from '@/hooks/use-back-handler';
 import ZoomableImage from '@/components/health-vault/zoomable-image';
 import {
   VAULT_ACCEPT_ATTR,
@@ -458,6 +459,37 @@ export default function HealthVaultClientView({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [previewUrl]);
+
+  /**
+   * HARDWARE BACK, FOR EVERY OVERLAY ON THIS PAGE.
+   *
+   * None of these change the URL, so `AndroidBack` could not see any of them and
+   * the Android back button navigated the webview out from under whatever was
+   * open. On the document viewer — which fills the screen — that left no exit at
+   * all. Registered in opening order; the registry runs the most recent first, so
+   * a dialog opened on top of a viewer inside a folder unwinds the way it was
+   * built. See lib/navigation/back-stack.ts.
+   *
+   * Declared AFTER `closePreview` on purpose: these are const arrow functions, so
+   * referencing one from a hook call placed above it is a TDZ crash at render.
+   */
+  useBackHandler(previewUrl !== null, closePreview);
+  useBackHandler(recordToEdit !== null, () => setRecordToEdit(null));
+  useBackHandler(recordToPermanentlyDelete !== null, () => setRecordToPermanentlyDelete(null));
+  useBackHandler(isModalOpen, () => {
+    // Back inside the wizard steps BACKWARD through it rather than discarding the
+    // whole upload — losing a chosen photo to one stray back press is the kind of
+    // thing that makes people stop trusting the button.
+    if (activeStep > 1) setActiveStep((s) => (s - 1) as 1 | 2 | 3 | 4);
+    else setIsModalOpen(false);
+  });
+  useBackHandler(viewingTrash, () => setViewingTrash(false));
+  useBackHandler(selectedCategory !== null, () => setSelectedCategory(null));
+
+  /* The upload wizard owns the screen while it is open, so the floating bottom nav
+     must stop competing for the bottom edge — same class of bug as the dose gate,
+     two fixed elements and no shared intent. */
+  useFocusTask(isModalOpen);
 
   // Re-sign the preview URL before its TTL expires so an open document (e.g. a
   // large PDF being read) doesn't break mid-session with a 403. Runs only while
@@ -1775,7 +1807,7 @@ export default function HealthVaultClientView({
               <button
                 onClick={() => setIsModalOpen(false)}
                 disabled={isUploading}
-                className="text-muted-foreground hover:text-foreground hover:bg-muted p-1.5 rounded-full transition-all cursor-pointer"
+                className="w-11 h-11 shrink-0 inline-flex items-center justify-center text-foreground bg-muted hover:bg-muted/70 rounded-full transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <X className="w-5 h-5 shrink-0" />
               </button>
