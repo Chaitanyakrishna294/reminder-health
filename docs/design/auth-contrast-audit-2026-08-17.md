@@ -172,10 +172,14 @@ placeholder reads as a filled value on a real device.
 The opacity was buying nothing that the size and placement do not already do —
 they remain the quietest text on the screen.
 
-**Still open and deliberately not changed here:** these sit at **11px**, under
-`project-a11y`'s 12px caption floor. Raising them is a size change, and the
-`(auth)` layout carries an explicit "must fit 375×812 without scrolling" warning,
-so it wants its own fit check rather than a drive-by.
+**Still open — DEFERRED to the testing-phase sweep (decided 2026-08-17):** these
+sit at **11px**, under `project-a11y`'s 12px caption floor. Raising them is a
+size change, and the `(auth)` layout carries an explicit "must fit 375×812
+without scrolling" warning, so it needs a page-level fit check
+([docs/VERIFY_DEVICE_WIDTH.md](../VERIFY_DEVICE_WIDTH.md)) rather than a
+drive-by edit. That phase is running next and will exercise exactly that check,
+so it lands there. Contrast is not the issue — at full opacity these now measure
+6.20:1 light / 6.61:1 dark; only the type size is outstanding.
 
 ### D. Captcha-state "Back" button — ✅ APPLIED
 
