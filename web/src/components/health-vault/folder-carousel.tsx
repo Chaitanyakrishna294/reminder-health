@@ -47,6 +47,44 @@ export default function FolderCarousel({ items, isElderly, onSelect }: FolderCar
   const cardW = isElderly ? 230 : 172;
   const cardH = isElderly ? 172 : 136;
 
+  /**
+   * THE FOLDER OUTLINE IS ONE PATH — tab and body, not two elements.
+   *
+   * v2 drew them as two overlapping divs. That cannot produce a clean join: the
+   * body's box-shadow painted upward across the tab, and two separately-filtered
+   * layers meeting mid-edge left a visible seam. A folder's tab GROWS OUT OF the
+   * body, so the silhouette has to be a single closed shape — then there is no
+   * join to get wrong, and the drop shadow traces the real outline instead of a
+   * rectangle.
+   *
+   * Walked clockwise from the tab's top-left, sharing the left edge with the body:
+   * up over the tab, right along it, down its right flank to the body's shoulder,
+   * across the body top, round the body, and back up the shared left edge.
+   */
+  /* TAB_R is deliberately small. At radius 10 on a 12px-tall tab the tab is almost
+     entirely corner, which is why v2's read as a rounded nub stuck on the side
+     rather than a folder tab. A real tab is shallow, wide and only softly rounded,
+     so the radius has to be a fraction of the tab's height, not most of it. */
+  const TAB_R = 6;
+  const BODY_R = 20;
+  const tabW = isElderly ? 106 : 78;
+  const bodyTop = isElderly ? 18 : 15;
+  const folderPath = [
+    `M ${TAB_R} 0`,
+    `L ${tabW - TAB_R} 0`,
+    `Q ${tabW} 0 ${tabW} ${TAB_R}`,
+    `L ${tabW} ${bodyTop}`,
+    `L ${cardW - BODY_R} ${bodyTop}`,
+    `Q ${cardW} ${bodyTop} ${cardW} ${bodyTop + BODY_R}`,
+    `L ${cardW} ${cardH - BODY_R}`,
+    `Q ${cardW} ${cardH} ${cardW - BODY_R} ${cardH}`,
+    `L ${BODY_R} ${cardH}`,
+    `Q 0 ${cardH} 0 ${cardH - BODY_R}`,
+    `L 0 ${TAB_R}`,
+    `Q 0 0 ${TAB_R} 0`,
+    'Z',
+  ].join(' ');
+
   // Start on the middle copy so there is material to scroll to in both directions.
   useEffect(() => {
     const el = scrollerRef.current;
@@ -212,58 +250,78 @@ export default function FolderCarousel({ items, isElderly, onSelect }: FolderCar
                 black scrim to hide exactly that. On paper it clears by
                 construction. */}
 
-            {/* TAB — steps up from the back plane, so the top edge is stepped. */}
+            {/* THE FOLDER BACK — tab and body as ONE closed path, so the join
+                cannot show. The drop shadow is on the path, so it traces the
+                folder's actual silhouette rather than a rectangle; the old
+                rectangular box-shadow painting upward across the tab was half of
+                what made the seam visible. */}
+            <svg
+              aria-hidden
+              width={cardW}
+              height={cardH}
+              viewBox={`0 0 ${cardW} ${cardH}`}
+              className="absolute inset-0 pointer-events-none"
+            >
+              <path
+                d={folderPath}
+                fill="var(--folder)"
+                style={{ filter: 'brightness(0.82) drop-shadow(0 3px 8px rgba(15,28,90,0.16))' }}
+              />
+            </svg>
+
+            {/* THE PAPER, CLIPPED BY THE FOLDER MOUTH.
+                It used to be a sibling of the body, so nothing stopped its top edge
+                appearing above the folder's front-left curve. This wrapper is the
+                body's own box with the body's radius and `overflow-hidden`, so every
+                sheet is cut off by the folder itself — it can only ever appear
+                INSIDE the mouth. */}
             <span
               aria-hidden
-              className={`absolute left-0 top-0 rounded-t-[10px] ${isElderly ? 'w-[46%] h-5' : 'w-[44%] h-4'}`}
-              style={{ background: 'var(--folder)', filter: 'brightness(0.82)' }}
-            />
+              className="absolute inset-x-0 bottom-0 overflow-hidden rounded-[var(--r-card)]"
+              style={{ top: bodyTop }}
+            >
+              {/* A second edge above 2 files, so a fuller folder looks fuller.
+                  Thickness is never the only carrier — the label states the count
+                  (project-a11y). */}
+              {item.count > 2 && (
+                <span
+                  className="absolute bg-[var(--surface)] rounded-t-[8px] opacity-70"
+                  style={{
+                    left: isElderly ? 22 : 17,
+                    right: isElderly ? 22 : 17,
+                    top: isElderly ? 5 : 4,
+                    bottom: isElderly ? 31 : 24,
+                  }}
+                />
+              )}
+              {/* The front sheet. Its bottom runs under the front panel, which is
+                  what makes it read as being in the folder rather than on it. */}
+              {item.count > 0 && (
+                <span
+                  className="absolute bg-[var(--surface)] rounded-t-[8px]"
+                  style={{
+                    left: isElderly ? 16 : 12,
+                    right: isElderly ? 16 : 12,
+                    top: isElderly ? 9 : 7,
+                    bottom: isElderly ? 31 : 24,
+                    boxShadow: '0 -1px 2px rgba(0,0,0,0.10)',
+                  }}
+                />
+              )}
 
-            {/* BACK PLANE — darker, so the sheet in front of it has something to sit
-                against and the folder has a visible inside. */}
-            <span
-              aria-hidden
-              className="absolute inset-x-0 bottom-0 rounded-[var(--r-card)]"
-              style={{
-                top: isElderly ? 15 : 12,
-                background: 'var(--folder)',
-                filter: 'brightness(0.82)',
-                boxShadow: 'var(--lift-1)',
-              }}
-            />
-
-            {/* THE SHEET — one, not three. Its top is tucked below the back plane's
-                rim and its bottom disappears behind the front panel, which is what
-                makes it read as being IN the folder. Square-cornered at the bottom
-                because that edge is never seen. */}
-            {item.count > 0 && (
-              <span
-                aria-hidden
-                className="absolute bg-[var(--surface)] rounded-t-[8px]"
-                style={{
-                  left: isElderly ? 16 : 12,
-                  right: isElderly ? 16 : 12,
-                  top: isElderly ? 24 : 19,
-                  bottom: isElderly ? 46 : 36,
-                  boxShadow: '0 -1px 2px rgba(0,0,0,0.10)',
-                }}
-              />
-            )}
-            {/* A second and third edge, just a few px each, for a fuller folder.
-                Thickness is never the only carrier — the caption states the number
-                (project-a11y). */}
-            {item.count > 2 && (
-              <span
-                aria-hidden
-                className="absolute bg-[var(--surface)] rounded-t-[8px] opacity-70"
-                style={{
-                  left: isElderly ? 22 : 17,
-                  right: isElderly ? 22 : 17,
-                  top: isElderly ? 20 : 16,
-                  bottom: isElderly ? 46 : 36,
-                }}
-              />
-            )}
+              {/* EMPTY — no paper at all, plus an inner shadow down the mouth so it
+                  reads as an OPEN empty folder rather than a flat colour chip.
+                  Inside the clip, so the shadow follows the folder's own curve. */}
+              {item.count === 0 && (
+                <span
+                  className="absolute inset-x-0 top-0"
+                  style={{
+                    bottom: isElderly ? 31 : 24,
+                    boxShadow: 'inset 0 10px 14px -8px rgba(0,0,0,0.55)',
+                  }}
+                />
+              )}
+            </span>
 
             {/* FRONT PANEL — the base colour, the dominant plane, overlapping the
                 sheet. This is the surface a real folder shows you. */}

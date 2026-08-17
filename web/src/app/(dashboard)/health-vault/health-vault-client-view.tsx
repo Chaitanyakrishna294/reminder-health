@@ -1020,8 +1020,27 @@ export default function HealthVaultClientView({
               before you have scrolled anything. */}
           <div className="rise-in flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h1 className={`font-extrabold text-foreground tracking-[-0.02em] ${isElderly ? 'text-3xl' : 'text-[26px]'}`}>
+              {/* BETA, on the title itself rather than in a banner.
+                  It belongs where the feature is named, so it is read every time
+                  the page is opened and cannot be dismissed and forgotten — this
+                  is the surface that holds people's medical records, and "still
+                  being built" is a fact they should have in front of them while
+                  deciding what to upload.
+
+                  A mono uppercase micro-label: structural, which is the one thing
+                  mono is for (§4). `--warning` tinted with `-strong` text, because
+                  it is text on a tint and the plain token fails 4.5:1 there. Not
+                  pink — pink is the accent and only ever marks something you can
+                  touch, and this is a state, not a control. */}
+              <h1 className={`font-extrabold text-foreground tracking-[-0.02em] flex items-center gap-2 flex-wrap ${isElderly ? 'text-3xl' : 'text-[26px]'}`}>
                 {userRole === 'CAREGIVER' ? `${patientName}'s documents` : 'Health Vault'}
+                <span
+                  className={`shrink-0 font-mono uppercase tracking-[0.08em] font-semibold rounded-[var(--r-chip)] bg-warning/15 text-warning-strong ${
+                    isElderly ? 'text-xs px-2 py-1' : 'text-[11px] px-1.5 py-0.5'
+                  }`}
+                >
+                  Beta
+                </span>
               </h1>
               {userRole === 'CAREGIVER' ? (
                 <p className="text-[11px] text-primary-strong font-bold mt-1">
