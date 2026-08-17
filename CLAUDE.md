@@ -912,14 +912,62 @@ diagnosis (below). **The deploy model, in one line each:**
   `source: "git"` production build, `READY`, holding the alias.
 - **Previews = push a branch.** The webhook builds those too, typically within
   ~3 minutes. `npx vercel deploy` is not needed for review any more.
-- **The CLI's only remaining job is `npx vercel alias set`**, pointing the
-  Turnstile-whitelisted hostname (`reminder-health-refresh.vercel.app`) at the
-  preview being reviewed. See the Turnstile note in M3 for why that alias exists.
-- **`npx vercel deploy --prod` is banned outright.** Not "banned without a go" —
-  banned. There is no reason left to run it: the merge does it, correctly, from
-  the committed tree instead of from whatever happens to be checked out.
+- **The review hostname is permanent and needs no CLI.** Push to `review` and the
+  preview lands at `reminder-health-git-review-chaitanya-krishnas-projects-397d3a53.vercel.app`,
+  whitelisted once in Turnstile. This replaces the old
+  `reminder-health-refresh.vercel.app` alias, which required `vercel alias set`
+  after every deploy and is now dead weight.
+- **`npx vercel deploy --prod` is impossible, not merely banned** — the CLI is
+  logged out; see below. There was no reason left to run it anyway: the merge
+  does it correctly, from the committed tree rather than from whatever happens to
+  be checked out.
 
-### THE BAN IS A POLICY, NOT A LOCK — the predicate does NOT enforce it
+### THE LOCK IS REAL: THE CLI IS LOGGED OUT (2026-08-17)
+
+`npx vercel logout` was run and **`--prod` now fails before it can upload
+anything**:
+
+```
+$ npx vercel deploy --prod --yes --scope chaitanya-krishnas-projects-397d3a53
+Error: You do not have access to the specified account          (exit 1)
+```
+
+So this is no longer a rule anyone can forget — it is the absence of a
+credential, and it binds every session on this machine equally, Claude's
+included. **The one action that would undo it is `vercel login`. Do not run it**
+without deciding, on purpose, to give the CLI production access back.
+
+Nothing depends on the CLI any more:
+
+| need | how, without the CLI |
+|---|---|
+| ship to production | merge to `main`; the webhook builds it |
+| a preview to review | push to **`review`**; the webhook builds it |
+| a stable preview URL | `reminder-health-git-review-….vercel.app`, minted automatically |
+| check what is live | `curl` the canary vs `reminder-health.vercel.app` |
+| roll back | the Vercel dashboard |
+
+**Three gotchas learned while setting this up, all of which cost a wrong turn:**
+
+- **A branch pointing at the same commit as `main` gets NO deployment at all.**
+  Vercel does not rebuild a commit it has already built, so a freshly-branched
+  `review` produced no preview and therefore no hostname. The branch needs a
+  commit of its own before its alias exists.
+- **The branch name must be short and slash-free.** The hostname label is capped
+  at 63 characters and `reminder-health-git-review-chaitanya-krishnas-projects-397d3a53`
+  is *exactly* 63. Anything longer, or containing a `/`, gets hashed instead —
+  `fix/auth-first-time-path` became `-git-7d6098-`, which is not stable and
+  cannot be whitelisted in advance. **This is why the review branch is called
+  `review` and must not be renamed.**
+- **Deployment Protection still guards every `.vercel.app` preview host.** A
+  device opening the review URL hits `vercel.com/login` unless it has a Vercel
+  session, or has been given the bypass cookie once via
+  `?x-vercel-protection-bypass=<secret>&x-vercel-set-bypass-cookie=true`
+  (the secret lives in Settings → Deployment Protection → Protection Bypass for
+  Automation). Whitelisting the hostname in Turnstile fixes *sign-in*, not
+  *access* — they are two different gates.
+
+### The predicate that was tried first, and why it could not work
 
 **Tested 2026-08-17 and it FAILED, so do not trust it.** With the Ignored Build
 Step saved as
@@ -937,23 +985,23 @@ needs history an upload does not have. Neither log prints an ignore-step line, s
 this is strong evidence rather than proof; what IS proven is that the predicate
 does not stop a CLI `--prod`.
 
-So the enforcement that actually exists is:
+**The predicate was REMOVED afterwards** (`commandForIgnoringBuildStep: null`) —
+an inert rule that enforces nothing is the same failure mode as a privilege
+footer describing an ACL the database does not have, and this repo has already
+paid for that once.
 
-1. **This rule.** Every session, every chat.
-2. **`reminder-health-git-main-….vercel.app` is the canary.** It always tracks
-   the git build of `main`. If it and `reminder-health.vercel.app` serve
-   different content, a CLI deploy is sitting on production.
-3. **If it happens again, the only mechanism left is removing the CLI's
-   credentials** (`npx vercel logout` on every disk). That is now cheap, because
-   previews come from the webhook — the sole cost is `vercel alias set`, and even
-   that has a replacement: `reminder-health-git-<branch>-<team>.vercel.app` is
-   stable per branch, so a short fixed review branch name whitelisted once in
-   Turnstile removes the last CLI dependency. (Long or slashed branch names get
-   hashed into that hostname — `fix/auth-first-time-path` became `-git-7d6098-` —
-   so the branch must be short and slash-free for this to be stable.)
+A timing note, because it is what makes the test trustworthy: the project's
+`updatedAt` moved at 17:41:44Z, **seventeen minutes after** the throwaway ran at
+17:24:09Z. The predicate was therefore in place during the test — the deploy
+succeeded *despite* it, not because the setting had never been saved.
 
 **There is no Vercel setting that disables CLI production deploys.** Checked
-against the full project payload, not assumed.
+against the full project payload, not assumed. Which is why the answer ended up
+being the credential, not a toggle.
+
+**`reminder-health-git-main-….vercel.app` remains the canary** regardless: it
+always tracks the git build of `main`, so if it and `reminder-health.vercel.app`
+ever serve different content, something has bypassed the git path.
 
 A detail worth knowing when reconstructing one of these: **a CLI deploy from a
 working tree leaves NO provenance.** `vercel inspect` on `8ld615gnb` returned no
