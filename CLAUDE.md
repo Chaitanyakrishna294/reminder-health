@@ -885,6 +885,38 @@ than letting someone discover it at 3am.
   resource qualifiers (`values-hi/`) pick up the *device* locale, which is NOT necessarily the
   language chosen in-app; the bridged value is what makes the two agree.
 
+## ELEMENT CHECKS ARE NOT PAGE CHECKS — VERIFY FIT AT 375px
+
+Paid for 2026-08-17. The conformance audit verified computed styles on ~250 sites
+— radius, colour, shadow, contrast — and every one passed. It verified nothing
+about whether any PAGE fits a phone, and three layout regressions were reported
+from a device the same day: the dashboard cut off at the left edge, the nav
+showing 4 of 5 icons, the dose gate no longer fitting one screen.
+
+A screen can be perfectly tokenised and still overflow its viewport. **Per-element
+verification and page-level verification are different checks; run both.**
+
+The snippets live in [docs/VERIFY_DEVICE_WIDTH.md](docs/VERIFY_DEVICE_WIDTH.md) —
+one that lists every element wider than the viewport or positioned off it, one
+that checks a full-screen surface actually equals the viewport. Run at 375×812 as
+the floor, and at 320px for anything with five or more inline targets.
+
+## --prod IS ONE EXPLICIT GO PER DEPLOY, NAMED IN THE SAME MESSAGE
+
+Tightened 2026-08-17 after the THIRD stale-tree production overwrite
+(`8ld615gnb`, which held the production alias for 17h and carried a tree that
+predated the gate portal fix). The standing rule below was not enough, so:
+
+**Nobody deploys `--prod` except on the maintainer's explicit go, given in the
+same message, naming that deploy.** Every session, every chat. Previews
+otherwise, no exceptions.
+
+A detail worth knowing when reconstructing one of these: **a CLI deploy from a
+working tree leaves NO provenance.** `vercel inspect` on `8ld615gnb` returned no
+git metadata at all, and once its aliases moved it 302s, so what it contained is
+now unrecoverable. `vercel ls` tells you WHICH deploy is live; nothing tells you
+what was in it.
+
 ## TWO SESSIONS DEPLOYING = SILENT OVERWRITES, AND IT LOOKS LIKE A BROKEN FIX
 
 Paid for 2026-08-16. A fix was deployed to production, verified, and reported
