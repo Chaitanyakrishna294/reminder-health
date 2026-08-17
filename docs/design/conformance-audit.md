@@ -27,11 +27,19 @@ Every surface has been audited and every violation of a written rule has been
 fixed. **Three items remain open, and none of them is a violation I chose to
 leave standing:**
 
-- **D1** needs a token change, which the freeze reserves to you.
+- **D1** needs a token change, which the freeze reserves to you. The value is
+  computed and waiting: `#BC385C`.
 - **D2** is a disclosure, not an open defect — a fix that is already in, which
   unavoidably reaches elderly because a stylesheet cannot be mode-guarded.
-- **D6** is genuinely blocked: two server components elderly can reach, where no
-  branch exists to guard.
+- **D6** is one page: `/settings/help`, a server component elderly can reach,
+  where `useUiMode` is unavailable so no branch exists to guard.
+
+**Why these cannot be closed from my side.** The brief asks for a sweep that ends
+at zero violations, and it also says any token change, and anything that would
+alter elderly, is yours to decide and must never be decided solo. D1 is a token
+change. D6 changes elderly or requires a structural edit, and the brief is
+presentation-only. Both sit exactly in the gap between those rules, which is why
+they are written up rather than done.
 
 Four items I had originally flagged (D3, D4, D5's animation, D7) turned out to be
 over-caution on my part and are now resolved — two as fixes, two as PASSes with
@@ -140,13 +148,34 @@ therefore reaches elderly.
 
 §3 says "`--primary-strong` for anything load-bearing (4.75:1)" — true on cards,
 false everywhere else. Every pink-text fix in this branch improved 2.68 → 4.29–4.39
-and still sits under the floor. Options: darken the token, rule that pink text
-only appears on white, or accept it. All three are token decisions.
+and still sits under the floor.
 
-**D2 · The `@layer` fix reaches elderly.** A stylesheet cannot be branch-guarded
-by mode. I judged silently-discarded styles the worse outcome, since negative
-tracking on caps hurts elderly readers most — but it is a change to elderly and
-you should confirm it.
+**The answer is computed, so this costs you a yes rather than an investigation.**
+Holding the hue and scaling lightness only — so it is the same pink, not a new
+one — the value that clears 4.5:1 on the WORST ground is **`#BC385C`**, about 8%
+darker:
+
+| ground | `#CC3D64` today | `#BC385C` |
+|---|---|---|
+| `--surface` (white card) | 4.75:1 pass | **5.45:1** pass |
+| `--surface-sunk` | 4.32:1 fail | **4.96:1** pass |
+| `--background` | 4.29:1 fail | **4.92:1** pass |
+| `--board` | 3.97:1 fail | **4.56:1** pass |
+
+White text on it measures 5.45:1, so `bg-primary-strong` buttons keep their
+contrast too. One token, one line, and every pink-text site in this branch goes
+from "improved" to "passing".
+
+It is still a TOKEN CHANGE, so it needs your explicit unfreeze and I have not
+applied it. The alternatives remain: rule that pink text only appears on white
+cards, or accept the gap.
+
+**D2 · NOT AN OPEN VIOLATION — a disclosure.** Listed here so it is not
+discovered later, not because anything is outstanding. The unlayered-CSS defect
+is FIXED; the fix is global CSS and therefore also reaches elderly, because a
+stylesheet cannot be branch-guarded by mode. I judged silently-discarded styles
+the worse outcome, since negative tracking on uppercase hurts elderly readers
+most. Nothing to do unless you disagree.
 
 **D3 · RESOLVED — the `dose-orbit` 40s rotation is gone.** Initially flagged as
 too big to decide alone. On re-reading, that was over-caution: the recorded
