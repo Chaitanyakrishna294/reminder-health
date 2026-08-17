@@ -201,13 +201,29 @@ admin-diagnostics is server-gated to `ADMIN_EMAILS` with its own `--con-*`
 console palette. Swapping either for system tokens is a redesign, not
 conformance. → `bd1573a`
 
-**D6 · STILL BLOCKED — `/settings/help` and `/settings/display`.** They carry the
-same bordered `rounded-3xl` card and 16px tile fixed everywhere else, but they
-are **server** components that elderly can reach, so `useUiMode` is unavailable
-and there is no branch to guard. Any fix changes elderly's rendering. The honest
-options are: accept the change (neither page has ever had elderly-specific
-styling), or extract the card into a client component — which is a structural
-change, not presentation, and therefore out of scope here.
+**D6 · `/settings/help` — one page, and there IS a mechanism.** (Display turned
+out not to be blocked at all: it has a client view that already takes
+`isElderly`, and it is fixed.) Help carries the same bordered `rounded-3xl` card
+and 16px tile fixed everywhere else, but it is a **server** component, so
+`useUiMode` is unavailable and there is no React branch to guard with.
+
+**Correction to what I first wrote here:** I said no guard existed. One does.
+`density-context` stamps `data-density` on `<html>` and elderly is one of its
+values, so a CSS rule scoped to `[data-density="elderly"]` can restore elderly's
+exact previous look without a hook — presentation only, no structural change.
+
+I have NOT applied it, because of a caveat you should weigh rather than inherit:
+that attribute is set in an effect, and the pre-paint script "cannot know about
+elderly" (CLAUDE.md). So elderly would render the new card for one frame before
+the stamp corrects it. On a help page that is minor; it is still a flash shown to
+the audience least able to shrug it off, to fix a radius.
+
+Three options, all yours:
+1. **Accept the change outright** — this page has never had elderly-specific
+   styling, so "byte-identical" is protecting a difference that does not exist.
+2. **CSS guard on `[data-density="elderly"]`** — correct after first paint,
+   one frame wrong before it.
+3. **Leave it** — one page off the radius scale, documented here.
 
 **D7 · RESOLVED, and it is a PASS.** `bg-white` on the vault's PDF/document viewer
 panes is the CONTENT, not chrome — a scanned page is white because paper is
