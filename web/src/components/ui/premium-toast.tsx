@@ -64,8 +64,8 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: (id: str
         isExiting ? 'animate-toast-out' : 'animate-toast-in'
       } ${
         isError
-          ? 'bg-danger text-white shadow-danger/20'
-          : 'bg-[#0F1C5A] text-white shadow-[#0F1C5A]/20'
+          ? 'bg-danger text-danger-foreground shadow-danger/20'
+          : 'bg-foreground text-background shadow-foreground/20'
       }`}
     >
       {isError ? (

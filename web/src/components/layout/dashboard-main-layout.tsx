@@ -457,7 +457,7 @@ export default function DashboardMainLayout({
                   <AlertTriangle className="w-4 h-4" /> CRITICAL ALARM
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black bg-[#EAF3FF] text-primary border border-primary/20 uppercase tracking-wider shrink-0">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black bg-info-surface text-info-strong border border-info/25 uppercase tracking-wider shrink-0">
                   <Shield className="w-4 h-4" /> READ ONLY â€” EXCEPT MISSED DOSES
                 </span>
               )}

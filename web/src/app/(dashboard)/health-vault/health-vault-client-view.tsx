@@ -2024,10 +2024,15 @@ export default function HealthVaultClientView({
                 <div className="space-y-4 text-center">
                   {uploadSuccess ? (
                     <div className="flex flex-col items-center justify-center py-6 space-y-3">
-                      <CheckCircle className="w-16 h-16 text-success shrink-0 animate-bounce" />
+                      {/* Static. It was `animate-bounce` — infinite, so it never
+                          stopped celebrating a file upload. CLAUDE.md earns motion
+                          in exactly two places and this is neither; the tick and
+                          the words already say it worked. */}
+                      <CheckCircle className="w-16 h-16 text-success shrink-0" />
                       <div>
                         <h4 className={`font-black text-foreground ${isElderly ? 'text-xl' : 'text-sm'}`}>
-                          Record Saved Successfully!
+                          {/* Sentence case, no exclamation (ux-copy). */}
+                          Record saved
                         </h4>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           Refreshing timeline view...
