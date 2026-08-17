@@ -156,53 +156,95 @@ export default function FolderCarousel({ items, isElderly, onSelect }: FolderCar
               isActive ? 'scale-100 opacity-100' : 'scale-[0.88] opacity-[0.88]'
             }`}
           >
-            {/* A CARD ON THE BOARD, not a paper folder (looks-maxx stage 2).
-                The skeuomorphic version — tab, stacked sheets, a front panel under
-                a black scrim — was a good drawing of a folder and the one object
-                in the app that belonged to a different world. Everything else is
-                now a card floating on the tray, so this is too.
+            {/* A FOLDER, WITH THE FILES INSIDE IT.
+                Owner override, 2026-08-17: this one surface is unfrozen. The
+                minimal band-card was correct about materials and wrong about
+                identity — it lost the folder.
 
-                WHAT SURVIVES, because it was carrying information rather than
-                decoration:
-                  - the token-derived cover colour, which is the folder's identity
-                    (--category-N, never status — see globals.css);
-                  - the count, which the stacked paper used to imply by thickness.
-                    It is now a WORD AND A NUMBER rather than a shape, which is
-                    also the a11y rule: never encode meaning in form alone.
+                THE SHAPE, and why it is built this way rather than drawn:
+                  - the card IS the folder back, in --category-N;
+                  - a TAB sits on its top-left edge;
+                  - white SHEETS emerge from inside it, offset, so the stack reads
+                    as paper;
+                  - a FRONT LIP in the same colour overlaps the sheets' bottom.
+                That last part is what makes the files read as INSIDE the folder
+                rather than stacked behind it. It is the whole trick.
 
-                WHAT GOES, and why it is a gain: the black gradient scrim existed
-                to force white text to clear contrast over four arbitrary hues. The
-                label now sits in ink on the card, which clears it by construction
-                and puts the folder name in the same type system as every other
-                name in the app. */}
+                WHY THE TEXT LIVES ON THE PAPER, and this is not a style choice.
+                White on the four category hues MEASURES 5.17 / 4.18 / 5.89 / 4.23
+                in light mode — green and orange FAIL 4.5:1. That is exactly why the
+                old skeuomorphic version carried a black scrim: the scrim was not
+                decoration, it was contrast machinery holding up an unsound
+                arrangement. Category-as-text on white fails on the same two hues.
+                So the name and count sit in ink on a white sheet, which clears the
+                floor by construction — and is also what a real folder looks like:
+                the colour is the folder, the writing is on the paper.
 
-            {/* The cover. A SURFACE, in the slot-tint tradition — colour that
-                identifies, never colour that invites a tap. The whole card is the
-                target; this band is not a button of its own. */}
+                The only white-on-colour element left is the icon, which is
+                non-text (3:1 floor) and clears it on all four at 4.18 minimum. */}
+
+            {/* The folder back — the whole card. */}
+            <span aria-hidden className="absolute inset-0" style={{ background: 'var(--folder)' }} />
+
+            {/* The TAB. A lightened wash of the folder's own colour rather than a
+                second hue, so the folder stays one object in one colour. */}
             <span
               aria-hidden
-              className="absolute inset-x-0 top-0 h-[44%]"
-              style={{ background: 'var(--folder)' }}
+              className={`absolute left-0 top-0 rounded-br-[10px] bg-white/25 ${isElderly ? 'h-4 w-[46%]' : 'h-3 w-[44%]'}`}
+            />
+
+            {/* THE SHEETS. Two decorative edges behind the front sheet imply a
+                stack; the count is still stated in WORDS below, because form must
+                never be the only carrier (project-a11y). */}
+            {item.count > 1 && (
+              <span
+                aria-hidden
+                className="absolute rounded-[14px] bg-[var(--surface)] opacity-60"
+                style={{ left: 22, right: 10, top: isElderly ? 26 : 20, bottom: isElderly ? 44 : 36 }}
+              />
+            )}
+            {item.count > 2 && (
+              <span
+                aria-hidden
+                className="absolute rounded-[14px] bg-[var(--surface)] opacity-80"
+                style={{ left: 16, right: 14, top: isElderly ? 30 : 23, bottom: isElderly ? 44 : 36 }}
+              />
+            )}
+
+            {/* The front sheet, carrying the words. */}
+            <span
+              className={`absolute rounded-[14px] bg-[var(--surface)] flex flex-col justify-center min-w-0 ${isElderly ? 'px-4' : 'px-3'}`}
+              style={{ left: 10, right: 10, top: isElderly ? 34 : 26, bottom: isElderly ? 40 : 32 }}
             >
-              <span className="absolute right-2.5 top-2.5 flex items-center justify-center rounded-[10px] bg-black/25 text-white w-7 h-7 [&_svg]:w-4 [&_svg]:h-4">
-                {item.icon}
+              {/* User content — truncated, never restyled into something clever. */}
+              <span className={`block font-bold text-foreground tracking-tight truncate ${isElderly ? 'text-lg' : 'text-[15px]'}`}>
+                {item.name}
+              </span>
+              {/* The caption already reads "3 files" / "Add your first prescription",
+                  so the separate numeral the band-card printed under it was the
+                  count twice — the exact defect a comment at the call site says was
+                  fixed once before. Once, here.
+
+                  12px normal / 14px elderly: the caption floor. It was 10px, which
+                  was below it. */}
+              <span className={`block font-medium text-muted-foreground truncate mt-0.5 tabular-nums ${isElderly ? 'text-sm' : 'text-xs'}`}>
+                {item.caption}
               </span>
             </span>
 
-            <span className="absolute inset-x-0 bottom-0 top-[44%] px-3 py-2.5 flex flex-col justify-center min-w-0">
-              {/* Mono, uppercase, small: a structural label, which is exactly what
-                  mono is for and the one thing it is still allowed to be. */}
-              <span className={`block font-mono uppercase tracking-[0.06em] text-muted-foreground ${isElderly ? 'text-[11px]' : 'text-[10px]'}`}>
-                {item.caption}
-              </span>
-              {/* The folder's NAME is user content — truncated, never restyled into
-                  something clever. */}
-              <span className={`block font-bold text-foreground tracking-tight truncate mt-0.5 ${isElderly ? 'text-lg' : 'text-sm'}`}>
-                {item.name}
-              </span>
-              {/* What the stacked paper used to say, said. */}
-              <span className={`block font-mono tabular-nums text-muted-foreground mt-0.5 ${isElderly ? 'text-xs' : 'text-[10px]'}`}>
-                {item.count === 0 ? 'Empty' : item.count}
+            {/* The FRONT LIP, overlapping the sheets. This is what puts the files
+                inside the folder. Its own top edge is rounded so it reads as the
+                folder's front panel rather than a bar across the card. */}
+            <span
+              aria-hidden
+              className={`absolute inset-x-0 bottom-0 rounded-t-[10px] ${isElderly ? 'h-10' : 'h-8'}`}
+              style={{ background: 'var(--folder)' }}
+            >
+              {/* 28px elderly / 20px normal — the project-a11y icon floor. It was
+                  16px. Decorative (the name is stated in words), but sized to the
+                  same rule so nothing here is the exception. */}
+              <span className={`absolute right-2.5 top-1/2 -translate-y-1/2 text-white ${isElderly ? '[&_svg]:w-7 [&_svg]:h-7' : '[&_svg]:w-5 [&_svg]:h-5'}`}>
+                {item.icon}
               </span>
             </span>
           </button>
