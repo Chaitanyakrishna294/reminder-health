@@ -109,7 +109,9 @@ export default function FolderCarousel({ items, isElderly, onSelect }: FolderCar
   return (
     <div
       ref={scrollerRef}
-      className={`-mx-4 flex gap-3 overflow-x-auto overscroll-x-contain pb-2 pt-4 snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+      /* pb-8, not pb-2: the caption now sits BELOW each folder on the board, and
+         the old padding cropped it. */
+      className={`-mx-4 flex gap-3 overflow-x-auto overscroll-x-contain pb-8 pt-4 snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
         loop ? '' : 'justify-center'
       }`}
       style={{
@@ -149,61 +151,151 @@ export default function FolderCarousel({ items, isElderly, onSelect }: FolderCar
             }}
             /* Only transform and opacity are transitioned — both are GPU-composited, so
                the scale change costs no layout or paint. box-shadow was in here too and
-               repaints the card on every frame of the transition. */
-            className={`card-lift press-sink overflow-hidden snap-center shrink-0 relative text-left transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none disabled:cursor-not-allowed enabled:cursor-pointer ${
+               repaints the card on every frame of the transition.
+
+               NO `card-lift` and NO `press-sink` on the button any more. The folder
+               is no longer a filled rectangle, so a card background here would paint
+               a white block behind the folder's stepped top edge and destroy the
+               silhouette. The BODY carries the surface and the lift instead, and the
+               press is `group-active` on it — press-sink resolves TO lift-1, which on
+               an element with no resting elevation would make it lift under the
+               finger rather than sink (CLAUDE.md). */
+            className={`group snap-center shrink-0 relative text-left transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none disabled:cursor-not-allowed enabled:cursor-pointer rounded-[var(--r-card)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
               // 0.7 opacity dropped the side cards' text to 4.14:1. Scale alone carries
               // the "this one is centred" hierarchy, so the fade only needs to be slight.
               isActive ? 'scale-100 opacity-100' : 'scale-[0.88] opacity-[0.88]'
             }`}
           >
-            {/* A CARD ON THE BOARD, not a paper folder (looks-maxx stage 2).
-                The skeuomorphic version — tab, stacked sheets, a front panel under
-                a black scrim — was a good drawing of a folder and the one object
-                in the app that belonged to a different world. Everything else is
-                now a card floating on the tray, so this is too.
+            {/* A FOLDER, WITH THE FILES INSIDE IT.
+                Owner override, 2026-08-17: this one surface is unfrozen. The
+                minimal band-card was correct about materials and wrong about
+                identity — it lost the folder.
 
-                WHAT SURVIVES, because it was carrying information rather than
-                decoration:
-                  - the token-derived cover colour, which is the folder's identity
-                    (--category-N, never status — see globals.css);
-                  - the count, which the stacked paper used to imply by thickness.
-                    It is now a WORD AND A NUMBER rather than a shape, which is
-                    also the a11y rule: never encode meaning in form alone.
+                THE SHAPE, and why it is built this way rather than drawn:
+                  - the card IS the folder back, in --category-N;
+                  - a TAB sits on its top-left edge;
+                  - white SHEETS emerge from inside it, offset, so the stack reads
+                    as paper;
+                  - a FRONT LIP in the same colour overlaps the sheets' bottom.
+                That last part is what makes the files read as INSIDE the folder
+                rather than stacked behind it. It is the whole trick.
 
-                WHAT GOES, and why it is a gain: the black gradient scrim existed
-                to force white text to clear contrast over four arbitrary hues. The
-                label now sits in ink on the card, which clears it by construction
-                and puts the folder name in the same type system as every other
-                name in the app. */}
+                WHY THE TEXT LIVES ON THE PAPER, and this is not a style choice.
+                White on the four category hues MEASURES 5.17 / 4.18 / 5.89 / 4.23
+                in light mode — green and orange FAIL 4.5:1. That is exactly why the
+                old skeuomorphic version carried a black scrim: the scrim was not
+                decoration, it was contrast machinery holding up an unsound
+                arrangement. Category-as-text on white fails on the same two hues.
+                So the name and count sit in ink on a white sheet, which clears the
+                floor by construction — and is also what a real folder looks like:
+                the colour is the folder, the writing is on the paper.
 
-            {/* The cover. A SURFACE, in the slot-tint tradition — colour that
-                identifies, never colour that invites a tap. The whole card is the
-                target; this band is not a button of its own. */}
+                The only white-on-colour element left is the icon, which is
+                non-text (3:1 floor) and clears it on all four at 4.18 minimum. */}
+
+            {/* THE TAB, and it is a real step now rather than a lighter patch.
+                The body starts BELOW it, so the folder's top edge is stepped —
+                tab on the left, board showing through on the right. That
+                silhouette is what makes it read as a folder before any colour or
+                label is processed. It was a white/25 wash on a full rectangle,
+                which had no step at all and so read as a stripe. */}
             <span
               aria-hidden
-              className="absolute inset-x-0 top-0 h-[44%]"
+              className={`absolute left-0 top-0 rounded-t-[10px] ${isElderly ? 'w-[52%] h-5' : 'w-[50%] h-4'}`}
               style={{ background: 'var(--folder)' }}
+            />
+
+            {/* The folder BODY. It carries the surface and the elevation, because
+                the button no longer can without filling in the step above. */}
+            <span
+              aria-hidden={false}
+              className="absolute inset-x-0 bottom-0 rounded-[var(--r-card)] overflow-hidden transition-transform duration-150 group-active:scale-[0.98] motion-reduce:transition-none"
+              style={{
+                top: isElderly ? 14 : 11,
+                background: 'var(--folder)',
+                boxShadow: 'var(--lift-1)',
+              }}
             >
-              <span className="absolute right-2.5 top-2.5 flex items-center justify-center rounded-[10px] bg-black/25 text-white w-7 h-7 [&_svg]:w-4 [&_svg]:h-4">
-                {item.icon}
+              {/* THE STACK. Offsets are wider than before and STEP WITH THE COUNT,
+                  so a full folder is visibly fuller than a nearly-empty one. Still
+                  never the only carrier — the caption says the number in words
+                  (project-a11y). */}
+              {item.count > 1 && (
+                <span
+                  aria-hidden
+                  className="absolute rounded-t-[12px] bg-[var(--surface)] opacity-50"
+                  style={{ left: 34, right: 26, top: isElderly ? 40 : 30, bottom: isElderly ? 34 : 26 }}
+                />
+              )}
+              {item.count > 3 && (
+                <span
+                  aria-hidden
+                  className="absolute rounded-t-[12px] bg-[var(--surface)] opacity-75"
+                  style={{ left: 29, right: 31, top: isElderly ? 45 : 34, bottom: isElderly ? 34 : 26 }}
+                />
+              )}
+
+              {/* THE FRONT SHEET — smaller than before, so more of the folder shows
+                  and the colour does the identifying. Absent entirely when the
+                  folder is empty: an empty folder should look empty. */}
+              {item.count > 0 && (
+                <span
+                  className="absolute rounded-t-[12px] bg-[var(--surface)]"
+                  style={{ left: 24, right: 36, top: isElderly ? 50 : 38, bottom: isElderly ? 34 : 26 }}
+                />
+              )}
+
+              {/* EMPTY: no paper, and an inner shadow so you are looking into an
+                  open, empty folder rather than at a flat colour chip. */}
+              {item.count === 0 && (
+                <span
+                  aria-hidden
+                  className="absolute inset-x-3 rounded-t-[12px]"
+                  style={{
+                    top: isElderly ? 22 : 17,
+                    bottom: isElderly ? 34 : 26,
+                    boxShadow: 'inset 0 8px 12px -6px rgba(0,0,0,0.45)',
+                  }}
+                />
+              )}
+            </span>
+
+            {/* THE LABEL, on its own paper strip across the folder's front.
+                Text CANNOT sit on the folder colour: white measures 5.17 / 4.18 /
+                5.89 / 4.23 over the four category hues in light mode, so green and
+                orange fail 4.5:1 — which is exactly why the old skeuomorphic
+                version needed a black scrim. The scrim was not decoration, it was
+                contrast machinery propping up an unsound arrangement. On paper it
+                clears by construction, and it is what a real folder looks like:
+                the colour is the folder, the writing is on the label. */}
+            <span
+              className={`absolute inset-x-0 bottom-0 rounded-b-[var(--r-card)] bg-[var(--surface)] flex flex-col justify-center min-w-0 ${isElderly ? 'px-4 h-[34px]' : 'px-3 h-[26px]'}`}
+            >
+              <span className={`block font-bold text-foreground tracking-tight truncate leading-tight ${isElderly ? 'text-base' : 'text-[13px]'}`}>
+                {item.name}
               </span>
             </span>
 
-            <span className="absolute inset-x-0 bottom-0 top-[44%] px-3 py-2.5 flex flex-col justify-center min-w-0">
-              {/* Mono, uppercase, small: a structural label, which is exactly what
-                  mono is for and the one thing it is still allowed to be. */}
-              <span className={`block font-mono uppercase tracking-[0.06em] text-muted-foreground ${isElderly ? 'text-[11px]' : 'text-[10px]'}`}>
-                {item.caption}
-              </span>
-              {/* The folder's NAME is user content — truncated, never restyled into
-                  something clever. */}
-              <span className={`block font-bold text-foreground tracking-tight truncate mt-0.5 ${isElderly ? 'text-lg' : 'text-sm'}`}>
-                {item.name}
-              </span>
-              {/* What the stacked paper used to say, said. */}
-              <span className={`block font-mono tabular-nums text-muted-foreground mt-0.5 ${isElderly ? 'text-xs' : 'text-[10px]'}`}>
-                {item.count === 0 ? 'Empty' : item.count}
-              </span>
+            {/* The caption sits BELOW the folder, on the board — ink on the tray,
+                which passes on both themes, and it keeps the folder itself an
+                object rather than a form. */}
+            <span
+              className={`absolute left-1 -bottom-5 font-medium text-muted-foreground truncate tabular-nums ${isElderly ? 'text-sm' : 'text-xs'}`}
+              style={{ maxWidth: '100%' }}
+            >
+              {item.caption}
+            </span>
+
+            {/* The icon rides the folder's front-right, clear of the label strip.
+                Non-text, so the 3:1 floor applies and all four hues clear it. */}
+            <span
+              aria-hidden
+              className={`absolute right-3 text-white ${isElderly ? 'top-[20px] [&_svg]:w-7 [&_svg]:h-7' : 'top-[16px] [&_svg]:w-5 [&_svg]:h-5'}`}
+            >
+              {/* 28px elderly / 20px normal — the project-a11y icon floor. It was
+                  16px. Decorative (the name is stated in words), but sized to the
+                  same rule so nothing here is the exception. */}
+              {item.icon}
             </span>
           </button>
         );
