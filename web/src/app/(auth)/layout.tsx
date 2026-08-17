@@ -23,8 +23,10 @@ export default function AuthLayout({
   return (
     // `isolate` creates the stacking context that lets the -z-10 bubble layer
     // sit above this div's background but below every in-flow child.
+    // pb-[var(--cookie-inset,0px)] lifts the trust strip clear of the cookie
+    // sheet on a first visit; 0 once acknowledged. See components/cookie-consent.
     <div
-      className="relative isolate flex min-h-screen flex-col"
+      className="relative isolate flex min-h-screen flex-col pb-[var(--cookie-inset,0px)]"
       style={{ background: 'var(--auth-radial)' }}
     >
       {/* Blurred bubble fields (same treatment as /welcome, one notch quieter —

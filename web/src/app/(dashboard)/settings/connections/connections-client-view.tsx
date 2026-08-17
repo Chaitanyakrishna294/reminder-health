@@ -202,7 +202,7 @@ export default function ConnectionsClientView({
             autoCorrect="off"
             spellCheck={false}
             aria-label="Their code"
-            className={`w-full font-mono font-bold tracking-[0.2em] bg-background border border-input rounded-[var(--r-control)] px-4 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring ${
+            className={`w-full font-mono font-bold tracking-[0.2em] bg-background border border-input rounded-[var(--r-control)] px-4 text-foreground placeholder:text-muted-foreground/90 focus:outline-none focus:ring-2 focus:ring-ring ${
               isElderly ? 'min-h-16 text-2xl' : 'min-h-12 text-base'
             }`}
           />

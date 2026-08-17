@@ -1408,7 +1408,7 @@ export default function HealthVaultClientView({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={t.vault.searchPlaceholder}
-                className={`w-full bg-muted border border-border/80 rounded-[var(--r-control)] pl-9 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary/20 text-foreground font-semibold placeholder:text-muted-foreground/50 ${
+                className={`w-full bg-muted border border-border/80 rounded-[var(--r-control)] pl-9 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary/20 text-foreground font-semibold placeholder:text-muted-foreground/90 ${
                   isElderly ? 'text-sm' : 'text-xs'
                 }`}
               />

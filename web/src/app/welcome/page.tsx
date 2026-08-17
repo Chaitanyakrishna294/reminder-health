@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Mail, Lock, Heart, UserRound, ShieldCheck, Loader2, Sparkles } from 'lucide-react';
+import { Mail, Heart, UserRound, ShieldCheck, Loader2, Sparkles } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import Turnstile, { captchaEnabled } from '@/components/turnstile';
 
@@ -87,11 +87,29 @@ export default function WelcomePage() {
     if (token && showCaptcha && !guestLoading) continueAsGuest(token);
   };
 
-  const continueToLogin = (e: React.FormEvent) => {
+  /**
+   * THE FRONT DOOR ANSWERS THE FIRST-TIME VISITOR, so the email field hands off
+   * to /register — not /login, which is where it used to go.
+   *
+   * The screen used to give the solid pink button to "Sign in" and leave
+   * "Create account" as an unfilled link under a divider, i.e. the loudest thing
+   * on a stranger's first screen was the one action a stranger cannot take. An
+   * external audit read the whole page as a returning-user login, which is the
+   * honest consequence of that weighting.
+   *
+   * Both handoffs carry the typed address so nobody types it twice — and the
+   * sign-in link carries it too (see below), which is what keeps a returning
+   * user who types their email from being pushed into a signup they will bounce
+   * off with "user already registered".
+   */
+  const continueToRegister = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = email.trim();
-    router.push(trimmed ? `/login?email=${encodeURIComponent(trimmed)}` : '/login');
+    router.push(trimmed ? `/register?email=${encodeURIComponent(trimmed)}` : '/register');
   };
+
+  /** Returning-user path, carrying whatever was typed above. */
+  const signInHref = email.trim() ? `/login?email=${encodeURIComponent(email.trim())}` : '/login';
 
   /**
    * Start a no-signup guest session.
@@ -145,7 +163,23 @@ export default function WelcomePage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#FBF7F8] dark:bg-[#0F1C5A]">
+    // data-fixed-palette opts this subtree OUT of globals.css's dark
+    // compatibility layer. Without it that layer's substring match rewrote every
+    // `text-[#0F1C5A]` here to near-white while the hardcoded pink sheet and
+    // white field stayed put — the headline at 1.75:1 and the typed email at
+    // 1.14:1. The poster is supposed to look the same in both themes (only the
+    // hero backdrop shifts, so the mascot never sits on a glaring panel at
+    // night); this attribute is what actually makes that true. The `dark:`
+    // variant below is ours and still applies — the surround goes navy, the
+    // sheet and its ink do not move.
+    //
+    // pb-[var(--cookie-inset,0px)]: reserve whatever the cookie sheet is
+    // actually occupying, so it can never sit on the first-time path. 0 when the
+    // notice has been acknowledged, which is every visit after the first.
+    <div
+      data-fixed-palette
+      className="min-h-screen flex flex-col bg-[#FBF7F8] dark:bg-[#0F1C5A] pb-[var(--cookie-inset,0px)]"
+    >
       {/* Hero: mascot over the app's auth wash + blurred bubble fields (the
           launch-splash colour family) — no flat white behind the art. */}
       {/* py-2, not py-6: the padding budget went to the larger artwork so the
@@ -158,9 +192,18 @@ export default function WelcomePage() {
           72px short of the bottom, clipping the widget. Reclaiming the hero
           makes the whole panel fit outright, so the challenge is on screen
           without depending on scrolling at all. */}
+      {/* min-h-0 is what makes the art RESPONSIVE TO HEIGHT rather than clipped.
+          A flex child will not shrink below its content's size without it, and
+          the content here is a fixed-width image with h-auto — so on a short
+          viewport the hero could not give way, and `overflow-hidden` quietly
+          cropped the mascot's head and feet instead. With min-h-0 plus
+          max-h-full/object-contain on the image, the art gives up height to the
+          action area instead of eating it. The floor drops 30vh -> 16vh for the
+          same reason: 30vh of a 640px webview is 192px reserved for decoration
+          before the headline gets a pixel. */}
       <div
         className={`relative overflow-hidden flex items-center justify-center ${
-          showCaptcha ? 'hidden' : 'flex-1 min-h-[30vh] py-2'
+          showCaptcha ? 'hidden' : 'flex-1 min-h-0 basis-[16vh] py-2'
         }`}
       >
         <div aria-hidden className="absolute inset-0" style={{ background: 'var(--auth-radial)' }} />
@@ -195,7 +238,7 @@ export default function WelcomePage() {
           aria-hidden
           width={690}
           height={528}
-          className="relative w-[330px] max-w-[82vw] h-auto select-none pointer-events-none"
+          className="relative w-[300px] max-w-[74vw] max-h-full h-auto object-contain select-none pointer-events-none"
         />
       </div>
 
@@ -232,7 +275,14 @@ export default function WelcomePage() {
             — and on a 320x560 screen those ~220px are the difference between
             the challenge fitting and being unreachable. Restored the moment the
             challenge is dismissed or completed. */}
-        <form onSubmit={continueToLogin} className={`mt-6 space-y-3.5 ${showCaptcha ? 'hidden' : ''}`}>
+        {/* Email directly above the ONE dominant action, per the audit: a first
+            visitor should not have to choose between three equally-shaped
+            buttons to find the one that applies to them. The divider that used
+            to sit between "Sign in" and "Create account" is gone with them —
+            it was separating two things of equal weight, and there are no
+            longer two. That also buys ~52px back for the fold (see the art
+            note in the hero above). */}
+        <form onSubmit={continueToRegister} className={`mt-6 space-y-3.5 ${showCaptcha ? 'hidden' : ''}`}>
           <div className="relative">
             <Mail
               className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#0F1C5A] pointer-events-none"
@@ -247,30 +297,17 @@ export default function WelcomePage() {
               className="w-full h-14 pl-12 pr-4 rounded-2xl bg-[#FFFFFF] text-[#0F1C5A] placeholder-[#64748B] border border-[#0F1C5A]/10 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#CC3D64]/40 transition-all"
             />
           </div>
+          {/* Keeps the exact fill and ink the old Sign in button had — white on
+              #CC3D64, measured 4.75:1. This pass moves weight around, it does
+              not repaint. */}
           <button
             type="submit"
             className="w-full h-14 inline-flex items-center justify-center gap-2 rounded-2xl bg-[#CC3D64] text-white font-bold text-lg shadow-md hover:brightness-95 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 transition-all cursor-pointer"
           >
-            <Lock className="w-5 h-5" aria-hidden />
-            Sign in
+            <UserRound className="w-5 h-5" aria-hidden />
+            Create free account
           </button>
         </form>
-
-        <div className={`relative flex items-center my-4 ${showCaptcha ? 'hidden' : ''}`} aria-hidden>
-          <div className="flex-grow border-t border-[#0F1C5A]/25"></div>
-          <span className="flex-shrink mx-4 font-bold text-sm text-[#0F1C5A]/70">or</span>
-          <div className="flex-grow border-t border-[#0F1C5A]/25"></div>
-        </div>
-
-        <Link
-          href="/register"
-          className={`w-full h-12 inline-flex items-center justify-center gap-2 rounded-2xl font-bold text-lg text-[#0F1C5A] hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 transition-colors ${
-            showCaptcha ? 'hidden' : ''
-          }`}
-        >
-          <UserRound className="w-5 h-5" aria-hidden />
-          Create account
-        </Link>
 
         {/* Guest mode. Deliberately the quietest of the three actions but on the
             same screen: the point is that a first-time visitor can be adding a
@@ -280,7 +317,7 @@ export default function WelcomePage() {
           type="button"
           onClick={handleGuestTap}
           disabled={guestLoading}
-          className="mt-1 w-full h-12 inline-flex items-center justify-center gap-2 rounded-2xl font-bold text-base text-[#0F1C5A]/85 underline underline-offset-4 decoration-[#0F1C5A]/30 hover:bg-white/25 hover:decoration-[#0F1C5A]/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-60 disabled:cursor-wait transition-colors cursor-pointer"
+          className="mt-3 w-full h-12 inline-flex items-center justify-center gap-2 rounded-2xl font-bold text-base text-[#0F1C5A]/85 underline underline-offset-4 decoration-[#0F1C5A]/30 hover:bg-white/25 hover:decoration-[#0F1C5A]/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-60 disabled:cursor-wait transition-colors cursor-pointer"
         >
           {guestLoading ? (
             <>
@@ -327,7 +364,26 @@ export default function WelcomePage() {
           </p>
         )}
 
-        <p className="mt-3 flex items-center justify-center gap-1.5 text-[11px] text-[#0F1C5A]/80">
+        {/* The returning-user path, demoted to a text row — the same shape
+            /login and /register already use for their cross-link, so the three
+            auth screens agree. It carries the typed address, so someone who
+            filled the field above and then realised they already have an
+            account arrives at /login with it prefilled instead of bouncing off
+            a "user already registered" error in signup.
+            44px floor: h-11 with the label centred, not a bare inline link. */}
+        <div className={`mt-2 ${showCaptcha ? 'hidden' : ''}`}>
+          <Link
+            href={signInHref}
+            className="w-full h-11 inline-flex items-center justify-center gap-1.5 rounded-2xl text-[15px] text-[#0F1C5A]/85 hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 transition-colors"
+          >
+            Already have an account?
+            <span className="font-bold underline underline-offset-4 decoration-[#0F1C5A]/40">
+              Sign in
+            </span>
+          </Link>
+        </div>
+
+        <p className="mt-2 flex items-center justify-center gap-1.5 text-[11px] text-[#0F1C5A]/80">
           <ShieldCheck className="w-4 h-4 shrink-0" aria-hidden />
           Your health data is secure and private with us.
         </p>

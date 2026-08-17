@@ -346,7 +346,7 @@ export default function NewMedicationPage() {
   };
 
   const labelClass = `block font-semibold text-foreground ${isElderly ? 'text-xl mb-2' : 'text-sm mb-1.5'}`;
-  const inputClass = `mt-1 block w-full px-4 py-3 min-h-11 rounded-[var(--r-control)] bg-muted text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm transition-all duration-200 font-[var(--font-sans)] ${
+  const inputClass = `mt-1 block w-full px-4 py-3 min-h-11 rounded-[var(--r-control)] bg-muted text-foreground placeholder:text-muted-foreground/90 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm transition-all duration-200 font-[var(--font-sans)] ${
     isElderly ? 'py-4 text-xl' : ''
   }`;
 

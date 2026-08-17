@@ -1,17 +1,18 @@
 'use client';
 
 import { useLanguage } from '@/context/language-context';
-import React, { useState } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useUiMode } from '@/context/ui-mode-context';
 import { Eye, EyeOff, User, Mail, Lock, AlertTriangle, Heart } from 'lucide-react';
 import Turnstile, { captchaEnabled } from '@/components/turnstile';
 import { buttonClasses } from '@/components/ui/button';
 import { CodeInput, SpamCallout } from '@/components/auth/code-entry';
+import LoadingMark from '@/components/ui/loading-mark';
 
-export default function RegisterPage() {
+function RegisterForm() {
   const { t } = useLanguage();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -25,8 +26,17 @@ export default function RegisterPage() {
   const [code, setCode] = useState('');
 
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
   const { isElderly } = useUiMode();
+
+  // /welcome's email field hands off HERE now, not to /login — its primary
+  // action is "Create free account". Same contract login already honoured, so
+  // nobody types their address twice on the way in.
+  useEffect(() => {
+    const emailParam = searchParams.get('email');
+    if (emailParam) setEmail(emailParam);
+  }, [searchParams]);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,7 +120,7 @@ export default function RegisterPage() {
   };
 
   // Kept identical to the login page — the two screens sit one tap apart.
-  const inputClass = `w-full pl-12 pr-4 rounded-[14px] surface-sunk border border-input text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all ${isElderly ? 'py-5 text-lg' : 'py-4 text-[15px]'}`;
+  const inputClass = `w-full pl-12 pr-4 rounded-[14px] surface-sunk border border-input text-foreground placeholder:text-muted-foreground/90 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all ${isElderly ? 'py-5 text-lg' : 'py-4 text-[15px]'}`;
   const iconClass = 'absolute left-4 top-1/2 -translate-y-1/2 text-primary pointer-events-none w-[18px] h-[18px]';
   const labelClass = `block font-bold text-foreground mb-1.5 ${isElderly ? 'text-base' : 'text-xs'}`;
 
@@ -159,7 +169,7 @@ export default function RegisterPage() {
             disabled={loading}
             className={buttonClasses({ variant: 'primary', size: 'lg', isElderly, fullWidth: true })}
           >
-            {loading ? 'Verifying…' : 'Verify & Continue'}
+            {loading ? 'Verifying…' : 'Verify & continue'}
           </button>
 
           <div className={`flex items-center justify-center gap-3 text-muted-foreground ${isElderly ? 'text-base' : 'text-xs'}`}>
@@ -168,7 +178,7 @@ export default function RegisterPage() {
             </button>
             <span aria-hidden>·</span>
             <Link href="/login" className="font-semibold hover:text-primary-strong transition-colors">
-              Back to Sign In
+              Back to sign in
             </Link>
           </div>
         </form>
@@ -296,9 +306,26 @@ export default function RegisterPage() {
       <div className={`text-center ${isElderly ? 'text-base' : 'text-sm'}`}>
         <span className="text-muted-foreground">{t.auth.alreadyHaveAccount} </span>
         <Link href="/login" className="font-semibold text-primary-strong hover:underline">
-          Sign In
+          Sign in
         </Link>
       </div>
     </div>
+  );
+}
+
+// useSearchParams needs a Suspense boundary — same wrapper login uses, for the
+// same reason (it opts the route out of static prerendering otherwise).
+export default function RegisterPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex flex-col items-center gap-3 py-10 text-sm text-muted-foreground">
+          <LoadingMark size={44} className="text-primary-strong" />
+          Loading sign-up…
+        </div>
+      }
+    >
+      <RegisterForm />
+    </Suspense>
   );
 }

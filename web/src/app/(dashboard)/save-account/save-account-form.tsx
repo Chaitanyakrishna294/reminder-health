@@ -113,7 +113,7 @@ export default function SaveAccountForm({ currentName }: { currentName: string }
   // control radius, so the off-scale `rounded-2xl` goes with it.
   // Elderly keeps its exact previous classes: it is excluded, and the swap is a
   // small warm/cool shift its branch should not inherit.
-  const inputClass = `block w-full px-4 py-3 text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm transition-all ${
+  const inputClass = `block w-full px-4 py-3 text-foreground placeholder:text-muted-foreground/90 focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm transition-all ${
     isElderly ? 'rounded-2xl bg-[#F2F2F7] py-4 text-xl' : 'surface-sunk'
   }`;
 
