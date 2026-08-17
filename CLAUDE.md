@@ -901,15 +901,59 @@ one that lists every element wider than the viewport or positioned off it, one
 that checks a full-screen surface actually equals the viewport. Run at 375×812 as
 the floor, and at 320px for anything with five or more inline targets.
 
-## --prod IS ONE EXPLICIT GO PER DEPLOY, NAMED IN THE SAME MESSAGE
+## PRODUCTION IS A MERGE TO `main`. NOTHING ELSE. `--prod` IS BANNED.
 
-Tightened 2026-08-17 after the THIRD stale-tree production overwrite
-(`8ld615gnb`, which held the production alias for 17h and carried a tree that
-predated the gate portal fix). The standing rule below was not enough, so:
+Settled 2026-08-17 after five stale-tree production overwrites and a full
+diagnosis (below). **The deploy model, in one line each:**
 
-**Nobody deploys `--prod` except on the maintainer's explicit go, given in the
-same message, naming that deploy.** Every session, every chat. Previews
-otherwise, no exceptions.
+- **Production = merge a PR to `main`.** The GitHub webhook builds it and moves
+  the production alias. No CLI step, ever. Verified four times on 2026-08-17:
+  pushes to `main` and the two merges each produced their own
+  `source: "git"` production build, `READY`, holding the alias.
+- **Previews = push a branch.** The webhook builds those too, typically within
+  ~3 minutes. `npx vercel deploy` is not needed for review any more.
+- **The CLI's only remaining job is `npx vercel alias set`**, pointing the
+  Turnstile-whitelisted hostname (`reminder-health-refresh.vercel.app`) at the
+  preview being reviewed. See the Turnstile note in M3 for why that alias exists.
+- **`npx vercel deploy --prod` is banned outright.** Not "banned without a go" —
+  banned. There is no reason left to run it: the merge does it, correctly, from
+  the committed tree instead of from whatever happens to be checked out.
+
+### THE BAN IS A POLICY, NOT A LOCK — the predicate does NOT enforce it
+
+**Tested 2026-08-17 and it FAILED, so do not trust it.** With the Ignored Build
+Step saved as
+`if [ "$VERCEL_ENV" = "production" ] && [ -z "$VERCEL_GIT_REPO_ID" ]; then exit 0; else exit 1; fi`,
+a throwaway `npx vercel deploy --prod` from a clean tree built anyway and went
+`READY` as `target: production` (`p7hwzamqd` / `dpl_BuwXwA4VvUPC8iPj4Ka88upeBPGY`).
+
+The build logs say why it is probably unfixable rather than merely mis-tuned: a
+git deploy logs `Cloning github.com/Chaitanyakrishna294/reminder-health (Branch:
+main, Commit: …)`, while the CLI deploy logs `Retrieving list of deployment
+files…` and goes straight to `Running "vercel build"`. **A CLI deploy is a file
+upload with no repository attached**, and the Ignored Build Step is a Git
+feature — Vercel's own canonical example for it is `git diff HEAD^ HEAD`, which
+needs history an upload does not have. Neither log prints an ignore-step line, so
+this is strong evidence rather than proof; what IS proven is that the predicate
+does not stop a CLI `--prod`.
+
+So the enforcement that actually exists is:
+
+1. **This rule.** Every session, every chat.
+2. **`reminder-health-git-main-….vercel.app` is the canary.** It always tracks
+   the git build of `main`. If it and `reminder-health.vercel.app` serve
+   different content, a CLI deploy is sitting on production.
+3. **If it happens again, the only mechanism left is removing the CLI's
+   credentials** (`npx vercel logout` on every disk). That is now cheap, because
+   previews come from the webhook — the sole cost is `vercel alias set`, and even
+   that has a replacement: `reminder-health-git-<branch>-<team>.vercel.app` is
+   stable per branch, so a short fixed review branch name whitelisted once in
+   Turnstile removes the last CLI dependency. (Long or slashed branch names get
+   hashed into that hostname — `fix/auth-first-time-path` became `-git-7d6098-` —
+   so the branch must be short and slash-free for this to be stable.)
+
+**There is no Vercel setting that disables CLI production deploys.** Checked
+against the full project payload, not assumed.
 
 A detail worth knowing when reconstructing one of these: **a CLI deploy from a
 working tree leaves NO provenance.** `vercel inspect` on `8ld615gnb` returned no
@@ -961,9 +1005,19 @@ had just triggered.
 - **There is no Vercel setting that disables CLI production deploys.** The full
   project payload has no such field — checked, not assumed. So the lock cannot be
   a toggle; it is either an Ignored Build Step predicate that can tell the two
-  apart, or removing the CLI's credentials.
+  apart, or removing the CLI's credentials. **The predicate route was then tried
+  and it does not work** — see the section above; credential removal is the only
+  mechanism left.
 - An Ignored Build Step keyed on `VERCEL_GIT_COMMIT_SHA` being empty **will not
-  work** — per the stamping above, CLI deploys populate it.
+  work** — per the stamping above, CLI deploys populate it. `VERCEL_GIT_REPO_ID`
+  *is* a genuine discriminator in the deployment metadata (`githubRepoId` is
+  git-only), and it still did not help, because the ignore step appears not to
+  run for an upload-based deploy at all.
+- **The actor IS recorded, contrary to the "no provenance" note above.**
+  `meta.actor` is present on CLI deploys and absent on git ones. All 13 CLI
+  production deploys in the recent window read `claude-code_*_agent` — no second
+  human, no rogue token. Every "overwrite" was a session racing the webhook it
+  had just triggered by merging.
 
 ## TWO SESSIONS DEPLOYING = SILENT OVERWRITES, AND IT LOOKS LIKE A BROKEN FIX
 
