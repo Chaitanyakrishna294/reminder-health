@@ -641,7 +641,7 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
               </p>
               <button
                 onClick={acknowledgeUnsaveable}
-                className={`w-full flex items-center justify-center gap-2 rounded-2xl bg-card text-foreground border border-border font-black hover:bg-muted active:scale-[0.98] transition-all cursor-pointer ${
+                className={`w-full flex items-center justify-center gap-2 rounded-[var(--r-control)] bg-card text-foreground border border-border font-black hover:bg-muted active:scale-[0.98] transition-all cursor-pointer ${
                   isElderly ? 'py-5 text-2xl' : FIT[fit].btn
                 }`}
               >
@@ -659,7 +659,7 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
             <button
               onClick={() => answer(event, 'TAKEN', false)}
               disabled={busyId !== null}
-              className={`w-full flex items-center justify-center gap-2 rounded-2xl bg-success text-success-foreground font-black shadow-[0_6px_16px_-6px_var(--success)] hover:bg-success/90 active:scale-[0.98] transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] disabled:opacity-50 cursor-pointer ${
+              className={`w-full flex items-center justify-center gap-2 rounded-[var(--r-control)] bg-success text-success-foreground font-black shadow-[0_6px_16px_-6px_var(--success)] hover:bg-success/90 active:scale-[0.98] transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] disabled:opacity-50 cursor-pointer ${
                 isElderly ? 'py-5 text-2xl' : FIT[fit].btn
               }`}
             >
@@ -669,7 +669,7 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
             <button
               onClick={() => answer(event, 'SKIP', false)}
               disabled={busyId !== null}
-              className={`w-full flex items-center justify-center gap-2 rounded-2xl bg-card text-foreground border border-border font-black hover:bg-muted active:scale-[0.98] transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] disabled:opacity-50 cursor-pointer ${
+              className={`w-full flex items-center justify-center gap-2 rounded-[var(--r-control)] bg-card text-foreground border border-border font-black hover:bg-muted active:scale-[0.98] transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] disabled:opacity-50 cursor-pointer ${
                 isElderly ? 'py-5 text-2xl' : FIT[fit].btn
               }`}
             >
@@ -681,7 +681,7 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
               disabled={busyId !== null}
               /* Was text-muted-foreground — the faintest text on the screen, for an
                  action that writes to the dose ledger. Quiet is fine; illegible is not. */
-              className={`w-full flex items-center justify-center gap-2 min-h-11 rounded-2xl text-foreground hover:bg-foreground/5 font-semibold transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] disabled:opacity-50 cursor-pointer ${
+              className={`w-full flex items-center justify-center gap-2 min-h-11 rounded-[var(--r-control)] text-foreground hover:bg-foreground/5 font-semibold transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] disabled:opacity-50 cursor-pointer ${
                 isElderly ? 'py-3 text-lg' : 'py-2.5 text-sm'
               }`}
             >
@@ -781,7 +781,7 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
           <button
             onClick={() => busyId === null && flashIds.length === 0 && onSnoozeAll()}
             disabled={busyId !== null || flashIds.length > 0}
-            className={`mt-4 flex items-center justify-center gap-2 min-h-11 rounded-2xl text-muted-foreground hover:text-foreground font-semibold transition-all disabled:opacity-50 cursor-pointer ${
+            className={`mt-4 flex items-center justify-center gap-2 min-h-11 rounded-[var(--r-control)] text-muted-foreground hover:text-foreground font-semibold transition-all disabled:opacity-50 cursor-pointer ${
               isElderly ? 'py-3 text-lg' : 'py-2.5 text-sm'
             }`}
           >

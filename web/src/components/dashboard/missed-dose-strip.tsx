@@ -69,7 +69,7 @@ export default function MissedDoseStrip({ events, userRole, onResolved, onUnreso
     new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   return (
-    <div className="bg-danger/5 border-2 border-danger/30 rounded-3xl p-5 space-y-3 animate-fade-in">
+    <div className="bg-danger/5 border-2 border-danger/30 rounded-[var(--r-card)] p-5 space-y-3 animate-fade-in">
       {/* Live region for the SUMMARY only. The interactive list must NOT sit
           inside role="alert" — it would re-announce the whole strip on every
           state change and put the buttons inside a live region. */}

@@ -97,7 +97,7 @@ export default function Turnstile({ onVerify }: { onVerify: (token: string | nul
 
   if (status === 'failed') {
     return (
-      <div className="bg-danger/10 text-danger-strong text-sm p-3 rounded-2xl border border-danger/20 flex items-start gap-2">
+      <div className="bg-danger/10 text-danger-strong text-sm p-3 rounded-[var(--r-card)] border border-danger/20 flex items-start gap-2">
         <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
         <div className="flex flex-col items-start gap-1.5">
           <span>Verification failed to load. Check your connection and try again.</span>

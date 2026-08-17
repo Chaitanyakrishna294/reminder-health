@@ -127,13 +127,16 @@ export default function LegalDocument({ docKey, footerLinks = [] }: LegalDocumen
             A reader deciding whether to trust a translated legal text needs that
             fact first; at the bottom it is a disclaimer nobody reaches. */}
         {isTranslated && (
-          <div className="rounded-2xl border border-border bg-muted/50 p-4 mb-8 space-y-3">
+          /* A well, not a bordered box: it receives content and sits below the
+             page (§1). Radius joins the scale — 20 for the panel, 14 for the
+             control inside it, which is also the concentric rule in §2. */
+          <div className="surface-sunk rounded-[var(--r-card)] p-4 mb-8 space-y-3">
             <p className="text-sm font-semibold text-foreground">{t.legal.translationNotice}</p>
             <button
               type="button"
               onClick={() => setShowEnglish((v) => !v)}
               aria-pressed={showEnglish}
-              className="min-h-11 px-4 rounded-xl bg-card border border-border font-bold text-sm text-foreground hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="min-h-11 px-4 rounded-[var(--r-control)] bg-card border border-border font-bold text-sm text-foreground hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               {showEnglish ? labelFor[docKey] : t.legal.readInEnglish}
             </button>
@@ -141,7 +144,11 @@ export default function LegalDocument({ docKey, footerLinks = [] }: LegalDocumen
         )}
 
         {doc.callout && (
-          <div className="rounded-2xl border border-warning/40 bg-warning/10 p-4 mb-8">
+          /* The warning KEEPS its border: §1 allows one where it is a BOUNDARY,
+             and on a tint this faint the outline is what separates the callout
+             from the page rather than decorating it. Radius only joins the
+             scale. */
+          <div className="rounded-[var(--r-card)] border border-warning/40 bg-warning/10 p-4 mb-8">
             <p className="text-sm font-semibold">{renderEmphasis(doc.callout)}</p>
           </div>
         )}
@@ -153,17 +160,27 @@ export default function LegalDocument({ docKey, footerLinks = [] }: LegalDocumen
         </section>
       </article>
 
+      {/* `--primary-strong`, never `--primary`, for pink TEXT — CLAUDE.md names
+          this as the contrast bug this project has already shipped twice. These
+          links measured 2.68:1 against the page ground; the strong token takes
+          them to 4.29:1.
+
+          FLAGGED, not silently accepted: 4.29 is still short of the 4.5:1 floor.
+          --primary-strong only clears it on a WHITE card (4.75:1) — measured on
+          the other grounds it is 4.29 on --background, 4.32 on --surface-sunk
+          and 3.97 on --board. That is a token problem, not a per-file one, and
+          the freeze puts it on the maintainer. */}
       <div className="mt-10 flex flex-wrap gap-4 text-sm">
         {footerLinks.map((key) => (
           <Link
             key={key}
             href={hrefFor[key]}
-            className="text-primary font-semibold hover:underline"
+            className="text-primary-strong font-semibold hover:underline"
           >
             {labelFor[key]}
           </Link>
         ))}
-        <Link href="/login" className="text-primary font-semibold hover:underline">
+        <Link href="/login" className="text-primary-strong font-semibold hover:underline">
           {t.legal.backToSignIn}
         </Link>
       </div>

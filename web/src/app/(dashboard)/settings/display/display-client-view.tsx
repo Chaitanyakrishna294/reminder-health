@@ -39,8 +39,8 @@ function Switch({
       aria-checked={checked}
       disabled={disabled}
       onClick={onClick}
-      className={`shrink-0 self-start sm:self-center inline-flex items-center gap-3 rounded-2xl border transition-all bg-card hover:bg-muted border-border disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-        isElderly ? 'h-16 px-5' : 'h-12 px-4'
+      className={`shrink-0 self-start sm:self-center inline-flex items-center gap-3 border transition-all bg-card hover:bg-muted border-border disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+        isElderly ? 'rounded-2xl h-16 px-5' : 'rounded-[var(--r-control)] h-12 px-4'
       }`}
     >
       <span className={`font-bold text-foreground ${isElderly ? 'text-lg' : 'text-xs'}`}>
@@ -73,7 +73,7 @@ function Row({
   isElderly: boolean;
 }) {
   return (
-    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-muted/30 border border-border/80 rounded-2xl p-4">
+    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 rounded-[var(--r-card)] bg-muted/30 border border-border/80 p-4">
       <div className="space-y-0.5">
         <span className={`font-extrabold text-foreground block ${isElderly ? 'text-xl' : 'text-sm'}`}>
           {title}

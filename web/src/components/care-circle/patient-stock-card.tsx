@@ -163,7 +163,7 @@ export default function PatientStockCard({
 
             <ul className="space-y-2.5">
               {rows.map(({ med, stock, days }) => (
-                <li key={med.id} className="rounded-2xl border border-border bg-card p-3 space-y-2">
+                <li key={med.id} className="rounded-[var(--r-card)] border border-border bg-card p-3 space-y-2">
                   <div className="flex items-baseline justify-between gap-3 min-w-0">
                     <span className="text-[13px] font-bold text-foreground truncate">{med.drug_name}</span>
                     <span className={`shrink-0 text-[11px] font-bold ${

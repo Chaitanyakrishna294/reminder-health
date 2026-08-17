@@ -212,7 +212,7 @@ export default function RefillGate({ meds, canEdit, onSnooze }: RefillGateProps)
           {remaining.map((med) => {
             const unit = unitPhrase(med.unit_type ?? undefined, med.stock);
             return (
-              <li key={med.id} className="bg-card/80 backdrop-blur-xl border border-border/70 rounded-2xl p-4 space-y-3 shadow-sm">
+              <li key={med.id} className="bg-card/80 backdrop-blur-xl border border-border/70 rounded-[var(--r-card)] p-4 space-y-3 shadow-sm">
                 <div>
                   <p className={`font-black text-foreground ${isElderly ? 'text-xl' : 'text-base'}`}>
                     {med.drug_name}
@@ -260,7 +260,7 @@ export default function RefillGate({ meds, canEdit, onSnooze }: RefillGateProps)
 
         <button
           onClick={onSnooze}
-          className={`w-full inline-flex items-center justify-center gap-2 font-bold rounded-2xl bg-card/80 backdrop-blur-xl border border-border/70 text-foreground hover:bg-muted transition-all cursor-pointer ${
+          className={`w-full inline-flex items-center justify-center gap-2 font-bold rounded-[var(--r-control)] bg-card/80 backdrop-blur-xl border border-border/70 text-foreground hover:bg-muted transition-all cursor-pointer ${
             isElderly ? 'h-16 text-lg' : 'h-12 text-sm'
           }`}
         >

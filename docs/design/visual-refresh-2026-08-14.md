@@ -99,7 +99,15 @@ Today's `rounded-3xl` (24) on cards *and* on 40px chips is the defect this fixes
 ## 3. Colour — audit and the one-accent rule
 
 - **Mind pink stays the single accent.** `--primary-strong` for anything
-  load-bearing (4.75:1), `--primary` for tints, rings and the logo. Unchanged.
+  load-bearing, `--primary` for tints, rings and the logo.
+  - **Value corrected 2026-08-17: `#CC3D64` → `#BC385C`**, on an explicit unfreeze.
+    The old figure quoted here — 4.75:1 — was true only against a WHITE CARD. On the
+    system's other grounds it measured 4.32 (`--surface-sunk`), 4.29
+    (`--background`) and 3.97 (`--board`), so pink text on the tray was below the
+    floor by construction and the number in this spec was quietly misleading. The
+    new value passes everywhere: **5.45 / 4.96 / 4.92 / 4.56**, with white on it at
+    5.44:1 so buttons hold. Hover moved with it (`#BD2F58` → `#AE2B51`).
+    Dark mode's `--primary-strong` is hand-tuned separately and unaffected.
 - **Slot tints stay surfaces**, never interactive, never text without `-ink`.
 - ~~**Slot-tinted shadows** — the board's shadow taking a slot hue by time of
   day.~~ **CUT after the device review.** It was the most distinctive idea here

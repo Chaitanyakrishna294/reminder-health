@@ -79,7 +79,7 @@ export default function AlarmRingDuration({
       <div className="flex items-start gap-3">
         <span
           aria-hidden
-          className={`shrink-0 rounded-2xl flex items-center justify-center bg-muted text-muted-foreground ${
+          className={`shrink-0 rounded-[var(--r-control)] flex items-center justify-center bg-muted text-muted-foreground ${
             isElderly ? 'w-14 h-14' : 'w-10 h-10'
           }`}
         >
@@ -104,7 +104,7 @@ export default function AlarmRingDuration({
               aria-checked={active}
               disabled={busy}
               onClick={() => choose(choice)}
-              className={`rounded-2xl px-4 font-black transition-all cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+              className={`rounded-[var(--r-control)] px-4 font-black transition-all cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                 isElderly ? 'min-h-16 text-lg' : 'min-h-12 text-sm'
               } ${
                 active

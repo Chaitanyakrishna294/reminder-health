@@ -38,7 +38,7 @@ export function CodeInput({
       autoFocus={autoFocus}
       value={value}
       onChange={(e) => onChange(e.target.value.replace(/\D/g, ''))}
-      className={`w-full px-4 rounded-2xl bg-white border border-border text-foreground shadow-sm text-center font-mono placeholder:tracking-normal placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all ${isElderly ? 'py-5 text-3xl' : 'py-4 text-2xl'}`}
+      className={`w-full px-4 rounded-[var(--r-control)] bg-card border border-border text-foreground shadow-sm text-center font-mono placeholder:tracking-normal placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all ${isElderly ? 'py-5 text-3xl' : 'py-4 text-2xl'}`}
       style={{ letterSpacing: '0.35em' }}
       placeholder="Enter code"
     />
@@ -48,7 +48,7 @@ export function CodeInput({
 export function SpamCallout({ noun = 'code' }: { noun?: 'code' | 'link' }) {
   const { isElderly } = useUiMode();
   return (
-    <div className="rounded-2xl bg-primary-soft border border-primary/20 p-4 flex items-start gap-3 text-left">
+    <div className="rounded-[var(--r-card)] bg-primary-soft border border-primary/20 p-4 flex items-start gap-3 text-left">
       <ShieldCheck
         className={`shrink-0 mt-0.5 text-primary-strong ${isElderly ? 'w-6 h-6' : 'w-5 h-5'}`}
         aria-hidden

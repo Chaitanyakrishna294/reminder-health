@@ -78,8 +78,15 @@ export default function InstallPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4 py-12 bg-[#f8fafc] dark:bg-background">
-      <div className="w-full max-w-md bg-white dark:bg-card border border-border/80 shadow-sm rounded-3xl p-8 space-y-6 text-center">
+    /* `board` + `card-lift` rather than a hex and a border. This route sits
+       outside the (dashboard) group, so it never inherited the board ground the
+       layout applies — it painted its own #f8fafc, a cool slate against the
+       system's warm tray. Spec §1 (the board is the ground, and the shadow IS a
+       card's edge), §2 (radius 20, not rounded-3xl's 24 — named there as the
+       defect the scale fixes) and §10.2 (a hardcoded colour bypasses the tokens
+       and cannot follow dark mode). */
+    <div className="flex min-h-screen items-center justify-center px-4 py-12 board">
+      <div className="w-full max-w-md card-lift p-8 space-y-6 text-center">
         {/* This page had NO way out at all — no link, no back, nothing but the
             install prompt. Left-aligned inside a centred card on purpose: a back
             control belongs where the thumb looks for it, not in the middle. */}
@@ -91,7 +98,7 @@ export default function InstallPage() {
           alt="Re-MIND-eЯ"
           width={72}
           height={72}
-          className="mx-auto rounded-2xl shadow-md"
+          className="mx-auto rounded-[var(--r-control)] shadow-md"
         />
 
         <div>
@@ -108,15 +115,16 @@ export default function InstallPage() {
         {platform === 'promptable' && (
           <button
             onClick={handleInstall}
-            className="w-full flex items-center justify-center gap-2 rounded-2xl bg-primary-strong text-primary-strong-foreground font-black px-6 py-4 text-base hover:bg-primary-strong-hover transition-all active:scale-[0.98] cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 rounded-[var(--r-control)] bg-primary-strong text-primary-strong-foreground font-black px-6 py-4 text-base hover:bg-primary-strong-hover transition-all active:scale-[0.98] cursor-pointer"
           >
-            <Download className="w-5 h-5" /> Install App
+            {/* Sentence case (ux-copy): "Install App" was title case. */}
+            <Download className="w-5 h-5" /> Install app
           </button>
         )}
 
         {platform === 'ios' && (
-          <div className="space-y-3 text-left bg-muted/30 border border-border rounded-2xl p-4">
-            <p className="text-xs font-black text-muted-foreground uppercase tracking-widest text-center mb-1">
+          <div className="space-y-3 text-left surface-sunk p-4">
+            <p className="font-mono text-[11px] font-semibold text-muted-foreground uppercase tracking-[0.06em] text-center mb-1">
               Add to Home Screen
             </p>
             <div className="flex items-start gap-3">
@@ -140,8 +148,8 @@ export default function InstallPage() {
 
         {platform === 'manual' && (
           <div className="space-y-3">
-            <div className="space-y-3 text-left bg-muted/30 border border-border rounded-2xl p-4">
-              <p className="text-xs font-black text-muted-foreground uppercase tracking-widest text-center mb-1">
+            <div className="space-y-3 text-left surface-sunk p-4">
+              <p className="font-mono text-[11px] font-semibold text-muted-foreground uppercase tracking-[0.06em] text-center mb-1">
                 Install from your browser menu
               </p>
               <div className="flex items-start gap-3">

@@ -180,7 +180,7 @@ export default function NotificationStyleClientView() {
         title={name}
         disabled={busy}
         onClick={() => run(key === 'custom' ? pickAlarmImage : () => setAlarmImage(key))}
-        className={`relative flex-1 min-w-[44px] aspect-square rounded-2xl overflow-hidden border-2 flex items-center justify-center transition-all cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+        className={`relative flex-1 min-w-[44px] aspect-square rounded-[var(--r-control)] overflow-hidden border-2 flex items-center justify-center transition-all cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
           active ? 'border-primary-strong' : 'border-border hover:border-muted-foreground/40'
         }`}
         style={background ? { background } : undefined}
@@ -231,7 +231,7 @@ export default function NotificationStyleClientView() {
               onClick={toggleSound}
               aria-label={playing ? 'Stop the sound' : 'Hear the alarm sound'}
               title={playing ? 'Stop' : 'Hear the alarm sound'}
-              className="shrink-0 w-11 h-11 rounded-2xl bg-muted text-foreground flex items-center justify-center hover:bg-muted/70 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="shrink-0 w-11 h-11 rounded-[var(--r-control)] bg-muted text-foreground flex items-center justify-center hover:bg-muted/70 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               {playing ? <Square aria-hidden className="w-4 h-4" /> : <Music aria-hidden className="w-4 h-4" />}
             </button>
@@ -246,7 +246,7 @@ export default function NotificationStyleClientView() {
         {preview && (
           <div className="flex justify-center">
             <div
-              className="w-[70%] rounded-3xl overflow-hidden border border-border pointer-events-none select-none"
+              className="w-[70%] rounded-[var(--r-card)] overflow-hidden border border-border pointer-events-none select-none"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -270,7 +270,7 @@ export default function NotificationStyleClientView() {
               type="button"
               disabled={busy}
               onClick={() => run(clearAlarmSound)}
-              className={`flex-1 min-w-[44%] rounded-2xl px-4 min-h-12 font-black transition-all cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${body} ${
+              className={`flex-1 min-w-[44%] rounded-[var(--r-control)] px-4 min-h-12 font-black transition-all cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${body} ${
                 media.soundChoice !== 'custom'
                   ? 'bg-primary-strong text-primary-strong-foreground'
                   : 'bg-muted text-foreground hover:bg-muted/70'
@@ -282,7 +282,7 @@ export default function NotificationStyleClientView() {
               type="button"
               disabled={busy}
               onClick={() => run(pickAlarmSound)}
-              className={`flex-1 min-w-[44%] rounded-2xl px-4 min-h-12 font-black transition-all cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${body} ${
+              className={`flex-1 min-w-[44%] rounded-[var(--r-control)] px-4 min-h-12 font-black transition-all cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${body} ${
                 media.soundChoice === 'custom'
                   ? 'bg-primary-strong text-primary-strong-foreground'
                   : 'bg-muted text-foreground hover:bg-muted/70'

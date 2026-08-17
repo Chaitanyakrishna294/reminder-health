@@ -85,7 +85,7 @@ export default function AccountClientView({ fullName, email, role, isGuest }: Ac
       {/* ── WHO YOU ARE ───────────────────────────────────────────────────── */}
       <section className="card-lift overflow-hidden divide-y divide-border">
         <div className={`flex items-center gap-3 px-5 ${isElderly ? 'py-5' : 'py-4'}`}>
-          <span aria-hidden className={`shrink-0 rounded-2xl bg-muted text-muted-foreground flex items-center justify-center ${isElderly ? 'w-14 h-14' : 'w-10 h-10'}`}>
+          <span aria-hidden className={`shrink-0 bg-muted text-muted-foreground flex items-center justify-center ${isElderly ? 'rounded-2xl w-14 h-14' : 'rounded-[var(--r-control)] w-10 h-10'}`}>
             <UserCircle className={isElderly ? 'w-7 h-7' : 'w-5 h-5'} />
           </span>
           <span className="min-w-0">
@@ -95,7 +95,7 @@ export default function AccountClientView({ fullName, email, role, isGuest }: Ac
         </div>
 
         <div className={`flex items-center gap-3 px-5 ${isElderly ? 'py-5' : 'py-4'}`}>
-          <span aria-hidden className={`shrink-0 rounded-2xl bg-muted text-muted-foreground flex items-center justify-center ${isElderly ? 'w-14 h-14' : 'w-10 h-10'}`}>
+          <span aria-hidden className={`shrink-0 bg-muted text-muted-foreground flex items-center justify-center ${isElderly ? 'rounded-2xl w-14 h-14' : 'rounded-[var(--r-control)] w-10 h-10'}`}>
             <Mail className={isElderly ? 'w-7 h-7' : 'w-5 h-5'} />
           </span>
           <span className="min-w-0">
@@ -108,7 +108,7 @@ export default function AccountClientView({ fullName, email, role, isGuest }: Ac
         </div>
 
         <div className={`flex items-center gap-3 px-5 ${isElderly ? 'py-5' : 'py-4'}`}>
-          <span aria-hidden className={`shrink-0 rounded-2xl bg-muted text-muted-foreground flex items-center justify-center ${isElderly ? 'w-14 h-14' : 'w-10 h-10'}`}>
+          <span aria-hidden className={`shrink-0 bg-muted text-muted-foreground flex items-center justify-center ${isElderly ? 'rounded-2xl w-14 h-14' : 'rounded-[var(--r-control)] w-10 h-10'}`}>
             <ShieldAlert className={isElderly ? 'w-7 h-7' : 'w-5 h-5'} />
           </span>
           <span className="min-w-0">
@@ -126,7 +126,7 @@ export default function AccountClientView({ fullName, email, role, isGuest }: Ac
       {isGuest && (
         <Link
           href="/save-account"
-          className={`w-full bg-warning/10 border border-warning/35 rounded-3xl px-5 flex items-center gap-3 hover:bg-warning/15 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset ${
+          className={`w-full bg-warning/10 border border-warning/35 rounded-[var(--r-card)] px-5 flex items-center gap-3 hover:bg-warning/15 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset ${
             isElderly ? 'min-h-[80px] py-4' : 'min-h-[64px] py-3'
           }`}
         >
@@ -147,7 +147,7 @@ export default function AccountClientView({ fullName, email, role, isGuest }: Ac
       )}
 
       {/* ── DELETE ────────────────────────────────────────────────────────── */}
-      <section className="rounded-3xl border border-danger/30 bg-danger/[0.03] p-5 space-y-3">
+      <section className="rounded-[var(--r-card)] border border-danger/30 bg-danger/[0.03] p-5 space-y-3">
         <h2 className={`font-extrabold text-danger-strong ${label}`}>Delete this account</h2>
         <p className={`text-muted-foreground font-semibold text-balance ${body}`}>
           Removes your medicines, your dose history and your care circle. This cannot
@@ -156,7 +156,7 @@ export default function AccountClientView({ fullName, email, role, isGuest }: Ac
         <button
           type="button"
           onClick={() => { setConfirmText(''); setModalOpen(true); }}
-          className={`inline-flex items-center gap-2 rounded-2xl border border-danger/40 text-danger-strong font-bold hover:bg-danger/10 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+          className={`inline-flex items-center gap-2 rounded-[var(--r-control)] border border-danger/40 text-danger-strong font-bold hover:bg-danger/10 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
             isElderly ? 'min-h-14 px-6 text-base' : 'min-h-11 px-4 text-xs'
           }`}
         >
@@ -189,7 +189,7 @@ export default function AccountClientView({ fullName, email, role, isGuest }: Ac
               autoCapitalize="characters"
               autoCorrect="off"
               aria-label="Type DELETE to confirm"
-              className="w-full min-h-12 font-mono font-bold tracking-widest bg-background border border-input rounded-2xl px-4 text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              className="w-full min-h-12 font-mono font-bold tracking-widest bg-background border border-input rounded-[var(--r-control)] px-4 text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             />
             <div className="space-y-2">
               {/* Cancel takes the accent, as in the exit dialog: the safe action gets
@@ -198,7 +198,7 @@ export default function AccountClientView({ fullName, email, role, isGuest }: Ac
                 type="button"
                 onClick={() => setModalOpen(false)}
                 disabled={deleting}
-                className="w-full min-h-12 rounded-2xl bg-primary-strong text-primary-strong-foreground font-bold text-sm hover:bg-primary-strong-hover cursor-pointer disabled:opacity-50"
+                className="w-full min-h-12 rounded-[var(--r-control)] bg-primary-strong text-primary-strong-foreground font-bold text-sm hover:bg-primary-strong-hover cursor-pointer disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -206,7 +206,7 @@ export default function AccountClientView({ fullName, email, role, isGuest }: Ac
                 type="button"
                 onClick={deleteAccount}
                 disabled={deleting || confirmText.trim().toUpperCase() !== 'DELETE'}
-                className="w-full min-h-12 rounded-2xl bg-danger-solid text-danger-solid-foreground font-bold text-sm hover:opacity-90 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                className="w-full min-h-12 rounded-[var(--r-control)] bg-danger-solid text-danger-solid-foreground font-bold text-sm hover:opacity-90 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {deleting ? 'Deleting…' : 'Delete for ever'}
               </button>

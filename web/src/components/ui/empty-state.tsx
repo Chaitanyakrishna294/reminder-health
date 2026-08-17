@@ -50,7 +50,7 @@ export function EmptyState({
       : 'p-4 text-center'
     : isElderly
       ? 'p-10 rounded-3xl border-2 border-dashed border-border text-center'
-      : 'p-8 rounded-3xl border border-dashed border-border text-center';
+      : 'p-8 rounded-[var(--r-card)] border border-dashed border-border text-center';
 
   return (
     <div className={`flex flex-col items-center justify-center ${container} ${className}`}>

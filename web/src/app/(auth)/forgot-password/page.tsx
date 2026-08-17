@@ -158,13 +158,13 @@ export default function ForgotPasswordPage() {
       </header>
 
       {error && (
-        <div className="bg-danger/10 text-danger-strong text-sm p-3 rounded-2xl border border-danger/20 flex items-start gap-2" role="alert">
+        <div className="bg-danger/10 text-danger-strong text-sm p-3 rounded-[var(--r-card)] border border-danger/20 flex items-start gap-2" role="alert">
           <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden /> <span>{error}</span>
         </div>
       )}
 
       {info && (
-        <div className="bg-success/10 text-success-strong text-sm p-3 rounded-2xl border border-success/20 flex items-start gap-2" role="status">
+        <div className="bg-success/10 text-success-strong text-sm p-3 rounded-[var(--r-card)] border border-success/20 flex items-start gap-2" role="status">
           <Mail className="w-4 h-4 shrink-0 mt-0.5" aria-hidden /> <span>{info}</span>
         </div>
       )}

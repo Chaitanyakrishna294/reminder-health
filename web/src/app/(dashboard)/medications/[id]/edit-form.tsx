@@ -260,8 +260,12 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
   };
 
   const labelClass = `block font-semibold text-foreground ${isElderly ? 'text-xl mb-2' : 'text-sm mb-1.5'}`;
-  const inputClass = `mt-1 block w-full px-4 py-3 min-h-11 border border-input rounded-2xl bg-background text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 text-sm transition-all duration-200 font-[var(--font-sans)] ${
-    isElderly ? 'py-4 text-xl rounded-2xl border-2' : ''
+  // Radius moved into the elderly ternary below rather than left here: both arms
+  // set it explicitly, so elderly keeps 16 and non-elderly joins the scale (§2).
+  // Leaving a base `rounded-2xl` with an override in one arm would have relied on
+  // stylesheet order between a named utility and an arbitrary value.
+  const inputClass = `mt-1 block w-full px-4 py-3 min-h-11 border border-input bg-background text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 text-sm transition-all duration-200 font-[var(--font-sans)] ${
+    isElderly ? 'py-4 text-xl rounded-2xl border-2' : 'rounded-[var(--r-control)]'
   }`;
 
   const stepContentClass = `transition-all duration-300 ease-out ${
@@ -285,7 +289,7 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
 
       {/* Error Banner */}
       {error && (
-        <div className="flex items-start gap-3 bg-danger/8 text-danger text-sm p-4 rounded-2xl border border-danger/15">
+        <div className="flex items-start gap-3 bg-danger/8 text-danger text-sm p-4 rounded-[var(--r-card)] border border-danger/15">
           <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
           <span>{error}</span>
         </div>
@@ -374,7 +378,7 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
                         key={opt.id}
                         type="button"
                         onClick={() => setUnitType(opt.id)}
-                        className={`p-3.5 rounded-2xl border text-center transition-all duration-200 flex flex-col items-center justify-center cursor-pointer gap-2 ${
+                        className={`p-3.5 rounded-[var(--r-control)] border text-center transition-all duration-200 flex flex-col items-center justify-center cursor-pointer gap-2 ${
                           unitType === opt.id 
                             ? 'border-primary bg-primary/6 ring-2 ring-primary/15 text-primary' 
                             : 'border-border hover:border-primary/30 hover:bg-muted/40 text-muted-foreground'
@@ -402,7 +406,7 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
                         key={freq.id}
                         type="button"
                         onClick={() => setFrequency(freq.id as any)}
-                        className={`p-4 rounded-2xl border text-left transition-all duration-200 flex items-center justify-between cursor-pointer ${
+                        className={`p-4 rounded-[var(--r-control)] border text-left transition-all duration-200 flex items-center justify-between cursor-pointer ${
                           frequency === freq.id 
                             ? 'border-primary bg-primary/6 ring-2 ring-primary/15' 
                             : 'border-border hover:border-primary/30 hover:bg-muted/40'
@@ -465,7 +469,7 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
                   <p className="text-xs text-muted-foreground mb-3">{t.medForm.reminderTimesHint}</p>
                   <div className="grid grid-cols-1 gap-2.5">
                     {times.map((time, idx) => (
-                      <div key={idx} className="bg-muted/30 p-4 rounded-2xl border border-border flex items-center justify-between gap-4">
+                      <div key={idx} className="bg-muted/30 p-4 rounded-[var(--r-card)] border border-border flex items-center justify-between gap-4">
                         <div className="flex items-center gap-2.5">
                           <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
                             <Clock className="w-4 h-4 text-primary" />
@@ -558,7 +562,7 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
             {/* STEP 4: Inventory Tracking */}
             {step === 4 && (
               <div className="space-y-5">
-                <div className="flex items-center justify-between p-4 bg-muted/30 rounded-2xl border border-border">
+                <div className="flex items-center justify-between p-4 bg-muted/30 rounded-[var(--r-card)] border border-border">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                       <Layers className="w-5 h-5 text-primary" />
@@ -647,7 +651,7 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
                           type="button"
                           onClick={() => setPriority(p.id as any)}
                           aria-pressed={isSelected}
-                          className={`p-4 rounded-2xl border text-left transition-all duration-200 flex items-center justify-between cursor-pointer hover:bg-muted/40 ${
+                          className={`p-4 rounded-[var(--r-control)] border text-left transition-all duration-200 flex items-center justify-between cursor-pointer hover:bg-muted/40 ${
                             isSelected ? `${t.borderStrong} ${t.bg} ring-2 ${t.border}` : 'border-border'
                           }`}
                         >
@@ -695,7 +699,7 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
             {step === 6 && (
               <div className="space-y-5">
                 {/* Summary Card */}
-                <div className="rounded-2xl border border-border overflow-hidden">
+                <div className="rounded-[var(--r-card)] border border-border overflow-hidden">
                   {/* Drug name header */}
                   <div className="bg-primary/6 px-5 py-4 border-b border-border/40">
                     <div className="flex items-center gap-3">
@@ -779,7 +783,7 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
                 <button
                   type="button"
                   onClick={handlePrevStep}
-                  className={`px-5 py-2.5 font-semibold rounded-2xl border border-border text-foreground bg-muted hover:bg-muted/70 transition-all duration-200 flex items-center gap-2 cursor-pointer ${
+                  className={`px-5 py-2.5 font-semibold rounded-[var(--r-control)] border border-border text-foreground bg-muted hover:bg-muted/70 transition-all duration-200 flex items-center gap-2 cursor-pointer ${
                     isElderly ? 'h-[72px] text-lg' : 'h-11 text-sm'
                   }`}
                 >
@@ -789,7 +793,7 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
               ) : (
                 <Link
                   href="/medications"
-                  className={`px-5 py-2.5 font-semibold rounded-2xl border border-border text-foreground bg-muted hover:bg-muted/70 transition-all duration-200 flex items-center justify-center gap-2 ${
+                  className={`px-5 py-2.5 font-semibold rounded-[var(--r-control)] border border-border text-foreground bg-muted hover:bg-muted/70 transition-all duration-200 flex items-center justify-center gap-2 ${
                     isElderly ? 'h-[72px] text-lg' : 'h-11 text-sm'
                   }`}
                 >
@@ -801,7 +805,7 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
                 <button
                   type="button"
                   onClick={handleNextStep}
-                  className={`px-6 py-2.5 font-semibold rounded-2xl bg-primary-strong text-primary-strong-foreground hover:bg-primary-strong-hover transition-all duration-200 flex items-center gap-2 cursor-pointer shadow-sm ${
+                  className={`px-6 py-2.5 font-semibold rounded-[var(--r-control)] bg-primary-strong text-primary-strong-foreground hover:bg-primary-strong-hover transition-all duration-200 flex items-center gap-2 cursor-pointer shadow-sm ${
                     isElderly ? 'h-[72px] text-lg' : 'h-11 text-sm'
                   }`}
                 >
@@ -812,7 +816,7 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
                 <button
                   type="submit"
                   disabled={loading}
-                  className={`px-6 py-2.5 font-semibold rounded-2xl bg-success text-success-foreground hover:bg-success/90 transition-all duration-200 flex items-center gap-2 cursor-pointer disabled:opacity-50 shadow-sm ${
+                  className={`px-6 py-2.5 font-semibold rounded-[var(--r-control)] bg-success text-success-foreground hover:bg-success/90 transition-all duration-200 flex items-center gap-2 cursor-pointer disabled:opacity-50 shadow-sm ${
                     isElderly ? 'h-[72px] text-lg' : 'h-11 text-sm'
                   }`}
                 >

@@ -194,7 +194,7 @@ export default function CallSchedule({ telegramId, isElderly }: { telegramId: st
   }: { icon: React.ReactNode; title: string; k: 'morning' | 'afternoon' | 'night' | 'nightly_confirm'; soon?: boolean }) => {
     const w = prefs[k];
     return (
-      <div className={`flex items-center justify-between gap-2 bg-muted/30 border border-border/80 rounded-2xl px-4 py-3 ${soon ? 'opacity-60' : ''}`}>
+      <div className={`flex items-center justify-between gap-2 bg-muted/30 border border-border/80 rounded-[var(--r-card)] px-4 py-3 ${soon ? 'opacity-60' : ''}`}>
         <div className="flex items-center gap-2.5 min-w-0">
           <span className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">{icon}</span>
           <span className={`font-bold text-foreground leading-tight ${label}`}>{title}</span>
@@ -265,7 +265,7 @@ export default function CallSchedule({ telegramId, isElderly }: { telegramId: st
       ) : (
         <>
           {/* Master enable */}
-          <div className="flex items-center justify-between gap-3 bg-muted/30 border border-border/80 rounded-2xl px-4 py-3">
+          <div className="flex items-center justify-between gap-3 bg-muted/30 border border-border/80 rounded-[var(--r-card)xl px-4 py-3">
             <div className="min-w-0">
               <span className={`font-extrabold text-foreground block ${label}`}>Enable call reminders</span>
               <span className="text-muted-foreground block text-[11px] font-semibold">Turn on to set up reminder calls for this account.</span>
@@ -377,7 +377,7 @@ export default function CallSchedule({ telegramId, isElderly }: { telegramId: st
                         aria-disabled={opt.soon}
                         title={opt.soon ? 'Coming soon' : undefined}
                         onClick={() => { if (!opt.soon) setPrefs((p) => ({ ...p, mode: opt.id })); }}
-                        className={`relative text-left rounded-2xl border p-3 transition-all ${
+                        className={`relative text-left rounded-[var(--r-card)] border p-3 transition-all ${
                           opt.soon
                             ? 'bg-muted/20 border-border/60 opacity-60 cursor-not-allowed'
                             : sel
@@ -409,7 +409,7 @@ export default function CallSchedule({ telegramId, isElderly }: { telegramId: st
                   <WindowRow icon={<Moon className="w-4 h-4" />} title="Night" k="night" soon />
                 </div>
               ) : (
-                <p className="text-[12px] text-muted-foreground font-semibold bg-muted/30 border border-border/80 rounded-2xl p-3">
+                <p className="text-[12px] text-muted-foreground font-semibold bg-muted/30 border border-border/80 rounded-[var(--r-card)] p-3">
                   We&apos;ll call at each medicine&apos;s scheduled time. (Per-medication calling rolls out after the grouped mode.)
                 </p>
               )}
@@ -422,7 +422,7 @@ export default function CallSchedule({ telegramId, isElderly }: { telegramId: st
               </div>
 
               {/* Consent */}
-              <label className="flex items-start gap-2.5 bg-primary/5 border border-primary/20 rounded-2xl p-3 cursor-pointer">
+              <label className="flex items-start gap-2.5 bg-primary/5 border border-primary/20 rounded-[var(--r-card)] p-3 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={prefs.consent}
@@ -439,7 +439,7 @@ export default function CallSchedule({ telegramId, isElderly }: { telegramId: st
 
           {msg && (
             <div
-              className={`flex items-start gap-2 p-3 rounded-2xl text-[12px] font-bold ${
+              className={`flex items-start gap-2 p-3 rounded-[var(--r-card)] text-[12px] font-bold ${
                 msg.type === 'ok' ? 'bg-success/10 border border-success/30 text-success' : 'bg-danger/10 border border-danger/30 text-danger'
               }`}
             >

@@ -250,8 +250,11 @@ export default async function PatientConsolePage({ params }: PageProps) {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 bg-muted/60 border border-border px-4 py-3 rounded-2xl">
-          <div className="h-2.5 w-2.5 rounded-full bg-success animate-pulse" />
+        <div className="flex items-center gap-3 bg-muted/60 border border-border px-4 py-3 rounded-[var(--r-card)]">
+          {/* A static dot (§6). It pulsed to say "live", but the line beside it
+              already reads "Active" — the motion was repeating in animation
+              what the words say in words. */}
+          <div className="h-2.5 w-2.5 rounded-full bg-success" />
           <div className="text-xs">
             <p className="text-muted-foreground font-bold">{t.patient.monitoringStatus}</p>
             <p className="text-foreground font-extrabold mt-0.5">{t.patient.active}</p>
@@ -260,7 +263,7 @@ export default async function PatientConsolePage({ params }: PageProps) {
       </div>
 
       {/* 3. Narrative-First Health Story Card */}
-      <div className={`p-6 border rounded-3xl shadow-sm flex flex-col gap-2.5 ${storyStyles}`}>
+      <div className={`p-6 border rounded-[var(--r-card)] shadow-sm flex flex-col gap-2.5 ${storyStyles}`}>
         <div className="flex items-center gap-2">
           {healthStory.type === 'danger' && <ShieldAlert className="w-5 h-5 text-danger" />}
           {healthStory.type === 'warning' && <Package className="w-5 h-5 text-warning" />}
@@ -445,7 +448,7 @@ export default async function PatientConsolePage({ params }: PageProps) {
             </div>
 
             {!connection.can_view_medications ? (
-              <div className="py-10 text-center space-y-2.5 bg-muted/40 rounded-2xl border border-border p-4">
+              <div className="py-10 text-center space-y-2.5 bg-muted/40 rounded-[var(--r-card)] border border-border p-4">
                 <Lock className="w-8 h-8 mx-auto text-muted-foreground opacity-60" />
                 <p className="text-xs text-foreground font-bold">
                   {patientName} has chosen not to share medication schedules.
@@ -483,7 +486,7 @@ export default async function PatientConsolePage({ params }: PageProps) {
             </h3>
 
             {!connection.can_view_reports ? (
-              <div className="py-10 text-center space-y-2.5 bg-muted/40 rounded-2xl border border-border p-4">
+              <div className="py-10 text-center space-y-2.5 bg-muted/40 rounded-[var(--r-card)] border border-border p-4">
                 <EyeOff className="w-8 h-8 mx-auto text-muted-foreground opacity-60" />
                 <p className="text-xs text-foreground font-bold">
                   This information has not been shared with you.
@@ -530,7 +533,7 @@ export default async function PatientConsolePage({ params }: PageProps) {
             </h3>
 
             {!connection.can_view_vault ? (
-              <div className="py-10 text-center space-y-2.5 bg-muted/40 rounded-2xl border border-border p-4">
+              <div className="py-10 text-center space-y-2.5 bg-muted/40 rounded-[var(--r-card)] border border-border p-4">
                 <FolderLock className="w-8 h-8 mx-auto text-muted-foreground opacity-60" />
                 <p className="text-xs text-foreground font-bold">
                   {patientName} has chosen not to share health documents.
@@ -545,7 +548,7 @@ export default async function PatientConsolePage({ params }: PageProps) {
                   <Link
                     key={folder}
                     href={`/health-vault?patientId=${patientProfile?.id}`}
-                    className="bg-muted/40 border border-border rounded-2xl p-4 flex flex-col justify-between hover:border-primary/45 hover:bg-muted/60 transition-all shadow-sm group"
+                    className="bg-muted/40 border border-border rounded-[var(--r-card)] p-4 flex flex-col justify-between hover:border-primary/45 hover:bg-muted/60 transition-all shadow-sm group"
                   >
                     <div>
                       <FileText className="w-6 h-6 text-primary group-hover:scale-105 transition-transform" />

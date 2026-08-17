@@ -45,10 +45,13 @@ const VARIANTS: Record<ButtonVariant, string> = {
 
 // Minimum 44px height in every size — `sm` gets there through a shorter label and
 // tighter padding rather than a shorter box.
+// Radius is `--r-control` (14) at every size — §2's scale is 20/14/10 and a
+// button is a control. These were 12/16/16, i.e. three different values, none of
+// them on the scale, in the one file whose whole job is that every button agrees.
 const SIZES: Record<ButtonSize, string> = {
-  sm: 'h-11 px-3.5 text-xs gap-1.5 rounded-xl',
-  md: 'h-12 px-5 text-sm gap-2 rounded-2xl',
-  lg: 'h-14 px-6 text-base gap-2.5 rounded-2xl',
+  sm: 'h-11 px-3.5 text-xs gap-1.5 rounded-[var(--r-control)]',
+  md: 'h-12 px-5 text-sm gap-2 rounded-[var(--r-control)]',
+  lg: 'h-14 px-6 text-base gap-2.5 rounded-[var(--r-control)]',
 };
 
 const ELDERLY_SIZES: Record<ButtonSize, string> = {

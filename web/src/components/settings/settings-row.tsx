@@ -44,8 +44,16 @@ export default function SettingsRow({
     <>
       <span
         aria-hidden
-        className={`shrink-0 rounded-2xl flex items-center justify-center ${
-          isElderly ? 'w-14 h-14' : 'w-10 h-10'
+        /* Radius joins the 20/14/10 scale (§2); `rounded-2xl` is 16, which is
+           not a step on it. 14 (`--r-control`) is the nearest sanctioned value
+           for a small control-sized tile.
+
+           BRANCH-GUARDED: elderly is excluded from the redesign, so it keeps
+           the 16 it already rendered. This is a shared component, so the guard
+           is what keeps elderly's output byte-identical rather than a promise
+           that it was not edited. */
+        className={`shrink-0 flex items-center justify-center ${
+          isElderly ? 'rounded-2xl w-14 h-14' : 'rounded-[var(--r-control)] w-10 h-10'
         } ${tone === 'danger' ? 'bg-danger/10 text-danger-strong' : 'bg-muted text-muted-foreground'}`}
       >
         {/* 28px in elderly — the written floor. */}

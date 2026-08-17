@@ -297,7 +297,11 @@ export default function TodaysSchedule({
   const getStatusBadge = (status: string) => (
     <Badge
       tone={doseTone(status)}
-      className={status === 'ESCALATED_TO_CG' ? 'animate-pulse' : ''}
+      /* No pulse on an escalated dose (§6). The status colour and the label
+         already say it; a throbbing row on the screen someone opens six times
+         a day is how a signal gets tuned out. Same removal as the escalation
+         markers on Today. */
+      className=""
     >
       {STATUS_ICON[status] ?? <Clock className="w-3 h-3" />}
       {status === 'ESCALATED_TO_CG' ? 'Escalated' : doseLabel(status)}
@@ -374,7 +378,7 @@ export default function TodaysSchedule({
              list icon. Given real size and real room, the empty day stops looking
              like a failed load and starts looking like a quiet day, which is what
              it actually is. */
-          <div className="px-6 py-10 flex flex-col items-center text-center gap-5 bg-card/60 rounded-3xl border border-dashed border-border/80">
+          <div className="px-6 py-10 flex flex-col items-center text-center gap-5 bg-card/60 rounded-[var(--r-card)] border border-dashed border-border/80">
             <BrainMascot {...mascotSlot('emptyState', isElderly)} />
             <p className={`text-muted-foreground font-semibold text-balance ${isElderly ? 'text-lg' : 'text-base'}`}>
               {isPastDay

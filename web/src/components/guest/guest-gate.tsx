@@ -14,9 +14,9 @@ import { Lock, ArrowRight } from 'lucide-react';
 export default function GuestGate({ title, reason }: { title: string; reason: string }) {
   return (
     <div className="mx-auto max-w-xl">
-      <div className="rounded-2xl bg-[#F6F6F9] dark:bg-muted overflow-hidden">
+      <div className="rounded-[var(--r-card)] bg-surface-sunk dark:bg-muted overflow-hidden">
         <div className="px-6 py-8 text-center">
-          <span className="mx-auto w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+          <span className="mx-auto w-14 h-14 rounded-[var(--r-control)] bg-primary/10 flex items-center justify-center text-primary">
             <Lock className="w-7 h-7" aria-hidden />
           </span>
           <h1 className="mt-4 text-xl font-bold text-foreground">{title}</h1>
@@ -24,7 +24,7 @@ export default function GuestGate({ title, reason }: { title: string; reason: st
 
           <Link
             href="/save-account"
-            className="mt-6 w-full h-14 inline-flex items-center justify-center gap-2 rounded-2xl bg-primary text-white font-bold text-base shadow-md hover:brightness-95 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 transition-all"
+            className="mt-6 w-full h-14 inline-flex items-center justify-center gap-2 rounded-[var(--r-control)] bg-primary text-white font-bold text-base shadow-md hover:brightness-95 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 transition-all"
           >
             Save my account
             <ArrowRight className="w-5 h-5" aria-hidden />

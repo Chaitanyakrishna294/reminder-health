@@ -38,7 +38,7 @@ export default function CookieConsent() {
       aria-label="Cookie notice"
       className="fixed inset-x-0 bottom-0 z-[100] p-4 sm:p-6"
     >
-      <div className="mx-auto max-w-3xl rounded-2xl border border-border bg-card shadow-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+      <div className="mx-auto max-w-3xl rounded-[var(--r-card)] border border-border bg-card shadow-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center gap-3">
         <p className="text-xs sm:text-sm text-muted-foreground flex-1">
           We use only essential cookies to keep you signed in. See our{' '}
           <Link href="/privacy" className="text-primary font-semibold hover:underline">Privacy Policy</Link>{' '}

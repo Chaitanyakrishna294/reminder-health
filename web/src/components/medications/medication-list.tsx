@@ -415,7 +415,7 @@ export default function MedicationList({
           Warning tone, not danger: running low is a waiting state with time to
           act, and the word "low" carries the meaning so colour is never alone. */}
       {!selectedDay && !isElderly && lowStockMeds.length > 0 && (
-        <div className="flex items-start gap-3 rounded-2xl border border-warning/35 bg-warning/10 px-4 py-3">
+        <div className="flex items-start gap-3 rounded-[var(--r-card)] border border-warning/35 bg-warning/10 px-4 py-3">
           <Package className="w-4 h-4 shrink-0 mt-0.5 text-warning-strong" aria-hidden />
           <div className="min-w-0">
             <p className={`font-bold text-warning-strong ${isElderly ? 'text-base' : 'text-[13px]'}`}>
@@ -451,7 +451,7 @@ export default function MedicationList({
                  stays as the accessible name below. */
               placeholder="Search medicines"
               aria-label="Search your medications or the medicine directory"
-              className={`w-full rounded-2xl bg-card border border-border pl-10 pr-12 font-semibold text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors ${
+              className={`w-full rounded-[var(--r-control)] bg-card border border-border pl-10 pr-12 font-semibold text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors ${
                 isElderly ? 'h-14 text-base' : 'h-11 text-[13px]'
               }`}
             />
@@ -472,7 +472,7 @@ export default function MedicationList({
           </div>
 
           {q.length >= 2 && (
-            <div className="rounded-2xl border border-border bg-card p-3 space-y-2">
+            <div className="rounded-[var(--r-card)] border border-border bg-card p-3 space-y-2">
               <p className={`font-black text-muted-foreground ${isElderly ? 'text-sm' : 'text-[11px]'}`}>
                 From the medicine directory
               </p>
@@ -699,7 +699,7 @@ export default function MedicationList({
           </div>
 
           {dosesForSelectedDay.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border bg-card/60 p-8 text-center">
+            <div className="rounded-[var(--r-card)] border border-dashed border-border bg-card/60 p-8 text-center">
               <p className={`font-bold text-foreground ${isElderly ? 'text-base' : 'text-sm'}`}>A clear day</p>
               <p className={`font-medium text-muted-foreground mt-1 ${isElderly ? 'text-sm' : 'text-xs'}`}>
                 No doses on this day.
@@ -818,7 +818,7 @@ export default function MedicationList({
           <div className="card-lift max-w-sm w-full p-6 space-y-5" style={{ boxShadow: '0 8px 40px rgba(16, 28, 90, 0.18)' }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0" style={{ background: cardTheme(stockModalMed).tint, color: cardTheme(stockModalMed).color }}>
+                <div className="w-11 h-11 rounded-[var(--r-control)] flex items-center justify-center shrink-0" style={{ background: cardTheme(stockModalMed).tint, color: cardTheme(stockModalMed).color }}>
                   {getUnitIcon(stockModalMed.unit_type, 'w-5 h-5')}
                 </div>
                 <div className="min-w-0">
@@ -844,7 +844,7 @@ export default function MedicationList({
                 onChange={(e) => { setStockInput(e.target.value); setStockError(''); }}
                 onKeyDown={(e) => { if (e.key === 'Enter') confirmAddStock(); }}
                 placeholder="0"
-                className="mt-1.5 w-full px-4 py-3 bg-muted rounded-2xl text-sm font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                className="mt-1.5 w-full px-4 py-3 bg-muted rounded-[var(--r-control)] text-sm font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
               />
               {(stockModalMed.current_stock ?? stockModalMed.tablet_count ?? null) !== null && (
                 <span className="block mt-1.5 text-[11px] font-medium text-muted-foreground">
