@@ -917,6 +917,54 @@ git metadata at all, and once its aliases moved it 302s, so what it contained is
 now unrecoverable. `vercel ls` tells you WHICH deploy is live; nothing tells you
 what was in it.
 
+### THE OVERWRITER WAS THE CLI ITSELF — git auto-deploy was never broken
+
+Diagnosed 2026-08-17 from the Vercel REST API, after five "overwrites" were
+blamed on a second session and then on a dead git integration. **Both were
+wrong.** The git path has worked the whole time and fires on every merge:
+
+- Project link is live — `github / Chaitanyakrishna294 / reminder-health`,
+  **Production Branch `main`**, **Root Directory `web`**,
+  `gitProviderOptions.createDeployments: "enabled"`, and
+  **`commandForIgnoringBuildStep: null`** (there has never been one).
+- **61 of the last 100 deployments are `source: "git"`** — including one
+  production build per merge: PR #7 → `dpl_8dRiWBef5A`, PR #8 → `dpl_cnqQeeoNi1`,
+  PR #9 → `dpl_9UCjZPMhZK`. All `READY`. "Zero automatic deployments" was a
+  misread of the dashboard, not a fact about the project.
+
+**Why the dashboard cannot be read for this.** A CLI deploy from inside a git
+repo **stamps the local HEAD onto itself** — `githubCommitSha`,
+`githubCommitRef`, `githubCommitMessage`, even `githubDeployment: "1"`. So in the
+Deployments list a CLI deploy is visually identical to a webhook deploy: same
+commit message, same branch, same everything. A merge that auto-built and was
+then overwritten by a CLI `--prod` of the same commit **looks like one
+deployment**. That is why this went five rounds.
+
+- **The one field that discriminates is `source` (`"git"` vs `"cli"`), and it is
+  API-only.** It is not in `vercel ls`, not in `vercel inspect`, not in the UI.
+- **Corrects the paragraph above**: a CLI deploy does not lack provenance, it
+  carries *borrowed* provenance, which is worse — it looks authoritative and
+  describes a commit that may share nothing with the uploaded tree.
+
+**The actual mechanism, and it needs no second session:** production target is
+production target. A `--prod` and a merge build both claim the production alias
+**on completion, so the one that finishes LAST wins.** The 12:52 pair —
+`dpl_8UNPdZG7X4` (git) and `dpl_4pax1rBicu` (cli), same minute, same commit — is
+that race, and the CLI one holds `reminder-health.vercel.app` today. The
+"16 seconds" was never two chats colliding; it was one chat racing the webhook it
+had just triggered.
+
+**Consequences worth keeping:**
+- **`reminder-health-git-main-….vercel.app` always tracks the GIT build** of
+  `main`. It is the honest canary: if it and `reminder-health.vercel.app` serve
+  different content, a CLI deploy is sitting on production.
+- **There is no Vercel setting that disables CLI production deploys.** The full
+  project payload has no such field — checked, not assumed. So the lock cannot be
+  a toggle; it is either an Ignored Build Step predicate that can tell the two
+  apart, or removing the CLI's credentials.
+- An Ignored Build Step keyed on `VERCEL_GIT_COMMIT_SHA` being empty **will not
+  work** — per the stamping above, CLI deploys populate it.
+
 ## TWO SESSIONS DEPLOYING = SILENT OVERWRITES, AND IT LOOKS LIKE A BROKEN FIX
 
 Paid for 2026-08-16. A fix was deployed to production, verified, and reported
