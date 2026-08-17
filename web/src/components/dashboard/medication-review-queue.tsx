@@ -10,6 +10,31 @@ import { PremiumToast } from '@/components/ui/premium-toast';
 import LoadingMark from '@/components/ui/loading-mark';
 import moment from 'moment-timezone';
 
+/**
+ * THIS CARD IS FOR RECENT MEMORY, NOT AN INFINITE BACKLOG.
+ *
+ * It used to select every UNCONFIRMED dose for the patient with no date floor and
+ * no limit, so it asked about every dose ever left unanswered, forever. Measured
+ * on real data 2026-08-17: 54 unconfirmed rows in four days, several medications
+ * unanswered on every single day, accumulating without bound.
+ *
+ * That is the double-ask disease, and the mechanism was not what it looked like.
+ * Answers DO reach the server and DO clear the status — one medication showed
+ * TAKEN on the 14th and SKIPPED on the 15th while the 16th and 17th sat
+ * unconfirmed. What the card showed was consecutive days of the SAME medication,
+ * which reads exactly like being asked twice about one dose.
+ *
+ * The rule, set by the maintainer: a guess about a four-day-old dose is worse
+ * data than an honest gap. Older unanswered doses stay in the record as
+ * missed/unconfirmed and remain visible in planner history — the app simply
+ * stops interrogating about them.
+ */
+
+/** Only doses this recent are worth asking about. Beyond it, memory is a guess. */
+const REVIEW_WINDOW_HOURS = 48;
+/** A short list someone can actually finish. Oldest first within the window. */
+const REVIEW_MAX_ITEMS = 5;
+
 interface MedicationReviewQueueProps {
   patientTelegramChatId: string;
   userRole: 'PATIENT' | 'CAREGIVER';
@@ -70,7 +95,13 @@ export default function MedicationReviewQueue({
         `)
         .eq('telegram_id', patientTelegramChatId)
         .eq('reminder_status', 'UNCONFIRMED')
-        .order('scheduled_for', { ascending: false });
+        // The window and the cap, applied in the QUERY rather than after it: an
+        // unbounded select was also the reason this card cost a growing amount on
+        // every app open. Oldest-first inside the window, so the dose whose memory
+        // is faintest is asked about first while it is still worth asking.
+        .gte('scheduled_for', new Date(Date.now() - REVIEW_WINDOW_HOURS * 3600_000).toISOString())
+        .order('scheduled_for', { ascending: true })
+        .limit(REVIEW_MAX_ITEMS);
 
       if (error) throw error;
       // Same guard as the dashboard: a deleted medication leaves medication_id NULL, so
@@ -147,24 +178,54 @@ export default function MedicationReviewQueue({
         
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
+            {/* Says what it IS — recent doses only. The old title ("Help Us
+                Complete Your Medication History") promised a complete record and
+                so implied every gap ever, which is exactly what it used to ask
+                about. Sentence case, and no "please" begging for data (ux-copy). */}
             <h3 className="text-lg font-black text-foreground tracking-tight flex items-center gap-2.5">
-              <Pill className="w-5 h-5 text-primary" />
-              Help Us Complete Your Medication History
+              <Pill className="w-5 h-5 text-primary-strong" />
+              Doses from the last 2 days
             </h3>
             <p className="text-xs text-muted-foreground font-medium max-w-xl leading-relaxed">
-              We noticed a few medications from earlier that were not confirmed. Please let us know if you took them.
+              These were not confirmed at the time. If you remember, mark them — anything
+              older stays as it is, because a guess is worse than a gap.
             </p>
           </div>
-          <span className="shrink-0 bg-primary/10 border border-primary/20 text-primary text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full w-max">
-            {events.length} Pending Review
+          <span className="shrink-0 bg-primary/10 border border-primary/20 text-primary-strong text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full w-max">
+            {events.length} to check
           </span>
         </div>
 
         <div className="divide-y divide-border/60 text-xs">
           {events.map((event) => {
+            /**
+             * WHICH DAY, said in a word rather than a date.
+             *
+             * This is the other half of the double-ask. The window keeps the list
+             * short, but inside 48 hours you will often have the SAME medication on
+             * two consecutive days — verified on live data: "Nee 9:40 PM" appears
+             * for both the 15th and the 16th. The day was already shown, as
+             * "August 15, 2026" in 10px under a bold drug name, which is the easiest
+             * thing on the card to miss. Two rows then look like one dose asked
+             * twice, which is exactly what was reported.
+             *
+             * Inside a 48h window "Yesterday" and "Today" are always unambiguous and
+             * are read at a glance, so the day leads and the absolute date goes.
+             *
+             * FLAGGED, not fixed here — `.tz('Asia/Kolkata')` is HARDCODED. For any
+             * user outside IST this can name the wrong day, which on this card means
+             * being asked about "yesterday's" dose that was actually today's. The
+             * dashboard already threads a `referenceTimeZone` to other components
+             * (see notifications-client-view); this one should take it too. That is a
+             * correctness change with a prop signature attached, so it wants its own
+             * commit rather than riding along inside a copy fix.
+             */
             const dateObj = moment(event.scheduled_for).tz('Asia/Kolkata');
             const timeStr = dateObj.format('h:mm A');
-            const dateStr = dateObj.format('MMMM D, YYYY');
+            const startOfToday = moment().tz('Asia/Kolkata').startOf('day');
+            const daysAgo = startOfToday.diff(dateObj.clone().startOf('day'), 'days');
+            const dateStr =
+              daysAgo === 0 ? 'Today' : daysAgo === 1 ? 'Yesterday' : dateObj.format('ddd D MMM');
             const isUpdating = resolvingId === event.id;
 
             return (
@@ -185,8 +246,11 @@ export default function MedicationReviewQueue({
                         </span>
                       )}
                     </h4>
-                    <p className="text-[10px] text-muted-foreground font-bold mt-0.5">
-                      Scheduled for: {dateStr} at {timeStr}
+                    {/* The DAY leads and is legible — 12px, not 10, and the
+                        day-word carries the emphasis because it is the thing that
+                        distinguishes two rows of the same medication. */}
+                    <p className="text-xs text-muted-foreground font-bold mt-0.5">
+                      <span className="text-foreground">{dateStr}</span>, {timeStr}
                     </p>
                   </div>
                 </div>
