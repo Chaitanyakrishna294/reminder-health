@@ -999,6 +999,16 @@ This is stronger than the freeze below: the freeze governs *how* a change is
 made, this says there is no design work to make. Bug fixes to shipped surfaces
 are of course still fixes.
 
+**`/settings/help` IS AN ACCEPTED DEVIATION (2026-08-17) — do not "fix" it.**
+It is the one surface deliberately off the 20/14/10 radius scale, keeping a
+bordered `rounded-3xl` card and a 16px tile. It is a SERVER component that
+elderly can reach, so `useUiMode` gives no branch to guard with; the only routes
+to conformance are changing elderly's rendering (violates the standing
+exclusion) or a CSS guard on `[data-density="elderly"]`, which is stamped in an
+effect and would therefore show elderly one wrong frame on every load. For a
+24px radius on a help page, **the cure costs more than the disease.** Full
+reasoning in [`docs/design/conformance-audit.md`](docs/design/conformance-audit.md) §D6.
+
 Two exceptions were re-confirmed as WON'T-FIX when the track closed, so nobody
 re-opens them as tidying:
 - **`/welcome`'s hardcoded palette stays** (`#0F1C5A`, `#CC3D64`, `#F59FB4`). It
