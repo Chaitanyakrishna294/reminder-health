@@ -11,7 +11,7 @@ import RetryLadderFields, { isCustomLadder } from '@/components/medications/retr
 import { ladderError } from '@/lib/schedule/retry-ladder';
 import { useUiMode } from '@/context/ui-mode-context';
 import { type UnitType, unitOptions, stepMeta, frequencies, priorities, weekdays, describeDoseDays, unitPhrase } from '@/components/medications/medication-form-options';
-import { validateMedicationStep, buildSharedMedicationFields, normalizeDoseDays } from '@/lib/medications/form-logic';
+import { validateMedicationStep, firstBlockingStep, buildSharedMedicationFields, normalizeDoseDays } from '@/lib/medications/form-logic';
 import { getToneTheme } from '@/lib/severity-theme';
 import MedicationCatalogLink from '@/components/medications/medication-catalog-link';
 import type { CatalogLinkValue } from '@/lib/medications/catalog';
@@ -165,6 +165,33 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
     }, 150);
   };
 
+  /**
+   * STEP JUMPING, IDENTICAL TO THE ADD FORM.
+   *
+   * The stepper here was six plain <div>s — no button, no handler — so tapping a
+   * step did nothing while the same strip in the add form navigated. Editing is
+   * exactly when jumping matters: you opened the form to change ONE field, and
+   * walking six Next taps to reach it is the whole cost of the feature.
+   *
+   * The rule comes from `firstBlockingStep` in lib/medications/form-logic.ts,
+   * beside the validator both forms already share. Keeping it there rather than in
+   * either page is what stops these two drifting again — which is how this
+   * asymmetry appeared in the first place.
+   */
+  const goToStep = (target: number) => {
+    if (target === step) return;
+    const blocked = firstBlockingStep(target, step, {
+      drugName, times, dosageAmount, enableInventory, currentStock, stockThreshold,
+    });
+    if (blocked) {
+      setError(blocked.error);
+      if (blocked.step !== step) animateStep(blocked.step, blocked.step > step ? 'forward' : 'backward');
+      return;
+    }
+    setError(null);
+    animateStep(target, target > step ? 'forward' : 'backward');
+  };
+
   const handleNextStep = (e: React.MouseEvent) => {
     e.preventDefault();
     setError(null);
@@ -298,17 +325,30 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
       <div className={`card-lift shadow-md overflow-hidden ${isElderly ? 'border-2' : ''}`}>
         
         {/* ── Premium Stepper ── */}
-        <div className="px-6 pt-6 pb-4 md:px-8 md:pt-8">
-          <div className="flex items-center justify-between gap-1">
+        {/* Same six-step overflow as the add wizard — this strip is the same family
+            and was sized for five steps too. px-4 on mobile, no container gap, and
+            the connector margins drop, which is the only way six 44px targets fit
+            375px without shrinking the targets. */}
+        <div className="px-4 pt-6 pb-4 md:px-8 md:pt-8">
+          <div className="flex items-center justify-between">
             {stepMeta.map((s, i) => {
               const stepNum = i + 1;
               const isCompleted = step > stepNum;
               const isCurrent = step === stepNum;
               return (
                 <React.Fragment key={stepNum}>
-                  <div className="flex flex-col items-center gap-1.5 min-w-0">
+                  {/* A real <button>, matching the add form. These were <div>s, so the
+                      strip looked identical and did nothing when tapped. 44px target
+                      (project-a11y) around the 36px circle. */}
+                  <button
+                    type="button"
+                    onClick={() => goToStep(stepNum)}
+                    aria-label={`Go to step ${stepNum}: ${s.label}`}
+                    aria-current={isCurrent ? 'step' : undefined}
+                    className="flex flex-col items-center justify-center gap-1.5 min-w-11 min-h-11 cursor-pointer group/step focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[var(--r-chip)]"
+                  >
                     <div
-                      className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${
+                      className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 group-hover/step:scale-105 ${
                         isCompleted
                           ? 'bg-success text-white'
                           : isCurrent
@@ -323,9 +363,9 @@ export default function EditMedicationForm({ medication }: EditMedicationFormPro
                     }`}>
                       {s.label}
                     </span>
-                  </div>
+                  </button>
                   {i < stepMeta.length - 1 && (
-                    <div className={`flex-1 h-[2px] rounded-full mx-1 mt-[-18px] sm:mt-0 transition-all duration-300 ${
+                    <div className={`flex-1 min-w-[3px] h-[2px] rounded-full mx-0 sm:mx-1 mt-[-18px] sm:mt-0 transition-all duration-300 ${
                       step > stepNum ? 'bg-success' : 'bg-muted'
                     }`} />
                   )}

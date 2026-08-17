@@ -29,7 +29,7 @@ import GuideAutoStart from '@/components/guide/guide-auto-start';
 import { useGuide } from '@/components/guide/guide-context';
 import { TOURS } from '@/components/guide/guide-content';
 import { searchMedicationCatalog, type CatalogLinkValue } from '@/lib/medications/catalog';
-import { validateMedicationStep, buildSharedMedicationFields, normalizeDoseDays } from '@/lib/medications/form-logic';
+import { validateMedicationStep, firstBlockingStep, buildSharedMedicationFields, normalizeDoseDays } from '@/lib/medications/form-logic';
 import { useLanguage } from '@/context/language-context';
 import {
   Pill,
@@ -243,9 +243,26 @@ export default function NewMedicationPage() {
     }
   };
 
-  // Jump directly to any step via the stepper.
+  /**
+   * Jump directly to any step via the stepper.
+   *
+   * It used to jump anywhere unconditionally, which made the stepper a skip button:
+   * tapping "6" from step 1 reached Review with no name and no reminder time. Now
+   * forward jumps validate every step being skipped over (backward is always free —
+   * see `firstBlockingStep`), and a blocked jump LANDS on the offending step with
+   * its message rather than doing nothing, because a control that silently refuses
+   * reads as broken.
+   */
   const goToStep = (target: number) => {
     if (target === step) return;
+    const blocked = firstBlockingStep(target, step, {
+      drugName, times, dosageAmount, enableInventory, currentStock, stockThreshold,
+    });
+    if (blocked) {
+      setError(blocked.error);
+      if (blocked.step !== step) animateStep(blocked.step, blocked.step > step ? 'forward' : 'backward');
+      return;
+    }
     setError(null);
     animateStep(target, target > step ? 'forward' : 'backward');
   };
@@ -367,8 +384,19 @@ export default function NewMedicationPage() {
         <div className="card-lift overflow-hidden">
           
           {/* ── Premium Stepper ── */}
-          <div className="px-6 pt-6 pb-4 md:px-8 md:pt-8">
-            <div className="flex items-center justify-between gap-1">
+          {/* SIX STEPS HAVE TO FIT 375px, AND THE TARGETS DO NOT NEGOTIATE.
+              This strip was laid out for five. At 375 the card is 327, px-6 left
+              279, and the strip wanted 264 of buttons + 44 of container gap + 40 of
+              connector margin = 348. Step 6 rendered outside the card.
+
+              44px targets are the floor (project-a11y), so six of them need 264px
+              and the space can only come from the gaps: px-4 on mobile buys 295,
+              the container gap goes (the connectors already separate the circles),
+              and the connector margins go with it. That leaves ~31px for five
+              flex-1 connectors — short dashes rather than long rules, which is the
+              honest trade at this width. Labels were already `hidden sm:block`. */}
+          <div className="px-4 pt-6 pb-4 md:px-8 md:pt-8">
+            <div className="flex items-center justify-between">
               {stepMeta.map((s, i) => {
                 const stepNum = i + 1;
                 const isCompleted = step > stepNum;
@@ -401,7 +429,7 @@ export default function NewMedicationPage() {
                       </span>
                     </button>
                     {i < stepMeta.length - 1 && (
-                      <div className={`flex-1 h-[2px] rounded-full mx-1 mt-[-18px] sm:mt-0 transition-all duration-300 ${
+                      <div className={`flex-1 min-w-[3px] h-[2px] rounded-full mx-0 sm:mx-1 mt-[-18px] sm:mt-0 transition-all duration-300 ${
                         step > stepNum ? 'bg-primary' : 'bg-muted'
                       }`} />
                     )}

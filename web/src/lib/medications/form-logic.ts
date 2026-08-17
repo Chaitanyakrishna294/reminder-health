@@ -91,6 +91,38 @@ export function validateMedicationStep(
 }
 
 /**
+ * CAN THE STEPPER JUMP THERE — and if not, which step is in the way.
+ *
+ * Lives here, next to `validateMedicationStep`, because that is what stops the add
+ * and edit forms drifting apart again. Both already share the step LIST
+ * (`stepMeta`) and the per-step VALIDATOR; the jump rule was the one piece each
+ * page was free to invent, and the two promptly diverged — add let you jump and
+ * skipped validation doing it, edit did not let you jump at all.
+ *
+ * The rule:
+ *   - BACKWARD is always allowed. You are returning to something you have already
+ *     filled in, and blocking that would trap someone on a step they want to fix.
+ *   - FORWARD validates every step being skipped over. Tapping "6" from step 2 is
+ *     navigation, not a licence to bypass steps 2 through 5.
+ *
+ * Returns the FIRST blocking step and its message rather than a bare false, so the
+ * caller can land the user on the problem with the reason showing. A jump that
+ * silently does nothing is indistinguishable from a dead control.
+ */
+export function firstBlockingStep(
+  target: number,
+  from: number,
+  s: Parameters<typeof validateMedicationStep>[1],
+): { step: number; error: string } | null {
+  if (target <= from) return null;
+  for (let step = from; step < target; step++) {
+    const error = validateMedicationStep(step, s);
+    if (error) return { step, error };
+  }
+  return null;
+}
+
+/**
  * The medication row fields written identically by both the insert (new) and the
  * update (edit) paths. Callers add their own page-specific fields (e.g. telegram_id,
  * active, next_reminder_at) by spreading this result.
