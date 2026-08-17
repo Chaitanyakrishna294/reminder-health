@@ -325,7 +325,7 @@ function LoginForm() {
             disabled={loading}
             className={buttonClasses({ variant: 'primary', size: 'lg', isElderly, fullWidth: true })}
           >
-            {loading ? 'Verifying…' : 'Verify & Sign in'}
+            {loading ? 'Verifying…' : 'Verify & sign in'}
           </button>
 
           <div
