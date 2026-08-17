@@ -163,10 +163,23 @@ export default function WelcomePage() {
   };
 
   return (
+    // data-fixed-palette opts this subtree OUT of globals.css's dark
+    // compatibility layer. Without it that layer's substring match rewrote every
+    // `text-[#0F1C5A]` here to near-white while the hardcoded pink sheet and
+    // white field stayed put — the headline at 1.75:1 and the typed email at
+    // 1.14:1. The poster is supposed to look the same in both themes (only the
+    // hero backdrop shifts, so the mascot never sits on a glaring panel at
+    // night); this attribute is what actually makes that true. The `dark:`
+    // variant below is ours and still applies — the surround goes navy, the
+    // sheet and its ink do not move.
+    //
     // pb-[var(--cookie-inset,0px)]: reserve whatever the cookie sheet is
     // actually occupying, so it can never sit on the first-time path. 0 when the
     // notice has been acknowledged, which is every visit after the first.
-    <div className="min-h-screen flex flex-col bg-[#FBF7F8] dark:bg-[#0F1C5A] pb-[var(--cookie-inset,0px)]">
+    <div
+      data-fixed-palette
+      className="min-h-screen flex flex-col bg-[#FBF7F8] dark:bg-[#0F1C5A] pb-[var(--cookie-inset,0px)]"
+    >
       {/* Hero: mascot over the app's auth wash + blurred bubble fields (the
           launch-splash colour family) — no flat white behind the art. */}
       {/* py-2, not py-6: the padding budget went to the larger artwork so the

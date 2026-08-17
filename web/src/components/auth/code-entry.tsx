@@ -38,7 +38,7 @@ export function CodeInput({
       autoFocus={autoFocus}
       value={value}
       onChange={(e) => onChange(e.target.value.replace(/\D/g, ''))}
-      className={`w-full px-4 rounded-[var(--r-control)] bg-card border border-border text-foreground shadow-sm text-center font-mono placeholder:tracking-normal placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all ${isElderly ? 'py-5 text-3xl' : 'py-4 text-2xl'}`}
+      className={`w-full px-4 rounded-[var(--r-control)] bg-card border border-border text-foreground shadow-sm text-center font-mono placeholder:tracking-normal placeholder:text-muted-foreground/90 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all ${isElderly ? 'py-5 text-3xl' : 'py-4 text-2xl'}`}
       style={{ letterSpacing: '0.35em' }}
       placeholder="Enter code"
     />

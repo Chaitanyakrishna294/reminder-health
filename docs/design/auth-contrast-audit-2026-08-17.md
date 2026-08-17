@@ -100,7 +100,13 @@ placeholder failure reaches every form in the app that uses the shared
 
 ## Proposals, with measured after-values
 
-### A. Stop the dark ink shim reaching the poster — **recommended, fixes 6 of 8**
+> **Status 2026-08-17, after maintainer review: A and B are APPROVED and APPLIED**
+> (unfreeze granted for exactly these two, on the grounds that a typed email at
+> 1.14:1 is a defect rather than a style). Measured after-values below are now
+> confirmed on the rebuilt markup, not predicted. **C and D remain open** — they
+> were not part of the approval.
+
+### A. Stop the dark ink shim reaching the poster — ✅ APPLIED, fixes 6 of 8
 
 Scope the shim so it cannot rewrite a surface that owns its palette. Mark the
 poster (`data-fixed-palette` on `/welcome`'s root) and exclude it:
@@ -110,39 +116,60 @@ poster (`data-fixed-palette` on `/welcome`'s root) and exclude it:
 :root.dark [class*="text-[#0F172A]"]:not([data-fixed-palette] *) { … }
 ```
 
-| | before | after |
+| | before | predicted | **measured after** |
+|---|---|---|---|
+| Typed email on the white field | 1.14:1 | 15.74:1 | **15.74:1** ✅ |
+| Headline (needs 3.0) | 1.75:1 | 7.87:1 | **7.87:1** ✅ |
+| Subtitle / trust line | 1.75:1 | 5.40:1 | **5.41:1** ✅ |
+| Guest / sign-in row | 1.75:1 | 6.01:1 | **5.97:1** ✅ |
+
+`/welcome` dark now measures **0 failures**. The primary button was already
+passing (4.75:1) and is unchanged.
+
+Implemented as `data-fixed-palette` on `/welcome`'s root plus
+`:not([data-fixed-palette] *)` on the three ink/border shim rules. This restores
+the stated intent rather than adding a second palette. The `dark:` variant on the
+root is ours and still applies, so the surround still goes navy while the sheet
+and its ink hold still — which is what the file's original comment describes.
+
+`:not()` with a descendant combinator is Selectors L4 (Chrome 88+); support is
+demonstrated by the measured ratios above rather than assumed.
+
+**Follow-up worth doing separately:** the shim is a token-migration leftover. The
+honest end state is deleting it once nothing depends on it, rather than adding
+more opt-outs.
+
+### B. Input placeholders — ✅ APPLIED at /90, all nine sites
+
+| | before | **measured after** |
 |---|---|---|
-| Typed email on the white field | 1.14:1 | **15.74:1** |
-| Headline (needs 3.0) | 1.75:1 | **7.87:1** |
-| Subtitle / trust line | 1.75:1 | **5.40:1** |
-| Guest / sign-in row | 1.75:1 | **6.01:1** |
+| Light (`--muted-foreground` on `--surface-sunk`) | 2.51:1 | **4.55:1** ✅ |
+| Dark | 4.01:1 | **7.55:1** ✅ |
 
-This restores the stated intent rather than adding a second palette, and it costs
-one attribute plus two `:not()`s. Worth checking what else the shim is currently
-load-bearing for before it ships — it is a migration leftover, so the honest
-follow-up is deleting it once nothing needs it.
+Applied to **all nine** occurrences, not just auth — seven were `/60` and two
+(`settings/connections`, `health-vault`) were `/50` and worse. A faint hint fails
+the same way wherever it appears.
 
-### B. Input placeholders — needs a decision, not just a number
+**The hint-vs-value cue survives without a second mechanism, measured:** the
+placeholder-to-value contrast gap is **9.77** in light (4.55 vs 14.32) and
+**8.68** in dark (7.55 vs 16.23). A weight split (regular placeholder, medium
+value) was considered per the maintainer's suggestion and **not** taken: it would
+change the rendering of every typed value in the app during a frozen design
+track, to reinforce a cue that is already strong. Revisit only if the /90
+placeholder reads as a filled value on a real device.
 
-`placeholder:text-muted-foreground/60` → light needs **/90 (4.54:1)** to pass;
-/70 is 3.02:1 and /80 is 3.68:1, so nothing gentle clears the bar. Dark passes
-from /70 (5.02:1).
-
-The trade-off is real: at /90 the placeholder is nearly as dark as a typed value,
-which weakens the one cue distinguishing "hint" from "content". The better answer
-is probably a dedicated `--placeholder` token tuned per theme rather than an
-opacity on `--muted-foreground`. Flagging rather than picking, since this reaches
-every form in the app.
-
-### C. Footer legal links — drop the opacity
+### C. Footer legal links — OPEN, not approved
 
 `text-muted-foreground/80` → `text-muted-foreground` at 11px: light **3.93:1 →
 6.20:1**, dark 4.79 → 6.61:1. No visual cost worth defending; they are already
-the quietest text on the screen.
+the quietest text on the screen. Re-measured after the approved changes and still
+**3.94:1** — untouched, because it was not in the approval.
 
-### D. Captcha-state "Back" button — one character
+### D. Captcha-state "Back" button — OPEN, not approved
 
-`#0F1C5A/70` → `/75`: **4.30:1 → 4.82:1**.
+`#0F1C5A/70` → `/75`: **4.30:1 → 4.82:1**. This one is inside the hardcoded
+palette, so it needs the same kind of explicit go A got. It is only reachable in
+the guest-captcha state.
 
 ## Applied
 

@@ -364,11 +364,26 @@
 :root.dark .hover\:bg-\[\#EFEFF3\]:hover,
 :root.dark .hover\:bg-\[\#E9E9EE\]:hover { background-color: var(--accent-surface) !important; }
 
-:root.dark [class*="text-[#0F1C5A]"],
-:root.dark [class*="text-[#0F172A]"] { color: var(--foreground) !important; }
-:root.dark [class*="text-[#475569]"] { color: var(--muted-foreground) !important; }
+/* THE SHIM MUST NOT REACH A SURFACE THAT OWNS ITS PALETTE.
+   `[class*=…]` is a SUBSTRING match, so these also catch `text-[#0F1C5A]/80` and
+   any ancestor that merely sets the inherited ink — which is how they reached
+   /welcome, a deliberately fixed-palette poster, and rewrote its ink to
+   near-white while its hardcoded `bg-[#F59FB4]` / `bg-[#FFFFFF]` grounds stayed
+   put. Measured 2026-08-17: headline 1.75:1, and the email you had just typed
+   sat at 1.14:1 on the white field.
+   The exception as recorded says that screen must not re-skin in dark mode. It
+   already did, halfway — ink re-skinned, grounds did not — so this `:not()` is
+   what makes the recorded exception true rather than a change to it. Anything
+   carrying `data-fixed-palette` is opting out of the whole compatibility layer
+   and is responsible for its own contrast in both themes.
+   `:not()` with a descendant combinator is Selectors L4 (Chrome 88+), fine for
+   the Capacitor system WebView; the ratios below were verified in-browser, so
+   support is demonstrated rather than assumed. */
+:root.dark [class*="text-[#0F1C5A]"]:not([data-fixed-palette] *),
+:root.dark [class*="text-[#0F172A]"]:not([data-fixed-palette] *) { color: var(--foreground) !important; }
+:root.dark [class*="text-[#475569]"]:not([data-fixed-palette] *) { color: var(--muted-foreground) !important; }
 
-:root.dark [class*="border-[#0F1C5A]"] { border-color: var(--border) !important; }
+:root.dark [class*="border-[#0F1C5A]"]:not([data-fixed-palette] *) { border-color: var(--border) !important; }
 
 /* Floating bottom overlays — the install FAB/banner and toasts. They live in the ROOT
    layout, so they know nothing about the dashboard's floating dock and used to paint on
