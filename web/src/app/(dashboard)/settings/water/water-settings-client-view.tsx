@@ -128,13 +128,16 @@ export default function WaterSettingsClientView({ initial }: { initial: WaterSet
 
       <section className="card-lift p-5 space-y-4">
         <label className="flex items-start gap-3 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={s.enabled}
-            disabled={busy}
-            onChange={(e) => save({ enabled: e.target.checked })}
-            className="mt-1 w-6 h-6 shrink-0 accent-[var(--hydration)] cursor-pointer"
-          />
+          {/* 44px hit area, same wrapper as the other consent-style boxes. */}
+          <span className="shrink-0 w-11 h-11 -my-2.5 -ml-3 flex items-center justify-center">
+            <input
+              type="checkbox"
+              checked={s.enabled}
+              disabled={busy}
+              onChange={(e) => save({ enabled: e.target.checked })}
+              className="w-6 h-6 accent-[var(--hydration)] cursor-pointer"
+            />
+          </span>
           <span className="min-w-0">
             <span className={`block font-extrabold text-foreground ${label}`}>Track my water</span>
             <span className={`block text-muted-foreground font-semibold mt-0.5 text-balance ${body}`}>

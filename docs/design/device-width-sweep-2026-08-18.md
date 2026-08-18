@@ -6,8 +6,8 @@ The testing-phase pass described in
 every route. Element-level conformance was already checked in the 2026-08-17
 audit — this is the other half, and the two find different things.
 
-**Status: public routes DONE (9) and FIXED. Dose gate DONE via harness.
-Authed routes PENDING (25)** — see [What is not covered yet](#what-is-not-covered-yet).
+**Status: COMPLETE.** 9 public routes + 19 authed routes + the dose gate, at
+375×812 and 320px. Findings fixed except one flagged for a decision.
 
 ## How it was run
 
@@ -173,6 +173,54 @@ Chrome or on the phone does not help: each is a separate cookie jar, and the
 Chrome extension is not connected. Checked and still signed out at the time of
 writing: `reminder-health.vercel.app`, `reminder-health-refresh.vercel.app`.
 
+## Authed routes — 19 swept, plus the dashboard at both widths
+
+Run against a signed-in session on a local production build. Routes: dashboard,
+health vault, medications, medications/new, care circle, notifications, the
+settings hub and its ten rooms, medical profile, schedule planner, emergency.
+
+**Everything passes the page-level checks:**
+
+| check | result |
+|---|---|
+| horizontal scrolling | **none**, on any of the 19, at 375 or 320 |
+| elements off-edge or over-wide (unclipped) | **none** |
+| the five-icon nav | **5 of 5, all on screen**, everywhere it renders |
+
+**Neither historic regression reproduces.** The dashboard does not cut off at the
+left edge, and the nav does not drop an icon — at 375 (items 56×48) or at 320
+(items 52×48). Whatever caused those in August is gone.
+
+**False positives, for the next reader:** the raw offender count is 15 at 375 and
+22 at 320 on the dashboard alone. Every one is inside an `overflow`-clipped
+ancestor — decorative wash layers and the horizontally-scrolling dose strip,
+which is *supposed* to extend past the viewport. The sweep now classifies these
+automatically by walking ancestors for a non-visible `overflow`; only unclipped
+elements are reported as real.
+
+### Finding — the week strip's day targets are too narrow
+
+The seven day buttons in the dashboard's week strip:
+
+| | width | height | floor |
+|---|---|---|---|
+| at 375px | **31px** | 64px | 44px (project) |
+| at 320px | **23px** | 64px | 44px project · 24px WCAG 2.5.8 AA |
+
+Height is fine; width is not. At 320 they fall below even the WCAG AA minimum.
+Seven 44px targets *do* fit inside 320px (7 × 44 = 308), so this is solvable —
+but it changes how the strip looks, so it is **flagged for a decision rather than
+fixed**.
+
+### Fixed — two more label-wrapped checkboxes
+
+`/medical-profile` ("Show my photo to my care circle", 20×20) and
+`/settings/water` ("Track my water", 24×24) had the same shape as the register
+consent box: the wrapping `<label>` already made the row tappable, so the
+effective target was never that small, but the visible box is what a thumb aims
+at. Both now use the **same 44×44 wrapper** register uses — one pattern in the
+codebase, not three.
+
 ## Fixed in this phase
 
 All five findings above are resolved, in two commits:
@@ -215,9 +263,19 @@ Most of the height came from the footer mascot yielding rather than holding —
   notice is up. That is the notice reserving its own height so it covers nothing;
   it self-resolves on dismiss and never hides an action.
 
-### Still open
+### Also fixed, second batch
 
-- **`Forgot password?` is a 16px-tall target** on `/login` and `/update-password`
-  — a standalone link, so the inline-sentence exemption does not apply. Approved
-  for the next batch; re-verify the height budget afterwards, since giving it a
-  44px hit area may add a few pixels.
+- **`Forgot password?`** on `/login` and `/update-password` — a standalone link,
+  so the inline-sentence exemption did not apply. Now `min-h-11` with `-my-3`, so
+  it gets the 44px without costing the row any height.
+
+**Height budget re-verified after that change**, as required: `/login` and
+`/update-password` still fit at 375 **and** 320, and both now report **zero**
+sub-44px targets. `/register` is unchanged (fits at 375, the accepted 19px at
+320).
+
+### Still open — one decision
+
+**The week strip's seven day targets** are 31px wide at 375 and 23px at 320,
+against a 44px floor. Fixable (7 × 44 fits in 320) but it changes the strip's
+appearance, so it wants a call rather than a drive-by.

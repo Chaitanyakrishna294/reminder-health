@@ -244,12 +244,17 @@ export default function MedicalProfileClientView({ userId, fullName, email, init
           <span className={`font-semibold text-foreground ${isElderly ? 'text-base' : 'text-sm'}`}>
             Show my photo to my care circle
           </span>
-          <input
-            type="checkbox"
-            checked={sharePhoto}
-            onChange={(e) => setSharePhoto(e.target.checked)}
-            className="w-5 h-5 accent-primary cursor-pointer shrink-0"
-          />
+          {/* 44px hit area around the visible box — same wrapper the register
+              consent checkbox uses. The label already made the row tappable;
+              this is for the thumb that aims at the box itself. */}
+          <span className="shrink-0 w-11 h-11 -my-3 -mr-3 flex items-center justify-center">
+            <input
+              type="checkbox"
+              checked={sharePhoto}
+              onChange={(e) => setSharePhoto(e.target.checked)}
+              className="w-5 h-5 accent-primary cursor-pointer"
+            />
+          </span>
         </label>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <label className="block">
