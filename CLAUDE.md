@@ -847,9 +847,22 @@ picker and **all three legal documents**. Two corrections to the plan below, bot
   **narrower in depth** — chrome and legal text only. Medication names are user data and are
   never translated.
 
-**The alarm screen is still English, and that remains the important gap** — see the CRITICAL
-note below, which is unchanged and unaddressed. The language picker says so on screen rather
-than letting someone discover it at 3am.
+**THE ALARM SCREEN IS TRANSLATED — this section said otherwise until 2026-08-18 and was
+STALE.** The CRITICAL note below was addressed by `2f51851` (2026-08-16) and the whole
+chain is on main: `values-{hi,kn,ml,mr,ta,te}/strings.xml` (32 user-facing keys each,
+complete — the 4 untranslated keys are Capacitor scaffold and must stay English),
+`AlarmPrefs.setLanguage`/`localized()` behind a supported-language allowlist, the
+`language` field read in `ScheduleBridgePlugin.syncSchedule`, and the web sending
+`locale` from `schedule-sync.tsx` with `locale` in the effect deps so a language change
+re-syncs rather than waiting for a navigation. `localized()` is wired into
+`AlarmActivity.attachBaseContext`, `AlarmPreview`, `DoseNotifications` and
+`WaterNudge` — so the alarm, its notifications, the settings miniature and the water
+nudge all speak the app's language, not the phone's.
+
+**Medication names are never translated** — they arrive as `%1$s` from the Room store
+exactly as typed.
+
+Requires an APK built after 2026-08-16; older builds still show English buttons.
 
 - **Phase 1 is the voice feature itself.** A recorded message in the patient's own language from
   their own family solves the alarm-language problem *without any translation work*. This is why
