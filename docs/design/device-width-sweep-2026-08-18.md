@@ -6,8 +6,8 @@ The testing-phase pass described in
 every route. Element-level conformance was already checked in the 2026-08-17
 audit — this is the other half, and the two find different things.
 
-**Status: public routes DONE (9). Authed routes PENDING (25)** — see
-[What is not covered yet](#what-is-not-covered-yet).
+**Status: public routes DONE (9) and FIXED. Dose gate DONE via harness.
+Authed routes PENDING (25)** — see [What is not covered yet](#what-is-not-covered-yet).
 
 ## How it was run
 
@@ -104,6 +104,53 @@ is a 16×16 target.
 A `ux-copy` sentence-case violation. The same string was fixed in `register`
 during the auth pass; this instance was missed.
 
+## The dose gate — measured via harness, and the regression it guards is holding
+
+The gate only renders behind auth with a dose outstanding, which is why three
+fixes once shipped to it without the screen being looked at. Measured by mounting
+the real component with fabricated props (four medications at one instant) inside
+a wrapper that deliberately reproduces the dashboard's `page-enter` **transform**
+and a 2472px-tall document — the exact conditions that once made `fixed inset-0`
+measure 3000px on a 764px viewport.
+
+| | 375×812 | 320×812 |
+|---|---|---|
+| `parentIsBody` (portalled) | yes | yes |
+| gate rect | 375×812 at (0,0) | 320×812 at (0,0) |
+| `isViewportSized` | **true** | **true** |
+| transformed ancestors | none | none |
+| internal overflow | **0px** | **33px** |
+| primary "Taken" button | 44px, on screen | 44px, on screen |
+
+**The containing-block regression is closed and stays closed**: the document was
+2472px tall and the gate still measured exactly 812. That is the check worth
+re-running after any change to the gate or to `page-enter`.
+
+**Finding — at 320px a four-dose gate overflows its own box by 33px** and scrolls
+internally. It degrades gracefully (the primary action stays on screen at
+`bottom: 333`), but the last row of a four-medication handful sits below the fold
+on the narrowest Android.
+
+**False positive to expect:** the detector reports a 96px "inner scroller" on both
+widths. That is the decorative `pointer-events-none absolute inset-0
+overflow-hidden` backdrop layer, not content.
+
+### Harness hygiene
+
+Two things cost a wrong turn:
+
+- **A folder starting with `_` is a PRIVATE folder in the App Router and is not
+  routed at all.** `app/__gate-harness/` built without complaint and served the
+  previous page; the measurement looked plausible and was of the wrong screen
+  (the giveaway was `docScrollHeight: 812` against a 2400px spacer). Name a
+  harness `zz-gate-harness`, not `__gate-harness`.
+- **The cookie notice is also `position: fixed` at `z-[100]` and full width**, so
+  a "find the full-width fixed overlay" selector finds it first. Exclude
+  `[aria-label="Cookie notice"]` explicitly.
+
+The harness was deleted immediately after measuring. It must never be committed:
+a merge to `main` auto-deploys, so a diagnostic route left in the tree ships.
+
 ## What is not covered yet
 
 The 25 authed routes — dashboard, medications, health vault, care circle, and the
@@ -120,5 +167,57 @@ Three automated ways in were tried and all are closed:
 - **Driving the maintainer's real Chrome** — no browser extension connected.
 - **Reusing an existing in-app session** — expired.
 
-So the authed half needs a human sign-in in the Browser pane, after which the
-same measurements apply.
+So the authed half needs a human sign-in **in the Claude Browser pane
+specifically** — the surface these tools drive. A sign-in in the maintainer's own
+Chrome or on the phone does not help: each is a separate cookie jar, and the
+Chrome extension is not connected. Checked and still signed out at the time of
+writing: `reminder-health.vercel.app`, `reminder-health-refresh.vercel.app`.
+
+## Fixed in this phase
+
+All five findings above are resolved, in two commits:
+
+- Install banner's dismiss 24×24 → **44×44**; its Install button 36 → 44px.
+- Register's consent checkbox given its own **44×44** hit area around a 22px box
+  (the wrapping label always made the sentence tappable, so the effective target
+  was never 16px — but the visible box was, and that is what a thumb aims at).
+  Negative margins keep the row at 68px, so it costs nothing in the height budget.
+- `Back to Sign In` → `Back to sign in` in `forgot-password` **and**
+  `update-password` — grepping the pattern found a second instance the sweep had
+  not reached.
+- **The auth screens now obey their own 375×812 rule**, and the captions sit at
+  the 12px floor. Correction to the original plan worth recording: the brief was
+  to budget ~70px for Turnstile *on top of* the measured overflow, but the
+  widget's 72px slot was **already inside** those numbers — so the gap was ~65px
+  on `/login`, not ~135px, and designing for the larger figure would have cut far
+  more than the screen needed.
+
+Measured after, steady state (notice dismissed):
+
+| route | 375×812 | 320px |
+|---|---|---|
+| `/login` | **fits** (was +61) | **fits** (was +75) |
+| `/register` | **fits** (was +103) | +19px — accepted, see below |
+| `/welcome` | **fits** | **fits** |
+| `/forgot-password` | **fits** | **fits** |
+| `/update-password` | **fits** | **fits** |
+
+Most of the height came from the footer mascot yielding rather than holding —
+`max-h-[9vh]` + `object-contain`, the same treatment `/welcome`'s art received.
+130px → 73px, scaling further on shorter screens. It is decorative and
+`aria-hidden`, so it is the right thing to spend before touching spacing.
+
+### Known states, not defects
+
+- **`/register` scrolls 19px at 320px.** Accepted 2026-08-18: a six-field form on
+  the narrowest width may scroll. 375×812 is the rule; 320 is the courtesy pass.
+- **Every auth screen scrolls on a FIRST visit** (~88–120px) while the cookie
+  notice is up. That is the notice reserving its own height so it covers nothing;
+  it self-resolves on dismiss and never hides an action.
+
+### Still open
+
+- **`Forgot password?` is a 16px-tall target** on `/login` and `/update-password`
+  — a standalone link, so the inline-sentence exemption does not apply. Approved
+  for the next batch; re-verify the height budget afterwards, since giving it a
+  44px hit area may add a few pixels.
