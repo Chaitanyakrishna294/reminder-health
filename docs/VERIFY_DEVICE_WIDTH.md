@@ -49,6 +49,13 @@ screen must not pan sideways. `left < 0` is content cut off the LEFT edge, which
 is the one users describe as "the header is chopped". Work outermost-first: the
 first offender in the list is usually the cause and the rest are its children.
 
+**Expect false positives in the offender list, and check the scroll flag first.**
+Every auth-world screen hangs `aria-hidden` blurred blobs off the edges
+(`-left-12`, `-right-16`) inside an `overflow-hidden` parent. They report as
+`left: -56` / `right: 439` and are clipped, not visible. `documentScrollsHorizontally`
+is the signal that separates a real overflow from a contained decorative layer —
+if it is false, the off-edge elements are fine.
+
 ## Fit check for full-screen surfaces
 
 For anything that must fit one screen without scrolling — the dose gate, the
@@ -80,6 +87,22 @@ Public routes directly. Auth-gated screens need a temporary harness route
 rendering the real component with fabricated props — see CLAUDE.md, "SEE THE
 SCREEN BEFORE FIXING IT". **Delete the harness before deploying**; Vercel ships
 the working tree.
+
+**For a whole-app sweep, drive Chrome over CDP rather than clicking through.**
+Node 22 has `fetch` and `WebSocket` built in, so a dependency-free script can
+launch `chrome.exe --headless=new --remote-debugging-port=…`, set
+`Emulation.setDeviceMetricsOverride` to 375×812, and run the snippet on every
+route in one pass. Two things that do NOT work, both learned the slow way:
+an **iframe harness is impossible** (the app sends `X-Frame-Options: DENY` and
+`frame-ancestors 'none'`), and the **in-app browser pane hangs** on that many
+navigations. Pre-acknowledge the cookie notice with
+`Page.addScriptToEvaluateOnNewDocument` or every page is measured ~127px taller
+than its steady state.
+
+**Headless cannot reach the authed routes**, which are most of the app. Guest
+sign-in does not rescue it: CAPTCHA is enforced Supabase-side, so
+`signInAnonymously` is rejected without a real Turnstile token and headless does
+not render the widget. Those routes need a human-signed-in browser.
 
 Run at **375×812** as the floor. Also worth a pass at 320px wide (the smallest
 Android still in use) for anything with five or more inline targets — the nav is
