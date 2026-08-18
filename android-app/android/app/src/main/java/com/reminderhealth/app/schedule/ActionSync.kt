@@ -99,12 +99,24 @@ object ActionSync {
                     )
                 },
                 onFailure = { error ->
-                    dao.markFailed(action.id, error.message)
-                    Log.w(
-                        AlarmScheduler.TAG,
-                        "sync failed for ${action.action} med ${action.medicationId} " +
-                            "(attempt ${action.attempts + 1}): ${error.message}",
-                    )
+                    // An auth failure is not evidence the action is bad, so it must
+                    // not spend one of the five retries. See markAuthFailed.
+                    if (isAuthFailure(error.message)) {
+                        dao.markAuthFailed(action.id, error.message)
+                        Log.w(
+                            AlarmScheduler.TAG,
+                            "sync deferred for ${action.action} med ${action.medicationId}: the session " +
+                                "is not usable (${error.message}). NO retry spent — it waits for the next " +
+                                "setSession, which re-queues it.",
+                        )
+                    } else {
+                        dao.markFailed(action.id, error.message)
+                        Log.w(
+                            AlarmScheduler.TAG,
+                            "sync failed for ${action.action} med ${action.medicationId} " +
+                                "(attempt ${action.attempts + 1}): ${error.message}",
+                        )
+                    }
                 },
             )
         }
@@ -116,6 +128,21 @@ object ActionSync {
         }
 
         return synced
+    }
+
+    /**
+     * Is this failure about the SESSION rather than the action?
+     *
+     * Matched on the message because [post] is the only producer of it and formats
+     * it as "<fn> HTTP <code>: <body>". 401 is the expired/invalid JWT (PostgREST
+     * answers PGRST303); 403 covers a token that parses but is no longer accepted.
+     * Network errors are deliberately NOT included — those already resolve
+     * themselves through WorkManager's network constraint, and treating them as
+     * unlimited would remove the ceiling from genuine failures too.
+     */
+    internal fun isAuthFailure(message: String?): Boolean {
+        val m = message ?: return false
+        return m.contains("HTTP 401") || m.contains("HTTP 403") || m.contains("PGRST303")
     }
 
     /**

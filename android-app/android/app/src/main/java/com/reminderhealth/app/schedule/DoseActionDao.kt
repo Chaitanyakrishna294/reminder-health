@@ -46,6 +46,34 @@ interface DoseActionDao {
     suspend fun markFailed(id: String, error: String?)
 
     /**
+     * A failure that says nothing about the ACTION — an expired or missing JWT.
+     * Records the error but does NOT spend a retry.
+     *
+     * Paid for 2026-08-18: a dose answered on the device hit `resolve_reminder_event
+     * HTTP 401 ... PGRST303 JWT expired`, and because an auth failure incremented
+     * `attempts` exactly like a real rejection, WorkManager's backoff chain burned
+     * all five against a token that could never work. The action was then excluded
+     * from [pending] forever — a patient's recorded "I took it", lost to a token
+     * lifetime. The ceiling exists to stop retrying doses the server will always
+     * reject; an unauthenticated attempt is not evidence of that.
+     */
+    @Query("UPDATE dose_actions SET syncError = :error WHERE id = :id")
+    suspend fun markAuthFailed(id: String, error: String?)
+
+    /**
+     * A fresh session has arrived, so every unsynced action deserves another go —
+     * including ones that already exhausted the ceiling under a dead token.
+     *
+     * Deliberately unconditional rather than filtered on the last error: a new
+     * session is new circumstances for ALL of them, and a permanently-rejected
+     * dose will simply re-exhaust its five attempts and strand again with the
+     * real error attached. The cost of being wrong here is five HTTP calls; the
+     * cost of being wrong the other way is a lost answer.
+     */
+    @Query("UPDATE dose_actions SET attempts = 0 WHERE synced = 0")
+    suspend fun requeueUnsynced(): Int
+
+    /**
      * Housekeeping. Synced actions are kept briefly rather than deleted immediately
      * so the UI can show "synced" instead of a row vanishing mid-glance; the server
      * is the real record either way.
