@@ -39,11 +39,12 @@ store exactly as typed. Stated in every locale file's header comment.
 |---|---|---|---|
 | 4 | Reboot mid-ladder (the crown) | AWAITING DEVICE VERDICT | `rescheduleAll` then `retry ladder rebuilt after boot … next rung +Nmin` |
 | 4b | Powered off past the whole ladder | AWAITING DEVICE VERDICT | **no ring**; sticky posted instead |
+| — | A snooze does not survive a reboot | **DOCUMENTED-STATE** | pre-listed by the maintainer; the server keeps the dose SNOOZED with `retry_reminder_at`, so only the device goes quiet. CLAUDE.md, M2 known gap |
 | 3 | Airplane-mode rungs | AWAITING DEVICE VERDICT | 3 rungs, then `synced 1 queued dose action(s)` |
 | 6 | Snooze suspends, does not race | **FINDING 2 — OPEN, triage blocked** | failure mode not yet named |
 | 2a | Cancel from the notification | AWAITING DEVICE VERDICT | `retry ladder cancelled … the dose was answered` |
 | 2b | Cancel from the app (the 08-14 regression) | AWAITING DEVICE VERDICT | `doseResolved: mirrored 1 of 1 …` **then** `retry ladder cancelled` |
-| 2c | Caregiver answers remotely | AWAITING DEVICE VERDICT | bounded ≤30 min — documented state, not a finding |
+| 2c | Caregiver answers remotely | AWAITING DEVICE VERDICT — *the ≤30 min delay within it is* **DOCUMENTED-STATE** | the cancel itself still needs a verdict; the delay is pre-listed and is not a finding |
 | 1 | Critical rings at +5; zero-blame copy | AWAITING DEVICE VERDICT | rungs 2–4 read "Still time to take" |
 | 5 | Escalation only after the window | AWAITING DEVICE VERDICT | escalation after +15, not during |
 | 7a–7e | Focused list, four doses at one instant | **FINDING 4 — re-run pending** | ONE notification, ONE screen, same notification id |
@@ -80,6 +81,20 @@ store exactly as typed. Stated in every locale file's header comment.
 | Wizard save | AWAITING DEVICE VERDICT |
 | Deep links | AWAITING DEVICE VERDICT |
 | Bug-1 race | AWAITING DEVICE VERDICT |
+
+### Deferred — named reason and owner
+
+These carry a verdict now. They are **not** awaiting a device; they are decisions
+that this evening deliberately does not attempt.
+
+| Item | Verdict | Reason | Owner |
+|---|---|---|---|
+| Escalation end to end with a real caregiver acting on it | **DEFERRED** | A two-person test. Sections 2c and 5 prove the device and server halves; a second human receiving and acting on the escalation is out of scope for a solo evening. | maintainer — schedule with a care-circle member before the Play closed test |
+| OEM battery managers beyond vivo (Xiaomi / Oppo / Realme) | **DEFERRED** | No such hardware available. vivo needed no autostart exemption and that does not generalise — it is a standing M3 risk, not something tonight can retire. | maintainer — M3 hardening, needs borrowed or bought devices |
+| Telegram-only and web-only delivery | **DEFERRED** | The server pipeline is unchanged by every commit tonight, so exercising it would test nothing this evening altered. | maintainer — covered by the existing bot tick; revisit if the pipeline changes |
+| Long-horizon reliability: multi-day drift, DST, month boundaries | **DEFERRED** | Not reachable in hours on hardware. Covered instead by `test/schedule-test-vectors.json`, which the bot, the web and the Kotlin port all run. | already covered by fixture — no owner needed unless the fixture is changed |
+| Rate-limiting `lookup_profile_by_connect_code` / `lookup_caregiver_by_code` | **DEFERRED** | A launch gate, not a verification item: it is unbuilt server work (`check_rate_limit` inside the two SECURITY DEFINER bodies), so there is nothing on the device to verify. | maintainer — before the Play closed test; tracked in CLAUDE.md M3 and PLAY_LISTING.md |
+| A human review pass on the six machine-produced translations | **DEFERRED** | Tonight can prove the alarm speaks Telugu; it cannot prove the Telugu is good. Different kind of check, different reviewer. | maintainer — needs a native speaker per language; tracked in `docs/I18N.md` |
 
 ---
 
@@ -172,9 +187,9 @@ notification stayed on the phone while the web tumbler read the lower row.
 
 | # | Condition | State |
 |---|---|---|
-| 1 | Every section carries a verdict | **OPEN** — awaiting device verdicts |
+| 1 | Every section carries a verdict | **PARTIAL** — 6 rows carry **DEFERRED** with a named reason and owner, 2 carry **DOCUMENTED-STATE**, 2 carry **FIXED, awaiting re-verify**. Every remaining row needs the device and says so. |
 | 2 | Water PR merged, the last open feature branch | **ALREADY SATISFIED** — water merged before tonight. `WaterNudge.kt` and 11 water web files are tracked on main, and `git branch -a --no-merged main` is empty, so no PR exists to merge. Recorded rather than manufactured. |
-| 3 | This document | **OPEN** — scaffold written, verdicts pending |
+| 3 | This document | **OPEN** — structure, evidence links and the deferred list are complete; the device-verdict cells and their Logcat quotes are what remain |
 | 4 | CLAUDE.md testing phase CLOSED | **NOT DONE, deliberately** — writing it now would record a close that has not happened |
 
 ## The honest boundary
