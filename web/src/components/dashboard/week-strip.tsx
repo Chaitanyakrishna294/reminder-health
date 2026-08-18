@@ -65,6 +65,19 @@ function dayNumber(key: string): string {
   return String(Number(key.slice(8, 10)));
 }
 
+/** "17 – 23 Aug" for the stepper row. Mono in the markup: a date range is a
+ *  VALUE, which is the one thing mono is for. */
+function rangeLabel(days: WeekStripDay[]): string {
+  if (!days.length) return '';
+  const fmt = (key: string, withMonth: boolean) => {
+    const at = new Date(Date.UTC(Number(key.slice(0, 4)), Number(key.slice(5, 7)) - 1, Number(key.slice(8, 10)), 12));
+    return at.toLocaleDateString('en-GB', withMonth ? { day: 'numeric', month: 'short', timeZone: 'UTC' } : { day: 'numeric', timeZone: 'UTC' });
+  };
+  const first = days[0].key, last = days[days.length - 1].key;
+  const sameMonth = first.slice(0, 7) === last.slice(0, 7);
+  return `${fmt(first, !sameMonth)} – ${fmt(last, true)}`;
+}
+
 function longDate(key: string): string {
   // Noon UTC + a UTC read-back: a local-midnight Date slips a day in any negative
   // offset, which would make the accessible name disagree with the visible number.
@@ -92,19 +105,49 @@ export default function WeekStrip({
   const stepBtn = 'w-11 h-11 shrink-0 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background';
 
   return (
-    <nav aria-label="Choose a day" className="flex items-center gap-1">
-      <button
-        type="button"
-        onClick={() => onStepWeek(-1)}
-        disabled={!canStepBack}
-        aria-label="Previous week"
-        className={stepBtn}
-      >
-        <ChevronLeft className={isElderly ? 'w-6 h-6' : 'w-5 h-5'} aria-hidden />
-      </button>
+    /**
+     * THE STEPPER SITS ABOVE THE DAYS, NOT BESIDE THEM, and that is a target-size
+     * decision rather than a stylistic one. Measured 2026-08-18 at 320px: the
+     * container is 272px, two 44px arrows plus gaps take 96 of it, and the seven
+     * days were left with 176px — 23px each, below even WCAG 2.5.8 AA's 24px and
+     * far below this project's 44px floor. The arrows cannot shrink; they are
+     * 44px targets themselves. Giving the row its own line hands the full
+     * container width to the days: ~45px each at 375, ~37px at 320.
+     *
+     * (44px at 320 is not reachable at all while the page keeps its padding —
+     * seven 44px cells plus gaps need 320px of usable width and there are 272.
+     * That would take a full-bleed strip, which is a bigger trade than the 7px
+     * is worth.)
+     */
+    <nav aria-label="Choose a day" className="space-y-1">
+      <div className="flex items-center justify-between gap-2">
+        <span className={`font-mono uppercase tracking-wider text-muted-foreground ${isElderly ? 'text-sm' : 'text-xs'}`}>
+          {rangeLabel(days)}
+        </span>
+        <div className="flex items-center gap-1 -my-1">
+          <button
+            type="button"
+            onClick={() => onStepWeek(-1)}
+            disabled={!canStepBack}
+            aria-label="Previous week"
+            className={stepBtn}
+          >
+            <ChevronLeft className={isElderly ? 'w-6 h-6' : 'w-5 h-5'} aria-hidden />
+          </button>
+          <button
+            type="button"
+            onClick={() => onStepWeek(1)}
+            disabled={!canStepForward}
+            aria-label="Next week"
+            className={stepBtn}
+          >
+            <ChevronRight className={isElderly ? 'w-6 h-6' : 'w-5 h-5'} aria-hidden />
+          </button>
+        </div>
+      </div>
 
       <ul
-        className="flex-1 grid grid-cols-7 gap-0.5 touch-pan-y"
+        className="grid grid-cols-7 gap-0.5 touch-pan-y"
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
@@ -172,16 +215,6 @@ export default function WeekStrip({
           );
         })}
       </ul>
-
-      <button
-        type="button"
-        onClick={() => onStepWeek(1)}
-        disabled={!canStepForward}
-        aria-label="Next week"
-        className={stepBtn}
-      >
-        <ChevronRight className={isElderly ? 'w-6 h-6' : 'w-5 h-5'} aria-hidden />
-      </button>
     </nav>
   );
 }

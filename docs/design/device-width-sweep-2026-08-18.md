@@ -208,9 +208,43 @@ The seven day buttons in the dashboard's week strip:
 | at 320px | **23px** | 64px | 44px project · 24px WCAG 2.5.8 AA |
 
 Height is fine; width is not. At 320 they fall below even the WCAG AA minimum.
-Seven 44px targets *do* fit inside 320px (7 × 44 = 308), so this is solvable —
-but it changes how the strip looks, so it is **flagged for a decision rather than
-fixed**.
+
+**CORRECTION — an earlier version of this document said "seven 44px targets fit
+inside 320px (7 × 44 = 308), so this is solvable". That was wrong**, and it was
+wrong in the way arithmetic usually is here: it counted only the cells. Measured
+at 320:
+
+| | px |
+|---|---|
+| viewport | 320 |
+| the strip's container | **272** (48px of page padding) |
+| the two week arrows + gaps, in the same row | **96** |
+| left for seven days | **176** → 23 each |
+| `ul` width seven 44px cells actually need | **320** |
+| shortfall with the arrows inline | **144** |
+| shortfall *even with the arrows removed entirely* | **48** |
+
+The arrows cannot shrink — they are 44px targets themselves. So 44px per day at
+320 is not reachable at all unless the strip **also** goes full-bleed, and even
+then it lands on exactly 44.0 with day cells touching both screen edges.
+
+**Fixed by moving the stepper out of the day row** (approved 2026-08-18), which
+hands the full container width to the seven days:
+
+| | before | after |
+|---|---|---|
+| day width at 375 | 31px | **45px — meets the 44px floor** |
+| day width at 320 | 23px | **37px** |
+| arrows | 44×44 | 44×44, unchanged |
+
+At 375 — the width this project treats as the rule — the floor is now met, and
+the dashboard reports **zero** sub-44px targets. At 320 it is 37px: above WCAG
+2.5.8 AA's 24px, below the project's stricter floor, and that residual is
+geometry rather than neglect. Full-bleed was declined: 7px is not worth a strip
+that pokes out of every other surface on the page.
+
+The stepper row carries the week range ("16 – 22 Aug") so it is not two floating
+chevrons — mono, because a date range is a value.
 
 ### Fixed — two more label-wrapped checkboxes
 
@@ -274,8 +308,17 @@ Most of the height came from the footer mascot yielding rather than holding —
 sub-44px targets. `/register` is unchanged (fits at 375, the accepted 19px at
 320).
 
-### Still open — one decision
+### Still open
 
-**The week strip's seven day targets** are 31px wide at 375 and 23px at 320,
-against a 44px floor. Fixable (7 × 44 fits in 320) but it changes the strip's
-appearance, so it wants a call rather than a drive-by.
+**Nothing from the width sweep.** The week strip was the last open item and is
+fixed above.
+
+Two things this sweep did **not** cover, so they are not evidence of anything:
+
+- **Behaviour.** This measured page fit and target size. Nothing was tapped that
+  writes, so resolving a dose, uploading to the vault and the care-circle flows
+  are still covered only by device passes.
+- **The gate at 320px** overflows its own box by 33px with four same-instant
+  doses and scrolls internally. The primary action stays on screen, so it
+  degrades gracefully, but the fourth row of a handful sits below the fold on the
+  narrowest device. Recorded, not fixed.
