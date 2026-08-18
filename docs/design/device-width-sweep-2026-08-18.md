@@ -6,8 +6,19 @@ The testing-phase pass described in
 every route. Element-level conformance was already checked in the 2026-08-17
 audit — this is the other half, and the two find different things.
 
-**Status: COMPLETE.** 9 public routes + 19 authed routes + the dose gate, at
-375×812 and 320px. Findings fixed except one flagged for a decision.
+**Status: CLOSED — verified on device (vivo I2202) 2026-08-18.** 9 public routes
++ 19 authed routes + the dose gate, at 375×812 and 320px. Every finding fixed;
+two states accepted and recorded below.
+
+Device verdict, all clean: the week strip reads as one picker and the swipe still
+works with the stepper moved out of the day row; the auth screens fit and the
+smaller footer mascot looks right; the grown targets feel natural; dashboard, nav
+and gate intact.
+
+**This closes the LAYOUT half of the testing phase.** The behaviour half —
+everything that writes — is owned by the maintainer on the device and is not
+covered by anything in this document. See [What this did not
+cover](#still-open).
 
 ## How it was run
 
