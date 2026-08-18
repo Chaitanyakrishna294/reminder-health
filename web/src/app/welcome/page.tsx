@@ -341,7 +341,7 @@ export default function WelcomePage() {
             {/* Hint ABOVE the widget: the widget is then the last element on the
                 page, so scrolling to the end lands it flush against the bottom
                 edge instead of leaving its tail clipped. */}
-            <p className="mb-2 text-center text-[11px] text-[#0F1C5A]/75">
+            <p className="mb-2 text-center text-xs text-[#0F1C5A]/75">
               Quick check that you&apos;re not a robot — then you&apos;re in.
             </p>
             <Turnstile key={captchaNonce} onVerify={handleCaptchaVerify} />
@@ -389,7 +389,7 @@ export default function WelcomePage() {
           </Link>
         </div>
 
-        <p className="mt-2 flex items-center justify-center gap-1.5 text-[11px] text-[#0F1C5A]/80">
+        <p className="mt-2 flex items-center justify-center gap-1.5 text-xs text-[#0F1C5A]/80">
           <ShieldCheck className="w-4 h-4 shrink-0" aria-hidden />
           Your health data is secure and private with us.
         </p>

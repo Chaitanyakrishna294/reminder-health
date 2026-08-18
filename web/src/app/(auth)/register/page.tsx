@@ -120,7 +120,7 @@ function RegisterForm() {
   };
 
   // Kept identical to the login page — the two screens sit one tap apart.
-  const inputClass = `w-full pl-12 pr-4 rounded-[14px] surface-sunk border border-input text-foreground placeholder:text-muted-foreground/90 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all ${isElderly ? 'py-5 text-lg' : 'py-4 text-[15px]'}`;
+  const inputClass = `w-full pl-12 pr-4 rounded-[14px] surface-sunk border border-input text-foreground placeholder:text-muted-foreground/90 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all ${isElderly ? 'py-5 text-lg' : 'py-3.5 text-[15px]'}`;
   const iconClass = 'absolute left-4 top-1/2 -translate-y-1/2 text-primary pointer-events-none w-[18px] h-[18px]';
   const labelClass = `block font-bold text-foreground mb-1.5 ${isElderly ? 'text-base' : 'text-xs'}`;
 
@@ -187,7 +187,7 @@ function RegisterForm() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* Headline matches the redesigned login page — the (auth) layout no longer
           renders a big brand hero, so each page owns its own heading. */}
       <header>
@@ -206,7 +206,7 @@ function RegisterForm() {
         </div>
       )}
 
-      <form onSubmit={handleRegister} className="space-y-3">
+      <form onSubmit={handleRegister} className="space-y-2">
         <div>
           <label htmlFor="reg-name" className={labelClass}>{t.auth.fullName}</label>
           <div className="relative">
@@ -272,12 +272,19 @@ function RegisterForm() {
         </div>
 
         <label className={`flex items-start gap-2.5 text-muted-foreground cursor-pointer pt-1 ${isElderly ? 'text-base' : 'text-xs'}`}>
-          <input
-            type="checkbox"
-            checked={agreed}
-            onChange={(e) => setAgreed(e.target.checked)}
-            className="mt-0.5 shrink-0 w-4 h-4 accent-primary cursor-pointer"
-          />
+          {/* The wrapping label already makes the whole sentence tappable, so
+              the EFFECTIVE target was never 16px — but the visible box was, and
+              that is what a thumb aims at. The span gives the box its own 44px
+              hit area; the negative margins keep the visual alignment and stop
+              a 44px row appearing in a screen that has to fit 375x812. */}
+          <span className="shrink-0 w-11 h-11 -my-3 -ml-3 flex items-center justify-center">
+            <input
+              type="checkbox"
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+              className="w-[22px] h-[22px] accent-primary cursor-pointer"
+            />
+          </span>
           <span>
             I am 18 or older and I agree to the{' '}
             <Link href="/terms" target="_blank" className="text-primary-strong font-semibold hover:underline">{t.legal.terms}</Link>{' '}

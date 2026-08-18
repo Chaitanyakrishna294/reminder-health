@@ -40,19 +40,19 @@ export default function AuthLayout({
       {/* Vertical budget is tight: at 375x812 the whole login screen — through the
           trust strip's Terms links — must fit WITHOUT scrolling (mockup parity).
           Change these paddings only with a scrollHeight check at 375x812. */}
-      <header className="w-full max-w-sm mx-auto flex items-center gap-3 px-6 pt-5">
+      <header className="w-full max-w-sm mx-auto flex items-center gap-3 px-6 pt-3">
         <BrainMascot {...mascotSlot('welcome')} />
         <div className="leading-tight">
           <p className="font-mono font-black text-lg text-foreground tracking-tight">
             Re-MIND-eЯ
           </p>
-          <p className="text-[11px] text-muted-foreground mt-0.5">
+          <p className="text-xs text-muted-foreground mt-0.5">
             Your health, our care
           </p>
         </div>
       </header>
 
-      <main className="w-full max-w-sm mx-auto flex-1 px-6 pt-5 pb-2">
+      <main className="w-full max-w-sm mx-auto flex-1 px-6 pt-3 pb-2">
         {children}
       </main>
 
@@ -72,9 +72,9 @@ export default function AuthLayout({
           aria-hidden
           width={224}
           height={141}
-          className="relative z-20 block mx-auto w-56 max-w-[55vw] h-auto -mb-1 select-none pointer-events-none"
+          className="relative z-20 block mx-auto w-56 max-w-[55vw] max-h-[9vh] h-auto object-contain -mb-1 select-none pointer-events-none"
         />
-        <div className="relative z-10 bg-card rounded-t-[28px] px-6 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-center shadow-[0_-10px_30px_rgba(15,28,90,0.08)]">
+        <div className="relative z-10 bg-card rounded-t-[28px] px-6 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] text-center shadow-[0_-10px_30px_rgba(15,28,90,0.08)]">
           <p className="flex items-center justify-center gap-1.5 text-xs font-semibold text-muted-foreground">
             <ShieldCheck className="w-4 h-4 text-success shrink-0" aria-hidden />
             Your health data is secure and private with us.
@@ -84,7 +84,7 @@ export default function AuthLayout({
               These are already the quietest text on the screen, so the opacity
               was buying nothing that the size and placement do not. Light
               3.94 -> 6.20:1, dark 4.79 -> 6.61:1. (Audit item C.) */}
-          <p className="mt-1 text-[11px] text-muted-foreground">
+          <p className="mt-0.5 text-xs text-muted-foreground">
             <Link href="/privacy" className="hover:underline">
               Privacy Policy
             </Link>
