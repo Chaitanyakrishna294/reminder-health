@@ -912,11 +912,18 @@ diagnosis (below). **The deploy model, in one line each:**
   `source: "git"` production build, `READY`, holding the alias.
 - **Previews = push a branch.** The webhook builds those too, typically within
   ~3 minutes. `npx vercel deploy` is not needed for review any more.
-- **The review hostname is permanent and needs no CLI.** Push to `review` and the
-  preview lands at `reminder-health-git-review-chaitanya-krishnas-projects-397d3a53.vercel.app`,
+- **The review hostname is permanent and needs no CLI.** Push to **`rev`** and the
+  preview lands at `reminder-health-git-rev-chaitanya-krishnas-projects-397d3a53.vercel.app`,
   whitelisted once in Turnstile. This replaces the old
   `reminder-health-refresh.vercel.app` alias, which required `vercel alias set`
   after every deploy and is now dead weight.
+  - **The branch is `rev`, not `review`, and the three characters are the point.**
+    `review` produced a label of **exactly 63** — the DNS maximum. It resolved and
+    served pages fine, but Turnstile answered every request from it with
+    `110200` (unknown domain) even after the hostname was added to the correct
+    widget, twice. `rev` brings the label to 60. If a future rename is ever
+    tempting, keep the label comfortably under 63 and re-run the Turnstile check
+    below before trusting it.
 - **`npx vercel deploy --prod` is impossible, not merely banned** — the CLI is
   logged out; see below. There was no reason left to run it anyway: the merge
   does it correctly, from the committed tree rather than from whatever happens to
@@ -942,8 +949,8 @@ Nothing depends on the CLI any more:
 | need | how, without the CLI |
 |---|---|
 | ship to production | merge to `main`; the webhook builds it |
-| a preview to review | push to **`review`**; the webhook builds it |
-| a stable preview URL | `reminder-health-git-review-….vercel.app`, minted automatically |
+| a preview to review | push to **`rev`**; the webhook builds it |
+| a stable preview URL | `reminder-health-git-rev-….vercel.app`, minted automatically |
 | check what is live | `curl` the canary vs `reminder-health.vercel.app` |
 | roll back | the Vercel dashboard |
 
@@ -953,12 +960,13 @@ Nothing depends on the CLI any more:
   Vercel does not rebuild a commit it has already built, so a freshly-branched
   `review` produced no preview and therefore no hostname. The branch needs a
   commit of its own before its alias exists.
-- **The branch name must be short and slash-free.** The hostname label is capped
-  at 63 characters and `reminder-health-git-review-chaitanya-krishnas-projects-397d3a53`
-  is *exactly* 63. Anything longer, or containing a `/`, gets hashed instead —
-  `fix/auth-first-time-path` became `-git-7d6098-`, which is not stable and
-  cannot be whitelisted in advance. **This is why the review branch is called
-  `review` and must not be renamed.**
+- **The branch name must be short and slash-free.** Anything long, or containing
+  a `/`, gets hashed into the hostname instead — `fix/auth-first-time-path`
+  became `-git-7d6098-`, which is not stable and cannot be whitelisted in
+  advance. **And a name that merely fits is not enough:** `review` produced a
+  label of exactly 63, the DNS maximum, which resolved but which Turnstile
+  refused with `110200`. The branch is `rev` (60) for that reason — leave it
+  alone unless you re-run the Turnstile check.
 - **Deployment Protection still guards every `.vercel.app` preview host.** A
   device opening the review URL hits `vercel.com/login` unless it has a Vercel
   session, or has been given the bypass cookie once via
