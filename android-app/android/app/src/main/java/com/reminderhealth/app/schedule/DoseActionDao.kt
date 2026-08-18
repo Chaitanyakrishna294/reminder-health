@@ -61,17 +61,22 @@ interface DoseActionDao {
     suspend fun markAuthFailed(id: String, error: String?)
 
     /**
-     * A fresh session has arrived, so every unsynced action deserves another go —
-     * including ones that already exhausted the ceiling under a dead token.
+     * Give one action its retries back — for rows a dead token stranded under a
+     * build that spent retries on 401s.
      *
-     * Deliberately unconditional rather than filtered on the last error: a new
-     * session is new circumstances for ALL of them, and a permanently-rejected
-     * dose will simply re-exhaust its five attempts and strand again with the
-     * real error attached. The cost of being wrong here is five HTTP calls; the
-     * cost of being wrong the other way is a lost answer.
+     * Per-id ON PURPOSE rather than one bulk UPDATE with a `syncError LIKE`
+     * filter: whether an error is auth-shaped is decided in exactly one place
+     * ([ActionSync.isAuthFailure]), and expressing that a second time in SQL is
+     * how the two drift apart. The caller reads [allUnsynced], filters with that
+     * function, and calls this.
+     *
+     * Filtering matters. An unconditional reset would hand five fresh attempts to
+     * a permanently-rejected dose (INVALID_SCHEDULED_TIME, MEDICATION_NOT_FOUND)
+     * on every app open forever, re-reporting to Sentry each time it re-stranded.
+     * The ceiling exists for exactly those.
      */
-    @Query("UPDATE dose_actions SET attempts = 0 WHERE synced = 0")
-    suspend fun requeueUnsynced(): Int
+    @Query("UPDATE dose_actions SET attempts = 0 WHERE id = :id")
+    suspend fun resetAttempts(id: String)
 
     /**
      * Housekeeping. Synced actions are kept briefly rather than deleted immediately

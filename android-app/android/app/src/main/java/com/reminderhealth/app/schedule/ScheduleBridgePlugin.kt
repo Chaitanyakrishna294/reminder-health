@@ -254,7 +254,13 @@ class ScheduleBridgePlugin : Plugin() {
             // stranded on `HTTP 401 ... PGRST303 JWT expired` was invisible to
             // every later sync even though a valid session had arrived.
             val requeued = runCatching {
-                ScheduleDatabase.getInstance(context).doseActionDao().requeueUnsynced()
+                val dao = ScheduleDatabase.getInstance(context).doseActionDao()
+                // Only rows a dead token stranded. isAuthFailure is the single
+                // definition of auth-shaped; see DoseActionDao.resetAttempts.
+                val rescuable = dao.allUnsynced()
+                    .filter { it.attempts > 0 && ActionSync.isAuthFailure(it.syncError) }
+                rescuable.forEach { dao.resetAttempts(it.id) }
+                rescuable.size
             }.getOrDefault(0)
             if (requeued > 0) {
                 Log.i(
