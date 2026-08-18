@@ -912,18 +912,16 @@ diagnosis (below). **The deploy model, in one line each:**
   `source: "git"` production build, `READY`, holding the alias.
 - **Previews = push a branch.** The webhook builds those too, typically within
   ~3 minutes. `npx vercel deploy` is not needed for review any more.
-- **The review hostname is permanent and needs no CLI.** Push to **`rev`** and the
-  preview lands at `reminder-health-git-rev-chaitanya-krishnas-projects-397d3a53.vercel.app`,
-  whitelisted once in Turnstile. This replaces the old
-  `reminder-health-refresh.vercel.app` alias, which required `vercel alias set`
-  after every deploy and is now dead weight.
-  - **The branch is `rev`, not `review`, and the three characters are the point.**
-    `review` produced a label of **exactly 63** — the DNS maximum. It resolved and
-    served pages fine, but Turnstile answered every request from it with
-    `110200` (unknown domain) even after the hostname was added to the correct
-    widget, twice. `rev` brings the label to 60. If a future rename is ever
-    tempting, keep the label comfortably under 63 and re-run the Turnstile check
-    below before trusting it.
+- **To review a preview with WORKING SIGN-IN, use `reminder-health-refresh.vercel.app`.**
+  Push any branch, let the webhook build it, then in the Vercel dashboard open
+  that deployment → **⋯ → Assign Domain** → `reminder-health-refresh.vercel.app`.
+  One click per review, no CLI, and sign-in works because that hostname has been
+  in the Turnstile allowlist since long before any of this.
+  - **Do NOT spend time trying to whitelist a `-git-<branch>-` hostname.**
+    Settled 2026-08-18 after a full attempt — see the 110200 note below. The
+    automatic per-branch hostnames still exist and are fine for anything that
+    does not need to sign in (layout, copy, dark mode, the signed-out screens);
+    they just cannot complete a CAPTCHA.
 - **`npx vercel deploy --prod` is impossible, not merely banned** — the CLI is
   logged out; see below. There was no reason left to run it anyway: the merge
   does it correctly, from the committed tree rather than from whatever happens to
@@ -949,8 +947,8 @@ Nothing depends on the CLI any more:
 | need | how, without the CLI |
 |---|---|
 | ship to production | merge to `main`; the webhook builds it |
-| a preview to review | push to **`rev`**; the webhook builds it |
-| a stable preview URL | `reminder-health-git-rev-….vercel.app`, minted automatically |
+| a preview to review | push any branch; the webhook builds it |
+| a preview URL that can SIGN IN | assign `reminder-health-refresh.vercel.app` to it in the dashboard |
 | check what is live | `curl` the canary vs `reminder-health.vercel.app` |
 | roll back | the Vercel dashboard |
 
@@ -960,13 +958,24 @@ Nothing depends on the CLI any more:
   Vercel does not rebuild a commit it has already built, so a freshly-branched
   `review` produced no preview and therefore no hostname. The branch needs a
   commit of its own before its alias exists.
-- **The branch name must be short and slash-free.** Anything long, or containing
-  a `/`, gets hashed into the hostname instead — `fix/auth-first-time-path`
-  became `-git-7d6098-`, which is not stable and cannot be whitelisted in
-  advance. **And a name that merely fits is not enough:** `review` produced a
-  label of exactly 63, the DNS maximum, which resolved but which Turnstile
-  refused with `110200`. The branch is `rev` (60) for that reason — leave it
-  alone unless you re-run the Turnstile check.
+- **A `-git-<branch>-` hostname CANNOT COMPLETE TURNSTILE, and this was chased
+  to the end so nobody chases it again.** Every request from one answers
+  `[Cloudflare Turnstile] Error: 110200` (unknown domain), and it stayed that way
+  after the hostname was added to the correct widget. Ruled out along the way, so
+  none of it needs redoing:
+  - **Not the site key.** Preview and production bundles embed the *same* key
+    (`0x4AAAAAAEL4prPRYtQJ0T7C`, read out of both). Vercel scopes env vars per
+    environment, so a Preview-only key would have produced this exact symptom
+    while looking correct in the dashboard — it is not that.
+  - **Not a stale console buffer.** Confirmed from a brand-new tab, single load.
+  - **Not length alone.** `review` gave a label of exactly 63 (the DNS maximum)
+    and `rev` gives 60 — and the shorter one could not be added to the widget
+    either. Cloudflare would not take the hostname at all.
+  - Branch names must still be short and slash-free for the hostname to be
+    *stable*: `fix/auth-first-time-path` became `-git-7d6098-`, a hash. That
+    matters for sharing a link, not for CAPTCHA.
+  **The workaround is the refresh alias above** — already whitelisted, and
+  reassignable from the dashboard without the CLI.
 - **Deployment Protection still guards every `.vercel.app` preview host.** A
   device opening the review URL hits `vercel.com/login` unless it has a Vercel
   session, or has been given the bypass cookie once via
