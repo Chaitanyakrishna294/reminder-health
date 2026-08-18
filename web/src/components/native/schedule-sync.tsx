@@ -293,11 +293,17 @@ export default function ScheduleSync() {
             // independent tallies, not a conflict between two edits of one.
             // Undo still wins everywhere it matters, because it writes the row.
             const deviceCups = (await getNativeWaterCount()) ?? 0;
+            // ONE day key for the read and the write below. Calling localDayKey()
+            // twice means two `new Date()`s, and a midnight rollover between them
+            // would file yesterday's merged count against today's row — inflating
+            // today with yesterday's cups, on the exact surface this fix exists to
+            // make agree.
+            const dayKey = localDayKey();
             const { data: log } = await supabase
               .from('water_logs')
               .select('cups')
               .eq('user_id', session.user.id)
-              .eq('day', localDayKey())
+              .eq('day', dayKey)
               .maybeSingle();
             const rowCups = log?.cups ?? 0;
             const cupsToday = Math.max(deviceCups, rowCups);
@@ -319,7 +325,7 @@ export default function ScheduleSync() {
               await supabase.from('water_logs').upsert(
                 {
                   user_id: session.user.id,
-                  day: localDayKey(),
+                  day: dayKey,
                   cups: cupsToday,
                   updated_at: new Date().toISOString(),
                 },

@@ -51,13 +51,15 @@ store exactly as typed. Stated in every locale file's header comment.
 | 7g | Single-dose alarm has not regressed | AWAITING DEVICE VERDICT | the rewrite's main regression risk |
 | 8a–8e | Alarm media, including `8a-preview` | AWAITING DEVICE VERDICT | the preview must **match** the real alarm |
 | — | Full-screen intent presentation | **FINDING 3 — OPEN, needs lock state** | unlocked + in use → heads-up only is documented |
+| 9a–9c | Expired-token recovery (new section) | **FINDING 1 — FIXED, awaiting re-verify** | `0acf4a2`, `54b9f12`; 9c guards that the ceiling still strands real rejections |
+| 10 | Water count agrees phone ↔ web (new section) | see Water below | web half — merge deploys it, no APK needed |
 
 ### Water
 
 | Test | Verdict | Evidence |
 |---|---|---|
 | Nudges arrive: silent, swipeable | AWAITING DEVICE VERDICT | |
-| Taken on the nudge increments the tumbler | **FINDING 5 — FIXED, awaiting re-verify** | `0acf4a2` |
+| Taken on the nudge increments the tumbler | **FINDING 5 — FIXED, awaiting re-verify** | `0acf4a2`, `54b9f12`; procedure now in checklist §10 |
 | Dose-clash drop (within 10 min of a dose) | AWAITING DEVICE VERDICT | |
 | Goal-met skip | AWAITING DEVICE VERDICT | `water: goal already met (n/m) — skipping this nudge` |
 
