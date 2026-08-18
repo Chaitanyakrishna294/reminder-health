@@ -107,6 +107,14 @@ placeholder failure reaches every form in the app that uses the shared
 >
 > **The auth-world audit is closed: 0 failures on `/welcome`, `/login` and
 > `/register`, in both themes.**
+>
+> **Verified on a real device (vivo I2202) 2026-08-18 — all six checks pass**,
+> including dark `/welcome`, which is the fix this audit exists for. The rest of
+> the pass: the fold on the real webview height, the cookie sheet covering
+> nothing and reflowing on dismiss, the email hand-off prefilling in both
+> directions, the /90 placeholders, and sign-in completing. Note the pass ran on
+> **production**, not a preview — this work was already merged, and the preview
+> hostname is blocked by an unrelated Turnstile allowlist issue (110200).
 
 ### A. Stop the dark ink shim reaching the poster — ✅ APPLIED, fixes 6 of 8
 
@@ -157,8 +165,12 @@ placeholder-to-value contrast gap is **9.77** in light (4.55 vs 14.32) and
 **8.68** in dark (7.55 vs 16.23). A weight split (regular placeholder, medium
 value) was considered per the maintainer's suggestion and **not** taken: it would
 change the rendering of every typed value in the app during a frozen design
-track, to reinforce a cue that is already strong. Revisit only if the /90
-placeholder reads as a filled value on a real device.
+track, to reinforce a cue that is already strong.
+
+**CLOSED on device 2026-08-18 — do not re-open on taste.** The open question was
+whether a /90 placeholder would read as a *filled value* on real hardware, which
+no measurement can answer. It was checked on the vivo and does not. The luminance
+gap alone carries the distinction, so the weight split stays unbuilt.
 
 ### C. Footer legal links — ✅ APPLIED
 
