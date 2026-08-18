@@ -112,18 +112,21 @@ export default function InstallPrompt() {
           <p className="text-sm font-bold text-foreground">Install Re-MIND-eЯ</p>
           <p className="text-xs text-muted-foreground">Add it to your device for faster access and reminders.</p>
         </div>
+        {/* Both controls carry the 44px floor. The dismiss was 24x24 — a
+            quarter of the required area, on a banner that appears over every
+            page in the app, and the only way to make it go away. */}
         <button
           onClick={handleInstall}
-          className="shrink-0 rounded-xl bg-primary-strong text-primary-strong-foreground font-bold px-4 py-2 text-sm hover:bg-primary-strong-hover transition-all cursor-pointer"
+          className="shrink-0 h-11 px-4 rounded-[var(--r-control)] bg-primary-strong text-primary-strong-foreground font-bold text-sm hover:bg-primary-strong-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-all cursor-pointer"
         >
           Install
         </button>
         <button
           onClick={handleCollapse}
           aria-label="Minimize install suggestion"
-          className="shrink-0 text-muted-foreground hover:text-foreground p-1 rounded-full transition-colors cursor-pointer"
+          className="shrink-0 w-11 h-11 inline-flex items-center justify-center text-muted-foreground hover:text-foreground rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors cursor-pointer"
         >
-          <X className="w-4 h-4" />
+          <X className="w-4 h-4" aria-hidden />
         </button>
       </div>
     </div>

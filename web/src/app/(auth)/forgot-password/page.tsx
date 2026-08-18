@@ -239,7 +239,7 @@ export default function ForgotPasswordPage() {
 
       <div className={`text-center ${isElderly ? 'text-base' : 'text-sm'}`}>
         <Link href="/login" className="font-semibold text-primary-strong hover:underline">
-          Back to Sign In
+          Back to sign in
         </Link>
       </div>
     </div>
