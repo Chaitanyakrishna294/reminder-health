@@ -22,7 +22,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useUiMode } from '@/context/ui-mode-context';
 import BrainMascot from '@/components/dashboard/brain-mascot';
-import { MASCOT_SLOTS } from '@/components/dashboard/mascot-slots';
+import { mascotSlot } from '@/components/dashboard/mascot-slots';
 
 interface ExitDialogProps {
   open: boolean;
@@ -33,7 +33,9 @@ interface ExitDialogProps {
 export default function ExitDialog({ open, onCancel, onExit }: ExitDialogProps) {
   const { isElderly } = useUiMode();
   const cancelRef = useRef<HTMLButtonElement>(null);
-  const slot = MASCOT_SLOTS.dialog;
+  // Through mascotSlot() like every other placement — reading MASCOT_SLOTS
+  // directly worked but re-implemented the elderly size choice at the call
+  // site, which is the drift the registry exists to prevent.
 
   useEffect(() => {
     if (!open) return;
@@ -68,7 +70,7 @@ export default function ExitDialog({ open, onCancel, onExit }: ExitDialogProps) 
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-xs card-lift card-lift-2 p-6 flex flex-col items-center text-center gap-4"
       >
-        <BrainMascot size={isElderly ? slot.elderlySize : slot.size} mood={slot.mood} />
+        <BrainMascot {...mascotSlot('exitDialog', isElderly)} />
 
         <div className="space-y-1">
           <h2 id="exit-dialog-title" className={`font-black text-foreground ${isElderly ? 'text-2xl' : 'text-lg'}`}>

@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { ArrowLeft, ArrowRight, X, Check } from 'lucide-react';
 import BrainMascot from '@/components/dashboard/brain-mascot';
+import { mascotSlot } from '@/components/dashboard/mascot-slots';
 import { useGuide } from './guide-context';
 import { TOURS } from './guide-content';
 import { useDensity } from '@/context/density-context';
@@ -11,7 +12,7 @@ const CARD_W = 320;
 
 function GuiderMascot({ size }: { size: number }) {
   const [ok, setOk] = useState(true);
-  if (!ok) return <BrainMascot size={size} mood="curious" />;
+  if (!ok) return <BrainMascot {...mascotSlot('guideTour')} />;
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img

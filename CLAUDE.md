@@ -218,8 +218,18 @@ are stale. Keep it updated when you add or move anything.
     APK built before that has no `window.Capacitor.Plugins.App`, so `supportsBackButton()`
     is false and the back button keeps its old behaviour. Per the server.url note above,
     this needs BOTH a fresh APK and a web deploy before it can be tested on a device.
-  - Mascot placement is a registry, not a convention: `MASCOT_SLOTS` in `brain-mascot.tsx`.
-    Adding a slot is a design decision — make it there, on purpose.
+  - **Remi's constitution lives in [docs/design/REMI.md](docs/design/REMI.md)** — the five
+    frozen laws (palette, silhouette, sticker-flat, the silhouette test, dark = same art
+    with the blush at 45%), the spec block for each of the five shipped expressions plus
+    the approved-but-unwired `peaceful-sleep`, the two size-conditional floors, and the
+    rejection ledger. The art is frozen; changing any of it needs an explicit unfreeze.
+  - Mascot placement is a registry, not a convention: `MASCOT_SLOTS` in
+    `components/dashboard/mascot-slots.ts` (NOT `brain-mascot.tsx` — it moved when the
+    client-boundary bug 500'd the auth routes). Adding a slot is a design decision — make
+    it there, on purpose.
+  - **Remi celebrates and comforts, and never appears on a missed-dose or alarm surface.**
+    The one live exception is `med-due-gate`, which still renders the legacy art and is
+    flagged for a decision at the bottom of `mascot-slots.ts` rather than settled.
 - **Medication catalog links are human-select-only** — never auto-match a nickname to a real drug (patient safety).
 - **WATER INTAKE IS THE QUIET TIER, AND THAT IS THE WHOLE DESIGN (2026-08-14).**
   Opt-in, OFF by default, and deliberately the least insistent thing in the

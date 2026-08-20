@@ -30,6 +30,20 @@ export interface UnitForms {
 }
 
 export interface Messages {
+  /**
+   * Remi's accessible names. Used ONLY where the mascot is announced; most
+   * placements are decorative and render aria-hidden instead — see
+   * BrainMascot's `altKey` prop and docs/design/REMI.md.
+   *
+   * The character's NAME is not translated, only what he is doing.
+   */
+  mascot: {
+    welcome: string;
+    happy: string;
+    proud: string;
+    peaceful: string;
+    curious: string;
+  };
   /** Keyed by `medications.unit_type`. OTHER is the fallback for an unknown id. */
   units: {
     TABLET: UnitForms;
@@ -1100,6 +1114,13 @@ const en: Messages = {
     readInEnglish: 'Read in English',
     backToSignIn: 'Back to sign in',
   },
+    mascot: {
+      welcome: 'Remi, waving hello',
+      happy: 'Remi, smiling',
+      proud: 'Remi, pleased with you',
+      peaceful: 'Remi, resting',
+      curious: 'Remi, listening',
+    },
 };
 
 export default en;

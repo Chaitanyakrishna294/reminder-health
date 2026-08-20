@@ -462,6 +462,13 @@ const mr: Messages = {
     readInEnglish: 'इंग्रजीत वाचा',
     backToSignIn: 'साइन इनवर परत जा',
   },
+  mascot: {
+    welcome: 'रेमी, हात हलवून स्वागत करत आहे',
+    happy: 'रेमी, हसत आहे',
+    proud: 'रेमी, तुमच्याबद्दल आनंदी',
+    peaceful: 'रेमी, विश्रांती घेत आहे',
+    curious: 'रेमी, लक्ष देऊन ऐकत आहे',
+  },
 };
 
 export default mr;

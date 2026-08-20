@@ -462,6 +462,13 @@ const te: Messages = {
     readInEnglish: 'ఇంగ్లీషులో చదవండి',
     backToSignIn: 'సైన్ ఇన్‌కు తిరిగి వెళ్లండి',
   },
+  mascot: {
+    welcome: 'రెమి, చేయి ఊపి స్వాగతం చెబుతోంది',
+    happy: 'రెమి, నవ్వుతోంది',
+    proud: 'రెమి, మీ పట్ల సంతోషం',
+    peaceful: 'రెమి, విశ్రాంతిలో',
+    curious: 'రెమి, శ్రద్ధగా వింటోంది',
+  },
 };
 
 export default te;
