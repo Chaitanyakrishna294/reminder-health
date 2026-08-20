@@ -293,13 +293,45 @@ export default function ScheduleSync() {
             // independent tallies, not a conflict between two edits of one.
             // Undo still wins everywhere it matters, because it writes the row.
             const deviceCups = (await getNativeWaterCount()) ?? 0;
+            // ONE day key for the read and the write below. Calling localDayKey()
+            // twice means two `new Date()`s, and a midnight rollover between them
+            // would file yesterday's merged count against today's row — inflating
+            // today with yesterday's cups, on the exact surface this fix exists to
+            // make agree.
+            const dayKey = localDayKey();
             const { data: log } = await supabase
               .from('water_logs')
               .select('cups')
               .eq('user_id', session.user.id)
-              .eq('day', localDayKey())
+              .eq('day', dayKey)
               .maybeSingle();
-            const cupsToday = Math.max(deviceCups, log?.cups ?? 0);
+            const rowCups = log?.cups ?? 0;
+            const cupsToday = Math.max(deviceCups, rowCups);
+
+            // AND WRITE THE MERGE BACK. Without this the max() is one-directional:
+            // it can raise the DEVICE but never the server, so cups added on the
+            // notification (which native counts locally in WaterPrefs, with no
+            // network call of its own) stayed on the phone and the web tumbler kept
+            // showing the lower number forever. Found 2026-08-18 as "the count
+            // differs between phone and web" — the merge was computed correctly and
+            // then only half-applied.
+            //
+            // Guarded on the device being AHEAD so this stays a merge of two
+            // independent tallies rather than a write that could resurrect a count
+            // the user just corrected. An undo writes the row, the row is then >=
+            // the device, and this branch does not fire — which is what keeps
+            // "undo still wins" true.
+            if (deviceCups > rowCups) {
+              await supabase.from('water_logs').upsert(
+                {
+                  user_id: session.user.id,
+                  day: dayKey,
+                  cups: cupsToday,
+                  updated_at: new Date().toISOString(),
+                },
+                { onConflict: 'user_id,day' },
+              );
+            }
 
             await syncWaterToNative({
               enabled: true,

@@ -46,6 +46,39 @@ interface DoseActionDao {
     suspend fun markFailed(id: String, error: String?)
 
     /**
+     * A failure that says nothing about the ACTION — an expired or missing JWT.
+     * Records the error but does NOT spend a retry.
+     *
+     * Paid for 2026-08-18: a dose answered on the device hit `resolve_reminder_event
+     * HTTP 401 ... PGRST303 JWT expired`, and because an auth failure incremented
+     * `attempts` exactly like a real rejection, WorkManager's backoff chain burned
+     * all five against a token that could never work. The action was then excluded
+     * from [pending] forever — a patient's recorded "I took it", lost to a token
+     * lifetime. The ceiling exists to stop retrying doses the server will always
+     * reject; an unauthenticated attempt is not evidence of that.
+     */
+    @Query("UPDATE dose_actions SET syncError = :error WHERE id = :id")
+    suspend fun markAuthFailed(id: String, error: String?)
+
+    /**
+     * Give one action its retries back — for rows a dead token stranded under a
+     * build that spent retries on 401s.
+     *
+     * Per-id ON PURPOSE rather than one bulk UPDATE with a `syncError LIKE`
+     * filter: whether an error is auth-shaped is decided in exactly one place
+     * ([ActionSync.isAuthFailure]), and expressing that a second time in SQL is
+     * how the two drift apart. The caller reads [allUnsynced], filters with that
+     * function, and calls this.
+     *
+     * Filtering matters. An unconditional reset would hand five fresh attempts to
+     * a permanently-rejected dose (INVALID_SCHEDULED_TIME, MEDICATION_NOT_FOUND)
+     * on every app open forever, re-reporting to Sentry each time it re-stranded.
+     * The ceiling exists for exactly those.
+     */
+    @Query("UPDATE dose_actions SET attempts = 0 WHERE id = :id")
+    suspend fun resetAttempts(id: String)
+
+    /**
      * Housekeeping. Synced actions are kept briefly rather than deleted immediately
      * so the UI can show "synced" instead of a row vanishing mid-glance; the server
      * is the real record either way.

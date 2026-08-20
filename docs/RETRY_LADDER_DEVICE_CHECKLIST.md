@@ -278,6 +278,64 @@ screen.
 
 ---
 
+## 9 · The expired-token recovery — **added 2026-08-18, after a real strand**
+
+A dose answered on the device was lost to a token lifetime: Sentry reported
+`dose actions stranded after 5 exhausted retries: resolve_reminder_event HTTP 401
+PGRST303 JWT expired` for med 159. An auth failure was spending a retry exactly
+like a genuine rejection, so WorkManager's backoff burned all five against a
+token that could never work. Fixed on `fix/sync-recovery`; needs an APK built
+from it or from main after it merges.
+
+**9a — the stranded row is rescued.** Install the new APK and open the app.
+
+**Pass:**
+- logcat: `a fresh session arrived — re-queued N unsynced dose action(s) for
+  another attempt`, then `synced TAKEN for med 159 …`.
+- No `STRANDED` line afterwards.
+- The dose reads answered on the web too — that is the half that was missing.
+
+**9b — reproduce the original failure deliberately.** Leave the app closed long
+enough for the access token to expire (an hour is plenty), then answer a dose on
+the notification without opening the app. Watch the retries.
+
+**Pass:**
+- `sync deferred for TAKEN med N: the session is not usable (… HTTP 401 …). NO
+  retry spent — it waits for the next setSession, which re-queues it.`
+- That line may repeat. **The action must never reach `STRANDED`.** Under the old
+  build it took five tries; now it should survive indefinitely.
+- Open the app: it syncs.
+
+**9c — the ceiling still works for real rejections.** This is the half that is
+easy to break while fixing 9a. Answer a dose, then delete that medication before
+the sync lands (or edit its `reminder_times` so the dose instant no longer
+exists).
+
+**Pass:** the action retries **five times and then strands**, with the real error
+(`MEDICATION_NOT_FOUND` / `INVALID_SCHEDULED_TIME`) in the log — and does NOT
+come back to life on the next app open. A permanently-rejected dose must stop
+retrying; if this one loops forever, the auth exemption is too wide.
+
+## 10 · Water count agrees between phone and web — **added 2026-08-18**
+
+The `max()` merge was one-directional: it raised the device but never the server,
+so cups added on the notification stayed on the phone. Fixed on the same branch
+(web half — deploys by merge, no APK needed for this one).
+
+1. With water enabled and the app **closed**, add 2–3 cups from the nudge's
+   **Taken** action.
+2. Open the app.
+
+**Pass:**
+- The tumbler on Today shows the phone's count, not the lower server one.
+- Reload the web app on a desktop browser: same number. That is the row having
+  been written, which is what was missing.
+- **Then test undo:** remove a cup in the app, close it, let a nudge arrive, open
+  again. The lower count must **stick** — undo writes the row, so the row is now
+  >= the device and the merge must not resurrect the old number.
+
+---
+
 ## If something fails
 
 Grab the window around it — `AlarmScheduler` logs every decision with the
