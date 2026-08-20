@@ -898,6 +898,35 @@ Requires an APK built after 2026-08-16; older builds still show English buttons.
   resource qualifiers (`values-hi/`) pick up the *device* locale, which is NOT necessarily the
   language chosen in-app; the bridged value is what makes the two agree.
 
+## TESTING PHASE — CLOSED 2026-08-18 BY OWNER DECISION
+
+**Testing phase closed 2026-08-18 by owner decision with deferred device
+verifications — see [docs/VERIFICATION_CLOSE_2026-08.md](docs/VERIFICATION_CLOSE_2026-08.md)
+for the open list. The deferred items are the first checklist when real-user
+validation begins.**
+
+Read that sentence exactly as written. The phase is closed **to move forward**,
+not because the checks passed:
+
+- **The LAYOUT half IS verified on hardware** — 9 public routes, 19 authed routes
+  and the dose gate at 375×812 and 320px, signed off on the vivo I2202
+  (`device-width-sweep-2026-08-18.md`).
+- **The BEHAVIOUR half is NOT.** The device runs did not happen. Nothing in the
+  verdict table reads PASS, because no device verdict was ever given. 23 rows read
+  DEFERRED-BY-OWNER.
+- **Two real bugs were still found and fixed** — a dose answer stranded by an
+  expired JWT, and a one-directional water merge — from a Sentry report and a user
+  observation rather than from the checklist. Both are compiled, unit-tested and
+  in an APK; **neither has run on a phone.**
+
+**Do not let a later session read "testing phase closed" as "the alarm core is
+proven on hardware".** The retry ladder's reboot rebuild, the coalesced ring, the
+alarm media, escalation timing, both language walks and the entire
+write-path behaviour walk are unexecuted. That list is the debt, and it is
+enumerated in the close document's honest boundary.
+
+**Next:** Remi's final art, then the landing page, then the master-context phase.
+
 ## ELEMENT CHECKS ARE NOT PAGE CHECKS — VERIFY FIT AT 375px
 
 Paid for 2026-08-17. The conformance audit verified computed styles on ~250 sites

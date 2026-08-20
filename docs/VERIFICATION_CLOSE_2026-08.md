@@ -1,12 +1,27 @@
 # Verification close — August 2026
 
-**STATUS: OPEN / IN PROGRESS.** The live verdict table for the verification
-evening, written up front so results drop into cells rather than being
-reconstructed afterwards.
+**STATUS: CLOSED 2026-08-18 BY OWNER DECISION, WITH DEFERRED DEVICE
+VERIFICATIONS.** The phase is closed to proceed to the next one — it is **not**
+closed because the checks passed. Most did not run.
 
-**No row may read PASS without the maintainer's explicit device verdict.** Rows
-read `AWAITING DEVICE VERDICT` until those words exist. That is the point of the
-table, not a gap in it.
+**NOTHING IN THIS TABLE READS PASS.** No row ever received a device verdict, so
+no row claims one. Rows that needed hardware read **DEFERRED-BY-OWNER**.
+
+### The deferral, in one place
+
+Every row marked **DEFERRED-BY-OWNER** carries this attribution:
+
+| | |
+|---|---|
+| **Dated** | 2026-08-20 (the decision is recorded as closing the phase of 2026-08-18) |
+| **Owner** | the maintainer |
+| **Reason** | "proceeding to next phase; to be verified during real-user validation or a future evening." |
+
+Stated once rather than repeated into twenty-three cells, so the table stays
+readable. It applies to each of them individually.
+
+**These deferred items are the first checklist when real-user validation
+begins.**
 
 - **Layout half: CLOSED** — see
   [device-width-sweep-2026-08-18.md](design/device-width-sweep-2026-08-18.md),
@@ -37,50 +52,50 @@ store exactly as typed. Stated in every locale file's header comment.
 
 | § | Test | Verdict | Evidence expected |
 |---|---|---|---|
-| 4 | Reboot mid-ladder (the crown) | AWAITING DEVICE VERDICT | `rescheduleAll` then `retry ladder rebuilt after boot … next rung +Nmin` |
-| 4b | Powered off past the whole ladder | AWAITING DEVICE VERDICT | **no ring**; sticky posted instead |
+| 4 | Reboot mid-ladder (the crown) | **DEFERRED-BY-OWNER** | `rescheduleAll` then `retry ladder rebuilt after boot … next rung +Nmin` |
+| 4b | Powered off past the whole ladder | **DEFERRED-BY-OWNER** | **no ring**; sticky posted instead |
 | — | A snooze does not survive a reboot | **DOCUMENTED-STATE** | pre-listed by the maintainer; the server keeps the dose SNOOZED with `retry_reminder_at`, so only the device goes quiet. CLAUDE.md, M2 known gap |
-| 3 | Airplane-mode rungs | AWAITING DEVICE VERDICT | 3 rungs, then `synced 1 queued dose action(s)` |
+| 3 | Airplane-mode rungs | **DEFERRED-BY-OWNER** | 3 rungs, then `synced 1 queued dose action(s)` |
 | 6 | Snooze suspends, does not race | **FINDING 2 — OPEN, triage blocked** | failure mode not yet named |
-| 2a | Cancel from the notification | AWAITING DEVICE VERDICT | `retry ladder cancelled … the dose was answered` |
-| 2b | Cancel from the app (the 08-14 regression) | AWAITING DEVICE VERDICT | `doseResolved: mirrored 1 of 1 …` **then** `retry ladder cancelled` |
-| 2c | Caregiver answers remotely | AWAITING DEVICE VERDICT — *the ≤30 min delay within it is* **DOCUMENTED-STATE** | the cancel itself still needs a verdict; the delay is pre-listed and is not a finding |
-| 1 | Critical rings at +5; zero-blame copy | AWAITING DEVICE VERDICT | rungs 2–4 read "Still time to take" |
-| 5 | Escalation only after the window | AWAITING DEVICE VERDICT | escalation after +15, not during |
+| 2a | Cancel from the notification | **DEFERRED-BY-OWNER** | `retry ladder cancelled … the dose was answered` |
+| 2b | Cancel from the app (the 08-14 regression) | **DEFERRED-BY-OWNER** | `doseResolved: mirrored 1 of 1 …` **then** `retry ladder cancelled` |
+| 2c | Caregiver answers remotely | **DEFERRED-BY-OWNER** — *the ≤30 min delay within it is* **DOCUMENTED-STATE** | the cancel itself still needs a verdict; the delay is pre-listed and is not a finding |
+| 1 | Critical rings at +5; zero-blame copy | **DEFERRED-BY-OWNER** | rungs 2–4 read "Still time to take" |
+| 5 | Escalation only after the window | **DEFERRED-BY-OWNER** | escalation after +15, not during |
 | 7a–7e | Focused list, four doses at one instant | **FINDING 4 — re-run pending** | ONE notification, ONE screen, same notification id |
-| 7f | Elderly is one question at a time | AWAITING DEVICE VERDICT | elderly otherwise untouched this phase |
-| 7g | Single-dose alarm has not regressed | AWAITING DEVICE VERDICT | the rewrite's main regression risk |
-| 8a–8e | Alarm media, including `8a-preview` | AWAITING DEVICE VERDICT | the preview must **match** the real alarm |
+| 7f | Elderly is one question at a time | **DEFERRED-BY-OWNER** | elderly otherwise untouched this phase |
+| 7g | Single-dose alarm has not regressed | **DEFERRED-BY-OWNER** | the rewrite's main regression risk |
+| 8a–8e | Alarm media, including `8a-preview` | **DEFERRED-BY-OWNER** | the preview must **match** the real alarm |
 | — | Full-screen intent presentation | **FINDING 3 — OPEN, needs lock state** | unlocked + in use → heads-up only is documented |
-| 9a–9c | Expired-token recovery (new section) | **FINDING 1 — FIXED, awaiting re-verify** | `0acf4a2`, `54b9f12`; 9c guards that the ceiling still strands real rejections |
+| 9a–9c | Expired-token recovery (new section) | **FINDING 1 — FIXED, re-verify **DEFERRED-BY-OWNER**** | `0acf4a2`, `54b9f12`; 9c guards that the ceiling still strands real rejections |
 | 10 | Water count agrees phone ↔ web (new section) | see Water below | web half — merge deploys it, no APK needed |
 
 ### Water
 
 | Test | Verdict | Evidence |
 |---|---|---|
-| Nudges arrive: silent, swipeable | AWAITING DEVICE VERDICT | |
-| Taken on the nudge increments the tumbler | **FINDING 5 — FIXED, awaiting re-verify** | `0acf4a2`, `54b9f12`; procedure now in checklist §10 |
-| Dose-clash drop (within 10 min of a dose) | AWAITING DEVICE VERDICT | |
-| Goal-met skip | AWAITING DEVICE VERDICT | `water: goal already met (n/m) — skipping this nudge` |
+| Nudges arrive: silent, swipeable | **DEFERRED-BY-OWNER** | |
+| Taken on the nudge increments the tumbler | **FINDING 5 — FIXED, re-verify **DEFERRED-BY-OWNER**** | `0acf4a2`, `54b9f12`; procedure now in checklist §10 |
+| Dose-clash drop (within 10 min of a dose) | **DEFERRED-BY-OWNER** | |
+| Goal-met skip | **DEFERRED-BY-OWNER** | `water: goal already met (n/m) — skipping this nudge` |
 
 ### Language
 
 | Test | Verdict | Evidence |
 |---|---|---|
-| Telugu walk + **alarm** | AWAITING DEVICE VERDICT | expects **translated** buttons — see pre-flight |
-| Hindi switch re-test | AWAITING DEVICE VERDICT | a language change re-syncs without needing a navigation |
+| Telugu walk + **alarm** | **DEFERRED-BY-OWNER** | expects **translated** buttons — see pre-flight |
+| Hindi switch re-test | **DEFERRED-BY-OWNER** | a language change re-syncs without needing a navigation |
 
 ### Behaviour walk (everything that writes)
 
 | Test | Verdict |
 |---|---|
-| Dose resolve from every surface | AWAITING DEVICE VERDICT |
-| Vault upload | AWAITING DEVICE VERDICT |
-| Care-circle invite / consent flow | AWAITING DEVICE VERDICT |
-| Wizard save | AWAITING DEVICE VERDICT |
-| Deep links | AWAITING DEVICE VERDICT |
-| Bug-1 race | AWAITING DEVICE VERDICT |
+| Dose resolve from every surface | **DEFERRED-BY-OWNER** |
+| Vault upload | **DEFERRED-BY-OWNER** |
+| Care-circle invite / consent flow | **DEFERRED-BY-OWNER** |
+| Wizard save | **DEFERRED-BY-OWNER** |
+| Deep links | **DEFERRED-BY-OWNER** |
+| Bug-1 race | **DEFERRED-BY-OWNER** |
 
 ### Deferred — named reason and owner
 
@@ -100,7 +115,7 @@ that this evening deliberately does not attempt.
 
 ## Findings
 
-### 1 · Stranded dose action on an expired JWT — NEW BUG, fixed, awaiting re-verify
+### 1 · Stranded dose action on an expired JWT — NEW BUG, fixed, re-verify deferred by owner
 
 Sentry, med 159, 2026-08-18 ~16:45 UTC: `dose actions stranded after 5 exhausted
 retries: resolve_reminder_event HTTP 401 PGRST303 JWT expired`.
@@ -155,7 +170,7 @@ Not yet a finding. The intended presentation — one notification, one screen, o
 active dose, answer or timeout advances, tap to jump the queue — was described to
 the maintainer for a four-dose re-run.
 
-### 5 · Water count differs between phone and web — NEW BUG, fixed, awaiting re-verify
+### 5 · Water count differs between phone and web — NEW BUG, fixed, re-verify deferred by owner
 
 **Not** the same root as finding 1: `WaterActionReceiver` calls
 `WaterPrefs.addCup()`, purely local SharedPreferences with no network call.
@@ -187,25 +202,49 @@ notification stayed on the phone while the web tumbler read the lower row.
 
 | # | Condition | State |
 |---|---|---|
-| 1 | Every section carries a verdict | **PARTIAL** — 6 rows carry **DEFERRED** with a named reason and owner, 2 carry **DOCUMENTED-STATE**, 2 carry **FIXED, awaiting re-verify**. Every remaining row needs the device and says so. |
-| 2 | Water PR merged, the last open feature branch | **ALREADY SATISFIED** — water merged before tonight. `WaterNudge.kt` and 11 water web files are tracked on main, and `git branch -a --no-merged main` is empty, so no PR exists to merge. Recorded rather than manufactured. |
-| 3 | This document | **OPEN** — structure, evidence links and the deferred list are complete; the device-verdict cells and their Logcat quotes are what remain |
-| 4 | CLAUDE.md testing phase CLOSED | **NOT DONE, deliberately** — writing it now would record a close that has not happened |
+| 1 | Every section carries a verdict | **MET, but read how.** Every row carries one: 23 **DEFERRED-BY-OWNER**, 6 **DEFERRED** (reason + owner), 2 **DOCUMENTED-STATE**, 2 **FIXED** with re-verify deferred. **Zero PASS** — no device verdict was ever given, so none is claimed. |
+| 2 | Water PR merged, the last open feature branch | **ALREADY SATISFIED** — water merged before the evening. `WaterNudge.kt` and 11 web files are on main and `git branch -a --no-merged main` was empty, so no PR existed to merge. |
+| 3 | This document | **MET** — table, evidence links, deferred list and boundary complete. The Logcat quotes the condition anticipated do not exist, because the runs they would have come from did not happen. |
+| 4 | CLAUDE.md testing phase CLOSED | **MET** — closed by owner decision with the deferral named, not by verification. |
 
 ## The honest boundary
 
-What this evening does **not** cover, and will not by the time it closes:
+**What was proven on hardware tonight: nothing.** The device runs did not happen.
+Two bugs were found from a Sentry report and a user observation, root-caused,
+fixed and unit-tested — but neither fix has run on a phone.
 
-- **The escalation ladder end to end with a real second person.** Sections 2c and
-  5 exercise the device and server halves; a caregiver actually receiving and
-  acting on an escalation is a two-person test.
-- **OEM battery managers other than vivo.** Xiaomi/Oppo/Realme autostart
-  behaviour is a documented M3 risk and untested. vivo needed no exemption, and
-  that does not generalise.
-- **Telegram-only and web-only users.** The server pipeline is unchanged and
-  untouched tonight.
-- **Long-horizon reliability.** Everything here is minutes to hours. Multi-day
-  drift, DST transitions and month boundaries are covered by the shared schedule
-  fixture, not by hardware.
-- **The two fixes from tonight on hardware.** `0acf4a2` compiles and the web half
-  builds, but neither has run on the device yet.
+**Unproven on hardware, in full:**
+
+- **§4 reboot mid-ladder** — the crown, and the one that was a known gap. Never run.
+- **§7 the coalesced ring** — the focused list, yield-on-timeout, tap-to-jump, the
+  elderly one-at-a-time branch, and §7g's single-dose regression check. Never run.
+- **§8 alarm media** — backdrops, the airplane-mode proof that nothing is fetched
+  at fire time, and the §8a preview-vs-real comparison. Never run.
+- **§5 escalation only after the window.** Never run.
+- **§9 the expired-token recovery** and **§10 the water write-back** — tonight's two
+  fixes. Compiled, unit-tested, packaged into an APK; never executed on a device.
+- **Both language walks** — Telugu and the Hindi switch. The translations are
+  confirmed present in the APK's resource table; that they *render on the alarm
+  screen* is unverified.
+- **The whole behaviour walk** — dose resolve from every surface, vault upload,
+  care-circle invite/consent, wizard save, deep links, the Bug-1 race.
+- **§1, §2a/2b/2c, §3, §6** — defaults, the three cancel paths, airplane rungs,
+  snooze-suspends.
+
+**What IS verified, and by what means:**
+
+- The **layout half**, on the vivo I2202 on 2026-08-18 — see
+  [device-width-sweep-2026-08-18.md](design/device-width-sweep-2026-08-18.md).
+- The **schedule maths**, by the shared fixture the bot, the web and the Kotlin
+  port all run.
+- **60 native unit tests**, 0 failures, including the new auth-failure rules.
+- The **six locales are packaged** in the APK's compiled resource table (checked
+  with `aapt2`, not merely present in source).
+
+**Also still deferred, from before the owner decision:** the two-person escalation
+test, OEM battery managers beyond vivo, Telegram/web-only delivery, long-horizon
+drift, the unbuilt directory-lookup rate limit, and a native-speaker review of the
+six translations. See the deferred table above for reasons and owners.
+
+**The honest summary:** this is a phase closed to move forward, with a named debt.
+The debt is this list.
