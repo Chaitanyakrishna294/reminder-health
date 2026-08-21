@@ -1166,10 +1166,60 @@ copy of its real wrapper, delete it after). Every provider it needs — theme, U
 mode, density, language — is in the ROOT layout, so a scratch route anywhere gets
 them. That harness answered in one run what three rounds of reading could not, and
 `getBoundingClientRect()` against `window.innerHeight` is what made the real cause
-undeniable.
+undeniable — **but read the next section before trusting that rect**, because the
+same call lies about anything animated when the pane is not being painted.
 
 **Delete it before deploying** — Vercel ships the working tree, so a diagnostic
 route left in place ships to production.
+
+## A HIDDEN TAB FREEZES THE CLOCK — AND THE MEASUREMENT LIES ABOUT IT
+
+Paid for twice on 2026-08-21, in one session, and both times it manufactured a
+**bug that did not exist**. This is the companion to the section above: the
+harness is still the right answer, but a harness the browser is not painting is
+an instrument with a stuck needle.
+
+A tab that is not compositing — the Browser pane hidden, `document.hidden === true`
+— pauses **`requestAnimationFrame` callbacks, `ResizeObserver` delivery, and every
+CSS transition and animation**. `setTimeout` still runs but is throttled to ~1s
+minimum, which is its own trap: a sweep written with 500ms waits silently takes
+twice as long and blows the tool's 30s call limit.
+
+**The two false bugs, so the shape is recognisable:**
+
+- **"The dose gate's fit search is dead."** It schedules its step-down as
+  `requestAnimationFrame(() => setLevel(...))`. In a hidden tab that callback
+  never fires, so the gate sat at level 0 through every configuration and looked
+  categorically broken. It is not broken; it is **untestable there**. Anything
+  rAF-scheduled must be marked UNVERIFIED in a harness — never inferred either way.
+- **"The tour fix didn't work."** `getBoundingClientRect().top` read **410** while
+  the authored `element.style.top` was **232px** — a 178px lie, because the CSS
+  transition on `top` was frozen part-way through and `computedTop` sat at
+  405.9px. The fix was correct the whole time. A frozen `fadeIn` also left a
+  stray `matrix(1,0,0,1,0,4)` on the element.
+
+**So, when verifying layout in a harness:**
+
+- **Check `document.hidden` and prove rAF fires BEFORE trusting anything.** One
+  await of a `requestAnimationFrame` against a 1.5s timeout settles it. Do this
+  first, not after a confusing result.
+- **Read the AUTHORED value, not the composited one.** `element.style.top` is
+  what the code decided; `getBoundingClientRect()` is what the compositor got
+  around to. They agree only when frames are being painted. Geometry that must
+  come from a rect (a target's position, text wrapping, overflow) is still fine —
+  it is *animated* properties that lie.
+- The tool refusing a screenshot with *"the Browser pane is not displayed, so the
+  page is not compositing frames"* is the tell. Treat it as a warning about every
+  measurement in that session, not just the screenshot.
+
+**And write measurement code that survives it.** `guide-tour.tsx` calls its
+`measure()` immediately inside the effect **and** attaches a `ResizeObserver`, on
+purpose: an effect body runs on every React commit regardless of compositing, so
+step changes stay correct in a paused webview, while the observer catches what has
+no React state to depend on (a system font-size change). The immediate call is not
+belt-and-braces — it is the half that works when the frames stop. **This matters
+beyond harnesses**: a backgrounded Capacitor webview is a real device state, and
+`ScheduleSync`'s reconciliation already runs only when the webview runs.
 
 ## `position: fixed` IS NOT VIEWPORT-RELATIVE IF ANY ANCESTOR HAS A TRANSFORM
 
