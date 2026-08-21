@@ -90,6 +90,20 @@ export interface MascotSlotSpec {
 export const MASCOT_SLOTS = {
   /** First launch — the auth shell. The one place Remi greets a stranger. */
   welcome: { expression: 'waving', size: 42, elderlySize: 56, altKey: 'welcome' },
+  /**
+   * The public landing page's hero (added 2026-08-21, on the landing blueprint's
+   * explicit instruction to "record landing as a sanctioned welcome surface").
+   *
+   * Same greeting as `welcome` and the same expression — what differs is only the
+   * room. The auth shell gives Remi 42px beside a form; a landing hero is a screen
+   * with nothing else competing, which is exactly the condition this registry says
+   * earns the character its place. At 120 the wave renders at its natural stroke,
+   * clear of the arm floor that exists to rescue it at 42.
+   *
+   * It is a SEPARATE slot rather than a bigger `welcome` because the two moments
+   * can drift: shrinking the auth greeting should never shrink the hero.
+   */
+  landing: { expression: 'waving', size: 120, elderlySize: 148, altKey: 'welcome' },
   /** Confirm dialogs — the exit confirmation, and any future one of the same weight. */
   exitDialog: { expression: 'happy', size: 56, elderlySize: 64, altKey: 'happy' },
   /** Every dose answered. The one celebration in the product. */

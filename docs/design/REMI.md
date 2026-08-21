@@ -263,6 +263,15 @@ Placement is a registry, not a convention:
 and is made there, on purpose. Elderly mode narrows to **welcome, celebration and
 offline only**.
 
+**`landing` added 2026-08-21** — the public landing page's hero, `waving` at 120
+(148 elderly). Same greeting as `welcome` and the same expression; what differs is
+only the room. The auth shell gives Remi 42px beside a form, while a landing hero
+is a screen with nothing else competing, which is exactly the condition that earns
+the character its place. At 120 the wave renders at its natural stroke, clear of
+the arm floor that exists to rescue it at 42. It is a SEPARATE slot rather than a
+larger `welcome` because the two can drift: shrinking the auth greeting must never
+shrink the hero.
+
 Offline is the one moment with no registry entry, and deliberately so: the offline
 page is `android-app/.../assets/offline.html`, which renders when nothing can be
 fetched and therefore hand-inlines the `peaceful` art at 120 rather than importing
