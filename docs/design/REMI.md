@@ -4,6 +4,21 @@ Frozen 2026-08-20 after three review rounds. **This file is the authority.** The
 art is not re-decided per screen, per session, or per taste; changing anything
 below needs an explicit unfreeze from the maintainer, stated as such.
 
+**Shipped and VERIFIED ON HARDWARE 2026-08-21** — the maintainer walked every
+placement on production from the device: the 42px welcome wave judged at arm's
+length (the size the rejection ledger's whole argument turns on), the exit dialog,
+the celebration, empty states, all three guided tours at maximum system font, the
+dose gate including elderly, dark mode, the offline page in airplane mode, and the
+dark + elderly + Telugu combination. All pass. That matters more than a screenshot
+approval: the two size-conditional floors below exist precisely because a detail
+sized as a fraction of the art disappears at 42px, and the only instrument that
+settles whether the wave still reads is a person holding a phone.
+
+The design chapter closed on those verdicts. Note the scope — this is the ART and
+its placements. It says nothing about the alarm-core behaviour debt in
+[VERIFICATION_CLOSE_2026-08.md](../VERIFICATION_CLOSE_2026-08.md), which is
+still open.
+
 Remi appears to **celebrate and to comfort**. Never on a missed dose, never on an
 alarm, never to scold. That is the rule the placement registry exists to enforce.
 

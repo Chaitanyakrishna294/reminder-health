@@ -935,7 +935,11 @@ alarm media, escalation timing, both language walks and the entire
 write-path behaviour walk are unexecuted. That list is the debt, and it is
 enumerated in the close document's honest boundary.
 
-**Next:** Remi's final art, then the landing page, then the master-context phase.
+**Next:** the landing page, then the master-context phase. **Remi's final art is
+DONE and the design chapter is closed** — see the design section below. That does
+NOT touch the deferred list above: the alarm core's behaviour debt is unchanged by
+a design close, and it is still the first checklist when real-user validation
+begins.
 
 ## ELEMENT CHECKS ARE NOT PAGE CHECKS — VERIFY FIT AT 375px
 
@@ -1294,11 +1298,28 @@ never the reverse. That ordering is not ceremony: the spec sat one round out of
 date until 2026-08-16, and a session "following" it would have reverted the four
 elevation steps to three and re-derived dark mode from the light tokens.
 
-**THE DESIGN TRACK IS CLOSED (2026-08-16)** — no further visual work until
-Remi's final art lands. `design/looks-maxx` is merged and its branch deleted.
-This is stronger than the freeze below: the freeze governs *how* a change is
-made, this says there is no design work to make. Bug fixes to shipped surfaces
-are of course still fixes.
+**THE DESIGN TRACK IS CLOSED (2026-08-16), AND THE CHAPTER CLOSED 2026-08-21
+WHEN REMI'S FINAL ART LANDED.** `design/looks-maxx` and `design/remi-final` are
+both merged and their branches deleted. This is stronger than the freeze below:
+the freeze governs *how* a change is made, this says there is no design work to
+make. Bug fixes to shipped surfaces are of course still fixes.
+
+**What closing the chapter means, stated precisely, because the last close in this
+file had to be walked back:** the five frozen expressions shipped, wired through
+the registry (`docs/design/REMI.md` is the constitution), and **the maintainer gave
+device verdicts on production for every placement** — the 42px welcome wave at
+arm's length, the exit dialog, the celebration, empty states, all three guided
+tours at maximum system font, the dose gate including elderly, dark mode, the
+offline page in airplane mode, and the dark + elderly + Telugu combination. Unlike
+the 2026-08 testing close, **these are real PASS verdicts from hardware, not
+deferrals** — but they cover the DESIGN surfaces only. The alarm-core behaviour
+debt in `docs/VERIFICATION_CLOSE_2026-08.md` is untouched and still open.
+
+Two defects were found by attacking these surfaces rather than confirming them,
+and both are fixed: the dose gate carried a mascot onto a missed-dose question
+(ruled off, `ca25f32`), and the guided tour placed its bubble from a hardcoded
+240px estimate, so at an enlarged system font every step hung off the bottom with
+Back and Next unreachable (`962a9f2`).
 
 **`/settings/help` IS AN ACCEPTED DEVIATION (2026-08-17) — do not "fix" it.**
 It is the one surface deliberately off the 20/14/10 radius scale, keeping a
