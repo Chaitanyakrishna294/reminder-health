@@ -10,7 +10,7 @@ import { LOCALE_META, pickableLocales } from '@/lib/i18n/locales';
 import { Reveal, DoseRail, HeroStickers, HighlightOnView } from './landing-motion';
 import { AlarmMock, TodayMock } from './phone-mock';
 import {
-  BRAND, DOWNLOAD_READY, WEB_APP_HREF, ADHERENCE_SOURCE, SECTIONS, sectionGround,
+  BRAND, DOWNLOAD_READY, DOWNLOAD_URL, WEB_APP_HREF, ADHERENCE_SOURCE, SECTIONS, sectionGround,
 } from '@/lib/landing/config';
 
 /**
@@ -127,6 +127,38 @@ const LEGAL = [
 
 const FOCUS = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
 
+/**
+ * THE PRIMARY ACTION — one implementation, used by the hero and the night section.
+ *
+ * Both the destination AND the label swap together on `DOWNLOAD_READY`, which is
+ * the whole point of it being one component: the first version of this had a
+ * conditional LABEL over a hardcoded `href`, so flipping the flag would have
+ * produced a button reading "Download for Android" that quietly opened the web
+ * installer. A label and its destination are one decision.
+ *
+ * The download is an off-site file, so it renders as a plain `<a>` — `next/link`
+ * is for in-app navigation and would prefetch a route that does not exist.
+ */
+function PrimaryCta({ size = 'lg' }: { size?: 'lg' | 'sm' }) {
+  const cls =
+    size === 'lg'
+      ? `inline-flex min-h-12 items-center justify-center rounded-[var(--r-control)] bg-primary-strong px-7 py-3.5 text-base font-black text-primary-strong-foreground shadow-md transition-colors hover:bg-primary-strong-hover ${FOCUS}`
+      : `inline-flex min-h-11 items-center justify-center rounded-[var(--r-control)] bg-primary-strong px-5 py-2.5 text-sm font-black text-primary-strong-foreground transition-colors hover:bg-primary-strong-hover ${FOCUS}`;
+
+  if (DOWNLOAD_READY) {
+    return (
+      <a href={DOWNLOAD_URL} className={cls}>
+        Download for Android
+      </a>
+    );
+  }
+  return (
+    <Link href={WEB_APP_HREF} className={cls}>
+      Open the web app
+    </Link>
+  );
+}
+
 function Eyebrow({ time, label, slot }: { time: string; label: string; slot: string }) {
   return (
     <p
@@ -177,12 +209,9 @@ export default function LandingPage() {
             nobody answers.
           </p>
 
-          <Link
-            href={WEB_APP_HREF}
-            className={`mt-7 inline-flex min-h-12 items-center justify-center rounded-[var(--r-control)] bg-primary-strong px-7 py-3.5 text-base font-black text-primary-strong-foreground shadow-md transition-colors hover:bg-primary-strong-hover ${FOCUS}`}
-          >
-            {DOWNLOAD_READY ? 'Download for Android' : 'Open the web app'}
-          </Link>
+          <div className="mt-7">
+            <PrimaryCta />
+          </div>
 
           {/* Trust line — mono, because it is a list of facts, and every one of
               these three is device-verified. */}
@@ -458,9 +487,34 @@ export default function LandingPage() {
               </p>
 
               {DOWNLOAD_READY ? (
-                <p className="mt-6 text-sm font-semibold text-white/70">
-                  Install steps appear here once the build is published.
-                </p>
+                /* Honest install steps for a sideloaded APK. Android will warn
+                   about installing outside the Play Store, and saying so BEFORE it
+                   happens is the difference between a scary interruption and an
+                   expected one. */
+                <div className="mt-6 rounded-[var(--r-card)] bg-white/10 p-5">
+                  <ol className="space-y-2.5">
+                    {[
+                      'Tap Download — the file saves to your phone.',
+                      'Open it. Android will ask whether to allow installs from this source; early-access builds always install this way.',
+                      'Open Remily and add the first medicine.',
+                    ].map((s, i) => (
+                      <li key={s} className="flex items-start gap-3">
+                        <span
+                          aria-hidden
+                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/20 font-mono text-[11px] font-bold text-white"
+                        >
+                          {i + 1}
+                        </span>
+                        <span className="text-[13px] font-semibold leading-relaxed text-white/80">
+                          {s}
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                  <div className="mt-4">
+                    <PrimaryCta size="sm" />
+                  </div>
+                </div>
               ) : (
                 <div className="mt-6 rounded-[var(--r-card)] bg-white/10 p-5">
                   <p className="text-[13.5px] font-black text-white">
@@ -471,12 +525,9 @@ export default function LandingPage() {
                     there is nothing honest to link to. The web version works today and
                     installs to your home screen.
                   </p>
-                  <Link
-                    href={WEB_APP_HREF}
-                    className={`mt-4 inline-flex min-h-11 items-center justify-center rounded-[var(--r-control)] bg-primary-strong px-5 py-2.5 text-sm font-black text-primary-strong-foreground transition-colors hover:bg-primary-strong-hover ${FOCUS}`}
-                  >
-                    Open the web app
-                  </Link>
+                  <div className="mt-4">
+                    <PrimaryCta size="sm" />
+                  </div>
                 </div>
               )}
             </Reveal>

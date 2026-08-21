@@ -16,20 +16,45 @@
 export const BRAND = 'Remily';
 
 /**
- * ── THE DOWNLOAD ──
+ * ── THE DOWNLOAD — GitHub release asset (decided 2026-08-21) ──
  *
- * DELIBERATELY UNWIRED. There is no APK: no `.apk` exists in this repo, the Play
- * Console is unpaid, and the closed test has not run. The hosting decision
- * (GitHub release asset vs Supabase Storage) is the maintainer's and was
- * presented rather than made.
+ * The URL below is **already final and never needs editing again**, because
+ * `/releases/latest/download/<asset>` is GitHub's stable alias: it always serves
+ * the newest published release's asset with that filename. Ship v1, v2, v9 — the
+ * link on this page stays the same. That is the property that made this the right
+ * host over Supabase Storage, alongside free bandwidth on a public repo (verified
+ * public: release assets download with no auth) and zero new RLS surface, which
+ * matters in a repo whose storage policies have drawn blood twice.
  *
- * When it is decided, this is the one line that changes. `DOWNLOAD_READY` is the
- * flag the page reads: while false the primary action falls back to the web app
- * and says so, because a download button that downloads nothing is the one thing
- * a landing page must never ship.
+ * **THE ASSET MUST BE NAMED EXACTLY `remily.apk`.** The alias resolves by
+ * filename, so a release whose asset is called `app-release.apk` or
+ * `remily-v1.0.apk` will 404 this link while looking perfectly fine in the
+ * GitHub UI. Rename on upload.
+ *
+ * **A PRE-RELEASE IS NOT "LATEST".** GitHub excludes pre-releases from that
+ * alias. If the closed-test build is published with the pre-release box ticked,
+ * this URL 404s. Publish it as a normal release, or point at the tag directly.
  */
-export const DOWNLOAD_URL: string | null = null;
-export const DOWNLOAD_READY = DOWNLOAD_URL !== null;
+export const DOWNLOAD_URL =
+  'https://github.com/Chaitanyakrishna294/reminder-health/releases/latest/download/remily.apk';
+
+/**
+ * ── AND THE FLAG THAT KEEPS IT HONEST ──
+ *
+ * **There are zero releases on the repo today** — checked against the API, not
+ * assumed. So the URL above currently 404s, and a download button pointing at a
+ * 404 is the exact failure this page refuses everywhere else.
+ *
+ * Code cannot know whether the asset exists without a network call, so this is a
+ * deliberate manual flag: **flip it to `true` the moment the first release is
+ * published, and change nothing else.** The URL is already right.
+ *
+ * It is a plain constant rather than an env var on purpose. An env var flips
+ * invisibly and fails silently on a typo; a constant is a diff somebody reviews —
+ * and this repo has already paid once for a value piped into `vercel env add`
+ * that arrived subtly wrong and broke a thing while looking configured.
+ */
+export const DOWNLOAD_READY = false;
 
 /** Where the primary action goes while there is no APK. */
 export const WEB_APP_HREF = '/install';
