@@ -16,16 +16,21 @@ import LandingPage from '@/components/landing/landing-page';
  * "must fit 375x812 without scrolling" constraint, neither of which a scrolling
  * marketing page wants. The landing page's "Sign in" is what reaches it.
  */
+/**
+ * The landing page ships as **Remily**; the rest of the product is still
+ * Re-MIND-eЯ (65 references, the Android `app_name`, the Play listing). That seam
+ * is deliberate and tracked — see `lib/landing/config.ts`. The name lives in one
+ * constant so the eventual rename is a sweep, not a rebuild.
+ */
+const TITLE = 'Remily — medication reminders that reach the family';
+const DESCRIPTION =
+  'Remily rings on the phone itself at dose time, so reminders work offline, with the app closed and after a restart — and the family is told when nobody answers.';
+
 export const metadata: Metadata = {
-  title: 'Re-MIND-eЯ — medication reminders that work offline',
-  description:
-    'Medication reminders for the people you look after. On Android the alarm is built into the phone, so it rings offline, with the app closed, and after a restart — and the family is told when a dose goes unanswered.',
-  openGraph: {
-    title: 'Re-MIND-eЯ — medication reminders that work offline',
-    description:
-      'The alarm rings even when the internet does not. Medication reminders for the people you look after, with the family told when a dose goes unanswered.',
-    type: 'website',
-  },
+  title: TITLE,
+  description: DESCRIPTION,
+  openGraph: { title: TITLE, description: DESCRIPTION, type: 'website' },
+  twitter: { card: 'summary', title: TITLE, description: DESCRIPTION },
 };
 
 export default async function Home() {
