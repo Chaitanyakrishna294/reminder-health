@@ -1,4 +1,3 @@
-import type { MascotMood } from '@/components/dashboard/mascot-slots';
 import type { Density } from '@/lib/design/density';
 
 export interface GuideStep {
@@ -6,7 +5,6 @@ export interface GuideStep {
   target: string;
   title: string;
   message: string;
-  mood?: MascotMood;
   /** For multi-step forms: which wizard step this field lives on, so the page can
    *  jump there before the field is spotlighted. Used by the Add Medication wizard. */
   wizardStep?: number;
@@ -33,7 +31,6 @@ export const TOURS: Record<string, GuideStep[]> = {
       // card, or the earliest unanswered dose when nothing is due yet.
       message:
         'This is the dose that needs answering next. When it is due, the card grows and shows Taken and Skip.',
-      mood: 'curious',
     },
     {
       target: 'dash-compliance',
@@ -48,21 +45,18 @@ export const TOURS: Record<string, GuideStep[]> = {
       // lifetime average.
       message:
         'The ring fills as you answer each dose today. Tap a pocket in the strip above to see that dose here.',
-      mood: 'encouraging',
     },
     {
       target: 'dash-today',
       title: 'Today’s schedule',
       message:
         'Your whole day runs down this line, grouped into morning, midday, evening and bedtime. If you logged a dose the wrong way, tap “Change” under it — that works on the same day only.',
-      mood: 'reminder',
     },
     {
       target: 'dash-nav',
       title: 'Get around',
       message:
         'Use these to reach Medications, the Scheduler, your Health Vault, and Settings. Your Medical Profile and Emergency card live in the profile menu.',
-      mood: 'proud',
     },
   ],
   // A field-by-field walkthrough. Each step jumps the wizard to `wizardStep`, then
@@ -73,7 +67,6 @@ export const TOURS: Record<string, GuideStep[]> = {
       wizardStep: 1,
       title: 'Name of the medicine',
       message: 'Type the medicine’s name here — like Paracetamol or Atorvastatin.',
-      mood: 'curious',
     },
     {
       target: 'mednew-catalog',
@@ -81,77 +74,66 @@ export const TOURS: Record<string, GuideStep[]> = {
       title: 'Link the real medicine',
       message:
         'If you know the exact brand, search and pick it here. It’s optional — but adding it helps your doctor see exactly what you take.',
-      mood: 'encouraging',
     },
     {
       target: 'mednew-form',
       wizardStep: 1,
       title: 'What form is it?',
       message: 'Choose the form it comes in — tablet, capsule, syrup, drops, and so on.',
-      mood: 'curious',
     },
     {
       target: 'mednew-frequency',
       wizardStep: 2,
       title: 'How often you take it',
       message: 'Pick how many times a day you take it — once, twice, or thrice.',
-      mood: 'reminder',
     },
     {
       target: 'mednew-times',
       wizardStep: 2,
       title: 'Time of each dose',
       message: 'Set the time for every dose. Your reminders arrive at exactly these times.',
-      mood: 'reminder',
     },
     {
       target: 'mednew-strength',
       wizardStep: 3,
       title: 'Strength',
       message: 'Type the strength, like 500mg — it’s printed on the box or strip. This one is optional.',
-      mood: 'curious',
     },
     {
       target: 'mednew-amount',
       wizardStep: 3,
       title: 'How much to take',
       message: 'Use − and + to set how many to take each time — for example, 1 tablet or 2.',
-      mood: 'encouraging',
     },
     {
       target: 'mednew-inventory',
       wizardStep: 4,
       title: 'Track your stock',
       message: 'Turn this on and I’ll count your pills down with each dose, then warn you before you run out.',
-      mood: 'curious',
     },
     {
       target: 'mednew-stock',
       wizardStep: 4,
       title: 'How many you have',
       message: 'Enter how many you have now, and the low number you’d like to be warned at.',
-      mood: 'reminder',
     },
     {
       target: 'mednew-reason',
       wizardStep: 5,
       title: 'What it’s for',
       message: 'Add a short note like “for blood pressure”, so it’s easy to recognise later. This is optional.',
-      mood: 'encouraging',
     },
     {
       target: 'mednew-priority',
       wizardStep: 5,
       title: 'How important is it',
       message: 'Set how important it is. Critical doses can alert your caregiver if one is missed.',
-      mood: 'reminder',
     },
     {
       target: 'mednew-review',
       wizardStep: 6,
       title: 'Check and save',
       message: 'Look over everything here, then tap Add Medication to switch on your reminders. You can edit it anytime.',
-      mood: 'proud',
     },
   ],
   medications: [
@@ -160,7 +142,6 @@ export const TOURS: Record<string, GuideStep[]> = {
       title: 'Your medication library',
       message:
         'All your active medications live here. Each card shows dose timing, stock level, and your next scheduled reminder.',
-      mood: 'curious',
     },
     {
       target: 'med-card-first',
@@ -169,14 +150,12 @@ export const TOURS: Record<string, GuideStep[]> = {
       // dose-form icon, and the chip row underneath carries every status.
       message:
         'The icon shows what form it comes in — tablet, syrup, drops. The marks underneath show how important it is, how much is left, and whether reminders are paused.',
-      mood: 'encouraging',
     },
     {
       target: 'med-times',
       title: 'When you take it',
       message:
         'One line for the whole schedule — the times, then which days. Tap Edit on the card to change either.',
-      mood: 'reminder',
     },
     {
       target: 'med-stock',
@@ -186,14 +165,12 @@ export const TOURS: Record<string, GuideStep[]> = {
       // heads-up rather than an alarm.
       message:
         'Stock counts down with each dose. It turns amber at the number you set, so you can order more before you run out.',
-      mood: 'curious',
     },
     {
       target: 'med-actions',
       title: 'Quick actions',
       message:
         'Pause stops reminders without deleting. Edit changes any detail. Add Stock tops up your count. Delete removes the medication entirely.',
-      mood: 'proud',
     },
   ],
 };

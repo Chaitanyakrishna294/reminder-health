@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useLanguage } from '@/context/language-context';
-import type { MascotMood, RemiExpression } from '@/components/dashboard/mascot-slots';
+import type { MascotMood } from '@/components/dashboard/mascot-slots';
 import { RemiArt } from '@/components/dashboard/remi-art';
 
 /**
@@ -17,36 +17,12 @@ import { RemiArt } from '@/components/dashboard/remi-art';
  */
 export type { MascotMood };
 
-/**
- * THE FROZEN SIX render as inline SVG from `remi-art`; anything else is legacy
- * PNG. See REMI.md for why inline is forced rather than preferred — the dark
- * blush rule and the size floors both have to reach inside the art, and an
- * `<img>` lets nothing in.
- */
-const FROZEN = new Set<string>(['happy', 'waving', 'proud', 'peaceful', 'curious', 'peaceful-sleep']);
-const isFrozen = (m: MascotMood): m is RemiExpression => FROZEN.has(m);
-
-/**
- * LEGACY ART — the pre-2026-08-20 PNGs.
- *
- * Only `med-due-gate` still reaches this path, and only because whether Remi
- * belongs on a dose question at all is a decision the maintainer has reserved
- * (see the flag at the bottom of mascot-slots.ts). Do not add call sites.
- */
-const LEGACY: Record<string, string> = {
-  reminder: '/mascot/reminder.png',
-  concerned: '/mascot/concerned.png',
-  encouraging: '/mascot/encouraging.png',
-  sorry: '/mascot/sorry.png',
-};
-
 /** Slot → accessible name. Decorative placements pass no key and stay hidden. */
 export type MascotAltKey = 'welcome' | 'happy' | 'proud' | 'peaceful' | 'curious';
 
 interface BrainMascotProps {
   size?: number;
-  /** 'asking' is kept as a backward-compatible alias for 'reminder'. */
-  mood?: MascotMood | 'asking';
+  mood?: MascotMood;
   className?: string;
   /**
    * Announce Remi with this name. Omitted (the default) renders `aria-hidden`,
@@ -56,14 +32,24 @@ interface BrainMascotProps {
   altKey?: MascotAltKey | null;
 }
 
+/**
+ * ONE RENDER PATH, ON PURPOSE.
+ *
+ * Until 2026-08-21 this component chose between inline SVG and a PNG, with a
+ * third branch for a PNG that failed to load. The PNGs were the pre-freeze art
+ * and their last caller was the dose gate, which was ruled to carry no mascot at
+ * all — so every mood is now a frozen expression and the branching is gone.
+ *
+ * Keep it that way. A fallback branch here is where a second, unreviewed
+ * character quietly lives: it renders only when something else is broken, which
+ * is exactly when nobody is looking at it.
+ */
 export default function BrainMascot({
   size = 160,
-  mood = 'reminder',
+  mood = 'happy',
   className = '',
   altKey = null,
 }: BrainMascotProps) {
-  const resolved: MascotMood = mood === 'asking' ? 'reminder' : mood;
-  const [imgOk, setImgOk] = useState(true);
   const { t } = useLanguage();
 
   const label = altKey ? (t.mascot?.[altKey] ?? FALLBACK_ALT[altKey]) : null;
@@ -89,35 +75,16 @@ export default function BrainMascot({
           than fixed. It now stops for anyone who asks. */}
       <style>{'@keyframes brainBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}.remi-bob{animation:brainBob 4.5s ease-in-out infinite}@media (prefers-reduced-motion: reduce){.remi-bob{animation:none}}'}</style>
 
-      {isFrozen(resolved) ? (
-        <svg
-          viewBox="0 0 512 512"
-          width={size}
-          height={size}
-          xmlns="http://www.w3.org/2000/svg"
-          style={{ display: 'block' }}
-          {...a11y}
-        >
-          <RemiArt expression={resolved} size={size} />
-        </svg>
-      ) : imgOk && LEGACY[resolved] ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={LEGACY[resolved]}
-          alt=""
-          width={size}
-          height={size}
-          onError={() => setImgOk(false)}
-          style={{ width: size, height: size, objectFit: 'contain' }}
-          aria-hidden
-        />
-      ) : (
-        // Last resort if a legacy PNG is missing: the calm frozen face rather
-        // than the old gradient brain, which broke the palette law.
-        <svg viewBox="0 0 512 512" width={size} height={size} aria-hidden style={{ display: 'block' }}>
-          <RemiArt expression="peaceful" size={size} />
-        </svg>
-      )}
+      <svg
+        viewBox="0 0 512 512"
+        width={size}
+        height={size}
+        xmlns="http://www.w3.org/2000/svg"
+        style={{ display: 'block' }}
+        {...a11y}
+      >
+        <RemiArt expression={mood} size={size} />
+      </svg>
     </span>
   );
 }

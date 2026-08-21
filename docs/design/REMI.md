@@ -250,3 +250,28 @@ offline only**.
 
 **Remi must never appear on a missed-dose or alarm surface.** If a surface asks
 the patient about a dose they may have missed, Remi does not belong on it.
+
+### The dose gate: no mascot, by constitutional rule
+
+Ruled 2026-08-21. `med-due-gate.tsx` was the one placement outside the registry —
+Remi sat inside the overdue ring with the face chosen by lateness, computing a
+`concerned` look once a dose was thirty minutes late. That is scolding, and it is
+the one thing this character is defined not to do.
+
+The three options were: drop Remi from the gate, keep the legacy art there as a
+documented exception, or design a gate-specific expression under a fresh unfreeze.
+**The first was chosen. The other two are closed.**
+
+The lateness ring and the frosted lens behind it went with the art, because both
+existed to frame and seat the mascot — leaving them would have left an empty
+donut where the character had been. Nothing was lost with them: the exact figure
+is spelled out in the chip below (icon, text and tint), and each row of the list
+view already carries its own time and missed state as text. The gate's own comment
+had already shrunk the art once "so the name can lead"; removing it finishes that
+sentence, and the drug name is now the first thing on a screen whose only job is
+naming a drug.
+
+This ruling is also what let the legacy PNG path be deleted outright — the gate
+was its last caller. `BrainMascot` now renders inline SVG with no branch, and
+`web/public/mascot/` keeps only the four scene illustrations (`welcome-mascot`,
+`login-hero`, `login-peek`, `refill-gate-mascot`), which are not Remi placements.

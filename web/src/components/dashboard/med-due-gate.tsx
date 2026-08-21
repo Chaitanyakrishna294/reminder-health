@@ -11,7 +11,6 @@ import { useTheme } from '@/context/theme-context';
 import { getUnitIcon } from '@/lib/design/dose-forms';
 import { unitPhrase } from '@/components/medications/medication-form-options';
 import { Check, X, Clock, Siren, AlertTriangle } from 'lucide-react';
-import BrainMascot from './brain-mascot';
 
 export interface GateEvent {
   id: number;
@@ -75,13 +74,6 @@ function overdueLabel(scheduledFor: string): string {
 const fmtTime = (iso: string) =>
   new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-const minutesLate = (iso: string) =>
-  Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000));
-
-/** How long the ring takes to fill. Two hours past the scheduled time is a
- *  full ring; beyond that it stays full rather than resetting. */
-const RING_WINDOW_MINS = 120;
-
 /** Placement of the three blurred colour fields behind the gate. Deliberately larger
  *  than the viewport and hung off the edges, so what shows is the soft middle of each
  *  field rather than a recognisable circle. */
@@ -91,57 +83,6 @@ const MESH_FIELDS = [
   { width: '18rem', height: '18rem', top: '38%', right: '-6rem' },
 ] as const;
 
-/** Lateness drawn as an arc around the mascot. Shape carries the urgency, so it
- *  reads in dark mode, in elderly mode, and without colour vision — and the exact
- *  figure is always spelled out in the chip beside it, never colour alone. */
-function OverdueRing({
-  minutes,
-  size,
-  missed,
-  children,
-}: {
-  minutes: number;
-  size: number;
-  missed: boolean;
-  children: React.ReactNode;
-}) {
-  const R = 46;
-  const CIRC = 2 * Math.PI * R;
-  const filled = Math.min(minutes / RING_WINDOW_MINS, 1) * CIRC;
-  return (
-    <span
-      className="relative inline-flex items-center justify-center shrink-0"
-      style={{ width: size, height: size }}
-    >
-      <svg
-        viewBox="0 0 100 100"
-        width={size}
-        height={size}
-        className="absolute inset-0 -rotate-90"
-        aria-hidden="true"
-      >
-        <circle cx="50" cy="50" r={R} fill="none" stroke="var(--border)" strokeWidth="3.5" />
-        {filled > 0 && (
-          <circle
-            cx="50"
-            cy="50"
-            r={R}
-            fill="none"
-            stroke={missed ? 'var(--danger)' : 'var(--warning)'}
-            strokeWidth="3.5"
-            strokeLinecap="round"
-            strokeDasharray={`${filled} ${CIRC}`}
-          />
-        )}
-      </svg>
-      {/* A soft lens for the mascot to sit on. Without it the brain art sank into the
-          navy in dark mode — it is a small pink drawing on a large dark field. */}
-      <span className="absolute inset-[8%] rounded-full bg-white/80 dark:bg-white/[0.10] backdrop-blur-md ring-1 ring-white/50 dark:ring-white/10" />
-      <span className="relative">{children}</span>
-    </span>
-  );
-}
-
 export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSnoozeAll, onUnresolvable }: MedDueGateProps) {
   const supabase = createClient();
   const router = useRouter();
@@ -149,15 +90,14 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
   const { theme } = useTheme();
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [small, setSmall] = useState(false);
   /**
    * FIT LEVEL — 0 roomy, 1 compact, 2 tight. Chosen by MEASURING, never guessed.
    *
    * Two attempts got this wrong before, both by picking a number:
    *
-   * 1. `small` (below) tests WIDTH, which says nothing about whether the question
-   *    and its three answers fit. A 412x915 phone took the LARGER ring for being
-   *    wide, then overflowed.
+   * 1. A width test says nothing about whether the question and its three
+   *    answers fit. A 412x915 phone took the roomier layout for being wide,
+   *    then overflowed.
    * 2. Replacing it with `innerHeight < 760` failed on the actual device, because
    *    a modern Android webview is ~830-900 CSS px tall — the condition was simply
    *    false and the screen never changed.
@@ -238,7 +178,6 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
 
   useEffect(() => {
     const f = () => {
-      setSmall(window.innerWidth < 420);
       // Re-measure from the top: a phone turned sideways loses half its height in
       // one frame, and a level chosen for the tall orientation is wrong for it.
       setLevel(0);
@@ -369,9 +308,9 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
    */
   const fit = isElderly ? 0 : level;
   const FIT = [
-    { pad: 'pt-12 pb-6', gap: 'mt-5', tray: 'mt-8', emg: 'mt-6', btn: 'py-4 text-lg', ring: small ? 132 : 148, ringList: small ? 96 : 108 },
-    { pad: 'pt-6 pb-4',  gap: 'mt-3', tray: 'mt-5', emg: 'mt-4', btn: 'py-4 text-lg', ring: small ? 104 : 116, ringList: small ? 84 : 92 },
-    { pad: 'pt-4 pb-3',  gap: 'mt-2', tray: 'mt-4', emg: 'mt-3', btn: 'py-3 text-base', ring: small ? 80 : 88, ringList: small ? 68 : 74 },
+    { pad: 'pt-12 pb-6', gap: 'mt-5', tray: 'mt-8', emg: 'mt-6', btn: 'py-4 text-lg' },
+    { pad: 'pt-6 pb-4',  gap: 'mt-3', tray: 'mt-5', emg: 'mt-4', btn: 'py-4 text-lg' },
+    { pad: 'pt-4 pb-3',  gap: 'mt-2', tray: 'mt-4', emg: 'mt-3', btn: 'py-3 text-base' },
   ] as const;
 
   const missedMode = isAttentionStatus(event.reminder_status);
@@ -510,33 +449,20 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
         </span>
       )}
 
-      {/* The mascot used to be the biggest thing on a screen whose job is naming a
-          drug — 168px of brain against a 24px medication name. It now sits inside
-          the lateness ring at roughly a third of that, so the name can lead. */}
-      {(() => {
-        // Elderly's two values are deliberately untouched — it is excluded from
-        // the redesign and its ring is sized for its own arm's-length scale.
-        const ringSize =
-          effectiveView === 'list'
-            ? FIT[fit].ringList
-            : isElderly
-              ? (small ? 152 : 172)
-              : FIT[fit].ring;
-        const mood =
-          missedMode || minutesLate(event.scheduled_for) >= 30 ? 'concerned' : 'reminder';
-        return (
-          <OverdueRing
-            minutes={minutesLate(event.scheduled_for)}
-            size={ringSize}
-            missed={missedMode}
-          >
-            {/* The art has its own transparent margin, so the drawn brain reads a good
-                deal smaller than its box — 0.78 fills the ring optically, not just
-                geometrically. */}
-            <BrainMascot size={Math.round(ringSize * 0.78)} mood={mood} />
-          </OverdueRing>
-        );
-      })()}
+      {/* NO MASCOT HERE, BY CONSTITUTIONAL RULE (ruled 2026-08-21).
+          docs/design/REMI.md: "Remi celebrates and comforts… never on a
+          missed-dose surface." The gate IS that surface — it asks about doses the
+          patient may have missed, and the code it replaced literally computed a
+          'concerned' face when they had.
+
+          The lateness RING went with the art rather than staying as an empty
+          donut, which is the hole this removal was told not to leave. Nothing was
+          lost with it: the arc's figure is spelled out below in the chip
+          (icon + text + tint), and in list view every row already carries
+          "${time} · missed" in danger text. What the column gains is the
+          reflow — the DRUG NAME is now the first thing on a screen whose only job
+          is naming a drug, which is the direction the old comment here had already
+          started when it shrank the art to a third of its size. */}
 
       {/* View toggle — only when there is a queue worth batching. */}
       {remaining > 1 && (

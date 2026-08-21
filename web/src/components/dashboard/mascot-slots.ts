@@ -12,8 +12,8 @@
  * rejection ledger. This file decides only WHERE and HOW BIG.
  *
  * REMI CELEBRATES AND COMFORTS. He never appears on a missed-dose or alarm
- * surface — see the note on `medDueGate` at the bottom of this file, which is the
- * one live exception and is flagged for a decision rather than settled.
+ * surface, and as of 2026-08-21 there is no exception — the dose gate was the last
+ * one and it was ruled off (see the bottom of this file).
  *
  * ELDERLY MODE narrows this further — Remi appears only at welcome, celebration and
  * offline reassurance, and says less everywhere (see the ux-copy skill).
@@ -53,20 +53,14 @@ export type RemiExpression =
   | 'peaceful-sleep';
 
 /**
- * LEGACY MOODS — the pre-2026-08-20 art, still rendered from PNG.
- *
- * Only `med-due-gate` still uses these (`reminder` / `concerned`), and only
- * because converting it is a design decision the maintainer has reserved. Do not
- * add new call sites; when the gate question is settled these disappear along
- * with `web/public/mascot/*.png`.
+ * Kept as the name the call sites and `brain-mascot` already use. It once also
+ * covered four PNG-only legacy moods (`reminder`, `concerned`, `encouraging`,
+ * `sorry`); those were deleted with the gate ruling on 2026-08-21, so the two
+ * types now name the same set. **Every mood is a frozen expression** — which is
+ * what lets `BrainMascot` render inline SVG unconditionally, with no PNG branch
+ * and no fallback.
  */
-export type LegacyMood =
-  | 'reminder'
-  | 'concerned'
-  | 'encouraging'
-  | 'sorry';
-
-export type MascotMood = RemiExpression | LegacyMood;
+export type MascotMood = RemiExpression;
 
 export interface MascotSlotSpec {
   /** Which frozen expression this moment gets. */
@@ -112,27 +106,26 @@ export function mascotSlot(slot: MascotSlot, isElderly = false) {
 }
 
 /**
- * ── FLAGGED, NOT DECIDED: the dose gate ──
+ * ── RULED 2026-08-21: THE DOSE GATE GETS NO MASCOT ──
  *
- * `med-due-gate.tsx` renders Remi inside the overdue ring and picks the face from
- * how late the dose is:
+ * `med-due-gate.tsx` used to render Remi inside its overdue ring and pick the face
+ * from how late the dose was:
  *
  *     const mood = missedMode || minutesLate(...) >= 30 ? 'concerned' : 'reminder'
  *
- * It is deliberately NOT in this registry, for two reasons the maintainer asked to
- * rule on rather than have settled:
+ * It was the one placement outside this registry, flagged rather than settled. The
+ * maintainer ruled: **drop Remi from the gate.** The gate is a dose question, and
+ * REMI.md is right that Remi never belongs on one — a mascot that computes a
+ * disappointed face when you missed a dose is scolding, which is the single thing
+ * the character is defined not to do.
  *
- *  1. **It contradicts the placement rule.** REMI.md says Remi celebrates and
- *     comforts and never appears on a missed-dose surface. The gate is exactly
- *     that surface — it asks about doses the patient may have missed, and it
- *     literally computes a `concerned` face when they have.
- *  2. **A registry lookup cannot express it.** Slots carry one fixed expression;
- *     the gate's face is dynamic. Converting it would mean choosing a single
- *     expression, which changes behaviour on a safety-critical screen — the one
- *     thing the conversion brief ruled out.
+ * The ring and its lens went with the art. Both existed to frame and seat the
+ * mascot, so keeping them would have left a frosted empty donut — exactly the hole
+ * the removal was told not to leave. No information went with them: the lateness
+ * figure is spelled out in the chip below (icon + text + tint), and every list row
+ * already carries its own time and missed state as text.
  *
- * So the gate keeps its legacy PNG moods untouched, with zero behaviour change,
- * until that call is made. The three options are: drop Remi from the gate
- * entirely (what REMI.md implies), keep the legacy art there as a documented
- * exception, or design a gate-specific expression under a fresh unfreeze.
+ * **Do not re-add a mascot to the gate.** The three options were drop it, keep the
+ * legacy art as a documented exception, or design a gate-specific expression under
+ * a fresh unfreeze. The first was chosen; the other two are closed.
  */
