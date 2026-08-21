@@ -115,6 +115,34 @@ export default function MedDueGate({ queue, userRole, onResolved, onSnooze, onSn
    * does. The container is `overflow-y-auto`, so it did scroll — silently, with
    * no affordance, which is why it read as stuck rather than scrollable.
    *
+   * ── MEASURED BOUNDS, 2026-08-21 (375x812, the search verified running) ──
+   *
+   *   system font 1.0x, 4 doses + longest name + missed → settles LEVEL 0, fits,
+   *                                                        all 4 rows on screen
+   *   system font 1.15x, 4 doses                        → LEVEL 2, over by 82px;
+   *                                                        all 4 rows still on
+   *                                                        screen — the spill is
+   *                                                        the trailing secondary
+   *                                                        actions, not the answers
+   *   system font 1.3x, 4 doses + longest name          → LEVEL 2, over by 198px,
+   *                                                        3 of 4 rows on screen
+   *
+   * So the search works and stops at its floor; the floor is simply not enough at
+   * an enlarged system font with a full handful, and it degrades to a scroll
+   * rather than to unreachable content.
+   *
+   * **DO NOT ADD A LEVEL 3.** The only user who reaches these cases is one who
+   * deliberately ENLARGED their system font, and the answer to "your text is too
+   * big to fit" cannot be "then we will shrink your text". That is hostile to the
+   * exact person the setting exists for, and it is the same trade this floor was
+   * already drawn to refuse. If this is ever worth improving, the honest move is a
+   * scroll AFFORDANCE (the complaint above is that it scrolled *silently*), or
+   * dropping the secondary actions at large font — not smaller type.
+   *
+   * Removing the mascot and its ring on 2026-08-21 is what bought the 1.0x row
+   * above: the everyday worst case now fits at LEVEL 0 without the search running
+   * at all.
+   *
    * NON-ELDERLY ONLY. Elderly owns its scale and is excluded from the redesign, so
    * it is pinned at level 0 and every value below is guarded.
    */

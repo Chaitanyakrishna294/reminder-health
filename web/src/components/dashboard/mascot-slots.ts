@@ -100,6 +100,28 @@ export const MASCOT_SLOTS = {
   guideTour: { expression: 'curious', size: 64, elderlySize: 80, altKey: 'curious' },
 } as const satisfies Record<string, MascotSlotSpec>;
 
+/**
+ * ── TWO PLACEMENTS ASKED FOR AND REFUSED, 2026-08-21 ──
+ *
+ * Both came out of an adversarial pass that assumed Remi was on these surfaces
+ * and found he was not. Recorded as DECISIONS so the absence reads as chosen
+ * rather than missed, and nobody "fixes" it later.
+ *
+ * **No all-taken celebration outside elderly.** `celebration` has exactly one
+ * caller, `elderly-today.tsx`. That is right, and the reason is what elderly IS:
+ * a ONE-QUESTION SCREEN, so when every dose is answered the screen would
+ * otherwise be blank and Remi becomes the content. The standard densities still
+ * render the rail, with each pocket pressed in — the screen is not empty and is
+ * already doing its job, so a mascot there is a garnish on a working surface,
+ * which is the exact thing this registry exists to prevent. (`todays-schedule`
+ * shows `emptyState` only when NO doses are scheduled, which is a different fact
+ * from all of them being answered.)
+ *
+ * **No Remi in the Health Vault or the Care Circle.** Neither is a celebrate-or-
+ * comfort moment: one manages documents, the other manages relationships. Both
+ * are working surfaces with content competing for attention, and putting the
+ * character on them is how a character stops being charming.
+ */
 export type MascotSlot = keyof typeof MASCOT_SLOTS;
 
 /**

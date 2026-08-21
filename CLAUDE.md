@@ -1368,6 +1368,13 @@ drop hard while shades DEEPEN, which is not a proportional dim.
 - **Remi's idle bob is the one sanctioned loop** (with the all-taken
   celebration). It is a carve-out, not an oversight — but it must keep its
   reduced-motion branch.
+  - **The all-taken celebration is ELDERLY-ONLY, and that is a decision, not a
+    gap** (confirmed 2026-08-21). `mascotSlot('celebration')` has exactly one
+    caller, `elderly-today.tsx`. Elderly is a one-question screen, so an
+    all-answered day would otherwise be blank and Remi becomes the content; the
+    standard densities still render the rail with every pocket pressed in, so the
+    screen is not empty and a mascot there is a garnish on a working surface.
+    This line used to read as though the celebration were general — it never was.
 
 **`motion-design`'s "always include an ambient layer" is a STANDING REFUSAL.**
 Refused four times now: an ambient layer is a looping idle animation, and nothing
