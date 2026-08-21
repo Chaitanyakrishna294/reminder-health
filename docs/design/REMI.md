@@ -248,6 +248,13 @@ Placement is a registry, not a convention:
 and is made there, on purpose. Elderly mode narrows to **welcome, celebration and
 offline only**.
 
+Offline is the one moment with no registry entry, and deliberately so: the offline
+page is `android-app/.../assets/offline.html`, which renders when nothing can be
+fetched and therefore hand-inlines the `peaceful` art at 120 rather than importing
+a component. Keep that copy in step with the geometry above if it ever changes.
+The `careCircleMoment` slot was deleted the same day (2026-08-21) — it had never
+had a caller.
+
 **Remi must never appear on a missed-dose or alarm surface.** If a surface asks
 the patient about a dose they may have missed, Remi does not belong on it.
 
