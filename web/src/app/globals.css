@@ -917,6 +917,19 @@ body {
 }
 
 /* Inputs and wells sit BELOW the card: they receive content. */
+/* ── REMI, DARK MODE — the one adjustment the frozen art allows ──
+   docs/design/REMI.md law 5: identical art, blush layer at 45%. The blush is a
+   HIGHLIGHT, and highlights are fractions of the room's light — on dark they
+   drop while shades deepen. At full strength the near-white blush reads as a
+   hotspot, the same failure the tumbler glass and the dose-strip pockets had.
+   Same colour, less of it, so the five-colour law holds.
+
+   This only reaches the art because Remi renders as INLINE svg; an <img> would
+   be opaque to it. That is why inline is forced rather than preferred. */
+@layer components {
+  :root.dark .remi-blush { opacity: 0.45; }
+}
+
 .surface-sunk {
   background: var(--surface-sunk);
   border-radius: var(--r-control);

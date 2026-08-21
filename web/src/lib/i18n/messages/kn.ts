@@ -463,6 +463,13 @@ const kn: Messages = {
     readInEnglish: 'ಇಂಗ್ಲಿಷ್‌ನಲ್ಲಿ ಓದಿ',
     backToSignIn: 'ಸೈನ್ ಇನ್‌ಗೆ ಹಿಂತಿರುಗಿ',
   },
+  mascot: {
+    welcome: 'ರೆಮಿ, ಕೈ ಬೀಸಿ ಸ್ವಾಗತಿಸುತ್ತಿದೆ',
+    happy: 'ರೆಮಿ, ನಗುತ್ತಿದೆ',
+    proud: 'ರೆಮಿ, ನಿಮ್ಮ ಬಗ್ಗೆ ಸಂತಸ',
+    peaceful: 'ರೆಮಿ, ವಿಶ್ರಾಂತಿಯಲ್ಲಿ',
+    curious: 'ರೆಮಿ, ಆಲಿಸುತ್ತಿದೆ',
+  },
 };
 
 export default kn;

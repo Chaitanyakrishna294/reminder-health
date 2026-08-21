@@ -71,6 +71,38 @@
   </head>
   <body>
     <main class="card">
+      <!-- REMI — the offline slot (docs/design/REMI.md). `peaceful`, drawn at the
+           registry's 120. Inlined rather than referenced: this page is shown
+           precisely when nothing can be fetched, so an <img src> would render a
+           broken icon at the one moment the reassurance matters.
+           No shine (closed eyes carry none) and no size floors needed at 120. -->
+      <svg class="remi" viewBox="0 0 512 512" width="120" height="120" aria-hidden="true">
+        <g fill="#F26B8A">
+          <ellipse cx="256" cy="256" rx="150" ry="120"/>
+          <circle cx="256" cy="161" r="68"/><circle cx="182" cy="179" r="68"/>
+          <circle cx="136" cy="227" r="68"/><circle cx="136" cy="285" r="68"/>
+          <circle cx="182" cy="333" r="68"/><circle cx="256" cy="351" r="68"/>
+          <circle cx="330" cy="333" r="68"/><circle cx="376" cy="285" r="68"/>
+          <circle cx="376" cy="227" r="68"/><circle cx="330" cy="179" r="68"/>
+        </g>
+        <g fill="none" stroke="#CC3D64" stroke-width="8.3" stroke-linecap="round">
+          <path d="M174.7 137.6 Q146.9 143.9 140.6 171.7"/>
+          <path d="M337.3 137.6 Q365.1 143.9 371.4 171.7"/>
+        </g>
+        <g transform="rotate(4 256 280)">
+          <g class="remi-blush" fill="#FDEEF2">
+            <ellipse cx="131.95" cy="290" rx="26.4" ry="14.5"/>
+            <ellipse cx="380.05" cy="290" rx="26.4" ry="14.5"/>
+          </g>
+          <g fill="none" stroke="#0F1C5A" stroke-width="8.3" stroke-linecap="round">
+            <path d="M169.9 258.2 Q198.6 285.6 227.3 258.2"/>
+            <path d="M284.7 258.2 Q313.4 285.6 342.1 258.2"/>
+          </g>
+          <g fill="none" stroke="#CC3D64" stroke-width="9.5" stroke-linecap="round">
+            <path d="M237.2 318.7 Q256 328.5 274.8 318.7"/>
+          </g>
+        </g>
+      </svg>
       <h1>You're offline</h1>
       <p>Re-MIND-e&#1071; needs a connection to load your medicines, care circle and vault.</p>
       <a class="retry" href="reminderhealth://retry">Retry</a>

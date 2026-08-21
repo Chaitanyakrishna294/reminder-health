@@ -3,27 +3,12 @@
 import React, { useEffect, useState } from 'react';
 import { ArrowLeft, ArrowRight, X, Check } from 'lucide-react';
 import BrainMascot from '@/components/dashboard/brain-mascot';
+import { mascotSlot } from '@/components/dashboard/mascot-slots';
 import { useGuide } from './guide-context';
 import { TOURS } from './guide-content';
 import { useDensity } from '@/context/density-context';
 
 const CARD_W = 320;
-
-function GuiderMascot({ size }: { size: number }) {
-  const [ok, setOk] = useState(true);
-  if (!ok) return <BrainMascot size={size} mood="curious" />;
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src="/mascot/guider.png"
-      alt=""
-      width={size}
-      height={size}
-      onError={() => setOk(false)}
-      style={{ width: size, height: size, objectFit: 'contain' }}
-    />
-  );
-}
 
 export default function GuideTour() {
   const { activeTour, stopTour, stepIndex: index, setStepIndex } = useGuide();
@@ -157,7 +142,13 @@ export default function GuideTour() {
         style={{ top: cardTop, left: cardLeft, width: cardW }}
       >
         <div className="flex items-start gap-3">
-          <GuiderMascot size={52} />
+          {/* Was `guider.png` at a hardcoded 52, with the registry lookup sitting
+              underneath as an error fallback — so the tour showed the pre-freeze art
+              and the approved `curious` face rendered only when the PNG failed. The
+              registry is the single source of truth for placement AND size; a
+              hardcoded number here is that decision quietly re-made somewhere
+              nobody would look again. */}
+          <BrainMascot {...mascotSlot('guideTour')} />
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
               <h3 className="font-black text-foreground text-base tracking-tight">{step.title}</h3>

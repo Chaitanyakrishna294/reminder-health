@@ -462,6 +462,13 @@ const hi: Messages = {
     readInEnglish: 'अंग्रेज़ी में पढ़ें',
     backToSignIn: 'साइन इन पर वापस जाएँ',
   },
+  mascot: {
+    welcome: 'रेमी, हाथ हिलाकर स्वागत करते हुए',
+    happy: 'रेमी, मुस्कुराते हुए',
+    proud: 'रेमी, आप पर प्रसन्न',
+    peaceful: 'रेमी, विश्राम करते हुए',
+    curious: 'रेमी, ध्यान से सुनते हुए',
+  },
 };
 
 export default hi;

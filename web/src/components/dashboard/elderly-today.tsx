@@ -40,6 +40,7 @@ import { getUnitIcon } from '@/components/dashboard/dashboard-helpers';
 import { useLanguage } from '@/context/language-context';
 import { format, formatTime, unitFor } from '@/lib/i18n/format';
 import BrainMascot from '@/components/dashboard/brain-mascot';
+import { mascotSlot } from '@/components/dashboard/mascot-slots';
 import { PremiumToast } from '@/components/ui/premium-toast';
 import type { ReminderEvent } from '@/components/dashboard/todays-schedule';
 
@@ -239,7 +240,7 @@ export default function ElderlyToday({
           <h1 className="text-4xl font-black text-foreground text-balance">{t.elderly.allDone}</h1>
           <p className="mt-2 text-xl font-bold text-muted-foreground">{t.elderly.nothingLeft}</p>
           <div className="mt-4 flex justify-center">
-            <BrainMascot size={144} mood="proud" />
+            <BrainMascot {...mascotSlot('celebration', true)} />
           </div>
         </section>
       ) : (
@@ -265,7 +266,7 @@ export default function ElderlyToday({
           )}
           <div className="mt-4 flex justify-center">
             {/* peaceful, not happy: this is a quiet moment, not an achievement. */}
-            <BrainMascot size={144} mood="peaceful" />
+            <BrainMascot {...mascotSlot('emptyState', true)} />
           </div>
         </section>
       )}
