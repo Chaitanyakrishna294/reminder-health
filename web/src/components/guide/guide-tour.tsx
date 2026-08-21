@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, X, Check } from 'lucide-react';
 import BrainMascot from '@/components/dashboard/brain-mascot';
 import { mascotSlot } from '@/components/dashboard/mascot-slots';
@@ -28,6 +28,23 @@ export default function GuideTour() {
   const [rect, setRect] = useState<DOMRect | null>(null);
   const [vw, setVw] = useState(0);
   const [vh, setVh] = useState(0);
+  /**
+   * THE BUBBLE'S REAL HEIGHT, MEASURED — never guessed.
+   *
+   * This used to be `const estCardH = 240`, a hardcoded number the placement math
+   * trusted completely. Real cards measure 203-271px at the default font, so the
+   * dashboard tour's "Today's schedule" step already hung 11px off the bottom of a
+   * 375x812 screen; at the system font's largest setting cards reach 472px and
+   * EVERY step hung off, by up to 212px. The Back/Next buttons live at the bottom
+   * of the card, so a card hanging off the bottom is a tour you cannot advance —
+   * only Esc or the small close cross gets you out.
+   *
+   * Same lesson the dose gate's fit search is built on: measure the rendered thing
+   * against the space it has. There is no threshold worth guessing here, because
+   * the height depends on the step's text, the font scale and the card's width.
+   */
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [cardH, setCardH] = useState(0);
 
   const step = steps ? steps[index] : null;
 
@@ -61,6 +78,29 @@ export default function GuideTour() {
     };
   }, [step]);
 
+  /**
+   * `measure()` runs IMMEDIATELY inside the effect as well as through the
+   * ResizeObserver, and that is deliberate rather than belt-and-braces: an effect
+   * body runs whenever React commits, but a ResizeObserver only delivers during
+   * the rendering steps, which a backgrounded or non-compositing webview pauses.
+   * The immediate call is what makes the card correct on a step change even then;
+   * the observer is what catches a system font-size change, which alters the
+   * height with no React state to depend on.
+   */
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    const measure = () => {
+      const h = el.getBoundingClientRect().height;
+      // Only commit real changes — sub-pixel churn would re-render forever.
+      setCardH((prev) => (Math.abs(prev - h) > 1 ? h : prev));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [step, activeTour, vw, vh]);
+
   useEffect(() => {
     if (!activeTour) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') stopTour(); };
@@ -79,19 +119,31 @@ export default function GuideTour() {
   const hasTarget = !!rect && rect.width > 4 && rect.height > 4 && rect.bottom > 0 && rect.top < vh;
 
   const cardW = Math.min(CARD_W, vw - 24);
-  const estCardH = 240;
+  const M = 12; // the margin the card keeps from every screen edge
+
+  // 240 only ever describes the FIRST frame, before the measurement lands. Every
+  // frame after that uses the real height.
+  const measuredH = cardH || 240;
+  // A card taller than the screen cannot be placed, only capped — see the style
+  // below, which lets it scroll internally so Back/Next stay reachable.
+  const maxCardH = Math.max(120, vh - M * 2);
+  const placedH = Math.min(measuredH, maxCardH);
 
   let cardTop: number;
   let cardLeft: number;
 
   if (hasTarget && rect) {
-    const below = rect.bottom + estCardH + 24 < vh;
-    cardTop = below ? rect.bottom + 16 : Math.max(12, rect.top - estCardH - 16);
-    cardLeft = Math.min(Math.max(12, rect.left + rect.width / 2 - cardW / 2), vw - 12 - cardW);
+    const fitsBelow = rect.bottom + 16 + placedH + M <= vh;
+    cardTop = fitsBelow ? rect.bottom + 16 : rect.top - placedH - 16;
+    cardLeft = Math.min(Math.max(M, rect.left + rect.width / 2 - cardW / 2), vw - M - cardW);
   } else {
-    cardTop = vh - estCardH - 24;
+    cardTop = vh - placedH - 24;
     cardLeft = (vw - cardW) / 2;
   }
+  // The last word, whatever the target did: neither edge may leave the viewport.
+  // Above-placement can still go negative for a target near the top, and a target
+  // near the bottom can push a tall card past it.
+  cardTop = Math.min(Math.max(M, cardTop), Math.max(M, vh - placedH - M));
 
   // Interactive tutorials (the Add Medication wizard, whose steps carry a wizardStep)
   // leave a live "hole" over the highlighted field so the user can actually use it;
@@ -139,7 +191,16 @@ export default function GuideTour() {
       {/* Step bubble — the guider mascot lives inside it. */}
       <div
         className="absolute card-lift card-lift-2 p-5 transition-all duration-300 animate-fade-in pointer-events-auto"
-        style={{ top: cardTop, left: cardLeft, width: cardW }}
+        ref={cardRef}
+        style={{
+          top: cardTop,
+          left: cardLeft,
+          width: cardW,
+          maxHeight: maxCardH,
+          // Only when the card genuinely cannot fit — an overflow container clips
+          // the card's own shadow, so it is not worth paying in the normal case.
+          overflowY: measuredH > maxCardH ? 'auto' : undefined,
+        }}
       >
         <div className="flex items-start gap-3">
           {/* Was `guider.png` at a hardcoded 52, with the registry lookup sitting

@@ -71,6 +71,22 @@ export interface MascotSlotSpec {
   readonly altKey: 'welcome' | 'happy' | 'proud' | 'peaceful' | 'curious' | null;
 }
 
+/**
+ * TWO SLOTS WERE DELETED HERE 2026-08-21, and the reason is worth keeping: they
+ * had ZERO call sites. A registry that advertises placements nothing renders is
+ * the same defect as a privilege footer describing an ACL the database does not
+ * have — it reads as authoritative and describes something that is not there.
+ *
+ *  - `careCircleMoment` (proud, 120/148) was never built. There is no
+ *    care-circle moment in the product for Remi to mark.
+ *  - `offline` (peaceful, 120/148) had no WEB caller because the offline page is
+ *    `android-app/.../assets/offline.html`, which HAND-INLINES the peaceful art
+ *    at 120. That is not an oversight to fix: the page renders when nothing can
+ *    be fetched, so it cannot import a component or load an asset. If a web
+ *    offline surface is ever built, add the slot back then.
+ *
+ * Add either back the day something actually calls it — not before.
+ */
 export const MASCOT_SLOTS = {
   /** First launch — the auth shell. The one place Remi greets a stranger. */
   welcome: { expression: 'waving', size: 42, elderlySize: 56, altKey: 'welcome' },
@@ -78,12 +94,8 @@ export const MASCOT_SLOTS = {
   exitDialog: { expression: 'happy', size: 56, elderlySize: 64, altKey: 'happy' },
   /** Every dose answered. The one celebration in the product. */
   celebration: { expression: 'proud', size: 120, elderlySize: 148, altKey: 'proud' },
-  /** A care-circle moment worth marking — same face, same weight as a celebration. */
-  careCircleMoment: { expression: 'proud', size: 120, elderlySize: 148, altKey: 'proud' },
   /** An empty day on the rail, or an empty notifications list. Remi is the content. */
   emptyState: { expression: 'peaceful', size: 144, elderlySize: 176, altKey: 'peaceful' },
-  /** Offline reassurance — one of elderly's three permitted moments. */
-  offline: { expression: 'peaceful', size: 120, elderlySize: 148, altKey: 'peaceful' },
   /** The guided tour's bubble. */
   guideTour: { expression: 'curious', size: 64, elderlySize: 80, altKey: 'curious' },
 } as const satisfies Record<string, MascotSlotSpec>;
